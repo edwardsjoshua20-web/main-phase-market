@@ -1,0 +1,163 @@
+{
+  "name": "Product",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Product name"
+    },
+    "product_type": {
+      "type": "string",
+      "enum": [
+        "single_card",
+        "booster_box",
+        "starter_deck",
+        "bundle",
+        "dice",
+        "playmat",
+        "accessories",
+        "sealed_product",
+        "merch_shirt",
+        "merch_hat",
+        "merch_other",
+        "plushie",
+        "model_kit",
+        "other"
+      ],
+      "description": "Type of product"
+    },
+    "game": {
+      "type": "string",
+      "enum": [
+        "magic",
+        "pokemon",
+        "yugioh",
+        "other"
+      ],
+      "description": "Trading card game or general"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "commander",
+        "standard",
+        "modern",
+        "pioneer",
+        "legacy",
+        "vintage",
+        "general"
+      ],
+      "default": "general",
+      "description": "Format or category"
+    },
+    "set_name": {
+      "type": "string",
+      "description": "Set or expansion name"
+    },
+    "card_number": {
+      "type": "string",
+      "description": "Card number in set (for singles)"
+    },
+    "rarity": {
+      "type": "string",
+      "enum": [
+        "common",
+        "uncommon",
+        "rare",
+        "holo_rare",
+        "ultra_rare",
+        "secret_rare",
+        "mythic_rare"
+      ],
+      "description": "Card rarity (for singles)"
+    },
+    "condition": {
+      "type": "string",
+      "enum": [
+        "mint",
+        "near_mint",
+        "excellent",
+        "good",
+        "light_played",
+        "played",
+        "poor",
+        "sealed"
+      ],
+      "default": "near_mint",
+      "description": "Product condition"
+    },
+    "price": {
+      "type": "number",
+      "description": "Selling price"
+    },
+    "cost": {
+      "type": "number",
+      "description": "Your cost (for profit tracking)"
+    },
+    "quantity": {
+      "type": "integer",
+      "default": 1,
+      "description": "Stock quantity"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "Product image URL"
+    },
+    "hero_image_url": {
+      "type": "string",
+      "description": "Dedicated homepage hero banner image URL"
+    },
+    "promo_image_url": {
+      "type": "string",
+      "description": "Promotional image URL for release marketing"
+    },
+    "set_image_url": {
+      "type": "string",
+      "description": "Set-level or release image URL"
+    },
+    "description": {
+      "type": "string",
+      "description": "Additional details"
+    },
+    "sku": {
+      "type": "string",
+      "description": "Unique SKU"
+    },
+    "featured": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_new_release": {
+      "type": "boolean",
+      "default": false,
+      "description": "Mark as new release"
+    },
+    "is_preorder": {
+      "type": "boolean",
+      "default": false,
+      "description": "Available for preorder"
+    },
+    "release_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Release date for preorders"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "sold_out",
+        "archived",
+        "preorder"
+      ],
+      "default": "active"
+    }
+  },
+  "required": [
+    "name",
+    "product_type",
+    "game",
+    "price",
+    "quantity"
+  ]
+}

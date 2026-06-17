@@ -1,0 +1,146 @@
+{
+  "name": "MagicCardV2",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Card name"
+    },
+    "name_lower": {
+      "type": "string",
+      "description": "Lowercase card name for exact matching"
+    },
+    "scryfall_id": {
+      "type": "string",
+      "description": "Scryfall card ID for this printing"
+    },
+    "oracle_id": {
+      "type": "string",
+      "description": "Scryfall oracle ID shared across printings"
+    },
+    "type_line": {
+      "type": "string",
+      "description": "Full type line"
+    },
+    "mana_cost": {
+      "type": "string",
+      "description": "Mana cost string"
+    },
+    "cmc": {
+      "type": "number",
+      "description": "Converted mana cost"
+    },
+    "colors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Card colors"
+    },
+    "color_identity": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Commander color identity"
+    },
+    "oracle_text": {
+      "type": "string",
+      "description": "Rules text"
+    },
+    "power": {
+      "type": "string",
+      "description": "Power for creatures"
+    },
+    "toughness": {
+      "type": "string",
+      "description": "Toughness for creatures"
+    },
+    "loyalty": {
+      "type": "string",
+      "description": "Loyalty for planeswalkers"
+    },
+    "keywords": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Keyword abilities"
+    },
+    "set": {
+      "type": "string",
+      "description": "Scryfall set code"
+    },
+    "set_name": {
+      "type": "string",
+      "description": "Full set name"
+    },
+    "collector_number": {
+      "type": "string",
+      "description": "Collector number"
+    },
+    "rarity": {
+      "type": "string",
+      "description": "Card rarity"
+    },
+    "released_at": {
+      "type": "string",
+      "format": "date",
+      "description": "Release date"
+    },
+    "image_small": {
+      "type": "string",
+      "description": "Small card image URL"
+    },
+    "image_normal": {
+      "type": "string",
+      "description": "Normal card image URL"
+    },
+    "image_large": {
+      "type": "string",
+      "description": "Large card image URL"
+    },
+    "image_art_crop": {
+      "type": "string",
+      "description": "Art crop image URL"
+    },
+    "edhrec_rank": {
+      "type": "number",
+      "description": "EDHREC rank"
+    },
+    "legal_commander": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether legal in Commander"
+    },
+    "can_be_commander": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the card can be used as a commander"
+    }
+  },
+  "required": [
+    "name",
+    "name_lower",
+    "scryfall_id",
+    "oracle_id",
+    "type_line",
+    "mana_cost",
+    "cmc",
+    "colors",
+    "color_identity",
+    "oracle_text",
+    "keywords",
+    "set",
+    "set_name",
+    "collector_number",
+    "rarity",
+    "released_at",
+    "image_small",
+    "image_normal",
+    "image_large",
+    "image_art_crop",
+    "legal_commander",
+    "can_be_commander"
+  ]
+}

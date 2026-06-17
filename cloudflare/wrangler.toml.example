@@ -1,0 +1,7 @@
+name = "main-phase-market"
+compatibility_date = "2026-04-17"
+
+[vars]
+PUBLIC_APP_URL = ""
+API_ORIGIN = ""
+ASSET_CDN_BASE = ""

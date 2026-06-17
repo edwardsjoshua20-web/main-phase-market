@@ -1,0 +1,49 @@
+#env
+.env
+.env.*
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+cf-dist
+cf-dist-final
+cf-dist-upload
+*.zip
+.codex-temp
+tmp
+CON
+Data Exports
+Pokemon Symbols
+base44/
+
+# Local/generated catalog and database files are deployed through Supabase
+# storage or local tooling, not committed to GitHub/Cloudflare Pages.
+server/data/
+public/data/
+public/data/**/images/
+public/data/**/search/
+public/data/mtg/source/
+supabase/.temp/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.env

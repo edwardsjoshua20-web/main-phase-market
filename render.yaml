@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: main-phase-market-api
+    runtime: node
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm run dev:backend
+    plan: starter
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: VITE_APP_BACKEND_PROVIDER
+        value: local
+      - key: ALLOW_REMOTE_CONNECTIONS
+        value: "true"
+      - key: ALLOWED_ORIGIN_HOSTS
+        sync: false
+      - key: PUBLIC_APP_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_PUBLIC_BUCKET
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: USPS_CONSUMER_KEY
+        sync: false
+      - key: USPS_CONSUMER_SECRET
+        sync: false
