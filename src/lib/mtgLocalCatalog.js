@@ -89,16 +89,28 @@ async function loadBucket(bucket) {
 
   const promise = loadManifest().then(async (manifest) => {
     const bucketInfo = manifest.buckets?.[bucket];
-    if (!bucketInfo?.file) {
+    const bucketFiles = Array.isArray(bucketInfo?.files) && bucketInfo.files.length > 0
+      ? bucketInfo.files
+      : bucketInfo?.file
+        ? [bucketInfo.file]
+        : [];
+
+    if (bucketFiles.length === 0) {
       return [];
     }
 
-    const response = await fetch(getCatalogAssetUrl('mtg', bucketInfo.file));
-    if (!response.ok) {
-      throw new Error(`Failed to load MTG bucket ${bucket}: ${response.status}`);
-    }
+    const bucketRows = await Promise.all(
+      bucketFiles.map(async (bucketFile) => {
+        const response = await fetch(getCatalogAssetUrl('mtg', bucketFile));
+        if (!response.ok) {
+          throw new Error(`Failed to load MTG bucket ${bucket}: ${response.status}`);
+        }
 
-    return response.json();
+        return response.json();
+      })
+    );
+
+    return bucketRows.flat();
   });
 
   bucketCache.set(bucket, promise);

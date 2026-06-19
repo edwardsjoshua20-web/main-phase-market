@@ -70,7 +70,7 @@ function contentTypeFor(filePath) {
 }
 
 function shouldSkipFile(relativePath) {
-  return relativePath.includes('/images/') || relativePath.includes('/mtg/search/');
+  return relativePath.includes('/images/');
 }
 
 function toObjectKey(relativePath) {
@@ -80,8 +80,9 @@ function toObjectKey(relativePath) {
     .join('/');
 }
 
-function collectFiles(rootDir) {
+function collectFiles(rootDir, uploadPrefix = '') {
   const files = [];
+  const normalizedUploadPrefix = String(uploadPrefix || '').trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
 
   function walk(currentDir) {
     for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
@@ -94,6 +95,10 @@ function collectFiles(rootDir) {
 
       const relativePath = path.relative(PUBLIC_ROOT, fullPath).split(path.sep).join('/');
       if (shouldSkipFile(relativePath)) {
+        continue;
+      }
+
+      if (normalizedUploadPrefix && relativePath !== normalizedUploadPrefix && !relativePath.startsWith(`${normalizedUploadPrefix}/`)) {
         continue;
       }
 
@@ -132,6 +137,7 @@ async function uploadFile({ file, storageBaseUrl, serviceRoleKey }) {
 
 async function main() {
   const env = readEnvFile(ENV_PATH);
+  const uploadPrefix = process.argv[2] || '';
   const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || '';
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
   const bucketName = env.SUPABASE_PUBLIC_BUCKET || 'main-phase-market-public';
@@ -148,11 +154,14 @@ async function main() {
     throw new Error(`Missing data directory: ${DATA_ROOT}`);
   }
 
-  const files = collectFiles(DATA_ROOT);
+  const files = collectFiles(DATA_ROOT, uploadPrefix);
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
   const storageBaseUrl = toStorageBaseUrl(supabaseUrl, bucketName);
 
   console.log(`Uploading ${files.length} files to bucket "${bucketName}"...`);
+  if (uploadPrefix) {
+    console.log(`Prefix: ${uploadPrefix}`);
+  }
   console.log(`Total bytes: ${totalBytes}`);
 
   let uploaded = 0;
