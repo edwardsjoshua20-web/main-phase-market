@@ -6,6 +6,7 @@ import NavigationTracker from '@/lib/NavigationTracker'
 import { useState, useEffect } from 'react';
 import OrderStatus from './pages/OrderStatus';
 import MemberBenefits from './pages/MemberBenefits';
+import MemberLogin from './pages/MemberLogin';
 import CollectionTracker from './pages/CollectionTracker';
 import PriceAlerts from './pages/PriceAlerts';
 import CardComparison from './pages/CardComparison';
@@ -69,6 +70,7 @@ const AuthenticatedApp = () => {
       <Routes>
         <Route path="/" element={<MobileHome />} />
         <Route path="/MobileHome" element={<MobileHome />} />
+        <Route path="/MemberLogin" element={<MemberLogin />} />
         <Route path="/MobileShop" element={<MobileShop />} />
         <Route path="/MobileDeckBuilder" element={<MobileDeckBuilder />} />
         <Route path="/MobileBrowse" element={<MobileBrowse />} />
@@ -104,6 +106,7 @@ const AuthenticatedApp = () => {
         />
       ))}
       <Route path="/OrderStatus" element={<LayoutWrapper currentPageName="OrderStatus"><OrderStatus /></LayoutWrapper>} />
+      <Route path="/MemberLogin" element={<MemberLogin />} />
       <Route path="/MemberBenefits" element={<LayoutWrapper currentPageName="MemberBenefits"><MemberBenefits /></LayoutWrapper>} />
       <Route path="/CommunityDecks" element={<LayoutWrapper currentPageName="CommunityDecks"><CommunityDecks /></LayoutWrapper>} />
       <Route path="/CommanderHub" element={<LayoutWrapper currentPageName="CommanderHub"><CommanderHub /></LayoutWrapper>} />
