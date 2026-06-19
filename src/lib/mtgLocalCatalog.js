@@ -53,6 +53,32 @@ function getCanonicalNormalizedName(row) {
   return normalizeText(canonicalName) || row.name_normalized || '';
 }
 
+function resolveMtgAssetUrl(value) {
+  const rawValue = String(value || '').trim();
+  if (!rawValue) return null;
+  if (/^https?:\/\//i.test(rawValue)) return rawValue;
+
+  const normalizedValue = rawValue.replace(/^\/+/, '');
+  if (normalizedValue.startsWith('data/mtg/')) {
+    return getCatalogAssetUrl('mtg', normalizedValue.slice('data/mtg/'.length));
+  }
+  if (normalizedValue.startsWith('mtg/')) {
+    return getCatalogAssetUrl('mtg', normalizedValue.slice('mtg/'.length));
+  }
+
+  return rawValue.startsWith('/') ? rawValue : `/${normalizedValue}`;
+}
+
+function getBestMtgImage(row) {
+  return (
+    resolveMtgAssetUrl(row?.image_normal) ||
+    resolveMtgAssetUrl(row?.image_png) ||
+    resolveMtgAssetUrl(row?.image_art_crop) ||
+    resolveMtgAssetUrl(row?.image_small) ||
+    null
+  );
+}
+
 function bucketForQuery(query) {
   const normalized = normalizeText(query);
   const first = normalized[0];
@@ -433,7 +459,7 @@ function buildEnglishImageIndexes(rows) {
 
   for (const row of rows) {
     if (!isEnglish(row) || !row.oracle_id) continue;
-    const imageUrl = row.image_normal || row.image_small || null;
+    const imageUrl = getBestMtgImage(row);
     if (!imageUrl) continue;
 
     const setKey = `${row.oracle_id}::${row.set_code || ''}`;
@@ -456,7 +482,7 @@ function getEnglishFallbackImage(row, indexes) {
 }
 
 function hasDisplayableImage(row, indexes = null) {
-  const directImageUrl = row?.image_normal || row?.image_small || null;
+  const directImageUrl = getBestMtgImage(row);
   if (directImageUrl) return true;
   return Boolean(!isEnglish(row) ? getEnglishFallbackImage(row, indexes) : null);
 }
@@ -536,7 +562,7 @@ function mergePrintingCollections(primaryRows = [], fallbackRows = []) {
 }
 
 function formatResult(row, englishImageIndexes = null) {
-  const directImageUrl = row.image_normal || row.image_small || null;
+  const directImageUrl = getBestMtgImage(row);
   const englishFallbackImage = !isEnglish(row) ? getEnglishFallbackImage(row, englishImageIndexes) : null;
   const displayImageUrl = directImageUrl || englishFallbackImage;
   const canonicalName = getCanonicalName(row);
@@ -554,8 +580,8 @@ function formatResult(row, englishImageIndexes = null) {
     image_url: displayImageUrl,
     raw_image_url: directImageUrl,
     english_image_url: englishFallbackImage,
-    image_small: row.image_small || row.image_normal || null,
-    image_art_crop: row.image_art_crop || null,
+    image_small: resolveMtgAssetUrl(row.image_small) || directImageUrl,
+    image_art_crop: resolveMtgAssetUrl(row.image_art_crop),
     highres_image: Boolean(row.highres_image),
     has_localized_image: Boolean(directImageUrl),
     price: row.prices?.usd ? Number.parseFloat(row.prices.usd) : null,

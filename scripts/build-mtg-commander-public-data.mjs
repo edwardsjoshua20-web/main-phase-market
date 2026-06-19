@@ -5,6 +5,7 @@ const PROJECT_ROOT = process.cwd();
 const SEARCH_SHARDS_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'search-shards');
 const SEARCH_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'search');
 const OUTPUT_PATH = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commanders.json');
+const HOSTED_PUBLIC_DATA_BASE_URL = 'https://wwvvyrhlybwijqlhubdv.supabase.co/storage/v1/object/public/main-phase-market-public/data';
 
 function normalizeText(value) {
   return String(value || '')
@@ -36,12 +37,27 @@ function isExternalUrl(value) {
   return /^https?:\/\//i.test(String(value || ''));
 }
 
+function resolveImageUrl(value) {
+  const rawValue = String(value || '').trim();
+  if (!rawValue) return null;
+  if (isExternalUrl(rawValue)) return rawValue;
+
+  const normalizedValue = rawValue.replace(/^\/+/, '');
+  if (normalizedValue.startsWith('data/')) {
+    return `${HOSTED_PUBLIC_DATA_BASE_URL}/${normalizedValue.slice('data/'.length)}`;
+  }
+
+  return rawValue;
+}
+
 function getImageUrl(row) {
-  if (isExternalUrl(row.image_small)) return row.image_small;
-  if (isExternalUrl(row.image_normal)) return row.image_normal;
-  if (isExternalUrl(row.image_png)) return row.image_png;
-  if (isExternalUrl(row.image_art_crop)) return row.image_art_crop;
-  return row.image_small || row.image_normal || row.image_png || row.image_art_crop || null;
+  return (
+    resolveImageUrl(row.image_normal) ||
+    resolveImageUrl(row.image_png) ||
+    resolveImageUrl(row.image_art_crop) ||
+    resolveImageUrl(row.image_small) ||
+    null
+  );
 }
 
 function isCommander(row) {

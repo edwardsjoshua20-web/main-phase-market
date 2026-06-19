@@ -3,9 +3,9 @@ import { backend } from '@/services/backend';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, ShoppingCart, Mail } from 'lucide-react';
+import { Heart, ShoppingCart } from 'lucide-react';
 
-export default function SearchResultCard({ result, user, onQuickView, onContactRequest, onHoverImage }) {
+export default function SearchResultCard({ result, user, onQuickView, onHoverImage }) {
   const [popupOpen, setPopupOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
@@ -140,9 +140,9 @@ export default function SearchResultCard({ result, user, onQuickView, onContactR
           ) : (
             <>
               <Badge variant="secondary" className="bg-red-100 text-red-700 text-xs w-fit">Out of Stock</Badge>
-              <Button variant="outline" size="sm" onClick={() => onContactRequest(result)} className="w-full text-xs h-8">
-                <Mail className="w-3 h-3 mr-1" /> Request
-              </Button>
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-center text-xs font-semibold text-slate-600">
+                Not in stock
+              </div>
             </>
           )}
         </div>

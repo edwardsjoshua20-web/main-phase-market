@@ -5,9 +5,7 @@ import { ChevronLeft, Globe, Layers, ScrollText, ShoppingCart, ShieldAlert, Shie
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { createPageUrl } from '@/utils';
 import { backend } from '@/services/backend';
@@ -120,6 +118,14 @@ function PokemonCostSymbols({ costs = [] }) {
   );
 }
 
+function OutOfStockNotice() {
+  return (
+    <div className="mt-4 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm font-semibold text-slate-600">
+      Not in stock
+    </div>
+  );
+}
+
 function normalizeMatchValue(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -165,9 +171,6 @@ export default function CardDetail() {
   const [selectedSetCode, setSelectedSetCode] = useState(initialSetCode);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [pokemonImageLoaded, setPokemonImageLoaded] = useState(false);
-  const [requestOpen, setRequestOpen] = useState(false);
-  const [requestEmail, setRequestEmail] = useState('');
-  const [sendingRequest, setSendingRequest] = useState(false);
   const [user, setUser] = useState(null);
   const [isCompactLayout, setIsCompactLayout] = useState(() => window.innerWidth < 768);
   const queryClient = useQueryClient();
@@ -262,37 +265,6 @@ export default function CardDetail() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  const isValidEmail = (value) => Boolean(value && value.includes('@'));
-
-  const handleSendRequest = async () => {
-    if (!requestItem) return;
-    if (!isValidEmail(requestEmail)) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
-
-    setSendingRequest(true);
-    try {
-      await backend.actions.invoke('sendProductRequest', {
-        productName: requestItem.name,
-        setName: requestItem.set_name,
-        cardNumber: requestItem.card_number,
-        rarity: requestItem.rarity,
-        requestType: 'card',
-        customerEmail: requestEmail
-      });
-
-      toast.success(`Request sent. We will notify you at ${requestEmail} if this card becomes available.`);
-      setRequestOpen(false);
-      setRequestEmail('');
-    } catch (error) {
-      const message = error?.response?.data?.error || error?.message || 'Failed to send request';
-      toast.error(message);
-    } finally {
-      setSendingRequest(false);
-    }
-  };
 
   const printingGroups = useMemo(() => {
     if (!isMtgCatalogMode) return [];
@@ -502,16 +474,7 @@ export default function CardDetail() {
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
               )}
-              {!canAddToCart && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full mt-4"
-                  onClick={() => setRequestOpen(true)}
-                >
-                  Request This Card
-                </Button>
-              )}
+              {!canAddToCart && <OutOfStockNotice />}
             </div>
 
             <div className="space-y-6">
@@ -742,16 +705,7 @@ export default function CardDetail() {
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
               )}
-              {!canAddToCart && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full mt-4"
-                  onClick={() => setRequestOpen(true)}
-                >
-                  Request This Card
-                </Button>
-              )}
+              {!canAddToCart && <OutOfStockNotice />}
             </div>
 
             <div className="space-y-6">
@@ -917,16 +871,7 @@ export default function CardDetail() {
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
               )}
-              {!canAddToCart && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full mt-4"
-                  onClick={() => setRequestOpen(true)}
-                >
-                  Request This Card
-                </Button>
-              )}
+              {!canAddToCart && <OutOfStockNotice />}
             </div>
 
             <div className="space-y-6">
@@ -1075,16 +1020,7 @@ export default function CardDetail() {
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
               )}
-              {!canAddToCart && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full mt-4"
-                  onClick={() => setRequestOpen(true)}
-                >
-                  Request This Card
-                </Button>
-              )}
+              {!canAddToCart && <OutOfStockNotice />}
             </div>
 
             <div className="space-y-6">
@@ -1212,16 +1148,7 @@ export default function CardDetail() {
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
               )}
-              {!canAddToCart && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full mt-4"
-                  onClick={() => setRequestOpen(true)}
-                >
-                  Request This Card
-                </Button>
-              )}
+              {!canAddToCart && <OutOfStockNotice />}
             </div>
 
             <div className="space-y-6">
@@ -1408,16 +1335,7 @@ export default function CardDetail() {
                 ) : (
                   <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
                 )}
-                {!canAddToCart && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full mt-4"
-                    onClick={() => setRequestOpen(true)}
-                  >
-                    Request This Card
-                  </Button>
-                )}
+                {!canAddToCart && <OutOfStockNotice />}
               </div>
 
               {starWarsCard.image_back_url && (
@@ -1676,16 +1594,7 @@ export default function CardDetail() {
             ) : (
               <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
             )}
-            {!canAddToCart && (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full mt-4"
-                onClick={() => setRequestOpen(true)}
-              >
-                Request This Card
-              </Button>
-            )}
+            {!canAddToCart && <OutOfStockNotice />}
           </div>
 
           <div className="space-y-6">
@@ -1834,57 +1743,6 @@ export default function CardDetail() {
           </div>
         </div>
       </div>
-      <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
-        <DialogContent className="bg-white">
-          <DialogHeader>
-            <DialogTitle>Request Card</DialogTitle>
-            <DialogDescription>
-              Enter your email and we will notify you when this card is available.
-            </DialogDescription>
-          </DialogHeader>
-          {requestItem && (
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                {requestItem.image_url && (
-                  <img
-                    src={requestItem.image_url}
-                    alt={requestItem.name}
-                    className="w-28 h-auto rounded shadow-sm"
-                  />
-                )}
-                <div>
-                  <h4 className="font-semibold text-gray-900">{requestItem.name}</h4>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {requestItem.set_name}
-                    {requestItem.card_number ? ` • #${requestItem.card_number}` : ''}
-                  </p>
-                  {requestItem.rarity && <p className="text-xs text-gray-500 mt-1">{requestItem.rarity}</p>}
-                </div>
-              </div>
-              <div>
-                <label htmlFor="detail-request-email" className="text-sm font-medium text-gray-700 mb-2 block">
-                  Your Email Address
-                </label>
-                <Input
-                  id="detail-request-email"
-                  type="email"
-                  placeholder="your.email@example.com"
-                  value={requestEmail}
-                  onChange={(event) => setRequestEmail(event.target.value)}
-                />
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setRequestOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSendRequest} disabled={sendingRequest} className="bg-blue-600 hover:bg-blue-700">
-                  {sendingRequest ? 'Sending...' : 'Send Request'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

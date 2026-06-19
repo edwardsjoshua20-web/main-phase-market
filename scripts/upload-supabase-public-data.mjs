@@ -70,6 +70,12 @@ function contentTypeFor(filePath) {
 }
 
 function shouldSkipFile(relativePath) {
+  // Legacy MTG bucket files are too large for Supabase's single-object upload limit.
+  // The app uses manifest bucket shards instead: data/mtg/search-shards/*.json.
+  if (/^data\/mtg\/search\/.+\.json$/i.test(relativePath)) {
+    return true;
+  }
+
   return relativePath.includes('/images/');
 }
 

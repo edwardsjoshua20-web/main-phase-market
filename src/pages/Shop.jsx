@@ -148,8 +148,6 @@ export default function Shop() {
   const [showCardResults, setShowCardResults] = useState(false);
   const [advancedSearchMeta, setAdvancedSearchMeta] = useState({ total: 0, page: 0, limit: 36, hasMore: false });
   const [advancedSearchCollapsed, setAdvancedSearchCollapsed] = useState(false);
-  const [selectedCardForContact, setSelectedCardForContact] = useState(null);
-  const [customerEmail, setCustomerEmail] = useState('');
   const [hoveredCardImage, setHoveredCardImage] = useState(null);
   const [singlesSearchDraft, setSinglesSearchDraft] = useState(filters.search || '');
 
@@ -234,7 +232,7 @@ export default function Shop() {
     scheduleHoverState(hoveredCardTimerRef, setHoveredCard, null, HOVER_CLOSE_DELAY_MS);
   };
 
-  const getResultGridImageUrl = (item) => item?.image_small || item?.image_url || item?.english_image_url || null;
+  const getResultGridImageUrl = (item) => item?.image_url || item?.english_image_url || item?.image_small || null;
   const getResultPreviewImageUrl = (item) => item?.image_url || item?.english_image_url || item?.image_small || null;
 
   const handleCardImagePreviewEnter = (imageUrl) => {
@@ -557,11 +555,6 @@ export default function Shop() {
     await triggerSearch(query, game);
   };
 
-  const handleContactRequest = (card) => {
-    setSelectedCardForContact(card);
-    setCustomerEmail('');
-  };
-
   const submitAvailabilityRequest = async ({
     item,
     customerEmail: email,
@@ -618,22 +611,6 @@ export default function Shop() {
       console.error('Error details:', error.response?.data || error.message);
       toast.error('Failed to send request: ' + (error.response?.data?.error || error.message));
     }
-  };
-
-  const handleSendContactRequest = async () => {
-    await submitAvailabilityRequest({
-      item: selectedCardForContact,
-      customerEmail,
-      requestType: 'card',
-      setName: selectedCardForContact?.set_name,
-      cardNumber: selectedCardForContact?.card_number,
-      rarity: selectedCardForContact?.rarity,
-      wishlistProductType: 'card',
-      onComplete: () => {
-        setSelectedCardForContact(null);
-        setCustomerEmail('');
-      }
-    });
   };
 
   const searchBoosterBoxes = async (query) => {
@@ -1165,6 +1142,48 @@ export default function Shop() {
             </div>
           </div>
         </div>
+
+        {filters.type === 'single_card' && !advancedSearchOpen &&
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitSinglesSearch();
+          }}
+          className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                <Input
+                value={singlesSearchDraft}
+                onChange={(event) => setSinglesSearchDraft(event.target.value)}
+                placeholder="Search singles by card name..."
+                className="h-12 pl-11 text-base" />
+              </div>
+              <Button type="submit" className="h-12 bg-slate-950 px-6 text-white hover:bg-slate-800">
+                Search Singles
+              </Button>
+              <Button
+              type="button"
+              variant="outline"
+              className="h-12 border-slate-300 px-6"
+              onClick={() => {
+                setSearchParams({
+                  ...buildFilterParams({
+                    ...filters,
+                    type: 'single_card',
+                    game: filters.game === 'all' ? 'magic' : filters.game,
+                    search: '',
+                    set: 'all',
+                    rarity: 'all'
+                  }),
+                  advancedSearch: '1'
+                });
+              }}>
+                Advanced Search
+              </Button>
+            </div>
+          </form>
+        }
 
         {/* Advanced Search Panel */}
         {filters.type === 'single_card' && advancedSearchOpen &&
@@ -2033,7 +2052,7 @@ export default function Shop() {
                     'No products currently in stock'}
                   </p>
                   <p className="text-sm text-gray-400 mt-1">
-                    {filters.type === 'single_card' ? 'Use the search above to request specific cards' :
+                    {filters.type === 'single_card' ? 'Use the search above to find specific cards' :
                     filters.type === 'starter_deck' ? 'Use the custom deck section above while we build out the live shelf.' :
                     filters.type === 'dice' ? 'Use this lane as the future home for mats, sleeves, dice, and table gear.' :
                     'Check back soon for new inventory!'}
@@ -2044,62 +2063,6 @@ export default function Shop() {
           </div>
         }
       </div>
-
-      {/* Contact Request Dialog - Cards */}
-      <Dialog open={!!selectedCardForContact} onOpenChange={() => setSelectedCardForContact(null)}>
-        <DialogContent className="bg-white">
-          <DialogHeader>
-            <DialogTitle>Request Card</DialogTitle>
-            <DialogDescription>
-              Enter your email and we'll notify you when this card is available.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedCardForContact &&
-          <div className="space-y-4">
-              <div className="flex gap-4">
-                {selectedCardForContact.image_url &&
-              <img
-                src={selectedCardForContact.image_url}
-                alt={selectedCardForContact.name}
-                className="w-32 h-auto rounded shadow" />
-
-              }
-                <div>
-                  <h4 className="font-semibold text-gray-900">{selectedCardForContact.name}</h4>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {selectedCardForContact.set_name} • #{selectedCardForContact.card_number}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1 capitalize">
-                    {selectedCardForContact.rarity}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="card-request-email" className="text-sm font-medium text-gray-700 mb-2 block">
-                  Your Email Address
-                </label>
-                <Input
-                id="card-request-email"
-                name="card-request-email"
-                type="email"
-                placeholder="your.email@example.com"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                className="w-full" />
-
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setSelectedCardForContact(null)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSendContactRequest} className="bg-blue-600 hover:bg-blue-700">
-                  Send Request
-                </Button>
-              </div>
-            </div>
-          }
-        </DialogContent>
-      </Dialog>
 
       {/* Contact Request Dialog - Booster Boxes */}
       <Dialog open={!!selectedBoxForContact} onOpenChange={() => setSelectedBoxForContact(null)}>
