@@ -1120,8 +1120,8 @@ export default function Shop() {
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Main Phase Market Shop</p>
               <div>
-                <h1 className="text-3xl font-black tracking-tight text-slate-950">Singles first. Sealed when you want it.</h1>
-                <p className="mt-1 text-sm text-slate-600">Search cards fast, then browse sealed product without the extra clutter.</p>
+                <h1 className="text-3xl font-black tracking-tight text-slate-950">Shop singles, sealed, and table gear.</h1>
+                <p className="mt-1 text-sm text-slate-600">Use the top search for exact cards, or pick a lane below.</p>
               </div>
             </div>
 
@@ -1225,68 +1225,21 @@ export default function Shop() {
           </div>
         }
 
-        {filters.type === 'single_card' && !advancedSearchOpen && !showCardResults &&
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl">
-                <h2 className="text-xl font-bold text-slate-950">Search singles fast</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Look up exact cards, jump between games, or open advanced search when you want to get surgical.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-500">
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">Exact card names</span>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">Set-aware results</span>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">Inventory matched</span>
-              </div>
-            </div>
-
-            <div className="mt-5 flex flex-col gap-3 lg:flex-row">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                <Input
-                  value={singlesSearchDraft}
-                  onChange={(e) => setSinglesSearchDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      submitSinglesSearch();
-                    }
-                  }}
-                  placeholder="Search for a card by name..."
-                  className="h-12 rounded-xl border-slate-300 pl-12 text-base"
-                />
-              </div>
-              <Button type="button" onClick={submitSinglesSearch} className="h-12 rounded-xl bg-slate-950 px-6 text-white hover:bg-slate-800">
-                Search Singles
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => updateFilters({ ...filters, type: 'single_card', game: filters.game === 'all' ? 'magic' : filters.game, search: '', set: 'all', rarity: 'all' })}
-                className="h-12 rounded-xl border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-              >
-                Browse In-Stock Cards
-              </Button>
-            </div>
-          </div>
-        }
-
         {filters.type === 'starter_deck' &&
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="grid gap-5 lg:grid-cols-[1.25fr_0.9fr]">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Starter Decks</p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">Precons to start fast. Built decks when you want something sharper.</h2>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">Starter and prebuilt decks.</h2>
                 <p className="mt-2 max-w-2xl text-sm text-slate-600">
-                  We can stock sealed starter decks, or build tuned custom lists for players who want a ready-to-play deck shipped out cleanly.
+                  This section will show real starter deck inventory as it is added.
                 </p>
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {[
-                    ['Commander Precons', 'Popular out-of-box Commander builds with upgrade paths.'],
-                    ['Pokemon Battle Decks', 'Battle-ready picks for learning fast and upgrading later.'],
-                    ['Lorcana Starter Decks', 'Easy entry points for casual tables and league nights.'],
-                    ['Custom Built Decks', 'Tell us your budget and strategy. We build and ship the list.']
+                    ['Commander Precons', 'Out-of-box Commander decks when stocked.'],
+                    ['Pokemon Battle Decks', 'Battle-ready Pokemon decks when stocked.'],
+                    ['Lorcana Starter Decks', 'Lorcana starters when stocked.'],
+                    ['Custom Built Decks', 'Built-to-order decks can return after launch.']
                   ].map(([title, copy]) => (
                     <div key={title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                       <h3 className="font-semibold text-slate-900">{title}</h3>
@@ -1300,19 +1253,8 @@ export default function Shop() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-700">Built For You</p>
                 <h3 className="mt-2 text-xl font-bold text-slate-950">Want a deck built and shipped?</h3>
                 <p className="mt-2 text-sm text-slate-700">
-                  Tell us the format, budget, and what you want the deck to do. We can build the list, source the cards, and ship a ready-to-play package.
+                  Custom deck requests are hidden for launch until the live order flow is ready.
                 </p>
-                <div className="mt-4 space-y-2 text-sm text-slate-700">
-                  <p>1. Pick your game and budget.</p>
-                  <p>2. Tell us the strategy or commander.</p>
-                  <p>3. We build the list and source what is available.</p>
-                </div>
-                <div className="mt-5 rounded-xl border border-amber-300 bg-white/80 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Contact</p>
-                  <p className="mt-2 text-sm text-slate-700">
-                    Email <a href="mailto:support@mainphasemarket.com?subject=Deck%20Build%20Request" className="font-semibold text-slate-950 underline underline-offset-4">support@mainphasemarket.com</a> with your game, budget, and what you want the deck to do.
-                  </p>
-                </div>
               </div>
             </div>
           </div>
@@ -1325,7 +1267,7 @@ export default function Shop() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Accessories</p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">Mats, sleeves, dice, and table gear.</h2>
                 <p className="mt-2 max-w-2xl text-sm text-slate-600">
-                  Accessories should feel like easy add-ons, not a separate maze. This lane can support direct inventory later while still showing customers what we source now.
+                  Accessories will become clickable once live inventory is connected.
                 </p>
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {[
@@ -1344,9 +1286,7 @@ export default function Shop() {
               <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-700">Easy Upsells</p>
                 <h3 className="mt-2 text-xl font-bold text-slate-950">This is where basket-building happens.</h3>
-                <p className="mt-2 text-sm text-slate-700">
-                  Once we wire live inventory, accessories can sit beside singles and sealed as natural add-ons instead of needing their own complicated store experience.
-                </p>
+                <p className="mt-2 text-sm text-slate-700">Hidden from checkout until real inventory is attached.</p>
               </div>
             </div>
           </div>
@@ -1615,7 +1555,7 @@ export default function Shop() {
         {/* Booster Box Search Section */}
         {showBoxSearch &&
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Browse sealed product even when it is not on hand</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Browse sealed product</h2>
             <p className="text-sm text-gray-500 mb-4">
               Search sets from {filters.game === 'pokemon' ? 'Pokémon TCG' : filters.game === 'yugioh' ? 'Yu-Gi-Oh!' : filters.game === 'lorcana' ? 'Disney Lorcana' : filters.game === 'onepiece' ? 'One Piece TCG' : filters.game === 'flesh_and_blood' ? 'Flesh & Blood' : filters.game === 'starwars' ? 'Star Wars Unlimited' : 'available games'} to see availability
             </p>
@@ -1650,9 +1590,11 @@ export default function Shop() {
                       </div>
                       <div className="mt-4 flex items-end justify-between gap-3">
                         <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Current Price</p>
-                          <p className="text-lg font-bold text-slate-950">
-                            {set.stockProduct?.price != null ? `$${set.stockProduct.price.toFixed(2)}` : 'Ask us'}
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            {set.stockProduct?.price != null ? 'Price' : 'Status'}
+                          </p>
+                          <p className={`text-lg font-bold ${set.stockProduct?.price != null ? 'text-slate-950' : 'text-slate-500'}`}>
+                            {set.stockProduct?.price != null ? `$${set.stockProduct.price.toFixed(2)}` : 'Not in stock'}
                           </p>
                         </div>
                         <Badge className={set.inStock ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}>
