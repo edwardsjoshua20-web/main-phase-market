@@ -1,18 +1,30 @@
 const API_BASE = '/api/local/mtg/commanders';
 
 async function parseJson(response, fallbackMessage) {
+  const contentType = response.headers.get('content-type') || '';
   if (!response.ok) {
     let message = fallbackMessage;
     try {
-      const payload = await response.json();
-      if (payload?.error) {
-        message = payload.error;
+      if (contentType.toLowerCase().includes('application/json')) {
+        const payload = await response.json();
+        if (payload?.error) {
+          message = payload.error;
+        }
       }
     } catch {}
     throw new Error(message);
   }
 
+  if (!contentType.toLowerCase().includes('application/json')) {
+    throw new Error(fallbackMessage);
+  }
+
   return response.json();
+}
+
+function isHostedWithoutLocalApi() {
+  if (typeof window === 'undefined') return false;
+  return !['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
 }
 
 export async function getAllMtgCommanders(options = {}) {
@@ -21,6 +33,10 @@ export async function getAllMtgCommanders(options = {}) {
 }
 
 export async function searchMtgCommanders(query, options = {}) {
+  if (isHostedWithoutLocalApi()) {
+    return { results: [], total: 0, query: String(query || ''), colors: [] };
+  }
+
   const response = await fetch(`${API_BASE}/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -36,6 +52,10 @@ export async function searchMtgCommanders(query, options = {}) {
 }
 
 export async function getMtgCommanderPage(oracleId, options = {}) {
+  if (isHostedWithoutLocalApi()) {
+    return { commander: null, related_commanders: [], packages: [], themes: [] };
+  }
+
   const params = new URLSearchParams();
   if (options.theme) {
     params.set('theme', String(options.theme));
@@ -55,6 +75,10 @@ export async function getMtgCommanderByOracleId(oracleId) {
 }
 
 export async function importMtgCommanderDeckText(text, options = {}) {
+  if (isHostedWithoutLocalApi()) {
+    throw new Error('Commander import is not available on the hosted site yet.');
+  }
+
   const response = await fetch(`${API_BASE}/import-text`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -70,6 +94,10 @@ export async function importMtgCommanderDeckText(text, options = {}) {
 }
 
 export async function rebuildMtgCommanderData() {
+  if (isHostedWithoutLocalApi()) {
+    throw new Error('Commander rebuild is only available in the local backend.');
+  }
+
   const response = await fetch(`${API_BASE}/rebuild`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' }
@@ -79,6 +107,10 @@ export async function rebuildMtgCommanderData() {
 }
 
 export async function simulateMtgCommanderDeck(deck) {
+  if (isHostedWithoutLocalApi()) {
+    throw new Error('Commander simulation is not available on the hosted site yet.');
+  }
+
   const response = await fetch(`${API_BASE}/simulate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -1,4 +1,5 @@
 import { getCatalogAssetUrl, hasExternalCatalogAssetBase } from '@/config/publicAssetUrls';
+import { postLocalJsonIfAvailable } from '@/lib/catalogApi';
 
 const cardsUrl = getCatalogAssetUrl('yugioh', 'cards.json');
 const setsUrl = getCatalogAssetUrl('yugioh', 'sets.json');
@@ -269,22 +270,9 @@ export async function searchYugiohCatalog(query, limit = 50) {
   }
 
   try {
-    const response = await fetch('/api/local/yugioh/search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        query,
-        limit
-      })
-    });
-
-    if (response.ok) {
-      const payload = await response.json();
-      if (Array.isArray(payload)) {
-        return payload;
-      }
+    const payload = await postLocalJsonIfAvailable('/api/local/yugioh/search', { query, limit });
+    if (Array.isArray(payload)) {
+      return payload;
     }
   } catch {
     // Fall back to local file scan.
@@ -324,23 +312,9 @@ export async function searchYugiohCatalogAdvanced(apiQuery, options = {}) {
   }
 
   try {
-    const response = await fetch('/api/local/yugioh/advanced-search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        filters,
-        limit,
-        page
-      })
-    });
-
-    if (response.ok) {
-      const payload = await response.json();
-      if (Array.isArray(payload?.results)) {
-        return payload;
-      }
+    const payload = await postLocalJsonIfAvailable('/api/local/yugioh/advanced-search', { filters, limit, page });
+    if (Array.isArray(payload?.results)) {
+      return payload;
     }
   } catch {
     // Fall back to local file scan.

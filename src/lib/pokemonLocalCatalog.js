@@ -1,4 +1,5 @@
 import { getCatalogAssetUrl, hasExternalCatalogAssetBase } from '@/config/publicAssetUrls';
+import { postLocalJsonIfAvailable } from '@/lib/catalogApi';
 
 const cardsUrl = getCatalogAssetUrl('pokemon', 'cards.json');
 const setsUrl = getCatalogAssetUrl('pokemon', 'sets.json');
@@ -214,22 +215,9 @@ export async function searchPokemonCatalog(query, limit = 50) {
   }
 
   try {
-    const response = await fetch('/api/local/pokemon/search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        query,
-        limit
-      })
-    });
-
-    if (response.ok) {
-      const payload = await response.json();
-      if (Array.isArray(payload)) {
-        return payload;
-      }
+    const payload = await postLocalJsonIfAvailable('/api/local/pokemon/search', { query, limit });
+    if (Array.isArray(payload)) {
+      return payload;
     }
   } catch {
     // Fall back to local file scan.
@@ -264,23 +252,9 @@ export async function searchPokemonCatalogAdvanced(filters, options = {}) {
   }
 
   try {
-    const response = await fetch('/api/local/pokemon/advanced-search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        filters,
-        limit,
-        page
-      })
-    });
-
-    if (response.ok) {
-      const payload = await response.json();
-      if (Array.isArray(payload?.results)) {
-        return payload;
-      }
+    const payload = await postLocalJsonIfAvailable('/api/local/pokemon/advanced-search', { filters, limit, page });
+    if (Array.isArray(payload?.results)) {
+      return payload;
     }
   } catch {
     // Fall back to local file scan.

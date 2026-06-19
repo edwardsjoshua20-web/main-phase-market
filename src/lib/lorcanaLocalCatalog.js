@@ -1,4 +1,5 @@
 import { getCatalogAssetUrl, hasExternalCatalogAssetBase } from '@/config/publicAssetUrls';
+import { postLocalJsonIfAvailable } from '@/lib/catalogApi';
 
 const cardsUrl = getCatalogAssetUrl('lorcana', 'cards.json');
 const setsUrl = getCatalogAssetUrl('lorcana', 'sets.json');
@@ -189,16 +190,8 @@ export async function searchLorcanaCatalog(query, limit = 50) {
   if (!normalizedQuery || normalizedQuery.length < 2) return [];
 
   try {
-    const response = await fetch('/api/local/lorcana/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, limit })
-    });
-
-    if (response.ok) {
-      const payload = await response.json();
-      if (Array.isArray(payload)) return payload;
-    }
+    const payload = await postLocalJsonIfAvailable('/api/local/lorcana/search', { query, limit });
+    if (Array.isArray(payload)) return payload;
   } catch {}
 
   const [cards, setsByCode] = await Promise.all([loadCards(), loadSets()]);
@@ -226,16 +219,8 @@ export async function searchLorcanaCatalogAdvanced(filters, options = {}) {
   }
 
   try {
-    const response = await fetch('/api/local/lorcana/advanced-search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filters, limit, page })
-    });
-
-    if (response.ok) {
-      const payload = await response.json();
-      if (Array.isArray(payload?.results)) return payload;
-    }
+    const payload = await postLocalJsonIfAvailable('/api/local/lorcana/advanced-search', { filters, limit, page });
+    if (Array.isArray(payload?.results)) return payload;
   } catch {}
 
   const [cards, setsByCode] = await Promise.all([loadCards(), loadSets()]);

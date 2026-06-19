@@ -1,4 +1,5 @@
 import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
+import { getLocalJsonIfAvailable, postLocalJsonIfAvailable } from '@/lib/catalogApi';
 
 const manifestUrl = getCatalogAssetUrl('mtg', 'manifest.json');
 
@@ -578,22 +579,9 @@ export async function searchMtgCatalog(query, limit = 50) {
   }
 
   try {
-    const response = await fetch('/api/local/mtg/search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        query,
-        limit
-      })
-    });
-
-    if (response.ok) {
-      const payload = await response.json();
-      if (Array.isArray(payload)) {
-        return payload;
-      }
+    const payload = await postLocalJsonIfAvailable('/api/local/mtg/search', { query, limit });
+    if (Array.isArray(payload)) {
+      return payload;
     }
   } catch {
     // Fall through to local file scan.
@@ -656,30 +644,20 @@ export async function searchMtgCatalogAdvanced(filters, options = {}) {
   }
 
   try {
-    const response = await fetch('/api/local/mtg/advanced-search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        filters,
-        limit,
-        page
-      })
-    });
+    const payload = await postLocalJsonIfAvailable('/api/local/mtg/advanced-search', { filters, limit, page });
+    if (payload) {
+      if (Array.isArray(payload?.results) && payload.results.every((row) => row?.groupKey && Array.isArray(row?.languageCodes))) {
+        return payload;
+      }
 
-    if (!response.ok) {
-      throw new Error(`Failed local MTG advanced search: ${response.status}`);
+      const englishImageIndexes = buildEnglishImageIndexes(await loadAllBuckets());
+      return normalizeAdvancedPayload(payload, englishImageIndexes, filters, page, limit);
     }
-
-    const payload = await response.json();
-    if (Array.isArray(payload?.results) && payload.results.every((row) => row?.groupKey && Array.isArray(row?.languageCodes))) {
-      return payload;
-    }
-
-    const englishImageIndexes = buildEnglishImageIndexes(await loadAllBuckets());
-    return normalizeAdvancedPayload(payload, englishImageIndexes, filters, page, limit);
   } catch {
+    // Fall back to static catalog scan.
+  }
+
+  try {
     const rows = await loadAllBuckets();
     const englishImageIndexes = buildEnglishImageIndexes(rows);
     const matchedRows = rows
@@ -702,6 +680,8 @@ export async function searchMtgCatalogAdvanced(filters, options = {}) {
       limit,
       hasMore: end < total
     };
+  } catch {
+    return { results: [], total: 0, page, limit, hasMore: false };
   }
 }
 
@@ -735,12 +715,9 @@ export async function getMtgPrintingsByOracleId(oracleId) {
   let apiRows = [];
 
   try {
-    const response = await fetch(`/api/local/mtg/printings/${encodeURIComponent(oracleId)}`);
-    if (response.ok) {
-      const rows = await response.json();
-      if (Array.isArray(rows)) {
-        apiRows = rows;
-      }
+    const rows = await getLocalJsonIfAvailable(`/api/local/mtg/printings/${encodeURIComponent(oracleId)}`);
+    if (Array.isArray(rows)) {
+      apiRows = rows;
     }
   } catch {
     // Fall back to static bucket lookup.
