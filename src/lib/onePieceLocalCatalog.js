@@ -89,6 +89,7 @@ function formatOnePieceResult(card, setsByCode) {
     card_number: card.id || '',
     rarity: card.rarity || '',
     image_url: getLocalOnePieceImageUrl(card),
+    fallback_image_url: card.image_url || null,
     price: null,
     type: card.category || '',
     game: 'onepiece',
@@ -116,7 +117,8 @@ function formatOnePieceDetail(card, setsByCode) {
     pack_id: card.pack_id || '',
     set_code: setMeta?.code || '',
     set_name: setMeta?.name || '',
-    image_url: getLocalOnePieceImageUrl(card)
+    image_url: getLocalOnePieceImageUrl(card),
+    fallback_image_url: card.image_url || null
   };
 }
 

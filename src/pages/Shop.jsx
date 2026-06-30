@@ -42,6 +42,7 @@ import {
 import { inventoryListings } from '@/services/inventoryListings';
 import { addToGuestCart } from '@/components/utils/guestStorage';
 import { createPageUrl } from '@/utils';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 
 export default function Shop() {
@@ -224,7 +225,7 @@ export default function Shop() {
   };
 
   const handleCardPreviewEnter = (card) => {
-    if (!card?.image_url) return;
+    if (!getCardImageUrl(card)) return;
     scheduleHoverState(hoveredCardTimerRef, setHoveredCard, card, HOVER_OPEN_DELAY_MS);
   };
 
@@ -232,8 +233,8 @@ export default function Shop() {
     scheduleHoverState(hoveredCardTimerRef, setHoveredCard, null, HOVER_CLOSE_DELAY_MS);
   };
 
-  const getResultGridImageUrl = (item) => item?.image_url || item?.english_image_url || item?.image_small || null;
-  const getResultPreviewImageUrl = (item) => item?.image_url || item?.english_image_url || item?.image_small || null;
+  const getResultGridImageUrl = getCardImageUrl;
+  const getResultPreviewImageUrl = getCardImageUrl;
 
   const handleCardImagePreviewEnter = (imageUrl) => {
     if (!imageUrl) return;
@@ -253,19 +254,10 @@ export default function Shop() {
     scheduleHoverState(hoveredBoxImageTimerRef, setHoveredBoxImage, null, HOVER_CLOSE_DELAY_MS);
   };
 
-  const handleResultImageError = (event, item, attemptedSrc) => {
-    if (item?.image_url && item.image_url !== attemptedSrc) {
-      event.currentTarget.src = item.image_url;
-      return;
-    }
-
-    if (item?.english_image_url && item.english_image_url !== attemptedSrc && item.english_image_url !== item?.image_url) {
-      event.currentTarget.src = item.english_image_url;
-      return;
-    }
-
-    event.currentTarget.style.display = 'none';
-    event.currentTarget.parentElement?.querySelector('[data-image-fallback]')?.classList.remove('hidden');
+  const handleResultImageError = (event, item) => {
+    handleCardImageError(event, item, (image) => {
+      image.parentElement?.querySelector('[data-image-fallback]')?.classList.remove('hidden');
+    });
   };
 
   const openMagicCardDetail = (result) => {
@@ -2121,12 +2113,13 @@ export default function Shop() {
       </Dialog>
 
       {/* Hover Card Preview */}
-      {hoveredCard && hoveredCard.image_url &&
+      {hoveredCard && getCardImageUrl(hoveredCard) &&
       <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-white rounded-lg shadow-2xl p-3 max-w-xs pointer-events-none border-4 border-blue-500">
             <img
-            src={hoveredCard.image_url}
+            src={getCardImageUrl(hoveredCard)}
             alt={hoveredCard.name}
+            onError={(event) => handleCardImageError(event, hoveredCard)}
             className="w-full h-auto rounded-lg mb-2" />
 
             <h3 className="font-bold text-sm text-gray-900 mb-1">{hoveredCard.name}</h3>

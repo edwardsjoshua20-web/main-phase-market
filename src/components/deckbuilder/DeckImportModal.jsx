@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { searchMtgCatalog } from '@/lib/mtgLocalCatalog';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 /**
  * Clean a card name by stripping common deck-export annotations:
@@ -240,7 +241,11 @@ export default function DeckImportModal({ game, onImport, onClose }) {
       .map(r => ({
         product_id: r.card.id,
         product_name: r.card.name,
-        product_image: r.card.image_url,
+        product_image: getCardImageUrl(r.card),
+        image_url: r.card.image_url || null,
+        english_image_url: r.card.english_image_url || null,
+        image_small: r.card.image_small || null,
+        fallback_image_url: r.card.fallback_image_url || null,
         price: r.card.price,
         product_type: r.card.product_type,
         type: r.card.type,
@@ -347,10 +352,10 @@ export default function DeckImportModal({ game, onImport, onClose }) {
               <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {results.map((r, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 6, background: r.card ? '#0f2937' : '#1c0a0a', border: `1px solid ${r.card ? '#164e63' : '#450a0a'}` }}>
-                    {r.card?.image_url && (
-                      <img src={r.card.image_url} alt={r.card.name} style={{ width: 28, height: 39, borderRadius: 3, objectFit: 'cover', flexShrink: 0 }} />
+                    {getCardImageUrl(r.card) && (
+                      <img src={getCardImageUrl(r.card)} alt={r.card.name} onError={(event) => handleCardImageError(event, r.card)} style={{ width: 28, height: 39, borderRadius: 3, objectFit: 'cover', flexShrink: 0 }} />
                     )}
-                    {!r.card?.image_url && (
+                    {!getCardImageUrl(r.card) && (
                       <div style={{ width: 28, height: 39, borderRadius: 3, background: '#1f2937', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 14 }}>🃏</span>
                       </div>

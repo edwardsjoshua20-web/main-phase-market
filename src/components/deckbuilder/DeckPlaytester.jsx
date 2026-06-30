@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, RefreshCw, RotateCcw, Trash2, ArrowUp } from 'lucide-react';
 import useGameState from '@/components/hooks/useGameState';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const CARD_W = 100;
 const CARD_H = 140;
@@ -26,8 +27,8 @@ function CardImage({ card, className = '', style = {}, onClick, onContextMenu, o
       onMouseLeave={onMouseLeave}
       onDragStart={onDragStart}
     >
-      {card.product_image
-        ? <img src={card.product_image} alt={card.product_name} className="w-full h-full object-cover" draggable={false} />
+      {getCardImageUrl(card)
+        ? <img src={getCardImageUrl(card)} alt={card.product_name} className="w-full h-full object-cover" draggable={false} onError={(event) => handleCardImageError(event, card)} />
         : (
           <div className="w-full h-full bg-slate-700 flex items-center justify-center p-2 border border-slate-500">
             <span className="text-white text-xs text-center leading-tight font-medium">{card.product_name}</span>
@@ -44,8 +45,8 @@ function HoverPreview({ card, x, y }) {
   return (
     <div className="fixed z-[200] pointer-events-none" style={{ left: x, top: y }}>
       <div className="rounded-xl border-2 border-cyan-400 overflow-hidden shadow-2xl" style={{ width: 240, height: 336 }}>
-        {card.product_image
-          ? <img src={card.product_image} alt={card.product_name} className="w-full h-full object-cover" />
+        {getCardImageUrl(card)
+          ? <img src={getCardImageUrl(card)} alt={card.product_name} className="w-full h-full object-cover" onError={(event) => handleCardImageError(event, card)} />
           : (
             <div className="w-full h-full bg-slate-800 flex items-center justify-center p-4 text-center">
               <span className="text-white text-base font-medium">{card.product_name}</span>
@@ -118,8 +119,8 @@ function ZonePile({ label, count, onClick, showBack = false, topCard = null, col
         {count > 0 ? (
           showBack ? (
             <img src={MTG_CARD_BACK} alt="Library" className="w-full h-full object-cover" />
-          ) : topCard?.product_image ? (
-            <img src={topCard.product_image} alt={topCard.product_name} className="w-full h-full object-cover" />
+          ) : getCardImageUrl(topCard) ? (
+            <img src={getCardImageUrl(topCard)} alt={topCard.product_name} className="w-full h-full object-cover" onError={(event) => handleCardImageError(event, topCard)} />
           ) : (
             <div className="w-full h-full bg-slate-700 flex items-center justify-center">
               <span className="text-slate-400 text-xs text-center px-1">{topCard?.product_name || '...'}</span>
@@ -185,8 +186,8 @@ function MulliganScreen({ hand, mulliganCount, library, onKeep, onMulligan, onPu
               <div key={idx} onClick={() => onPutBack(idx)}
                 className="rounded-lg border-2 border-yellow-500/60 overflow-hidden cursor-pointer hover:border-yellow-300 hover:-translate-y-2 transition-all"
                 style={{ width: CARD_W * 1.5, height: CARD_H * 1.5 }}>
-                {card.product_image
-                  ? <img src={card.product_image} alt={card.product_name} className="w-full h-full object-cover" />
+                {getCardImageUrl(card)
+                  ? <img src={getCardImageUrl(card)} alt={card.product_name} className="w-full h-full object-cover" onError={(event) => handleCardImageError(event, card)} />
                   : <div className="w-full h-full bg-slate-800 flex items-center justify-center p-2"><span className="text-white text-xs text-center">{card.product_name}</span></div>
                 }
               </div>
@@ -210,8 +211,8 @@ function MulliganScreen({ hand, mulliganCount, library, onKeep, onMulligan, onPu
           {hand.map((card, idx) => (
             <div key={idx} className="rounded-lg border border-slate-600 overflow-hidden flex-shrink-0"
               style={{ width: CARD_W * 1.5, height: CARD_H * 1.5 }}>
-              {card.product_image
-                ? <img src={card.product_image} alt={card.product_name} className="w-full h-full object-cover" />
+              {getCardImageUrl(card)
+                ? <img src={getCardImageUrl(card)} alt={card.product_name} className="w-full h-full object-cover" onError={(event) => handleCardImageError(event, card)} />
                 : <div className="w-full h-full bg-slate-800 flex items-center justify-center p-2"><span className="text-white text-xs text-center">{card.product_name}</span></div>
               }
             </div>

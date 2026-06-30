@@ -51,6 +51,7 @@ import { searchOnePieceCatalog } from '@/lib/onePieceLocalCatalog';
 import { searchPokemonCatalog } from '@/lib/pokemonLocalCatalog';
 import { searchStarWarsCatalog } from '@/lib/starwarsLocalCatalog';
 import { searchYugiohCatalog } from '@/lib/yugiohLocalCatalog';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { getGuestCart, getGuestWishlist, removeFromGuestCart, removeFromGuestWishlist } from '@/components/utils/guestStorage';
 
 const adminPages = ['AdminInventory', 'AdminOrders'];
@@ -558,6 +559,7 @@ export default function Layout({ children, currentPageName }) {
                 <option value="lorcana">Lorcana</option>
                 <option value="onepiece">One Piece</option>
                 <option value="flesh_and_blood">Flesh & Blood</option>
+                <option value="starwars">Star Wars Unlimited</option>
               </select>
               <div className="relative flex-1 search-dropdown">
                 <Input
@@ -585,21 +587,20 @@ export default function Layout({ children, currentPageName }) {
                               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 border-b last:border-b-0 transition-colors text-left"
                             >
                               <div className="w-12 h-16 shrink-0 rounded border border-gray-200 bg-gray-100 overflow-hidden">
-                                {result.image_url ? (
+                                {getCardImageUrl(result) ? (
                                   <img
-                                    src={result.image_url}
+                                    src={getCardImageUrl(result)}
                                     alt={result.name}
                                     className="w-full h-full object-contain bg-white"
                                     loading="lazy"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                      e.currentTarget.parentElement?.querySelector('[data-search-image-fallback]')?.classList.remove('hidden');
-                                    }}
+                                    onError={(e) => handleCardImageError(e, result, (image) => {
+                                      image.parentElement?.querySelector('[data-search-image-fallback]')?.classList.remove('hidden');
+                                    })}
                                   />
                                 ) : null}
                                 <div
                                   data-search-image-fallback
-                                  className={`${result.image_url ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-[10px] text-gray-400`}
+                                  className={`${getCardImageUrl(result) ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-[10px] text-gray-400`}
                                 >
                                   No Image
                                 </div>

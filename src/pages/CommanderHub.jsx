@@ -12,12 +12,12 @@ function CommanderSummaryCard({ commander, onOpen }) {
       onClick={onOpen}
       className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-left transition-all hover:-translate-y-0.5 hover:border-orange-400/25 hover:bg-white/[0.05]"
     >
-      <div className="relative aspect-[0.76] overflow-hidden bg-slate-950">
+      <div className="relative aspect-[5/7] overflow-hidden bg-slate-950">
         {commander.image_url ? (
           <img
             src={commander.image_url}
             alt={commander.name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
             loading="lazy"
           />
         ) : (
@@ -50,12 +50,12 @@ function BrowseCommanderCard({ commander, onOpen }) {
       onClick={onOpen}
       className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-left transition-all hover:-translate-y-0.5 hover:border-orange-400/30 hover:bg-white/[0.05]"
     >
-      <div className="aspect-[2/3] overflow-hidden bg-slate-900">
+      <div className="aspect-[5/7] overflow-hidden bg-slate-900">
         {commander.image_url ? (
           <img
             src={commander.image_url}
             alt={commander.name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
             loading="lazy"
           />
         ) : (
@@ -177,7 +177,7 @@ export default function CommanderHub() {
               <span>Loading featured commanders...</span>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10">
               {rankedFeatured.map((commander) => (
                 <CommanderSummaryCard
                   key={commander.oracle_id}
@@ -210,7 +210,7 @@ export default function CommanderHub() {
               <p className="mt-2 text-sm text-slate-400">Try a different search or clear your color filters.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-8 2xl:grid-cols-10">
               {browseResults.map((commander) => (
                 <BrowseCommanderCard
                   key={commander.oracle_id}

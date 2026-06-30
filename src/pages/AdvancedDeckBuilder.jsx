@@ -14,6 +14,7 @@ import AISimulationResults from '@/components/deckbuilder/AISimulationResults';
 import { simulateMtgCommanderDeck } from '@/lib/mtgCommanderCatalog';
 import { getMtgPrintingsByOracleId, searchMtgCatalog } from '@/lib/mtgLocalCatalog';
 import { normalizeDeckGame } from '@/lib/deckSections';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { toast } from 'sonner';
 
 const DECK_TYPE_LABELS = {
@@ -196,13 +197,30 @@ function countCards(items, predicate) {
     .reduce((sum, item) => sum + (item.quantity || 1), 0);
 }
 
+const ANY_NUMBER_CARD_NAMES = new Set([
+  'dragons approach',
+  'hare apparent',
+  'persistent petitioners',
+  'rat colony',
+  'relentless rats',
+  'shadowborn apostle',
+  'slime against humanity',
+  'templar knight'
+]);
+
+function allowsAnyNumberOfCopies(item) {
+  const name = getDeckItemNameKey(item).replace(/['’]/g, '');
+  const oracleText = String(item?.oracle_text || '').toLowerCase();
+  return ANY_NUMBER_CARD_NAMES.has(name) || oracleText.includes('a deck can have any number of cards named');
+}
+
 function findCopyLimitErrors(items, maxCopies, options = {}) {
   if (!Number.isFinite(maxCopies)) return [];
   const { keyBy = getDeckItemNameKey, ignore = () => false, label = 'card' } = options;
   const counts = new Map();
 
   for (const item of items) {
-    if (ignore(item)) continue;
+    if (ignore(item) || allowsAnyNumberOfCopies(item)) continue;
     const key = keyBy(item);
     if (!key) continue;
     const current = counts.get(key) || { name: item.product_name || item.name || key, quantity: 0 };
@@ -472,7 +490,7 @@ export default function AdvancedDeckBuilder() {
       const isBasicLand = card.type?.toLowerCase().includes('basic');
       const existing = activeDeck.items?.find(i => i.product_id === card.id);
       
-      if (existing && !isBasicLand) {
+      if (existing && !isBasicLand && !allowsAnyNumberOfCopies(card)) {
         toast.error('Commander: Only 1 of each non-land card allowed');
         return;
       }
@@ -488,13 +506,18 @@ export default function AdvancedDeckBuilder() {
       updatedItems = [...(activeDeck.items || []), {
         product_id: card.id,
         product_name: card.name,
-        product_image: card.image_url,
+        product_image: getCardImageUrl(card),
+        image_url: card.image_url || null,
+        english_image_url: card.english_image_url || null,
+        image_small: card.image_small || null,
+        fallback_image_url: card.fallback_image_url || null,
         price: card.price || 0,
         product_type: selectedGame,
         type: card.type,
         quantity: qty,
         mana_cost: card.mana_cost || '',
         cmc: card.cmc ?? 0,
+        oracle_text: card.oracle_text || '',
       }];
     }
     
@@ -639,6 +662,28 @@ export default function AdvancedDeckBuilder() {
     const results = await searchCards(trimmedQuery, selectedGame, 18);
     setSearchResults(results);
     setSearching(false);
+  };
+
+  const exportDeck = () => {
+    if (!activeDeck?.items?.length) {
+      toast.error('There are no cards to export');
+      return;
+    }
+
+    const lines = [...activeDeck.items]
+      .sort((a, b) => String(a.product_name || '').localeCompare(String(b.product_name || '')))
+      .map((item) => `${item.quantity || 1} ${item.product_name}`)
+      .join('\n');
+    const blob = new Blob([`${activeDeck.name}\n${activeDeck.deck_format || ''}\n\n${lines}\n`], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${String(activeDeck.name || 'deck').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '') || 'deck'}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    toast.success('Deck exported');
   };
 
   const handleSimulation = async () => {
@@ -999,7 +1044,7 @@ export default function AdvancedDeckBuilder() {
                   >
                     {cardDisplayMode === 'grid' ? 'Deck View' : 'Advanced View'}
                   </Button>
-                  <Button size="sm" variant="outline" className="h-8 text-xs bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600">
+                  <Button size="sm" variant="outline" className="h-8 text-xs bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600" onClick={exportDeck}>
                     <Share2 className="w-3 h-3 mr-1" />Export
                   </Button>
                   <Button
@@ -1127,8 +1172,8 @@ export default function AdvancedDeckBuilder() {
                             className="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-gray-700 transition-colors"
                           >
                             <div className="w-12 h-16 rounded overflow-hidden bg-gray-700 shrink-0">
-                              {card.image_url ? (
-                                <img src={card.image_url} alt={card.name} className="w-full h-full object-cover" />
+                              {getCardImageUrl(card) ? (
+                                <img src={getCardImageUrl(card)} alt={card.name} onError={(event) => handleCardImageError(event, card)} className="w-full h-full object-cover" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 px-1 text-center">{card.name}</div>
                               )}
@@ -1153,8 +1198,8 @@ export default function AdvancedDeckBuilder() {
                             onClick={() => addCardToDeck(card)}
                             title={card.name}
                           >
-                            {card.image_url ? (
-                              <img src={card.image_url} alt={card.name} className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity" />
+                            {getCardImageUrl(card) ? (
+                              <img src={getCardImageUrl(card)} alt={card.name} onError={(event) => handleCardImageError(event, card)} className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity" />
                             ) : (
                               <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
                                 {card.name}
@@ -1231,8 +1276,8 @@ export default function AdvancedDeckBuilder() {
                     {group.items.map((item) => (
                       <div key={item.product_id} className="flex items-center gap-3 px-4 py-3">
                         <div className="w-10 h-14 rounded overflow-hidden bg-gray-700 shrink-0">
-                          {item.product_image ? (
-                            <img src={item.product_image} alt={item.product_name} className="w-full h-full object-cover" />
+                          {getCardImageUrl(item) ? (
+                            <img src={getCardImageUrl(item)} alt={item.product_name} onError={(event) => handleCardImageError(event, item)} className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 px-1 text-center">
                               {item.product_name}
@@ -1501,8 +1546,8 @@ export default function AdvancedDeckBuilder() {
                               key={item.product_id}
                               className="relative group rounded overflow-hidden border-4 border-black hover:border-gray-600 hover:shadow-lg transition-all bg-gray-800"
                             >
-                              {item.product_image ? (
-                                <img src={item.product_image} alt={item.product_name} className="w-full aspect-[2/3] object-cover group-hover:opacity-70 transition-opacity" />
+                              {getCardImageUrl(item) ? (
+                                <img src={getCardImageUrl(item)} alt={item.product_name} onError={(event) => handleCardImageError(event, item)} className="w-full aspect-[2/3] object-cover group-hover:opacity-70 transition-opacity" />
                               ) : (
                                 <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
                                   {item.product_name}
@@ -1556,8 +1601,8 @@ export default function AdvancedDeckBuilder() {
                                 className="relative group rounded overflow-hidden border border-gray-700 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer bg-gray-800"
                                 onClick={() => addCardToDeck(card)}
                               >
-                                {card.image_url ? (
-                                  <img src={card.image_url} alt={card.name} className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity" />
+                                {getCardImageUrl(card) ? (
+                                  <img src={getCardImageUrl(card)} alt={card.name} onError={(event) => handleCardImageError(event, card)} className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity" />
                                 ) : (
                                   <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
                                     {card.name}

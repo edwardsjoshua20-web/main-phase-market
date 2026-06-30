@@ -1,10 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import Database from 'better-sqlite3';
+import { getMtgCommanderPage } from '../server/mtgCommanderEngine.mjs';
 
 const PROJECT_ROOT = process.cwd();
 const SEARCH_SHARDS_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'search-shards');
 const SEARCH_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'search');
 const OUTPUT_PATH = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commanders.json');
+const DETAILS_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commander-details');
+const COMMANDER_DB_PATH = path.join(PROJECT_ROOT, 'server', 'data', 'main-phase-market.db');
 const HOSTED_PUBLIC_DATA_BASE_URL = 'https://wwvvyrhlybwijqlhubdv.supabase.co/storage/v1/object/public/main-phase-market-public/data';
 
 function normalizeText(value) {
@@ -73,7 +77,7 @@ function isCommander(row) {
   return typeLine.includes('Legendary') && typeLine.includes('Creature');
 }
 
-function toCommander(row) {
+function toCommander(row, deckCounts) {
   return {
     id: row.id,
     oracle_id: row.oracle_id,
@@ -93,11 +97,24 @@ function toCommander(row) {
     set_name: row.set_name || '',
     set_code: row.set_code || '',
     rarity: row.rarity || '',
-    deck_count: 1,
+    deck_count: Number(deckCounts.get(row.oracle_id) || 0),
     legal_commander: Boolean(row.legal_commander),
     can_be_commander: true,
     game: 'magic'
   };
+}
+
+function makeHostedPayload(value) {
+  if (Array.isArray(value)) {
+    return value.map(makeHostedPayload);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, makeHostedPayload(child)]));
+  }
+  if (typeof value === 'string' && value.startsWith('/data/')) {
+    return `${HOSTED_PUBLIC_DATA_BASE_URL}/${value.slice('/data/'.length)}`;
+  }
+  return value;
 }
 
 function compareCommanderRows(a, b) {
@@ -121,6 +138,15 @@ function main() {
   }
 
   const commandersByOracleId = new Map();
+  const deckCounts = new Map();
+  if (fs.existsSync(COMMANDER_DB_PATH)) {
+    const commanderDb = new Database(COMMANDER_DB_PATH, { readonly: true });
+    const rows = commanderDb.prepare('SELECT oracle_id, deck_count FROM mtg_commander_index').all();
+    for (const row of rows) {
+      deckCounts.set(row.oracle_id, Number(row.deck_count || 0));
+    }
+    commanderDb.close();
+  }
 
   for (const filePath of sourceFiles) {
     const rows = readJson(filePath);
@@ -133,7 +159,7 @@ function main() {
         continue;
       }
 
-      const candidate = toCommander(row);
+      const candidate = toCommander(row, deckCounts);
       const existing = commandersByOracleId.get(row.oracle_id);
       if (!existing || compareCommanderRows(candidate, existing) < 0) {
         commandersByOracleId.set(row.oracle_id, candidate);
@@ -141,11 +167,26 @@ function main() {
     }
   }
 
-  const commanders = [...commandersByOracleId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const commanders = [...commandersByOracleId.values()].sort(
+    (a, b) => Number(b.deck_count || 0) - Number(a.deck_count || 0) || a.name.localeCompare(b.name)
+  );
   fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, `${JSON.stringify(commanders)}\n`);
 
-  console.log(`Wrote ${commanders.length} commanders to ${path.relative(PROJECT_ROOT, OUTPUT_PATH)}`);
+  let detailCount = 0;
+  if (deckCounts.size > 0) {
+    fs.mkdirSync(DETAILS_DIR, { recursive: true });
+    for (const commander of commanders) {
+      if (commander.deck_count <= 0) continue;
+      const payload = getMtgCommanderPage(commander.oracle_id);
+      if (!payload?.has_local_data) continue;
+      const outputPath = path.join(DETAILS_DIR, `${commander.oracle_id}.json`);
+      fs.writeFileSync(outputPath, `${JSON.stringify(makeHostedPayload(payload))}\n`);
+      detailCount += 1;
+    }
+  }
+
+  console.log(`Wrote ${commanders.length} commanders and ${detailCount} rich detail pages to ${path.relative(PROJECT_ROOT, path.dirname(OUTPUT_PATH))}`);
 }
 
 main();
