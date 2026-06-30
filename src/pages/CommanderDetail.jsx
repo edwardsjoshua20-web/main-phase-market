@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { ResponsiveContainer, Tooltip, XAxis, YAxis, BarChart, Bar, CartesianGrid } from 'recharts';
 import ColorIdentity from '@/components/commander/ColorIdentity';
 import { getMtgCommanderPage } from '@/lib/mtgCommanderCatalog';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const TYPE_COLORS = {
   Land: '#d4a017',
@@ -109,12 +110,13 @@ function CardTile({ card }) {
   return (
     <button type="button" className="text-left">
       <div className="overflow-hidden rounded-md border border-white/10 bg-slate-950">
-        {card.image_url ? (
+        {getCardImageUrl(card) ? (
           <img
-            src={card.image_url}
+            src={getCardImageUrl(card)}
             alt={card.card_name}
             className="aspect-[0.715] h-auto w-full object-contain"
             loading="lazy"
+            onError={(event) => handleCardImageError(event, card)}
           />
         ) : (
           <div className="flex aspect-[0.715] items-center justify-center text-xs text-white/25">No image</div>
@@ -145,12 +147,13 @@ function AverageDeckCardTile({ card }) {
   return (
     <button type="button" className="text-left">
       <div className="relative overflow-hidden rounded-md border border-white/10 bg-slate-950">
-        {card.image_url ? (
+        {getCardImageUrl(card) ? (
           <img
-            src={card.image_url}
+            src={getCardImageUrl(card)}
             alt={card.card_name}
             className="aspect-[0.715] h-auto w-full object-contain"
             loading="lazy"
+            onError={(event) => handleCardImageError(event, card)}
           />
         ) : (
           <div className="flex aspect-[0.715] items-center justify-center text-xs text-white/25">No image</div>
@@ -170,12 +173,13 @@ function AverageDeckCardTile({ card }) {
 function DeckPreviewTile({ card }) {
   return (
     <div className="relative overflow-hidden rounded-md border border-white/10 bg-slate-950">
-      {card.image_url ? (
+      {getCardImageUrl(card) ? (
         <img
-          src={card.image_url}
+          src={getCardImageUrl(card)}
           alt={card.card_name}
           className="aspect-[0.715] h-auto w-full object-contain"
           loading="lazy"
+          onError={(event) => handleCardImageError(event, card)}
         />
       ) : (
         <div className="flex aspect-[0.715] items-center justify-center text-xs text-white/25">No image</div>
@@ -191,12 +195,13 @@ function CommanderUsageTile({ commander, onOpen }) {
   return (
     <button type="button" onClick={onOpen} className="text-left">
       <div className="overflow-hidden rounded-md border border-white/10 bg-slate-950">
-        {commander.image_url ? (
+        {getCardImageUrl(commander) ? (
           <img
-            src={commander.image_url}
+            src={getCardImageUrl(commander)}
             alt={commander.name}
             className="aspect-[0.715] h-auto w-full object-contain"
             loading="lazy"
+            onError={(event) => handleCardImageError(event, commander)}
           />
         ) : (
           <div className="flex aspect-[0.715] items-center justify-center text-xs text-white/25">{commander.name}</div>
@@ -500,8 +505,13 @@ export default function CommanderDetail() {
           <aside ref={asideRef} className="space-y-5 xl:relative xl:self-start">
             <div ref={commanderRailRef} className="border border-white/10 bg-white/[0.02] p-5">
               <div className="overflow-hidden rounded-md border border-white/10 bg-slate-950">
-                {commander.image_url ? (
-                  <img src={commander.image_url} alt={commander.name} className="h-auto w-full object-contain" />
+                {getCardImageUrl(commander) ? (
+                  <img
+                    src={getCardImageUrl(commander)}
+                    alt={commander.name}
+                    className="h-auto w-full object-contain"
+                    onError={(event) => handleCardImageError(event, commander)}
+                  />
                 ) : (
                   <div className="flex aspect-[0.715] items-center justify-center text-white/20">{commander.name}</div>
                 )}

@@ -12,7 +12,18 @@ const providerMap = {
   supabase: supabaseBackend
 };
 
-export const backend = providerMap[providerName] || localBackend;
+const shouldPreferLocalSupabaseBridge = (() => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return providerName === 'supabase'
+    && ['main-phase-market.pages.dev', 'mainphasemarket.net', 'www.mainphasemarket.net'].includes(window.location.hostname);
+})();
+
+export const backend = shouldPreferLocalSupabaseBridge
+  ? localBackend
+  : (providerMap[providerName] || localBackend);
 export const activeBackendProvider = providerName;
 
 if (typeof window !== 'undefined') {

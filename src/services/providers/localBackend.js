@@ -316,6 +316,374 @@ function createHostedCardListClient() {
   };
 }
 
+function encodeHostedFilterValue(value) {
+  return encodeURIComponent(String(value ?? ''));
+}
+
+function normalizeHostedEntityRow(row) {
+  const data = row?.data && typeof row.data === 'object' ? row.data : {};
+  return {
+    ...data,
+    id: row?.id || data.id,
+    created_date: data.created_date || row?.created_date || null,
+    updated_date: data.updated_date || row?.updated_date || null
+  };
+}
+
+function buildHostedEntityRecord(entityName, payload = {}, existing = null) {
+  const timestamp = new Date().toISOString();
+  const id = payload?.id || existing?.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `entity-${Date.now()}`);
+  const createdDate = payload?.created_date || existing?.created_date || timestamp;
+  const updatedDate = timestamp;
+  const data = {
+    ...(existing || {}),
+    ...(payload || {}),
+    id,
+    created_date: createdDate,
+    updated_date: updatedDate
+  };
+
+  return {
+    entity_name: entityName,
+    id,
+    created_date: createdDate,
+    updated_date: updatedDate,
+    data
+  };
+}
+
+function getHostedSortValue(row, field) {
+  const value = row?.[field];
+  if (value == null) return '';
+  if (typeof value === 'number') return value;
+  return String(value).toLowerCase();
+}
+
+function sortHostedRows(rows, sort = '-created_date') {
+  const descending = String(sort || '').startsWith('-');
+  const field = String(sort || '-created_date').replace(/^-/, '') || 'created_date';
+
+  return [...rows].sort((a, b) => {
+    const aValue = getHostedSortValue(a, field);
+    const bValue = getHostedSortValue(b, field);
+
+    if (aValue === bValue) {
+      return String(a?.id || '').localeCompare(String(b?.id || ''));
+    }
+
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      return descending ? bValue - aValue : aValue - bValue;
+    }
+
+    return descending
+      ? String(bValue).localeCompare(String(aValue))
+      : String(aValue).localeCompare(String(bValue));
+  });
+}
+
+function matchesHostedFilterValue(rowValue, filterValue) {
+  if (filterValue && typeof filterValue === 'object' && !Array.isArray(filterValue)) {
+    if ('$regex' in filterValue) {
+      const pattern = String(filterValue.$regex || '');
+      const flags = String(filterValue.$options || '');
+      try {
+        return new RegExp(pattern, flags).test(String(rowValue || ''));
+      } catch {
+        return false;
+      }
+    }
+  }
+
+  if (Array.isArray(filterValue)) {
+    return filterValue.includes(rowValue);
+  }
+
+  return rowValue === filterValue;
+}
+
+function matchesHostedFilter(row, filter = {}) {
+  return Object.entries(filter || {}).every(([key, value]) => matchesHostedFilterValue(row?.[key], value));
+}
+
+function createHostedEntityClient(entityName) {
+  return {
+    async list(sort = '-created_date', limit, skip) {
+      return this.filter({}, sort, limit, skip);
+    },
+    async filter(filter = {}, sort = '-created_date', limit, skip = 0) {
+      requireHostedSession();
+      const params = new URLSearchParams();
+      params.set('select', '*');
+      params.set('entity_name', `eq.${encodeHostedFilterValue(entityName)}`);
+      params.set('order', 'created_date.desc');
+
+      const rows = await supabaseRequest(`/rest/v1/app_entities?${params.toString()}`);
+      const filteredRows = (rows || [])
+        .map(normalizeHostedEntityRow)
+        .filter((row) => matchesHostedFilter(row, filter));
+      const sortedRows = sortHostedRows(filteredRows, sort);
+      const safeSkip = Math.max(0, Number(skip) || 0);
+      const safeLimit = limit == null ? undefined : Math.max(0, Number(limit) || 0);
+
+      return safeLimit == null
+        ? sortedRows.slice(safeSkip)
+        : sortedRows.slice(safeSkip, safeSkip + safeLimit);
+    },
+    async create(data) {
+      requireHostedSession();
+      const record = buildHostedEntityRecord(entityName, data || {});
+      const rows = await supabaseRequest('/rest/v1/app_entities', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(record)
+      });
+      return normalizeHostedEntityRow(Array.isArray(rows) ? rows[0] : rows);
+    },
+    async update(id, data) {
+      requireHostedSession();
+      const currentRows = await supabaseRequest(
+        `/rest/v1/app_entities?select=*&entity_name=eq.${encodeHostedFilterValue(entityName)}&id=eq.${encodeHostedFilterValue(id)}&limit=1`
+      );
+      const currentRow = Array.isArray(currentRows) ? currentRows[0] : null;
+      if (!currentRow) {
+        throw new Error(`Record not found for ${entityName}:${id}`);
+      }
+
+      const current = normalizeHostedEntityRow(currentRow);
+      const record = buildHostedEntityRecord(entityName, { ...(data || {}), id }, current);
+      const rows = await supabaseRequest(
+        `/rest/v1/app_entities?entity_name=eq.${encodeHostedFilterValue(entityName)}&id=eq.${encodeHostedFilterValue(id)}`,
+        {
+          method: 'PATCH',
+          headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({
+            created_date: record.created_date,
+            updated_date: record.updated_date,
+            data: record.data
+          })
+        }
+      );
+
+      return normalizeHostedEntityRow(Array.isArray(rows) ? rows[0] : rows);
+    },
+    async delete(id) {
+      requireHostedSession();
+      await supabaseRequest(
+        `/rest/v1/app_entities?entity_name=eq.${encodeHostedFilterValue(entityName)}&id=eq.${encodeHostedFilterValue(id)}`,
+        { method: 'DELETE' }
+      );
+      return { success: true, id };
+    }
+  };
+}
+
+function normalizeHostedForumPost(row) {
+  return {
+    id: row.id,
+    title: row.title || '',
+    content: row.content || '',
+    game: row.game || 'magic',
+    category: row.category || 'general',
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    author_id: row.author_id || null,
+    author_name: row.author_name || row.author_email || 'Unknown',
+    author_email: row.author_email || '',
+    is_pinned: Boolean(row.is_pinned),
+    is_solved: Boolean(row.is_solved),
+    view_count: Number(row.view_count || 0),
+    reply_count: Number(row.reply_count || 0),
+    likes: Number(row.likes || 0),
+    liked_by: Array.isArray(row.liked_by) ? row.liked_by : [],
+    last_reply_at: row.last_reply_at || null,
+    last_reply_by: row.last_reply_by || '',
+    created_date: row.created_at || null,
+    updated_date: row.updated_at || null
+  };
+}
+
+function buildHostedForumPostRecord(payload, existing = null) {
+  const record = {
+    title: payload.title ?? existing?.title ?? '',
+    content: payload.content ?? existing?.content ?? '',
+    game: payload.game ?? existing?.game ?? 'magic',
+    category: payload.category ?? existing?.category ?? 'general',
+    tags: Array.isArray(payload.tags) ? payload.tags : (existing?.tags || []),
+    author_id: payload.author_id ?? existing?.author_id ?? null,
+    author_name: payload.author_name ?? existing?.author_name ?? '',
+    author_email: payload.author_email ?? existing?.author_email ?? '',
+    is_pinned: payload.is_pinned ?? existing?.is_pinned ?? false,
+    is_solved: payload.is_solved ?? existing?.is_solved ?? false,
+    view_count: payload.view_count ?? existing?.view_count ?? 0,
+    reply_count: payload.reply_count ?? existing?.reply_count ?? 0,
+    likes: payload.likes ?? existing?.likes ?? 0,
+    liked_by: Array.isArray(payload.liked_by) ? payload.liked_by : (existing?.liked_by || [])
+  };
+
+  if (payload.last_reply_at ?? existing?.last_reply_at) {
+    record.last_reply_at = payload.last_reply_at ?? existing?.last_reply_at;
+  }
+  if (payload.last_reply_by ?? existing?.last_reply_by) {
+    record.last_reply_by = payload.last_reply_by ?? existing?.last_reply_by;
+  }
+
+  return record;
+}
+
+function createHostedForumPostClient() {
+  return {
+    async list(sort = '-created_date', limit, skip) {
+      return this.filter({}, sort, limit, skip);
+    },
+    async filter(filter = {}, sort = '-created_date', limit, skip = 0) {
+      requireHostedSession();
+      const params = new URLSearchParams();
+      params.set('select', '*');
+
+      if (filter?.id) params.set('id', `eq.${encodeHostedFilterValue(filter.id)}`);
+      if (filter?.game) params.set('game', `eq.${encodeHostedFilterValue(filter.game)}`);
+      if (filter?.category) params.set('category', `eq.${encodeHostedFilterValue(filter.category)}`);
+      if (filter?.author_email) params.set('author_email', `eq.${encodeHostedFilterValue(filter.author_email)}`);
+
+      const ascending = !String(sort || '').startsWith('-');
+      const field = String(sort || '-created_date').replace(/^-/, '');
+      const remoteField = field === 'likes'
+        ? 'likes'
+        : field === 'updated_date'
+          ? 'updated_at'
+          : field === 'last_reply_at'
+            ? 'last_reply_at'
+            : 'created_at';
+      params.set('order', `${remoteField}.${ascending ? 'asc' : 'desc'}`);
+
+      if (limit !== undefined && limit !== null) {
+        params.set('offset', String(Math.max(0, Number(skip) || 0)));
+        params.set('limit', String(Number(limit)));
+      }
+
+      const rows = await supabaseRequest(`/rest/v1/forum_threads?${params.toString()}`);
+      return (rows || []).map(normalizeHostedForumPost);
+    },
+    async create(data) {
+      requireHostedSession();
+      const rows = await supabaseRequest('/rest/v1/forum_threads', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(buildHostedForumPostRecord(data || {}))
+      });
+      return normalizeHostedForumPost(Array.isArray(rows) ? rows[0] : rows);
+    },
+    async update(id, data) {
+      requireHostedSession();
+      const currentRows = await supabaseRequest(`/rest/v1/forum_threads?select=*&id=eq.${encodeHostedFilterValue(id)}&limit=1`);
+      const current = Array.isArray(currentRows) ? currentRows[0] : null;
+      if (!current) {
+        throw new Error(`Record not found for ForumPost:${id}`);
+      }
+
+      const rows = await supabaseRequest(`/rest/v1/forum_threads?id=eq.${encodeHostedFilterValue(id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(buildHostedForumPostRecord(data || {}, current))
+      });
+      return normalizeHostedForumPost(Array.isArray(rows) ? rows[0] : rows);
+    },
+    async delete(id) {
+      requireHostedSession();
+      await supabaseRequest(`/rest/v1/forum_threads?id=eq.${encodeHostedFilterValue(id)}`, {
+        method: 'DELETE'
+      });
+      return { success: true, id };
+    }
+  };
+}
+
+function normalizeHostedForumReply(row) {
+  return {
+    id: row.id,
+    post_id: row.thread_id,
+    author_id: row.author_id || null,
+    author_name: row.author_name || row.author_email || 'Unknown',
+    author_email: row.author_email || '',
+    content: row.content || '',
+    likes: Number(row.likes || 0),
+    liked_by: Array.isArray(row.liked_by) ? row.liked_by : [],
+    is_accepted_answer: Boolean(row.is_accepted_answer),
+    created_date: row.created_at || null,
+    updated_date: row.updated_at || null
+  };
+}
+
+function buildHostedForumReplyRecord(payload, existing = null) {
+  return {
+    thread_id: payload.post_id ?? existing?.thread_id ?? null,
+    author_id: payload.author_id ?? existing?.author_id ?? null,
+    author_name: payload.author_name ?? existing?.author_name ?? '',
+    author_email: payload.author_email ?? existing?.author_email ?? '',
+    content: payload.content ?? existing?.content ?? '',
+    likes: payload.likes ?? existing?.likes ?? 0,
+    liked_by: Array.isArray(payload.liked_by) ? payload.liked_by : (existing?.liked_by || []),
+    is_accepted_answer: payload.is_accepted_answer ?? existing?.is_accepted_answer ?? false
+  };
+}
+
+function createHostedForumReplyClient() {
+  return {
+    async list(sort = 'created_date', limit, skip) {
+      return this.filter({}, sort, limit, skip);
+    },
+    async filter(filter = {}, sort = 'created_date', limit, skip = 0) {
+      requireHostedSession();
+      const params = new URLSearchParams();
+      params.set('select', '*');
+      if (filter?.post_id) params.set('thread_id', `eq.${encodeHostedFilterValue(filter.post_id)}`);
+      if (filter?.id) params.set('id', `eq.${encodeHostedFilterValue(filter.id)}`);
+
+      const ascending = !String(sort || '').startsWith('-');
+      const remoteField = String(sort || 'created_date').replace(/^-/, '') === 'updated_date' ? 'updated_at' : 'created_at';
+      params.set('order', `${remoteField}.${ascending ? 'asc' : 'desc'}`);
+
+      if (limit !== undefined && limit !== null) {
+        params.set('offset', String(Math.max(0, Number(skip) || 0)));
+        params.set('limit', String(Number(limit)));
+      }
+
+      const rows = await supabaseRequest(`/rest/v1/forum_replies?${params.toString()}`);
+      return (rows || []).map(normalizeHostedForumReply);
+    },
+    async create(data) {
+      requireHostedSession();
+      const rows = await supabaseRequest('/rest/v1/forum_replies', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(buildHostedForumReplyRecord(data || {}))
+      });
+      return normalizeHostedForumReply(Array.isArray(rows) ? rows[0] : rows);
+    },
+    async update(id, data) {
+      requireHostedSession();
+      const currentRows = await supabaseRequest(`/rest/v1/forum_replies?select=*&id=eq.${encodeHostedFilterValue(id)}&limit=1`);
+      const current = Array.isArray(currentRows) ? currentRows[0] : null;
+      if (!current) {
+        throw new Error(`Record not found for ForumReply:${id}`);
+      }
+
+      const rows = await supabaseRequest(`/rest/v1/forum_replies?id=eq.${encodeHostedFilterValue(id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(buildHostedForumReplyRecord(data || {}, current))
+      });
+      return normalizeHostedForumReply(Array.isArray(rows) ? rows[0] : rows);
+    },
+    async delete(id) {
+      requireHostedSession();
+      await supabaseRequest(`/rest/v1/forum_replies?id=eq.${encodeHostedFilterValue(id)}`, {
+        method: 'DELETE'
+      });
+      return { success: true, id };
+    }
+  };
+}
+
 function createHostedNoopEntityClient(entityName) {
   return {
     list() {
@@ -451,9 +819,11 @@ export const localBackend = {
     {
       get(_target, property) {
         if (hostedSupabaseMode) {
-          return String(property) === 'CardList'
-            ? createHostedCardListClient()
-            : createHostedNoopEntityClient(String(property));
+          const entityName = String(property);
+          if (entityName === 'CardList') return createHostedCardListClient();
+          if (entityName === 'ForumPost') return createHostedForumPostClient();
+          if (entityName === 'ForumReply') return createHostedForumReplyClient();
+          return createHostedEntityClient(entityName);
         }
         return createEntityClient(String(property));
       }

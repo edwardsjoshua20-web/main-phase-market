@@ -4,6 +4,7 @@ import { Loader2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import ColorIdentity from '@/components/commander/ColorIdentity';
 import { searchMtgCommanders } from '@/lib/mtgCommanderCatalog';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 function CommanderSummaryCard({ commander, onOpen }) {
   return (
@@ -13,12 +14,13 @@ function CommanderSummaryCard({ commander, onOpen }) {
       className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-left transition-all hover:-translate-y-0.5 hover:border-orange-400/25 hover:bg-white/[0.05]"
     >
       <div className="relative aspect-[5/7] overflow-hidden bg-slate-950">
-        {commander.image_url ? (
+        {getCardImageUrl(commander) ? (
           <img
-            src={commander.image_url}
+            src={getCardImageUrl(commander)}
             alt={commander.name}
             className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
             loading="lazy"
+            onError={(event) => handleCardImageError(event, commander)}
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(249,115,22,0.28),transparent_55%),linear-gradient(180deg,#101827,#090c14)]">
@@ -51,12 +53,13 @@ function BrowseCommanderCard({ commander, onOpen }) {
       className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-left transition-all hover:-translate-y-0.5 hover:border-orange-400/30 hover:bg-white/[0.05]"
     >
       <div className="aspect-[5/7] overflow-hidden bg-slate-900">
-        {commander.image_url ? (
+        {getCardImageUrl(commander) ? (
           <img
-            src={commander.image_url}
+            src={getCardImageUrl(commander)}
             alt={commander.name}
             className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
             loading="lazy"
+            onError={(event) => handleCardImageError(event, commander)}
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(249,115,22,0.22),transparent_55%),linear-gradient(180deg,#101827,#090c14)]">
@@ -147,7 +150,7 @@ export default function CommanderHub() {
         <div className="px-6 py-10 xl:px-10">
           <div className="max-w-4xl">
             <h1 className="text-3xl font-black tracking-tight text-white md:text-5xl">
-              Your hub for card synergy.
+              Discover commanders and the cards that make them hum.
             </h1>
           </div>
 
