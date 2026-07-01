@@ -43,7 +43,28 @@ function getUuidCandidate(card) {
 
 function isMagicCard(card) {
   const game = String(card?.game || card?.product_type || '').trim().toLowerCase();
-  return game === 'magic' || game === 'mtg';
+  if (game === 'magic' || game === 'mtg') {
+    return true;
+  }
+
+  if (cleanUrl(card?.oracle_id)) {
+    return true;
+  }
+
+  const imageHints = [
+    card?.image_url,
+    card?.product_image,
+    card?.card_image,
+    card?.english_image_url,
+    card?.image_normal,
+    card?.image_large,
+    card?.image_small
+  ]
+    .map(cleanUrl)
+    .filter(Boolean)
+    .join(' ');
+
+  return /\/data\/mtg\/|cards\.scryfall\.io|api\.scryfall\.com/i.test(imageHints);
 }
 
 export function getCardImageCandidates(card) {
