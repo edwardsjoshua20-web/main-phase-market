@@ -97,6 +97,43 @@ function CommanderStack({ commanderItem }) {
   );
 }
 
+function estimateSectionHeight(section, groupedCards) {
+  if (!section) return 0;
+
+  if (section.type === 'commander') {
+    return 380;
+  }
+
+  const cards = groupedCards[section.label] || [];
+  const stackHeight = 311 + Math.max(cards.length - 1, 0) * 42;
+  const priceBarAllowance = cards.length > 0 ? 36 : 0;
+  const headerAllowance = 36;
+  const sectionGapAllowance = 24;
+
+  return stackHeight + priceBarAllowance + headerAllowance + sectionGapAllowance;
+}
+
+function buildBalancedColumns(sections, groupedCards, targetColumnCount) {
+  const seededColumns = Array.from({ length: targetColumnCount }, () => []);
+  const seededHeights = Array.from({ length: targetColumnCount }, () => 0);
+
+  sections.forEach((section, index) => {
+    const smallestColumnIndex = seededHeights.reduce((bestIndex, height, currentIndex, allHeights) => (
+      height < allHeights[bestIndex] ? currentIndex : bestIndex
+    ), 0);
+
+    const preferredColumnIndex = index < targetColumnCount ? index : smallestColumnIndex;
+    const chosenColumnIndex = seededColumns[preferredColumnIndex].length === 0
+      ? preferredColumnIndex
+      : smallestColumnIndex;
+
+    seededColumns[chosenColumnIndex].push(section);
+    seededHeights[chosenColumnIndex] += estimateSectionHeight(section, groupedCards);
+  });
+
+  return seededColumns.filter((column) => column.length > 0);
+}
+
 export default function DeckStackView({
   deck,
   game,
@@ -125,52 +162,47 @@ export default function DeckStackView({
     const commanderSection = isCommanderFormat ? { type: 'commander' } : null;
 
     if (game === 'magic') {
-      const usedLabels = new Set(['Artifacts', 'Enchantments', 'Planeswalkers', 'Battles', 'Lands', 'Creatures', 'Instants', 'Sorceries', 'Other']);
-      const utilityColumn = [
+      const orderedSections = [
         commanderSection,
+        makeStack('Creatures'),
+        makeStack('Instants'),
+        makeStack('Sorceries'),
         makeStack('Artifacts'),
         makeStack('Enchantments'),
         makeStack('Planeswalkers'),
         makeStack('Battles'),
         makeStack('Lands'),
+        makeStack('Other'),
       ].filter(Boolean);
+
+      const usedLabels = new Set(['Artifacts', 'Enchantments', 'Planeswalkers', 'Battles', 'Lands', 'Creatures', 'Instants', 'Sorceries', 'Other']);
       const remainingStacks = Object.keys(groupedCards)
         .filter((type) => !usedLabels.has(type))
         .map((type) => ({ type: 'stack', label: type }));
 
-      return [
-        utilityColumn,
-        [makeStack('Creatures')].filter(Boolean),
-        [makeStack('Instants')].filter(Boolean),
-        [makeStack('Sorceries')].filter(Boolean),
-        [makeStack('Other')].filter(Boolean),
-        remainingStacks,
-      ].filter((column) => column.length > 0);
+      return buildBalancedColumns([...orderedSections, ...remainingStacks], groupedCards, 4);
     }
 
     const primaryTypes = orderedTypes.slice(0, 3);
     const utilityTypes = orderedTypes.slice(3);
     const usedLabels = new Set(orderedTypes);
-    const utilityColumn = [
+    const orderedSections = [
       commanderSection,
+      ...primaryTypes.map(makeStack),
       ...utilityTypes.map(makeStack),
     ].filter(Boolean);
     const remainingStacks = Object.keys(groupedCards)
       .filter((type) => !usedLabels.has(type))
       .map((type) => ({ type: 'stack', label: type }));
 
-    return [
-      utilityColumn,
-      ...primaryTypes.map((type) => [makeStack(type)].filter(Boolean)),
-      remainingStacks,
-    ].filter((column) => column.length > 0);
+    return buildBalancedColumns([...orderedSections, ...remainingStacks], groupedCards, 4);
   })();
 
   return (
     <div className="flex-1 px-6 py-6 overflow-auto">
-      <div className="flex gap-5 items-start">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,300px))] items-start gap-5">
         {stackColumns.map((column, columnIndex) => (
-          <div key={columnIndex} className="flex w-[300px] shrink-0 flex-col gap-6">
+          <div key={columnIndex} className="flex min-w-0 flex-col gap-6">
             {column.map((section) => {
               if (section.type === 'commander') {
                 return <CommanderStack key="commander" commanderItem={commanderItem} />;

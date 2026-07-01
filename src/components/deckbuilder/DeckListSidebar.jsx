@@ -13,7 +13,7 @@ export default function DeckListSidebar({
   onCancelCreate
 }) {
   return (
-    <div className="w-44 flex-shrink-0 bg-gray-800 border-r border-gray-700 p-3 overflow-y-auto">
+    <div className="sticky top-24 h-[calc(100vh-120px)] w-44 flex-shrink-0 self-start overflow-y-auto border-r border-gray-700 bg-gray-800 p-3">
       <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">My Decks</h3>
       <div className="space-y-1.5">
         {decks.map(deck => (
