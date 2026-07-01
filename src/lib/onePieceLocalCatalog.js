@@ -27,10 +27,6 @@ function getLocalOnePieceImageUrl(card) {
   const sourceUrl = card?.image_url;
   if (!sourceUrl) return null;
 
-  if (hasExternalCatalogAssetBase) {
-    return sourceUrl;
-  }
-
   let extension = '.png';
   try {
     const pathname = new URL(sourceUrl).pathname.toLowerCase();
@@ -39,7 +35,13 @@ function getLocalOnePieceImageUrl(card) {
 
   const cardId = String(card.id || 'unknown');
   const prefix = cardId.slice(0, 2).toLowerCase();
-  return `${getCatalogAssetUrl('onepiece', `images/${prefix}/${encodeURIComponent(cardId)}${extension}`)}?v=${ONE_PIECE_IMAGE_VERSION}`;
+  const mirroredUrl = `${getCatalogAssetUrl('onepiece', `images/${prefix}/${encodeURIComponent(cardId)}${extension}`)}?v=${ONE_PIECE_IMAGE_VERSION}`;
+
+  if (hasExternalCatalogAssetBase) {
+    return mirroredUrl;
+  }
+
+  return mirroredUrl;
 }
 
 async function loadCards() {

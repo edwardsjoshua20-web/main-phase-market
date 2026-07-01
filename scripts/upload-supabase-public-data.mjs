@@ -69,14 +69,18 @@ function contentTypeFor(filePath) {
   }
 }
 
-function shouldSkipFile(relativePath) {
+function shouldSkipFile(relativePath, { includeImages = false } = {}) {
   // Legacy MTG bucket files are too large for Supabase's single-object upload limit.
   // The app uses manifest bucket shards instead: data/mtg/search-shards/*.json.
   if (/^data\/mtg\/search\/.+\.json$/i.test(relativePath)) {
     return true;
   }
 
-  return relativePath.includes('/images/');
+  if (!includeImages && relativePath.includes('/images/')) {
+    return true;
+  }
+
+  return false;
 }
 
 function toObjectKey(relativePath) {
@@ -86,7 +90,7 @@ function toObjectKey(relativePath) {
     .join('/');
 }
 
-function collectFiles(rootDir, uploadPrefix = '') {
+function collectFiles(rootDir, uploadPrefix = '', options = {}) {
   const files = [];
   const normalizedUploadPrefix = String(uploadPrefix || '').trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
 
@@ -100,7 +104,7 @@ function collectFiles(rootDir, uploadPrefix = '') {
       }
 
       const relativePath = path.relative(PUBLIC_ROOT, fullPath).split(path.sep).join('/');
-      if (shouldSkipFile(relativePath)) {
+      if (shouldSkipFile(relativePath, options)) {
         continue;
       }
 
@@ -144,6 +148,8 @@ async function uploadFile({ file, storageBaseUrl, serviceRoleKey }) {
 async function main() {
   const env = readEnvFile(ENV_PATH);
   const uploadPrefix = process.argv[2] || '';
+  const includeImages = process.argv.includes('--include-images');
+  const quietProgress = process.argv.includes('--quiet-progress');
   const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || '';
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
   const bucketName = env.SUPABASE_PUBLIC_BUCKET || 'main-phase-market-public';
@@ -160,7 +166,7 @@ async function main() {
     throw new Error(`Missing data directory: ${DATA_ROOT}`);
   }
 
-  const files = collectFiles(DATA_ROOT, uploadPrefix);
+  const files = collectFiles(DATA_ROOT, uploadPrefix, { includeImages });
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
   const storageBaseUrl = toStorageBaseUrl(supabaseUrl, bucketName);
 
@@ -168,12 +174,17 @@ async function main() {
   if (uploadPrefix) {
     console.log(`Prefix: ${uploadPrefix}`);
   }
+  if (includeImages) {
+    console.log('Including image assets in upload.');
+  }
   console.log(`Total bytes: ${totalBytes}`);
 
   let uploaded = 0;
   for (const file of files) {
     uploaded += 1;
-    console.log(`[${uploaded}/${files.length}] ${file.relativePath}`);
+    if (!quietProgress || uploaded === 1 || uploaded === files.length || uploaded % 50 === 0) {
+      console.log(`[${uploaded}/${files.length}] ${file.relativePath}`);
+    }
     await uploadFile({ file, storageBaseUrl, serviceRoleKey });
   }
 
