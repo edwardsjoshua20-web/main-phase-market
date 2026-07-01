@@ -116,11 +116,12 @@ function CardTile({ card }) {
             alt={card.card_name}
             className="aspect-[0.715] h-auto w-full object-contain"
             loading="lazy"
-            onError={(event) => handleCardImageError(event, card)}
+            onError={(event) => handleCardImageError(event, card, (image) => {
+              image.parentElement?.querySelector('[data-card-tile-fallback]')?.classList.remove('hidden');
+            })}
           />
-        ) : (
-          <div className="flex aspect-[0.715] items-center justify-center text-xs text-white/25">No image</div>
-        )}
+        ) : null}
+        <div data-card-tile-fallback className={`${getCardImageUrl(card) ? 'hidden' : 'flex'} aspect-[0.715] items-center justify-center text-xs text-white/25`}>No image</div>
       </div>
       <div className="mt-2 grid grid-cols-3 gap-0 border border-white/10 bg-white/[0.02] text-center">
         <div className="min-w-0 px-1.5 py-2 sm:px-2">
@@ -153,11 +154,12 @@ function AverageDeckCardTile({ card }) {
             alt={card.card_name}
             className="aspect-[0.715] h-auto w-full object-contain"
             loading="lazy"
-            onError={(event) => handleCardImageError(event, card)}
+            onError={(event) => handleCardImageError(event, card, (image) => {
+              image.parentElement?.querySelector('[data-average-card-fallback]')?.classList.remove('hidden');
+            })}
           />
-        ) : (
-          <div className="flex aspect-[0.715] items-center justify-center text-xs text-white/25">No image</div>
-        )}
+        ) : null}
+        <div data-average-card-fallback className={`${getCardImageUrl(card) ? 'hidden' : 'flex'} aspect-[0.715] items-center justify-center text-xs text-white/25`}>No image</div>
         <div className="absolute left-2 top-2 rounded bg-black/80 px-2 py-1 text-xs font-black uppercase tracking-[0.14em] text-white">
           {card.quantity}x
         </div>
@@ -179,11 +181,12 @@ function DeckPreviewTile({ card }) {
           alt={card.card_name}
           className="aspect-[0.715] h-auto w-full object-contain"
           loading="lazy"
-          onError={(event) => handleCardImageError(event, card)}
+          onError={(event) => handleCardImageError(event, card, (image) => {
+            image.parentElement?.querySelector('[data-deck-preview-fallback]')?.classList.remove('hidden');
+          })}
         />
-      ) : (
-        <div className="flex aspect-[0.715] items-center justify-center text-xs text-white/25">No image</div>
-      )}
+      ) : null}
+      <div data-deck-preview-fallback className={`${getCardImageUrl(card) ? 'hidden' : 'flex'} aspect-[0.715] items-center justify-center text-xs text-white/25`}>No image</div>
       <div className="absolute left-2 top-2 rounded bg-black/80 px-2 py-1 text-xs font-black uppercase tracking-[0.14em] text-white">
         {card.quantity}x
       </div>
@@ -201,11 +204,12 @@ function CommanderUsageTile({ commander, onOpen }) {
             alt={commander.name}
             className="aspect-[0.715] h-auto w-full object-contain"
             loading="lazy"
-            onError={(event) => handleCardImageError(event, commander)}
+            onError={(event) => handleCardImageError(event, commander, (image) => {
+              image.parentElement?.querySelector('[data-commander-usage-fallback]')?.classList.remove('hidden');
+            })}
           />
-        ) : (
-          <div className="flex aspect-[0.715] items-center justify-center text-xs text-white/25">{commander.name}</div>
-        )}
+        ) : null}
+        <div data-commander-usage-fallback className={`${getCardImageUrl(commander) ? 'hidden' : 'flex'} aspect-[0.715] items-center justify-center text-xs text-white/25`}>{commander.name}</div>
       </div>
       <div className="mt-2 border border-white/10 bg-white/[0.02] px-3 py-2">
         <p className="truncate text-sm font-semibold text-white">{commander.name}</p>

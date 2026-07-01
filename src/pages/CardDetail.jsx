@@ -21,6 +21,7 @@ import { getStarWarsCardById } from '@/lib/starwarsLocalCatalog';
 import { getYugiohCardById } from '@/lib/yugiohLocalCatalog';
 import { ManaCost, PlaneswalkerLoyaltyBadge, MtgSymbolText as SharedMtgSymbolText } from '@/components/lib/MtgSymbolText';
 import { PokemonSymbol, PokemonSymbolRow } from '@/components/lib/PokemonSymbol';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const LANGUAGE_LABELS = {
   en: 'English',
@@ -366,7 +367,7 @@ export default function CardDetail() {
       const cartItem = {
         card_id: card.id,
         card_name: card.name,
-        card_image: card.image_url,
+        card_image: getCardImageUrl(card),
         price: card.price,
         quantity: 1
       };
@@ -451,7 +452,7 @@ export default function CardDetail() {
 
           <div className={detailGridClass}>
             <div className={detailMediaPanelClass}>
-              {pokemonCard.image_url ? (
+              {getCardImageUrl(pokemonCard) ? (
                 <div className="relative">
                   {pokemonCard.image_small && (
                     <img
@@ -463,12 +464,13 @@ export default function CardDetail() {
                     />
                   )}
                   <img
-                    src={pokemonCard.image_url}
+                    src={getCardImageUrl(pokemonCard)}
                     alt={pokemonCard.name}
                     className={`w-full h-auto object-contain rounded-xl transition-opacity duration-200 ${pokemonImageLoaded ? 'opacity-100' : 'opacity-0'}`}
                     loading="eager"
                     decoding="async"
                     onLoad={() => setPokemonImageLoaded(true)}
+                    onError={(event) => handleCardImageError(event, pokemonCard)}
                   />
                 </div>
               ) : (
@@ -694,13 +696,14 @@ export default function CardDetail() {
 
           <div className={detailGridClass}>
             <div className={detailMediaPanelClass}>
-              {yugiohCard.image_url ? (
+              {getCardImageUrl(yugiohCard) ? (
                 <img
-                  src={yugiohCard.image_url}
+                  src={getCardImageUrl(yugiohCard)}
                   alt={yugiohCard.name}
                   className="w-full h-auto object-contain rounded-xl"
                   loading="eager"
                   decoding="async"
+                  onError={(event) => handleCardImageError(event, yugiohCard)}
                 />
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
@@ -860,13 +863,14 @@ export default function CardDetail() {
 
           <div className={detailGridClass}>
             <div className={detailMediaPanelClass}>
-              {lorcanaCard.image_url ? (
+              {getCardImageUrl(lorcanaCard) ? (
                 <img
-                  src={lorcanaCard.image_url}
+                  src={getCardImageUrl(lorcanaCard)}
                   alt={lorcanaCard.name}
                   className="w-full h-auto object-contain rounded-xl"
                   loading="eager"
                   decoding="async"
+                  onError={(event) => handleCardImageError(event, lorcanaCard)}
                 />
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
@@ -1009,13 +1013,14 @@ export default function CardDetail() {
 
           <div className={detailGridClass}>
             <div className={detailMediaPanelClass}>
-              {onePieceCard.image_url ? (
+              {getCardImageUrl(onePieceCard) ? (
                 <img
-                  src={onePieceCard.image_url}
+                  src={getCardImageUrl(onePieceCard)}
                   alt={onePieceCard.name}
                   className="w-full h-auto object-contain rounded-xl"
                   loading="eager"
                   decoding="async"
+                  onError={(event) => handleCardImageError(event, onePieceCard)}
                 />
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
@@ -1137,13 +1142,14 @@ export default function CardDetail() {
 
           <div className={detailGridClass}>
             <div className={detailMediaPanelClass}>
-              {fabCard.image_url ? (
+              {getCardImageUrl(fabCard) ? (
                 <img
-                  src={fabCard.image_url}
+                  src={getCardImageUrl(fabCard)}
                   alt={fabCard.name}
                   className="w-full h-auto object-contain rounded-xl"
                   loading="eager"
                   decoding="async"
+                  onError={(event) => handleCardImageError(event, fabCard)}
                 />
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
@@ -1324,13 +1330,14 @@ export default function CardDetail() {
           <div className={detailGridClass}>
             <div className="self-start space-y-4">
               <div className={detailMediaPanelClass}>
-                {starWarsCard.image_url ? (
+                {getCardImageUrl(starWarsCard) ? (
                   <img
-                    src={starWarsCard.image_url}
+                    src={getCardImageUrl(starWarsCard)}
                     alt={starWarsCard.name}
                     className="w-full h-auto object-contain rounded-xl"
                     loading="eager"
                     decoding="async"
+                    onError={(event) => handleCardImageError(event, starWarsCard)}
                   />
                 ) : (
                   <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
@@ -1533,7 +1540,7 @@ export default function CardDetail() {
 
           <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-white rounded-xl border border-gray-200 p-4">
-              {card.image_url ? <img src={card.image_url} alt={card.name} className="w-full h-auto object-contain" /> : <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>}
+              {getCardImageUrl(card) ? <img src={getCardImageUrl(card)} alt={card.name} className="w-full h-auto object-contain" onError={(event) => handleCardImageError(event, card)} /> : <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>}
             </div>
             <div className="space-y-4">
               <h1 className="text-3xl font-bold text-gray-900">{card.name}</h1>
@@ -1585,11 +1592,12 @@ export default function CardDetail() {
 
         <div className={detailGridClass}>
           <div className={detailMediaPanelClass}>
-            {activePrinting.image_url ? (
+            {getCardImageUrl(activePrinting) ? (
               <img
-                src={activePrinting.image_url}
+                src={getCardImageUrl(activePrinting)}
                 alt={activePrinting.raw_name || activePrinting.name}
                 className="w-full h-auto object-contain rounded-xl"
+                onError={(event) => handleCardImageError(event, activePrinting)}
               />
             ) : (
               <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>

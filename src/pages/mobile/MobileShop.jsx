@@ -45,6 +45,7 @@ import { addToGuestCart, getGuestCart, getGuestWishlist } from '@/components/uti
 import { toast } from 'sonner';
 import { inventoryListings } from '@/services/inventoryListings';
 import { enrichSearchResultsWithInventory, findInventoryMatch } from '@/pages/shop/shopUtils';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const GAME_OPTIONS = [
   { value: 'all', label: 'All Games' },
@@ -305,7 +306,7 @@ export default function MobileShop() {
   });
 
   const addToCartFromWishlistMutation = useMutation({
-    mutationFn: (item) => user ? backend.data.CartItem.create({ card_id: item.product_id, card_name: item.product_name, card_image: item.product_image, price: item.price, quantity: 1, user_email: user.email }) : Promise.resolve(),
+    mutationFn: (item) => user ? backend.data.CartItem.create({ card_id: item.product_id, card_name: item.product_name, card_image: getCardImageUrl(item), price: item.price, quantity: 1, user_email: user.email }) : Promise.resolve(),
     onSuccess: () => user && queryClient.invalidateQueries(['cart'])
   });
 
@@ -318,7 +319,7 @@ export default function MobileShop() {
         await backend.data.CartItem.create({
           card_id: stockCard.id,
           card_name: stockCard.name,
-          card_image: stockCard.image_url,
+          card_image: getCardImageUrl(stockCard),
           price: stockCard.price,
           quantity: 1,
           user_email: user.email
@@ -329,7 +330,7 @@ export default function MobileShop() {
       addToGuestCart({
         card_id: stockCard.id,
         card_name: stockCard.name,
-        card_image: stockCard.image_url,
+        card_image: getCardImageUrl(stockCard),
         price: stockCard.price,
         quantity: 1
       });
@@ -531,19 +532,18 @@ export default function MobileShop() {
               >
                 <div className="flex gap-3">
                   <div className="h-24 w-16 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                    {card.image_url ? (
+                    {getCardImageUrl(card) ? (
                       <img
-                        src={card.image_url}
+                        src={getCardImageUrl(card)}
                         alt={card.name}
                         className="h-full w-full object-contain"
                         loading="lazy"
-                        onError={(event) => {
-                          event.currentTarget.style.display = 'none';
-                          event.currentTarget.nextSibling.style.display = 'flex';
-                        }}
+                        onError={(event) => handleCardImageError(event, card, (image) => {
+                          image.nextSibling.style.display = 'flex';
+                        })}
                       />
                     ) : null}
-                    <div className="hidden h-full w-full items-center justify-center text-[10px] text-slate-400">
+                    <div className={`${getCardImageUrl(card) ? 'hidden' : 'flex'} h-full w-full items-center justify-center text-[10px] text-slate-400`}>
                       No Image
                     </div>
                   </div>

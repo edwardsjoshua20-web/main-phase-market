@@ -23,6 +23,7 @@ import {
   Crown
 } from 'lucide-react';
 import { brandAssets } from '@/config/appAssets';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 export default function MobileHeader({
   searchQuery,
@@ -157,25 +158,24 @@ export default function MobileHeader({
                     onClearSearch?.();
                     onResultClick(result);
                   }}
-                  className="w-full px-3 py-2.5 text-left border-b last:border-b-0 hover:bg-blue-50 transition-colors active:bg-blue-100"
+                    className="w-full px-3 py-2.5 text-left border-b last:border-b-0 hover:bg-blue-50 transition-colors active:bg-blue-100"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-14 shrink-0 rounded border border-gray-200 bg-gray-100 overflow-hidden">
-                      {result.image_url ? (
+                      {getCardImageUrl(result) ? (
                         <img
-                          src={result.image_url}
+                          src={getCardImageUrl(result)}
                           alt={result.name}
                           className="w-full h-full object-contain bg-white"
                           loading="lazy"
-                          onError={(event) => {
-                            event.currentTarget.style.display = 'none';
-                            event.currentTarget.parentElement?.querySelector('[data-mobile-search-image-fallback]')?.classList.remove('hidden');
-                          }}
+                          onError={(event) => handleCardImageError(event, result, (image) => {
+                            image.parentElement?.querySelector('[data-mobile-search-image-fallback]')?.classList.remove('hidden');
+                          })}
                         />
                       ) : null}
                       <div
                         data-mobile-search-image-fallback
-                        className={`${result.image_url ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-[10px] text-gray-400`}
+                        className={`${getCardImageUrl(result) ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-[10px] text-gray-400`}
                       >
                         No Image
                       </div>
