@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const CARD_WIDTH = 223;
 const CARD_HEIGHT = 311;
@@ -116,12 +117,13 @@ export default function CardStack({ type, cards, onChangeQty, onRemove, onChange
                     position: 'relative',
                   }}
                 >
-                  {item.product_image ? (
+                  {getCardImageUrl(item) ? (
                     <img
-                      src={item.product_image}
+                      src={getCardImageUrl(item)}
                       alt={item.product_name}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                       draggable={false}
+                      onError={(event) => handleCardImageError(event, item)}
                     />
                   ) : (
                     <div style={{ width: '100%', height: '100%', background: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>

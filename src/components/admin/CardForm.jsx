@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import LocationInput from '@/components/admin/LocationInput';
 import { searchMtgCatalog } from '@/lib/mtgLocalCatalog';
 import { buildInventoryCardPayload } from '@/components/admin/cardInventorySnapshot';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const scanStyle = `
   @keyframes scan {
@@ -545,11 +546,12 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
           {/* Card Info Display */}
           <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg mb-4">
             <div className="flex items-start gap-4">
-              {selectedCard.image_url && (
+              {getCardImageUrl(selectedCard) && (
                 <img
-                  src={selectedCard.image_url}
+                  src={getCardImageUrl(selectedCard)}
                   alt={selectedCard.name}
                   className="w-32 h-auto rounded shadow"
+                  onError={(event) => handleCardImageError(event, selectedCard)}
                 />
               )}
               <div className="flex-1">
@@ -755,14 +757,15 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
                     onClick={() => handleCardSelect(result)}
                     className="w-full flex items-start gap-4 p-3 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-200 mb-2"
                   >
-                    {result.image_url ? (
+                    {getCardImageUrl(result) ? (
                       <img
-                        src={result.image_url}
+                        src={getCardImageUrl(result)}
                         alt={result.name}
                         className="w-24 h-auto rounded shadow-sm flex-shrink-0 cursor-pointer"
-                        onMouseEnter={() => setHoveredImage(result.image_url)}
+                        onMouseEnter={() => setHoveredImage(getCardImageUrl(result))}
                         onMouseLeave={() => setHoveredImage(null)}
                         onClick={(e) => { e.stopPropagation(); setHoveredImage(null); handleCardSelect(result); }}
+                        onError={(event) => handleCardImageError(event, result)}
                       />
                     ) : (
                       <div className="w-24 h-32 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
@@ -835,11 +838,12 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
         {selectedCard && (
           <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start gap-4">
-              {selectedCard.image_url && (
+              {getCardImageUrl(selectedCard) && (
                 <img
-                  src={selectedCard.image_url}
+                  src={getCardImageUrl(selectedCard)}
                   alt={selectedCard.name}
                   className="w-32 h-auto rounded shadow"
+                  onError={(event) => handleCardImageError(event, selectedCard)}
                 />
               )}
               <div className="flex-1">
@@ -1063,8 +1067,8 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
             <div className="space-y-2">
               {batchCards.map((card, index) => (
                 <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  {card.image_url && (
-                    <img src={card.image_url} alt={card.name} className="w-16 h-auto rounded shadow-sm flex-shrink-0" />
+                  {getCardImageUrl(card) && (
+                    <img src={getCardImageUrl(card)} alt={card.name} className="w-16 h-auto rounded shadow-sm flex-shrink-0" onError={(event) => handleCardImageError(event, card)} />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 text-sm truncate">{card.name}</p>

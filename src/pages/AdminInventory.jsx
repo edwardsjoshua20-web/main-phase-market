@@ -50,6 +50,7 @@ import StatsCard from '@/components/admin/StatsCard';
 import DollarCardStatsCard from '@/components/admin/DollarCardStatsCard';
 import { getInventoryCardFinish, getInventoryCardMergeKey } from '@/components/admin/cardInventorySnapshot';
 import { inventoryListings } from '@/services/inventoryListings';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const gameLabels = {
   magic: 'Magic: The Gathering',
@@ -128,6 +129,10 @@ export default function AdminInventory() {
       queryClient.invalidateQueries(['admin-cards']);
       setShowForm(false);
       toast.success(`${count} card${count > 1 ? 's' : ''} added/updated successfully`);
+    },
+    onError: (error) => {
+      console.error('Inventory create failed:', error);
+      toast.error(error?.message || 'Failed to add card');
     }
   });
 
@@ -138,6 +143,10 @@ export default function AdminInventory() {
       setShowForm(false);
       setEditingCard(null);
       toast.success('Card updated successfully');
+    },
+    onError: (error) => {
+      console.error('Inventory update failed:', error);
+      toast.error(error?.message || 'Failed to update card');
     }
   });
 
@@ -146,6 +155,10 @@ export default function AdminInventory() {
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-cards']);
       toast.success('Card deleted');
+    },
+    onError: (error) => {
+      console.error('Inventory delete failed:', error);
+      toast.error(error?.message || 'Failed to delete card');
     }
   });
 
@@ -155,6 +168,10 @@ export default function AdminInventory() {
       queryClient.invalidateQueries(['admin-products']);
       setShowForm(false);
       toast.success('Product added successfully');
+    },
+    onError: (error) => {
+      console.error('Product create failed:', error);
+      toast.error(error?.message || 'Failed to add product');
     }
   });
 
@@ -165,6 +182,10 @@ export default function AdminInventory() {
       setShowForm(false);
       setEditingProduct(null);
       toast.success('Product updated successfully');
+    },
+    onError: (error) => {
+      console.error('Product update failed:', error);
+      toast.error(error?.message || 'Failed to update product');
     }
   });
 
@@ -173,6 +194,10 @@ export default function AdminInventory() {
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-products']);
       toast.success('Product deleted');
+    },
+    onError: (error) => {
+      console.error('Product delete failed:', error);
+      toast.error(error?.message || 'Failed to delete product');
     }
   });
 
@@ -438,8 +463,8 @@ export default function AdminInventory() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-14 rounded bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
-                          {card.image_url && (
-                            <img src={card.image_url} alt="" className="w-full h-full object-contain" />
+                          {getCardImageUrl(card) && (
+                            <img src={getCardImageUrl(card)} alt="" className="w-full h-full object-contain" onError={(event) => handleCardImageError(event, card)} />
                           )}
                         </div>
                         <div>
@@ -581,8 +606,8 @@ export default function AdminInventory() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-14 h-14 rounded bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
-                          {product.image_url && (
-                            <img src={product.image_url} alt="" className="w-full h-full object-cover" />
+                          {getCardImageUrl(product) && (
+                            <img src={getCardImageUrl(product)} alt="" className="w-full h-full object-cover" onError={(event) => handleCardImageError(event, product)} />
                           )}
                         </div>
                         <div>

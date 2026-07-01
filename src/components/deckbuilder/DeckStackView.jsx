@@ -1,5 +1,6 @@
 import React from 'react';
 import CardStack from './CardStack';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const cardTypeCategories = {
   magic: ['Creatures', 'Instants', 'Sorceries', 'Artifacts', 'Enchantments', 'Planeswalkers', 'Battles', 'Lands'],
@@ -71,8 +72,8 @@ function CommanderStack({ commanderItem }) {
       {commanderItem ? (
         <div style={{ position: 'relative', width: 223 }}>
           <div style={{ width: 223, height: 311, borderRadius: 8, overflow: 'hidden', border: '2px solid #fbbf24', boxShadow: '0 0 16px rgba(251,191,36,0.4)' }}>
-            {commanderItem.product_image
-              ? <img src={commanderItem.product_image} alt={commanderItem.product_name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            {getCardImageUrl(commanderItem)
+              ? <img src={getCardImageUrl(commanderItem)} alt={commanderItem.product_name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={(event) => handleCardImageError(event, commanderItem)} />
               : <div style={{ width: '100%', height: '100%', background: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
                   <span style={{ color: '#d1d5db', fontSize: 10, textAlign: 'center' }}>{commanderItem.product_name}</span>
                 </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Plus, Loader2, Sparkles, Star, Zap, Shield, Swords, FlameKindling, Wand2, Gem, TreePine, Layers, CircleDollarSign } from 'lucide-react';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const CATEGORY_CONFIG = {
   new_cards: { label: 'New Cards', icon: Sparkles, color: 'text-green-400', bg: 'bg-green-900/30', border: 'border-green-700' },
@@ -27,8 +28,8 @@ function SynergyCard({ card, onAdd, alreadyInDeck }) {
   return (
     <div className="flex flex-col flex-shrink-0 w-48">
       <div className="relative group rounded-xl overflow-hidden border-2 border-gray-700 hover:border-blue-400 transition-all bg-gray-800 shadow-lg">
-        {card.image_url ? (
-          <img src={card.image_url} alt={card.name} className="w-full aspect-[2/3] object-cover" loading="lazy" />
+        {getCardImageUrl(card) ? (
+          <img src={getCardImageUrl(card)} alt={card.name} className="w-full aspect-[2/3] object-cover" loading="lazy" onError={(event) => handleCardImageError(event, card)} />
         ) : (
           <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center p-3">
             <span className="text-gray-400 text-sm text-center">{card.name}</span>

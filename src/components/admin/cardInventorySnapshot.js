@@ -1,3 +1,5 @@
+import { getCardImageUrl } from '@/lib/cardImages';
+
 function normalizeFinishKey(finish) {
   if (!finish || finish === 'normal') {
     return 'nonfoil';
@@ -72,7 +74,12 @@ export function buildInventoryCardPayload({
     price: finalPrice,
     cost: Number(fallbackCost) || 0,
     quantity: quantity || 1,
-    image_url: selectedCard.image_url,
+    image_url: getCardImageUrl(selectedCard),
+    product_image: getCardImageUrl(selectedCard),
+    english_image_url: selectedCard.english_image_url || null,
+    fallback_image_url: selectedCard.fallback_image_url || null,
+    raw_image_url: selectedCard.raw_image_url || selectedCard.source_image_url || null,
+    oracle_id: selectedCard.oracle_id || null,
     description,
     sku: `${setCode}-${collectorNumber}-${finishPart}-${languagePart}`,
     featured: false,

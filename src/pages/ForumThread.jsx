@@ -17,6 +17,7 @@ import {
   Pin
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 
 const CATEGORY_META = {
   rules_qa: { label: 'Rules', color: 'border-[#cdd8e8] bg-[#eef3f9] text-[#3d5d86]' },
@@ -60,26 +61,33 @@ export default function ForumThread() {
   });
 
   const handleReply = async () => {
-    if (!replyText.trim()) return;
+    if (!replyText.trim() || !user) return;
     setSubmitting(true);
-    await backend.data.ForumReply.create({
-      post_id: postId,
-      content: replyText,
-      author_email: user.email,
-      author_name: user.full_name || user.email,
-      likes: 0,
-      liked_by: [],
-      is_accepted_answer: false
-    });
-    await backend.data.ForumPost.update(postId, {
-      reply_count: (post?.reply_count || 0) + 1,
-      last_reply_at: new Date().toISOString(),
-      last_reply_by: user.full_name || user.email
-    });
-    qc.invalidateQueries(['forum-replies', postId]);
-    qc.invalidateQueries(['forum-post', postId]);
-    setReplyText('');
-    setSubmitting(false);
+    try {
+      await backend.data.ForumReply.create({
+        post_id: postId,
+        content: replyText,
+        author_email: user.email,
+        author_name: user.full_name || user.email,
+        likes: 0,
+        liked_by: [],
+        is_accepted_answer: false
+      });
+      await backend.data.ForumPost.update(postId, {
+        reply_count: (post?.reply_count || 0) + 1,
+        last_reply_at: new Date().toISOString(),
+        last_reply_by: user.full_name || user.email
+      });
+      qc.invalidateQueries(['forum-replies', postId]);
+      qc.invalidateQueries(['forum-post', postId]);
+      setReplyText('');
+      toast.success('Reply posted');
+    } catch (error) {
+      console.error('Forum reply failed:', error);
+      toast.error(error?.message || 'Post reply failed');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleLikePost = async () => {

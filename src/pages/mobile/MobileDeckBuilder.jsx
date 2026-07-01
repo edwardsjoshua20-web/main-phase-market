@@ -23,6 +23,7 @@ import {
   X,
   Image as ImageIcon,
 } from 'lucide-react';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import CartDrawer from '@/components/store/CartDrawer';
@@ -887,8 +888,8 @@ export default function MobileDeckBuilder() {
                     className="grid grid-cols-[4.6rem_minmax(0,1fr)_3.3rem] items-center gap-3 border-b border-slate-200 px-4 py-2 last:border-b-0"
                   >
                     <button type="button" onClick={() => setSelectedAddCard(card)} className="h-24 overflow-hidden rounded bg-slate-100">
-                      {card.image_url ? (
-                        <img src={card.image_url} alt={card.name} className="h-full w-full object-contain" />
+                      {getCardImageUrl(card) ? (
+                        <img src={getCardImageUrl(card)} alt={card.name} className="h-full w-full object-contain" onError={(event) => handleCardImageError(event, card)} />
                       ) : (
                         <div className="flex h-full items-center justify-center text-[10px] text-slate-400">No image</div>
                       )}

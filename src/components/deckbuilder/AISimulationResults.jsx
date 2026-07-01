@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { X, BrainCircuit, ShieldAlert, Sparkles, TrendingUp, Swords } from 'lucide-react';
 import { ManaCost, MtgSymbolText } from '@/components/lib/MtgSymbolText';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const MATCHUP_TONES = {
   mill: { accent: 'bg-sky-400', text: 'text-sky-300', line: 'border-sky-500/25' },
@@ -30,8 +31,8 @@ function SuggestionPreview({ card }) {
 
   return (
     <div className="grid gap-6 border-b border-slate-800 pb-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-      {card.image_url ? (
-        <img src={card.image_url} alt={card.name} className="h-[336px] w-[240px] object-cover shadow-2xl" />
+      {getCardImageUrl(card) ? (
+        <img src={getCardImageUrl(card)} alt={card.name} className="h-[336px] w-[240px] object-cover shadow-2xl" onError={(event) => handleCardImageError(event, card)} />
       ) : (
         <div className="flex h-[336px] w-[240px] items-center justify-center bg-slate-900 text-xs text-slate-500">Card</div>
       )}
@@ -72,8 +73,8 @@ function SuggestionRow({ card, active, onSelect }) {
         active ? 'border-cyan-500/35 bg-slate-900/80' : 'border-slate-800 hover:bg-slate-900/45'
       }`}
     >
-      {card.image_url ? (
-        <img src={card.image_url} alt={card.name} className="h-16 w-12 object-cover" />
+      {getCardImageUrl(card) ? (
+        <img src={getCardImageUrl(card)} alt={card.name} className="h-16 w-12 object-cover" onError={(event) => handleCardImageError(event, card)} />
       ) : (
         <div className="flex h-16 w-12 items-center justify-center bg-slate-900 text-[10px] text-slate-500">Card</div>
       )}

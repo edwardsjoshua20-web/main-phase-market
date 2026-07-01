@@ -9,6 +9,7 @@ import { Loader2, Plus, Search, Swords, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
 import { searchGameLocal } from '@/lib/localSearch';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const GAME_OPTIONS = [
   { value: 'magic', label: 'Magic: The Gathering' },
@@ -473,8 +474,8 @@ export default function DeckBuilder() {
                       {searchResults.map((card, index) => (
                         <div key={`${card.id}-${index}`} className="flex items-center gap-3 rounded-xl border border-gray-200 p-3">
                           <div className="h-16 w-12 overflow-hidden rounded bg-gray-100 shrink-0">
-                            {card.image_url ? (
-                              <img src={card.image_url} alt={card.name} className="h-full w-full object-contain" />
+                            {getCardImageUrl(card) ? (
+                              <img src={getCardImageUrl(card)} alt={card.name} className="h-full w-full object-contain" onError={(event) => handleCardImageError(event, card)} />
                             ) : (
                               <div className="flex h-full items-center justify-center text-[10px] text-gray-400">No image</div>
                             )}
