@@ -63,7 +63,7 @@ export default defineConfig(({ mode }) => {
     ],
     publicDir: externalizePublicData ? false : 'public',
     build: {
-      outDir: externalizePublicData ? 'cf-dist' : 'dist',
+      outDir: 'dist',
       emptyOutDir: true
     },
     resolve: {
