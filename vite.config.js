@@ -40,13 +40,12 @@ function copyFilteredPublicAssetsPlugin({ enabled, rootDir }) {
     name: 'copy-filtered-public-assets',
     apply: 'build',
     writeBundle(outputOptions) {
-      if (!enabled) {
-        return;
-      }
-
-      const publicDir = path.resolve(rootDir, 'public');
       const outDir = path.resolve(rootDir, outputOptions.dir || 'dist');
-      copyDirectoryContents(publicDir, outDir, { exclude: new Set(['data']) });
+
+      if (enabled) {
+        const publicDir = path.resolve(rootDir, 'public');
+        copyDirectoryContents(publicDir, outDir, { exclude: new Set(['data']) });
+      }
 
       const cloudflareOutDir = path.resolve(rootDir, 'cf-dist');
       if (cloudflareOutDir !== outDir) {
