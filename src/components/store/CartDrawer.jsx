@@ -4,6 +4,7 @@ import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 export default function CartDrawer({ open, onClose, items = [], onUpdateQuantity, onRemove }) {
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -31,11 +32,12 @@ export default function CartDrawer({ open, onClose, items = [], onUpdateQuantity
               {items.map((item) => (
                 <div key={item.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
                   <div className="w-16 h-20 bg-white rounded border border-gray-200 overflow-hidden shrink-0">
-                    {item.card_image ? (
+                    {getCardImageUrl(item) ? (
                       <img 
-                        src={item.card_image} 
+                        src={getCardImageUrl(item)} 
                         alt={item.card_name}
                         className="w-full h-full object-contain"
+                        onError={(event) => handleCardImageError(event, item)}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">

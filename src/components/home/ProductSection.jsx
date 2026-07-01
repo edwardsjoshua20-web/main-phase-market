@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronRight, ShoppingCart, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 import HomepageContentShell from '@/components/layout/HomepageContentShell';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const conditionLabels = {
   mint: 'Mint',
@@ -42,7 +43,7 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
         await backend.data.CartItem.create({
           card_id: product.id,
           card_name: product.name,
-          card_image: product.image_url,
+          card_image: getCardImageUrl(product),
           price: product.price,
           quantity: 1,
           user_email: user.email
@@ -58,7 +59,7 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
             id: `guest-${Date.now()}-${Math.random()}`,
             card_id: product.id,
             card_name: product.name,
-            card_image: product.image_url,
+            card_image: getCardImageUrl(product),
             price: product.price,
             quantity: 1
           });
@@ -85,7 +86,7 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
         user_email: user.email,
         product_id: product.id,
         product_name: product.name,
-        product_image: product.image_url,
+        product_image: getCardImageUrl(product),
         price: product.price,
         product_type: product.product_type || 'card'
       });
@@ -129,11 +130,12 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
                 className="group bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-xl hover:border-slate-300 transition-all duration-200 block"
               >
                 <div className="aspect-square bg-gray-100 relative overflow-hidden">
-                  {product.image_url ? (
+                  {getCardImageUrl(product) ? (
                     <img 
-                      src={product.image_url} 
+                      src={getCardImageUrl(product)} 
                       alt={product.name}
                       className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+                      onError={(event) => handleCardImageError(event, product)}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
@@ -208,13 +210,14 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
       </HomepageContentShell>
 
       {/* Large Image Popup on Hover */}
-      {hoveredProduct && hoveredProduct.image_url && (
+      {hoveredProduct && getCardImageUrl(hoveredProduct) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-white rounded-lg shadow-2xl p-3 max-w-xs pointer-events-auto border-4 border-gray-700">
             <img 
-              src={hoveredProduct.image_url} 
+              src={getCardImageUrl(hoveredProduct)} 
               alt={hoveredProduct.name}
               className="w-full h-auto rounded-lg mb-2"
+              onError={(event) => handleCardImageError(event, hoveredProduct)}
             />
             <h3 className="font-bold text-sm text-gray-900 mb-1">{hoveredProduct.name}</h3>
             {hoveredProduct.set_name && (

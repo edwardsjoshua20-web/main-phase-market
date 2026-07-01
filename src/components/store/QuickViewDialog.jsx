@@ -6,6 +6,7 @@ import { ShoppingCart, Heart } from 'lucide-react';
 import { backend } from '@/services/backend';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 export default function QuickViewDialog({ item, open, onClose, user }) {
   const queryClient = useQueryClient();
@@ -16,7 +17,7 @@ export default function QuickViewDialog({ item, open, onClose, user }) {
         await backend.data.CartItem.create({
           card_id: item.id,
           card_name: item.name,
-          card_image: item.image_url,
+          card_image: getCardImageUrl(item),
           price: item.price,
           quantity: 1,
           user_email: user.email
@@ -33,7 +34,7 @@ export default function QuickViewDialog({ item, open, onClose, user }) {
             id: `guest-${item.id}-${Date.now()}`,
             card_id: item.id,
             card_name: item.name,
-            card_image: item.image_url,
+            card_image: getCardImageUrl(item),
             price: item.price,
             quantity: 1
           });
@@ -56,7 +57,7 @@ export default function QuickViewDialog({ item, open, onClose, user }) {
           user_email: user.email,
           product_id: item.id,
           product_name: item.name,
-          product_image: item.image_url,
+          product_image: getCardImageUrl(item),
           price: item.price,
           product_type: item.game ? 'card' : 'product'
         });
@@ -69,7 +70,7 @@ export default function QuickViewDialog({ item, open, onClose, user }) {
             id: `guest-wish-${item.id}-${Date.now()}`,
             product_id: item.id,
             product_name: item.name,
-            product_image: item.image_url,
+            product_image: getCardImageUrl(item),
             price: item.price,
             product_type: item.game ? 'card' : 'product'
           });
@@ -95,11 +96,12 @@ export default function QuickViewDialog({ item, open, onClose, user }) {
         </DialogHeader>
         <div className="grid md:grid-cols-2 gap-6">
           <div className="bg-gray-100 rounded-lg overflow-hidden">
-            {item.image_url ? (
+            {getCardImageUrl(item) ? (
               <img 
-                src={item.image_url} 
+                src={getCardImageUrl(item)} 
                 alt={item.name}
                 className="w-full h-full object-contain p-4"
+                onError={(event) => handleCardImageError(event, item)}
               />
             ) : (
               <div className="w-full h-64 flex items-center justify-center text-gray-400">

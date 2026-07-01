@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Plus, Search, Loader2, MessageSquare, Clock, Flame, Pin, ArrowUpRight } from 'lucide-react';
 import ContentShellWide from '@/components/layout/ContentShellWide';
 import { START_HERE_THREADS } from '@/components/forum/forumSeedData';
+import { toast } from 'sonner';
 
 const GAMES = [
   { key: 'all', label: 'All Games' },
@@ -106,6 +107,10 @@ export default function Forum() {
   }), [filtered, pinned.length]);
 
   const handleSubmit = async () => {
+    if (!user) {
+      toast.error('Sign in to post');
+      return;
+    }
     if (!form.title.trim() || !form.content.trim()) return;
     setSubmitting(true);
     try {
@@ -121,9 +126,10 @@ export default function Forum() {
       qc.invalidateQueries(['forum-posts']);
       setShowNew(false);
       setForm({ title: '', content: '', game: 'magic', category: 'general', tags: [] });
+      toast.success('Discussion posted');
     } catch (error) {
       console.error('Forum thread create failed:', error);
-      window.alert('Posting discussion failed. Restart the backend, then try again.');
+      toast.error(error?.message || 'Posting discussion failed');
     } finally {
       setSubmitting(false);
     }

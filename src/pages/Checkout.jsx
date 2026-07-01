@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { 
   ChevronLeft, 
   Truck, 
@@ -439,8 +440,8 @@ export default function Checkout() {
                   {cartItems.map((item) => (
                     <div key={item.id} className="flex gap-3 items-start">
                       <div className="w-16 h-20 rounded bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
-                        {item.card_image && (
-                          <img src={item.card_image} alt="" className="w-full h-full object-contain" />
+                        {getCardImageUrl(item) && (
+                          <img src={getCardImageUrl(item)} alt="" className="w-full h-full object-contain" onError={(event) => handleCardImageError(event, item)} />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">

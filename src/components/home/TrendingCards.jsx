@@ -6,6 +6,7 @@ import { ChevronRight, Loader2, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import HomepageContentShell from '@/components/layout/HomepageContentShell';
 import { inventoryListings } from '@/services/inventoryListings';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 export default function TrendingCards() {
   const [trendingCards, setTrendingCards] = useState([]);
@@ -16,7 +17,7 @@ export default function TrendingCards() {
     queryFn: async () => {
       try {
         const cards = await inventoryListings.filter({ status: "active" }, "-price", 1000);
-        return cards.filter((card) => Number(card.quantity || 0) > 0 && card.image_url);
+        return cards.filter((card) => Number(card.quantity || 0) > 0 && getCardImageUrl(card));
       } catch {
         return [];
       }
@@ -93,12 +94,17 @@ export default function TrendingCards() {
               className="group bg-slate-900/70 border border-white/10 rounded-xl overflow-hidden hover:border-yellow-400/35 hover:shadow-[0_18px_38px_rgba(0,0,0,0.35)] transition-all duration-200"
             >
               <div className="aspect-[3/4] bg-slate-950/70">
-                <img
-                  src={card.image_url}
-                  alt={card.name}
-                  loading="lazy"
-                  className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform"
-                />
+                {getCardImageUrl(card) ? (
+                  <img
+                    src={getCardImageUrl(card)}
+                    alt={card.name}
+                    loading="lazy"
+                    className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform"
+                    onError={(event) => handleCardImageError(event, card)}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">No Image</div>
+                )}
               </div>
 
               <div className="p-2">

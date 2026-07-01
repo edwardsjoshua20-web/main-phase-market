@@ -250,29 +250,36 @@ function PublishDeckModal({ open, onClose, user, myDecks, onPublished }) {
   const handlePublish = async () => {
     if (!selectedList || !title) { toast.error('Please select a deck and add a title'); return; }
     setSubmitting(true);
-    const list = myDecks.find(d => d.id === selectedList);
-    const commanderItem = list?.items?.find(i => i.is_commander);
+    try {
+      const list = myDecks.find(d => d.id === selectedList);
+      const commanderItem = list?.items?.find(i => i.is_commander);
 
-    await backend.data.CommunityDeck.create({
-      user_email: user.email,
-      user_name: user.full_name,
-      user_avatar: user.avatar_url || null,
-      title,
-      description,
-      commander_name: list?.commander_name || commanderItem?.product_name || '',
-      commander_image: commanderItem?.product_image || '',
-      format: list?.deck_format || 'commander',
-      game: 'magic',
-      items: list?.items || [],
-      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-      likes: 0,
-      liked_by: [],
-      views: 0,
-      is_published: true,
-      card_list_id: list?.id
-    });
-    setSubmitting(false);
-    onPublished();
+      await backend.data.CommunityDeck.create({
+        user_email: user.email,
+        user_name: user.full_name,
+        user_avatar: user.avatar_url || null,
+        title,
+        description,
+        commander_name: list?.commander_name || commanderItem?.product_name || '',
+        commander_image: commanderItem?.product_image || '',
+        format: list?.deck_format || 'commander',
+        game: 'magic',
+        items: list?.items || [],
+        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        likes: 0,
+        liked_by: [],
+        views: 0,
+        is_published: true,
+        card_list_id: list?.id
+      });
+
+      onPublished();
+    } catch (error) {
+      console.error('Community deck publish failed:', error);
+      toast.error(error?.message || 'Publishing deck failed');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

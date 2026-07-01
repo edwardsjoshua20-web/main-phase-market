@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Heart, ShoppingCart } from 'lucide-react';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 export default function SearchResultCard({ result, user, onQuickView, onHoverImage }) {
   const [popupOpen, setPopupOpen] = useState(false);
@@ -32,7 +33,7 @@ export default function SearchResultCard({ result, user, onQuickView, onHoverIma
       user_email: user.email,
       product_id: result.id,
       product_name: result.name,
-      product_image: result.image_url,
+      product_image: getCardImageUrl(result),
       price: result.price || 0,
       product_type: 'card'
     });
@@ -49,7 +50,7 @@ export default function SearchResultCard({ result, user, onQuickView, onHoverIma
       : [...(list.items || []), {
           product_id: result.id,
           product_name: result.name,
-          product_image: result.image_url,
+          product_image: getCardImageUrl(result),
           price: result.price || 0,
           product_type: 'card',
           quantity: 1
@@ -63,20 +64,19 @@ export default function SearchResultCard({ result, user, onQuickView, onHoverIma
   return (
     <div className="group bg-white rounded-lg border border-gray-200 overflow-visible hover:shadow-lg hover:border-gray-400 transition-all duration-200 relative">
       <div className="aspect-square bg-gray-100 relative overflow-hidden rounded-t-lg">
-        {result.image_url ? (
+        {getCardImageUrl(result) ? (
           <img
-            src={result.image_url}
+            src={getCardImageUrl(result)}
             alt={result.name}
             className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300 cursor-pointer"
-            onMouseEnter={() => onHoverImage?.(result.image_url)}
+            onMouseEnter={() => onHoverImage?.(getCardImageUrl(result))}
             onMouseLeave={() => onHoverImage?.(null)}
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.parentElement?.querySelector('[data-image-fallback]')?.classList.remove('hidden');
-            }}
+            onError={(event) => handleCardImageError(event, result, (image) => {
+              image.parentElement?.querySelector('[data-image-fallback]')?.classList.remove('hidden');
+            })}
           />
         ) : null}
-        <div data-image-fallback className={`${result.image_url ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-gray-400`}>No Image</div>
+        <div data-image-fallback className={`${getCardImageUrl(result) ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-gray-400`}>No Image</div>
 
         {/* Heart button */}
         <div className="absolute top-2 right-2">

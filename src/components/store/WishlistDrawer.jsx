@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ShoppingCart, Trash2, Heart, List, Plus, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 export default function WishlistDrawer({ open, onClose, items, onAddToCart, onRemove, user }) {
   const [view, setView] = useState('main'); // 'main' | 'list-detail'
@@ -126,8 +127,8 @@ export default function WishlistDrawer({ open, onClose, items, onAddToCart, onRe
                   {items.map((item) => (
                     <div key={item.id} className="flex gap-3 p-3 border rounded-lg">
                       <div className="w-16 h-16 bg-gray-100 rounded flex-shrink-0 overflow-hidden">
-                        {item.product_image ? (
-                          <img src={item.product_image} alt={item.product_name} className="w-full h-full object-contain" />
+                        {getCardImageUrl(item) ? (
+                          <img src={getCardImageUrl(item)} alt={item.product_name} className="w-full h-full object-contain" onError={(event) => handleCardImageError(event, item)} />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Image</div>
                         )}
@@ -250,8 +251,8 @@ export default function WishlistDrawer({ open, onClose, items, onAddToCart, onRe
                   {selectedList.items.map((item) => (
                     <div key={item.product_id} className="flex gap-3 p-3 border rounded-lg">
                       <div className="w-16 h-16 bg-gray-100 rounded flex-shrink-0 overflow-hidden">
-                        {item.product_image ? (
-                          <img src={item.product_image} alt={item.product_name} className="w-full h-full object-contain" />
+                        {getCardImageUrl(item) ? (
+                          <img src={getCardImageUrl(item)} alt={item.product_name} className="w-full h-full object-contain" onError={(event) => handleCardImageError(event, item)} />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Image</div>
                         )}

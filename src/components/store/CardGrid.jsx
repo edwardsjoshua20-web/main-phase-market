@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Heart } from 'lucide-react';
 import { backend } from '@/services/backend';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const conditionLabels = {
   mint: 'Mint',
@@ -51,7 +52,7 @@ export default function CardGrid({ cards, user }) {
       user_email: user.email,
       product_id: card.id,
       product_name: card.name,
-      product_image: card.image_url,
+      product_image: getCardImageUrl(card),
       price: card.price || 0,
       product_type: 'card'
     });
@@ -70,7 +71,7 @@ export default function CardGrid({ cards, user }) {
       : [...(list.items || []), {
           product_id: card.id,
           product_name: card.name,
-          product_image: card.image_url,
+          product_image: getCardImageUrl(card),
           price: card.price || 0,
           product_type: 'card',
           quantity: 1
@@ -91,11 +92,12 @@ export default function CardGrid({ cards, user }) {
           >
             {/* Card Image */}
             <div className="aspect-[3/4] bg-gray-100 relative overflow-hidden">
-              {card.image_url ? (
+              {getCardImageUrl(card) ? (
                 <img
-                  src={card.image_url}
+                  src={getCardImageUrl(card)}
                   alt={card.name}
                   className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                  onError={(event) => handleCardImageError(event, card)}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
