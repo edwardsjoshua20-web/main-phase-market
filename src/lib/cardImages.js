@@ -3,11 +3,42 @@ function cleanUrl(value) {
   return url && url !== 'null' && url !== 'undefined' ? url : null;
 }
 
+function extractUuidFromText(value) {
+  const text = cleanUrl(value);
+  if (!text) return null;
+
+  const match = text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
+  return match ? match[0] : null;
+}
+
 function getUuidCandidate(card) {
-  const value = cleanUrl(card?.product_id || card?.id || card?.card_id);
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || '')
-    ? value
-    : null;
+  const directValue = cleanUrl(card?.product_id || card?.id || card?.card_id);
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(directValue || '')) {
+    return directValue;
+  }
+
+  return (
+    extractUuidFromText(card?.image_url) ||
+    extractUuidFromText(card?.product_image) ||
+    extractUuidFromText(card?.card_image) ||
+    extractUuidFromText(card?.english_image_url) ||
+    extractUuidFromText(card?.image_normal) ||
+    extractUuidFromText(card?.image_large) ||
+    extractUuidFromText(card?.image_small) ||
+    extractUuidFromText(card?.thumbnail_url) ||
+    extractUuidFromText(card?.images?.large) ||
+    extractUuidFromText(card?.images?.normal) ||
+    extractUuidFromText(card?.images?.small) ||
+    extractUuidFromText(card?.image_uris?.png) ||
+    extractUuidFromText(card?.image_uris?.large) ||
+    extractUuidFromText(card?.image_uris?.normal) ||
+    extractUuidFromText(card?.image_uris?.small) ||
+    extractUuidFromText(card?.card_faces?.[0]?.image_uris?.png) ||
+    extractUuidFromText(card?.card_faces?.[0]?.image_uris?.large) ||
+    extractUuidFromText(card?.card_faces?.[0]?.image_uris?.normal) ||
+    extractUuidFromText(card?.card_faces?.[0]?.image_uris?.small) ||
+    null
+  );
 }
 
 function isMagicCard(card) {
