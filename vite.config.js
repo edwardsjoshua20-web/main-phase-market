@@ -28,6 +28,13 @@ function copyDirectoryContents(sourceDir, targetDir, { exclude = new Set() } = {
   }
 }
 
+function resetDirectory(targetDir) {
+  if (fs.existsSync(targetDir)) {
+    fs.rmSync(targetDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(targetDir, { recursive: true });
+}
+
 function copyFilteredPublicAssetsPlugin({ enabled, rootDir }) {
   return {
     name: 'copy-filtered-public-assets',
@@ -40,6 +47,12 @@ function copyFilteredPublicAssetsPlugin({ enabled, rootDir }) {
       const publicDir = path.resolve(rootDir, 'public');
       const outDir = path.resolve(rootDir, outputOptions.dir || 'dist');
       copyDirectoryContents(publicDir, outDir, { exclude: new Set(['data']) });
+
+      const cloudflareOutDir = path.resolve(rootDir, 'cf-dist');
+      if (cloudflareOutDir !== outDir) {
+        resetDirectory(cloudflareOutDir);
+        copyDirectoryContents(outDir, cloudflareOutDir);
+      }
     }
   };
 }
