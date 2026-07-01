@@ -1,6 +1,7 @@
 import React from 'react';
 import CardStack from './CardStack';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { buildPackedColumns } from '@/lib/deckColumnLayout';
 
 const cardTypeCategories = {
   magic: ['Creatures', 'Instants', 'Sorceries', 'Artifacts', 'Enchantments', 'Planeswalkers', 'Battles', 'Lands'],
@@ -113,27 +114,6 @@ function estimateSectionHeight(section, groupedCards) {
   return stackHeight + priceBarAllowance + headerAllowance + sectionGapAllowance;
 }
 
-function buildBalancedColumns(sections, groupedCards, targetColumnCount) {
-  const seededColumns = Array.from({ length: targetColumnCount }, () => []);
-  const seededHeights = Array.from({ length: targetColumnCount }, () => 0);
-
-  sections.forEach((section, index) => {
-    const smallestColumnIndex = seededHeights.reduce((bestIndex, height, currentIndex, allHeights) => (
-      height < allHeights[bestIndex] ? currentIndex : bestIndex
-    ), 0);
-
-    const preferredColumnIndex = index < targetColumnCount ? index : smallestColumnIndex;
-    const chosenColumnIndex = seededColumns[preferredColumnIndex].length === 0
-      ? preferredColumnIndex
-      : smallestColumnIndex;
-
-    seededColumns[chosenColumnIndex].push(section);
-    seededHeights[chosenColumnIndex] += estimateSectionHeight(section, groupedCards);
-  });
-
-  return seededColumns.filter((column) => column.length > 0);
-}
-
 export default function DeckStackView({
   deck,
   game,
@@ -156,10 +136,11 @@ export default function DeckStackView({
     return acc;
   }, {});
 
+  const stackSectionHeight = (section) => estimateSectionHeight(section, groupedCards);
   const orderedTypes = cardTypeCategories[game] || [];
   const stackColumns = (() => {
     const makeStack = (type) => groupedCards[type]?.length ? { type: 'stack', label: type } : null;
-    const commanderSection = isCommanderFormat ? { type: 'commander' } : null;
+    const commanderSection = isCommanderFormat ? { type: 'commander', anchorColumn: 0 } : null;
 
     if (game === 'magic') {
       const orderedSections = [
@@ -180,7 +161,7 @@ export default function DeckStackView({
         .filter((type) => !usedLabels.has(type))
         .map((type) => ({ type: 'stack', label: type }));
 
-      return buildBalancedColumns([...orderedSections, ...remainingStacks], groupedCards, 4);
+      return buildPackedColumns([...orderedSections, ...remainingStacks], stackSectionHeight, 5);
     }
 
     const primaryTypes = orderedTypes.slice(0, 3);
@@ -195,7 +176,7 @@ export default function DeckStackView({
       .filter((type) => !usedLabels.has(type))
       .map((type) => ({ type: 'stack', label: type }));
 
-    return buildBalancedColumns([...orderedSections, ...remainingStacks], groupedCards, 4);
+    return buildPackedColumns([...orderedSections, ...remainingStacks], stackSectionHeight, 4);
   })();
 
   return (

@@ -15,6 +15,7 @@ import { simulateMtgCommanderDeck } from '@/lib/mtgCommanderCatalog';
 import { getMtgPrintingsByOracleId, searchMtgCatalog } from '@/lib/mtgLocalCatalog';
 import { normalizeDeckGame } from '@/lib/deckSections';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { buildPackedColumns } from '@/lib/deckColumnLayout';
 import { toast } from 'sonner';
 
 const DECK_TYPE_LABELS = {
@@ -231,6 +232,18 @@ function findCopyLimitErrors(items, maxCopies, options = {}) {
   return [...counts.values()]
     .filter((entry) => entry.quantity > maxCopies)
     .map((entry) => `${entry.name} has ${entry.quantity} copies; ${label} limit is ${maxCopies}`);
+}
+
+function estimateCompactSectionHeight(section) {
+  if (!section) return 0;
+  if (section.type === 'commander') return 132;
+
+  const rowCount = Array.isArray(section.group?.items) ? section.group.items.length : 0;
+  const headerAllowance = 34;
+  const rowAllowance = rowCount * 56;
+  const sectionGapAllowance = 20;
+
+  return headerAllowance + rowAllowance + sectionGapAllowance;
 }
 
 export default function AdvancedDeckBuilder() {
@@ -908,12 +921,15 @@ export default function AdvancedDeckBuilder() {
   const deckListColumns = (() => {
     const groupMap = Object.fromEntries(compactDeckGroups.map((group) => [group.label, group]));
     const takeGroup = (label) => groupMap[label] ? { type: 'group', group: groupMap[label] } : null;
-    const commanderSection = isCommanderFormat ? { type: 'commander' } : null;
+    const commanderSection = isCommanderFormat ? { type: 'commander', anchorColumn: 0 } : null;
 
     if (deckGame === 'magic') {
       const usedLabels = new Set(['Artifacts', 'Enchantments', 'Planeswalkers', 'Battles', 'Lands', 'Creatures', 'Instants', 'Sorceries']);
-      const utilityColumn = [
+      const orderedSections = [
         commanderSection,
+        takeGroup('Creatures'),
+        takeGroup('Instants'),
+        takeGroup('Sorceries'),
         takeGroup('Artifacts'),
         takeGroup('Enchantments'),
         takeGroup('Planeswalkers'),
@@ -924,13 +940,7 @@ export default function AdvancedDeckBuilder() {
         .filter((group) => !usedLabels.has(group.label))
         .map((group) => ({ type: 'group', group }));
 
-      return [
-        utilityColumn,
-        [takeGroup('Creatures')].filter(Boolean),
-        [takeGroup('Instants')].filter(Boolean),
-        [takeGroup('Sorceries')].filter(Boolean),
-        remaining,
-      ].filter((column) => column.length > 0);
+      return buildPackedColumns([...orderedSections, ...remaining], estimateCompactSectionHeight, 5);
     }
 
     const genericSections = [
@@ -938,7 +948,7 @@ export default function AdvancedDeckBuilder() {
       ...compactDeckGroups.map((group) => ({ type: 'group', group })),
     ].filter(Boolean);
 
-    return genericSections.map((section) => [section]);
+    return buildPackedColumns(genericSections, estimateCompactSectionHeight, Math.min(4, genericSections.length || 1));
   })();
 
   const handleImportCards = async (importedItems) => {
