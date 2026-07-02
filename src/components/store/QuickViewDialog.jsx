@@ -7,6 +7,7 @@ import { backend } from '@/services/backend';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { addToGuestCart, addToGuestWishlist } from '@/components/utils/guestStorage';
 
 export default function QuickViewDialog({ item, open, onClose, user }) {
   const queryClient = useQueryClient();
@@ -23,24 +24,13 @@ export default function QuickViewDialog({ item, open, onClose, user }) {
           user_email: user.email
         });
       } else {
-        // Guest: save to localStorage
-        const stored = localStorage.getItem('guestCart');
-        const cart = stored ? JSON.parse(stored) : [];
-        const existing = cart.find(c => c.card_id === item.id);
-        if (existing) {
-          existing.quantity += 1;
-        } else {
-          cart.push({
-            id: `guest-${item.id}-${Date.now()}`,
-            card_id: item.id,
-            card_name: item.name,
-            card_image: getCardImageUrl(item),
-            price: item.price,
-            quantity: 1
-          });
-        }
-        localStorage.setItem('guestCart', JSON.stringify(cart));
-        window.dispatchEvent(new Event('guestCartUpdated'));
+        addToGuestCart({
+          card_id: item.id,
+          card_name: item.name,
+          card_image: getCardImageUrl(item),
+          price: item.price,
+          quantity: 1
+        });
       }
     },
     onSuccess: () => {
@@ -62,21 +52,13 @@ export default function QuickViewDialog({ item, open, onClose, user }) {
           product_type: item.game ? 'card' : 'product'
         });
       } else {
-        // Guest: save wishlist to localStorage
-        const stored = localStorage.getItem('guestWishlist');
-        const wishlist = stored ? JSON.parse(stored) : [];
-        if (!wishlist.find(w => w.product_id === item.id)) {
-          wishlist.push({
-            id: `guest-wish-${item.id}-${Date.now()}`,
-            product_id: item.id,
-            product_name: item.name,
-            product_image: getCardImageUrl(item),
-            price: item.price,
-            product_type: item.game ? 'card' : 'product'
-          });
-          localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
-          window.dispatchEvent(new Event('guestWishlistUpdated'));
-        }
+        addToGuestWishlist({
+          product_id: item.id,
+          product_name: item.name,
+          product_image: getCardImageUrl(item),
+          price: item.price,
+          product_type: item.game ? 'card' : 'product'
+        });
       }
     },
     onSuccess: () => {

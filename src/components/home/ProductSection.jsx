@@ -9,6 +9,7 @@ import { ChevronRight, ShoppingCart, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 import HomepageContentShell from '@/components/layout/HomepageContentShell';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { addToGuestCart } from '@/components/utils/guestStorage';
 
 const conditionLabels = {
   mint: 'Mint',
@@ -49,23 +50,13 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
           user_email: user.email
         });
       } else {
-        // Add to guest cart in localStorage
-        const guestCart = JSON.parse(localStorage.getItem('guestCart') || '[]');
-        const existingItem = guestCart.find(item => item.card_id === product.id);
-        if (existingItem) {
-          existingItem.quantity += 1;
-        } else {
-          guestCart.push({
-            id: `guest-${Date.now()}-${Math.random()}`,
-            card_id: product.id,
-            card_name: product.name,
-            card_image: getCardImageUrl(product),
-            price: product.price,
-            quantity: 1
-          });
-        }
-        localStorage.setItem('guestCart', JSON.stringify(guestCart));
-        window.dispatchEvent(new Event('guestCartUpdated'));
+        addToGuestCart({
+          card_id: product.id,
+          card_name: product.name,
+          card_image: getCardImageUrl(product),
+          price: product.price,
+          quantity: 1
+        });
       }
     },
     onSuccess: () => {

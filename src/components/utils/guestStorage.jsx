@@ -7,12 +7,17 @@ export const getGuestCart = () => {
     const stored = localStorage.getItem(CART_KEY);
     return stored ? JSON.parse(stored) : [];
   } catch {
+    localStorage.removeItem(CART_KEY);
     return [];
   }
 };
 
 export const setGuestCart = (cart) => {
-  localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  try {
+    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  } catch {
+    localStorage.removeItem(CART_KEY);
+  }
   window.dispatchEvent(new Event('guestCartUpdated'));
 };
 
@@ -50,12 +55,17 @@ export const getGuestWishlist = () => {
     const stored = localStorage.getItem(WISHLIST_KEY);
     return stored ? JSON.parse(stored) : [];
   } catch {
+    localStorage.removeItem(WISHLIST_KEY);
     return [];
   }
 };
 
 export const setGuestWishlist = (wishlist) => {
-  localStorage.setItem(WISHLIST_KEY, JSON.stringify(wishlist));
+  try {
+    localStorage.setItem(WISHLIST_KEY, JSON.stringify(wishlist));
+  } catch {
+    localStorage.removeItem(WISHLIST_KEY);
+  }
   window.dispatchEvent(new Event('guestWishlistUpdated'));
 };
 

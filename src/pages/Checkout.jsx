@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { clearGuestStorage, getGuestCart } from '@/components/utils/guestStorage';
 import { 
   ChevronLeft, 
   Truck, 
@@ -87,11 +88,7 @@ export default function Checkout() {
           email: userData.email || ''
         }));
       } else {
-        // Load guest cart from localStorage
-        const storedCart = localStorage.getItem('guestCart');
-        if (storedCart) {
-          setGuestCart(JSON.parse(storedCart));
-        }
+        setGuestCart(getGuestCart());
       }
       setLoading(false);
     };
@@ -227,7 +224,7 @@ export default function Checkout() {
     onSuccess: (checkoutUrl) => {
       // Clear guest cart on successful checkout
       if (!user) {
-        localStorage.removeItem('guestCart');
+        clearGuestStorage();
       }
       window.location.href = checkoutUrl;
     },

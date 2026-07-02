@@ -149,6 +149,7 @@ function getStoredSession() {
     return raw ? JSON.parse(raw) : null;
   } catch (error) {
     console.warn('Failed to read Supabase session:', error);
+    window.localStorage.removeItem(SUPABASE_SESSION_KEY);
     return null;
   }
 }
