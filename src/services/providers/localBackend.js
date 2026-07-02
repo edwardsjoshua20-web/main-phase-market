@@ -67,6 +67,15 @@ async function fetchStaticSystemHealth() {
     throw error;
   }
 
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+  if (!contentType.includes('application/json')) {
+    const body = await response.text();
+    const error = new Error('Hosted system health payload is not published yet.');
+    error.status = 503;
+    error.body = body;
+    throw error;
+  }
+
   const payload = await response.json();
   return {
     systemHealth: payload
@@ -754,10 +763,17 @@ export const localBackend = {
     async getCurrentUser() {
       if (hostedSupabaseMode) {
         const token = requireHostedSession();
-        const user = await supabaseRequest('/auth/v1/user', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        return normalizeHostedUser(user);
+        try {
+          const user = await supabaseRequest('/auth/v1/user', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          return normalizeHostedUser(user);
+        } catch (error) {
+          if (error?.status === 401 || error?.status === 403) {
+            storeSession(null);
+          }
+          throw error;
+        }
       }
       if (staticGuestMode) {
         return Promise.resolve(null);

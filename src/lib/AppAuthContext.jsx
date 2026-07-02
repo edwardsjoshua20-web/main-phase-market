@@ -80,13 +80,20 @@ export const AppAuthProvider = ({ children }) => {
       const currentUser = await backend.auth.getCurrentUser();
       setUser(currentUser);
       setIsAuthenticated(true);
+      setAuthError(null);
       setIsLoadingAuth(false);
     } catch (error) {
       console.error('User auth check failed:', error);
+      setUser(null);
       setIsLoadingAuth(false);
       setIsAuthenticated(false);
 
       if (error.status === 401 || error.status === 403) {
+        try {
+          logout(false);
+        } catch (logoutError) {
+          console.warn('Failed to clear invalid session during auth check:', logoutError);
+        }
         setAuthError({
           type: 'auth_required',
           message: 'Authentication required'

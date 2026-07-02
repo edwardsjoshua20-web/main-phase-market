@@ -50,7 +50,7 @@ const AuthenticatedApp = () => {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAppAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError } = useAppAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -62,7 +62,6 @@ const AuthenticatedApp = () => {
 
   if (authError) {
     if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
-    if (authError.type === 'auth_required') { navigateToLogin(); return null; }
   }
 
   // ── MOBILE ── only mobile components load, zero desktop code executes
