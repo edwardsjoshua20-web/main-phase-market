@@ -35,6 +35,51 @@ const sectionIcons = {
   pricing: HardDriveDownload
 };
 
+function formatSourceSummary(source) {
+  if (!source || source.configured === false || source.type === 'missing') {
+    return 'No source configured';
+  }
+
+  if (source.type === 'remote') {
+    return source.url ? `Remote API: ${source.url}` : 'Remote API';
+  }
+
+  if (source.type === 'file') {
+    return source.path || source.envVar || 'File source';
+  }
+
+  return 'Unknown source';
+}
+
+function classifyEntryIssue(entry) {
+  const source = entry?.source || null;
+  const status = String(entry?.status || 'missing').toLowerCase();
+
+  if (status === 'ok') return 'Operational';
+  if (status === 'stale') return 'Output stale';
+  if (status === 'degraded') return 'Output degraded';
+
+  if (status === 'missing') {
+    if (!source || source.configured === false || source.type === 'missing') {
+      return 'Missing source config';
+    }
+
+    if (source.type === 'file' && !source.exists) {
+      return 'Missing source file';
+    }
+
+    if (source.type === 'remote') {
+      return 'Missing generated output';
+    }
+
+    if (source.type === 'file' && source.exists) {
+      return 'Source ready, output missing';
+    }
+  }
+
+  return 'Needs review';
+}
+
 function formatDate(value) {
   if (!value) return '—';
   const date = new Date(value);
@@ -122,6 +167,8 @@ function SectionCard({ title, sectionKey, section }) {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Target</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Issue</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Source</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Updated</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Freshness</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Coverage</th>
@@ -134,6 +181,8 @@ function SectionCard({ title, sectionKey, section }) {
                       {entry.game || entry.source || entry.id || 'entry'}
                     </td>
                     <td className="px-4 py-3 text-sm"><StatusBadge status={entry.status} /></td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{classifyEntryIssue(entry)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 break-all max-w-xs">{formatSourceSummary(entry.source)}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{formatDate(entry.file?.modifiedAt || entry.cards?.file?.modifiedAt || entry.sets?.file?.modifiedAt)}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{formatHours(entry.modifiedHoursAgo)}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">
