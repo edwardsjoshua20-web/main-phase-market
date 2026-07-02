@@ -240,6 +240,26 @@ export default function AdminOperations() {
           <StatsCard title="Missing Areas" value={summary.missing} icon={ServerCrash} color="red" />
         </div>
 
+        {healthQuery.isError && (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="flex flex-col gap-3 p-5 md:flex-row md:items-start md:justify-between">
+              <div className="flex gap-3">
+                <div className="rounded-xl bg-amber-100 p-2.5">
+                  <AlertTriangle className="h-5 w-5 text-amber-700" />
+                </div>
+                <div>
+                  <p className="font-semibold text-amber-900">Live health feed is not connected on the hosted domain yet.</p>
+                  <p className="mt-1 text-sm text-amber-800">
+                    The admin operations panel itself is live, but the hosted site is not returning the runtime health payload yet.
+                    We can still use this page for structure and automation visibility while we wire the hosted health endpoint.
+                  </p>
+                </div>
+              </div>
+              <StatusBadge status="degraded" />
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="border-gray-200">
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
