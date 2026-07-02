@@ -4,6 +4,7 @@ import {
   invokeSupabaseAction,
   uploadSupabaseFile
 } from '@/services/supabaseFunctions';
+import { fetchJsonWithEmbeddedFallback, getEmbeddedSystemHealth } from '@/services/siteStaticSnapshots';
 
 const fallbackSupabaseUrl = 'https://wwvvyrhlybwijqlhubdv.supabase.co';
 const fallbackSupabaseAnonKey = 'sb_publishable_tWMznF-RAJFLR1XiQC7KEQ_VGoezQU9';
@@ -58,27 +59,11 @@ async function apiRequest(path, options = {}) {
 }
 
 async function fetchStaticSystemHealth() {
-  const response = await fetch('/data/site/system-health.json', {
-    cache: 'no-store'
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    const error = new Error(errorText || `Static system health request failed: ${response.status}`);
-    error.status = response.status;
-    throw error;
-  }
-
-  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
-  if (!contentType.includes('application/json')) {
-    const body = await response.text();
-    const error = new Error('Hosted system health payload is not published yet.');
-    error.status = 503;
-    error.body = body;
-    throw error;
-  }
-
-  const payload = await response.json();
+  const payload = await fetchJsonWithEmbeddedFallback(
+    '/data/site/system-health.json',
+    getEmbeddedSystemHealth(),
+    { cache: 'no-store' }
+  );
   return {
     systemHealth: payload
   };

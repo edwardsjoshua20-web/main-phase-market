@@ -1,4 +1,5 @@
 import { backend } from '@/services/backend';
+import { fetchJsonWithEmbeddedFallback, getEmbeddedUpcomingReleasesManifest } from '@/services/siteStaticSnapshots';
 import {
   fallbackHomepageReleases,
   filterUpcomingReleases,
@@ -8,9 +9,11 @@ import {
 
 async function fetchStaticUpcomingReleaseManifest() {
   try {
-    const response = await fetch('/data/site/upcoming-releases.json', { cache: 'no-store' });
-    if (!response.ok) return [];
-    const payload = await response.json();
+    const payload = await fetchJsonWithEmbeddedFallback(
+      '/data/site/upcoming-releases.json',
+      getEmbeddedUpcomingReleasesManifest(),
+      { cache: 'no-store' }
+    );
     const releases = Array.isArray(payload?.releases) ? payload.releases : [];
     return sortUpcomingReleases(releases.map((entry) => normalizeHomepageRelease(entry, 'manifest')));
   } catch {
