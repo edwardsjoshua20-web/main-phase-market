@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import { 
+  Activity,
   ShoppingCart, 
   User, 
   Menu,
