@@ -992,10 +992,16 @@ const localAdminUser = {
 };
 
 app.get('/api/local/health', (_req, res) => {
+  const systemHealthPath = path.join(process.cwd(), 'public', 'data', 'site', 'system-health.json');
+  const systemHealth = fs.existsSync(systemHealthPath)
+    ? parseJsonSafely(fs.readFileSync(systemHealthPath, 'utf8'), null)
+    : null;
+
   res.json({
     ok: true,
     mode: 'local',
-    dbPath: getDbPath()
+    dbPath: getDbPath(),
+    systemHealth
   });
 });
 

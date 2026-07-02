@@ -1,0 +1,69 @@
+{
+  "jobs": [
+    {
+      "id": "mtg-build",
+      "label": "Build MTG catalog",
+      "command": "npm",
+      "args": ["run", "mtg:build"],
+      "requires": [
+        { "type": "file-exists", "path": "server/data/mtg/source/all_cards-latest.json", "label": "MTG source export" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "fab-sets",
+      "label": "Extract FAB sets",
+      "command": "npm",
+      "args": ["run", "fab:extract:sets"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/fab/cards.json", "label": "FAB cards catalog" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "lorcana-sets",
+      "label": "Extract Lorcana sets",
+      "command": "npm",
+      "args": ["run", "lorcana:extract:sets"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/lorcana/cards.json", "label": "Lorcana cards catalog" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "pokemon-sets",
+      "label": "Extract Pokemon sets",
+      "command": "npm",
+      "args": ["run", "pokemon:extract:sets"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/pokemon/cards.json", "label": "Pokemon cards catalog" },
+        { "type": "file-exists", "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json", "label": "Pokemon source export" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "onepiece-sets",
+      "label": "Extract One Piece sets",
+      "command": "npm",
+      "args": ["run", "onepiece:extract:sets"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/onepiece/cards.json", "label": "One Piece cards catalog" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "yugioh-sets",
+      "label": "Extract Yu-Gi-Oh sets",
+      "command": "npm",
+      "args": ["run", "yugioh:extract:sets"],
+      "enabled": true
+    },
+    {
+      "id": "starwars-sets",
+      "label": "Extract Star Wars sets",
+      "command": "npm",
+      "args": ["run", "starwars:extract:sets"],
+      "enabled": true
+    }
+  ]
+}

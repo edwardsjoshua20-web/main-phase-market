@@ -1,0 +1,35 @@
+{
+  "jobs": [
+    {
+      "id": "pokemon-backfill",
+      "label": "Backfill Pokemon cards",
+      "command": "npm",
+      "args": ["run", "pokemon:backfill:cards"],
+      "requires": [
+        { "type": "file-exists", "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json", "label": "Pokemon source export" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "onepiece-backfill",
+      "label": "Backfill One Piece cards",
+      "command": "npm",
+      "args": ["run", "onepiece:backfill:cards"],
+      "enabled": true
+    },
+    {
+      "id": "yugioh-backfill",
+      "label": "Backfill Yu-Gi-Oh cards",
+      "command": "npm",
+      "args": ["run", "yugioh:backfill:cards"],
+      "enabled": true
+    },
+    {
+      "id": "starwars-backfill",
+      "label": "Backfill Star Wars cards",
+      "command": "npm",
+      "args": ["run", "starwars:backfill:cards"],
+      "enabled": true
+    }
+  ]
+}

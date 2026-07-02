@@ -22,6 +22,7 @@ import ForumThread from './pages/ForumThread';
 import RulesReference from './pages/RulesReference';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminInventory from './pages/AdminInventory';
+import AdminOperations from './pages/AdminOperations';
 import AdvancedDeckBuilderBackup from './pages/AdvancedDeckBuilderBackup';
 import MobileShop from './pages/mobile/MobileShop';
 import MobileDeckBuilder from './pages/mobile/MobileDeckBuilder';
@@ -116,6 +117,7 @@ const AuthenticatedApp = () => {
       <Route path="/CardComparison" element={<LayoutWrapper currentPageName="CardComparison"><CardComparison /></LayoutWrapper>} />
       <Route path="/AdvancedDeckBuilderBackup" element={<LayoutWrapper currentPageName="AdvancedDeckBuilderBackup"><AdvancedDeckBuilderBackup /></LayoutWrapper>} />
       <Route path="/AdminDashboard" element={<AdminDashboard />} />
+      <Route path="/AdminOperations" element={<AdminOperations />} />
       <Route path="/Forum" element={<LayoutWrapper currentPageName="Forum"><Forum /></LayoutWrapper>} />
       <Route path="/ForumThread" element={<LayoutWrapper currentPageName="ForumThread"><ForumThread /></LayoutWrapper>} />
       <Route path="/RulesReference" element={<LayoutWrapper currentPageName="RulesReference"><RulesReference /></LayoutWrapper>} />

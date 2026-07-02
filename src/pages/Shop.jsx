@@ -24,13 +24,7 @@ import {
 import { Search, X, Package, Loader2, ChevronDown, ChevronRight, Mail, Layers, Box, Dice1, Heart, ShoppingCart } from 'lucide-react';
 import QuickViewDialog from '@/components/store/QuickViewDialog';
 import AdvancedSearch from '@/components/store/AdvancedSearch';
-import { searchFabCatalog, searchFabCatalogAdvanced } from '@/lib/fabLocalCatalog';
-import { searchLorcanaCatalog, searchLorcanaCatalogAdvanced } from '@/lib/lorcanaLocalCatalog';
-import { searchMtgCatalog, searchMtgCatalogAdvanced } from '@/lib/mtgLocalCatalog';
-import { searchOnePieceCatalog, searchOnePieceCatalogAdvanced } from '@/lib/onePieceLocalCatalog';
-import { searchPokemonCatalog, searchPokemonCatalogAdvanced } from '@/lib/pokemonLocalCatalog';
-import { searchStarWarsCatalog, searchStarWarsCatalogAdvanced } from '@/lib/starwarsLocalCatalog';
-import { searchYugiohCatalog, searchYugiohCatalogAdvanced, searchYugiohSets } from '@/lib/yugiohLocalCatalog';
+import { searchYugiohSets } from '@/lib/yugiohLocalCatalog';
 import { toast } from 'sonner';
 import {
   GAME_OPTIONS,
@@ -40,6 +34,7 @@ import {
   isValidEmail
 } from '@/pages/shop/shopUtils';
 import { inventoryListings } from '@/services/inventoryListings';
+import { performShopCardSearch } from '@/services/search/shopSearch';
 import { addToGuestCart } from '@/components/utils/guestStorage';
 import { createPageUrl } from '@/utils';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
@@ -395,143 +390,17 @@ export default function Shop() {
     setSearchingCards(true);
     setShowCardResults(true);
     try {
-      let formattedResults = [];
       const searchGame = game || (filters.game === 'all' ? 'magic' : filters.game);
+      const { results, meta } = await performShopCardSearch({
+        query,
+        game: searchGame,
+        apiQuery,
+        page: options.page || 0,
+        limit: 36
+      });
 
-      if (searchGame === 'pokemon') {
-        let params = null;
-        try {params = apiQuery ? JSON.parse(apiQuery) : null;} catch {}
-        if (params) {
-          const advancedResponse = await searchPokemonCatalogAdvanced(params, {
-            page: options.page || 0,
-            limit: 36
-          });
-          formattedResults = advancedResponse.results || [];
-          setAdvancedSearchMeta({
-            total: advancedResponse.total || 0,
-            page: advancedResponse.page || 0,
-            limit: advancedResponse.limit || 36,
-            hasMore: Boolean(advancedResponse.hasMore)
-          });
-        } else {
-          formattedResults = await searchPokemonCatalog(query, 500);
-          setAdvancedSearchMeta({ total: 0, page: 0, limit: 36, hasMore: false });
-        }
-      } else if (searchGame === 'magic') {
-        let params = null;
-        try {params = apiQuery ? JSON.parse(apiQuery) : null;} catch {}
-        if (params) {
-            const advancedResponse = await searchMtgCatalogAdvanced(params, {
-              page: options.page || 0,
-            limit: 36
-            });
-          formattedResults = advancedResponse.results || [];
-          setAdvancedSearchMeta({
-            total: advancedResponse.total || 0,
-            page: advancedResponse.page || 0,
-            limit: advancedResponse.limit || 36,
-            hasMore: Boolean(advancedResponse.hasMore)
-          });
-        } else {
-          formattedResults = await searchMtgCatalog(query, 500);
-          setAdvancedSearchMeta({ total: 0, page: 0, limit: 36, hasMore: false });
-        }
-      } else if (searchGame === 'yugioh') {
-        if (apiQuery) {
-          const advancedResponse = await searchYugiohCatalogAdvanced(apiQuery, {
-            page: options.page || 0,
-            limit: 36
-          });
-          formattedResults = advancedResponse.results || [];
-          setAdvancedSearchMeta({
-            total: advancedResponse.total || 0,
-            page: advancedResponse.page || 0,
-            limit: advancedResponse.limit || 36,
-            hasMore: Boolean(advancedResponse.hasMore)
-          });
-        } else {
-          formattedResults = await searchYugiohCatalog(query, 500);
-          setAdvancedSearchMeta({ total: 0, page: 0, limit: 36, hasMore: false });
-        }
-      } else if (searchGame === 'onepiece') {
-        let params = {};
-        try {params = apiQuery ? JSON.parse(apiQuery) : {};} catch {}
-        if (apiQuery) {
-          const advancedResponse = await searchOnePieceCatalogAdvanced(params, {
-            page: options.page || 0,
-            limit: 36
-          });
-          formattedResults = advancedResponse.results || [];
-          setAdvancedSearchMeta({
-            total: advancedResponse.total || 0,
-            page: advancedResponse.page || 0,
-            limit: advancedResponse.limit || 36,
-            hasMore: Boolean(advancedResponse.hasMore)
-          });
-        } else {
-          formattedResults = await searchOnePieceCatalog(query, 500);
-          setAdvancedSearchMeta({ total: 0, page: 0, limit: 36, hasMore: false });
-        }
-      } else if (searchGame === 'lorcana') {
-        let params = {};
-        try {params = apiQuery ? JSON.parse(apiQuery) : {};} catch {}
-        if (apiQuery) {
-          const advancedResponse = await searchLorcanaCatalogAdvanced(params, {
-            page: options.page || 0,
-            limit: 36
-          });
-          formattedResults = advancedResponse.results || [];
-          setAdvancedSearchMeta({
-            total: advancedResponse.total || 0,
-            page: advancedResponse.page || 0,
-            limit: advancedResponse.limit || 36,
-            hasMore: Boolean(advancedResponse.hasMore)
-          });
-        } else {
-          formattedResults = await searchLorcanaCatalog(query, 500);
-          setAdvancedSearchMeta({ total: 0, page: 0, limit: 36, hasMore: false });
-        }
-      } else if (searchGame === 'flesh_and_blood') {
-        let params = {};
-        try {params = apiQuery ? JSON.parse(apiQuery) : {};} catch {}
-        if (apiQuery) {
-          const advancedResponse = await searchFabCatalogAdvanced(params, {
-            page: options.page || 0,
-            limit: 36
-          });
-          formattedResults = advancedResponse.results || [];
-          setAdvancedSearchMeta({
-            total: advancedResponse.total || 0,
-            page: advancedResponse.page || 0,
-            limit: advancedResponse.limit || 36,
-            hasMore: Boolean(advancedResponse.hasMore)
-          });
-        } else {
-          formattedResults = await searchFabCatalog(query, 500);
-          setAdvancedSearchMeta({ total: 0, page: 0, limit: 36, hasMore: false });
-        }
-      } else if (searchGame === 'starwars') {
-        let params = {};
-        try {params = apiQuery ? JSON.parse(apiQuery) : {};} catch {}
-        if (apiQuery) {
-          const advancedResponse = await searchStarWarsCatalogAdvanced(params, {
-            page: options.page || 0,
-            limit: 36
-          });
-          formattedResults = advancedResponse.results || [];
-          setAdvancedSearchMeta({
-            total: advancedResponse.total || 0,
-            page: advancedResponse.page || 0,
-            limit: advancedResponse.limit || 36,
-            hasMore: Boolean(advancedResponse.hasMore)
-          });
-        } else {
-          formattedResults = await searchStarWarsCatalog(query, 500);
-          setAdvancedSearchMeta({ total: 0, page: 0, limit: 36, hasMore: false });
-        }
-      }
-
-      formattedResults = enrichSearchResultsWithInventory(formattedResults, cards, pokemonCards);
+      const formattedResults = enrichSearchResultsWithInventory(results, cards, pokemonCards);
+      setAdvancedSearchMeta(meta);
 
       setCardSearchResults(formattedResults);
     } catch (error) {

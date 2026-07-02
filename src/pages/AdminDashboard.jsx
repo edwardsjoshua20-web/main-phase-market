@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Package, ClipboardList, ArrowRight, Home } from 'lucide-react';
+import { Package, ClipboardList, ArrowRight, Home, Activity } from 'lucide-react';
 
 const tools = [
   {
@@ -15,6 +15,13 @@ const tools = [
     icon: ClipboardList,
     href: '/AdminOrders',
     color: 'bg-green-500'
+  },
+  {
+    title: 'Operations',
+    description: 'See pipeline health, freshness, missing data, and system status in one place.',
+    icon: Activity,
+    href: '/AdminOperations',
+    color: 'bg-purple-500'
   }
 ];
 

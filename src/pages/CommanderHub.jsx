@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import ColorIdentity from '@/components/commander/ColorIdentity';
-import { searchMtgCommanders } from '@/lib/mtgCommanderCatalog';
-import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import CardImage from '@/components/cards/CardImage';
+import { useCommanderHubData } from '@/hooks/useCommanderHubData';
 
 function CommanderSummaryCard({ commander, onOpen }) {
   return (
@@ -14,19 +14,16 @@ function CommanderSummaryCard({ commander, onOpen }) {
       className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-left transition-all hover:-translate-y-0.5 hover:border-orange-400/25 hover:bg-white/[0.05]"
     >
       <div className="relative aspect-[5/7] overflow-hidden bg-slate-950">
-        {getCardImageUrl(commander) ? (
-          <img
-            src={getCardImageUrl(commander)}
-            alt={commander.name}
-            className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-            loading="lazy"
-            onError={(event) => handleCardImageError(event, commander)}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(249,115,22,0.28),transparent_55%),linear-gradient(180deg,#101827,#090c14)]">
-            <span className="text-4xl font-black text-white/20">{commander.name?.charAt(0)}</span>
-          </div>
-        )}
+        <CardImage
+          card={commander}
+          alt={commander.name}
+          className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+          renderFallback={() => (
+            <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(249,115,22,0.28),transparent_55%),linear-gradient(180deg,#101827,#090c14)]">
+              <span className="text-4xl font-black text-white/20">{commander.name?.charAt(0)}</span>
+            </div>
+          )}
+        />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black via-black/70 to-transparent" />
         <div className="absolute left-3 top-3 rounded-full bg-black/65 px-2.5 py-1 text-sm font-black text-white">
           #{commander.rank}
@@ -53,19 +50,16 @@ function BrowseCommanderCard({ commander, onOpen }) {
       className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-left transition-all hover:-translate-y-0.5 hover:border-orange-400/30 hover:bg-white/[0.05]"
     >
       <div className="aspect-[5/7] overflow-hidden bg-slate-900">
-        {getCardImageUrl(commander) ? (
-          <img
-            src={getCardImageUrl(commander)}
-            alt={commander.name}
-            className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-            loading="lazy"
-            onError={(event) => handleCardImageError(event, commander)}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(249,115,22,0.22),transparent_55%),linear-gradient(180deg,#101827,#090c14)]">
-            <span className="text-3xl font-black text-white/20">{commander.name?.charAt(0)}</span>
-          </div>
-        )}
+        <CardImage
+          card={commander}
+          alt={commander.name}
+          className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+          renderFallback={() => (
+            <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(249,115,22,0.22),transparent_55%),linear-gradient(180deg,#101827,#090c14)]">
+              <span className="text-3xl font-black text-white/20">{commander.name?.charAt(0)}</span>
+            </div>
+          )}
+        />
       </div>
       <div className="space-y-2 p-3">
         <ColorIdentity colors={commander.color_identity || []} />
@@ -80,65 +74,15 @@ function BrowseCommanderCard({ commander, onOpen }) {
 
 export default function CommanderHub() {
   const navigate = useNavigate();
-  const [featuredCommanders, setFeaturedCommanders] = useState([]);
-  const [browseResults, setBrowseResults] = useState([]);
-  const [browseTotal, setBrowseTotal] = useState(0);
-  const [featuredLoading, setFeaturedLoading] = useState(true);
-  const [browseLoading, setBrowseLoading] = useState(true);
-  const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadFeatured() {
-      try {
-        const payload = await searchMtgCommanders('', { limit: 10, minDeckCount: 1 });
-        const commanders = (payload.results || []).slice(0, 10);
-        if (!mounted) return;
-        setFeaturedCommanders(commanders);
-      } finally {
-        if (mounted) {
-          setFeaturedLoading(false);
-        }
-      }
-    }
-
-    loadFeatured();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    setBrowseLoading(true);
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        const payload = await searchMtgCommanders(search, {
-          limit: 1000,
-          minDeckCount: 1
-        });
-        if (!mounted) return;
-        setBrowseResults(payload.results || []);
-        setBrowseTotal(payload.total || 0);
-      } finally {
-        if (mounted) {
-          setBrowseLoading(false);
-        }
-      }
-    }, search.trim() ? 120 : 0);
-
-    return () => {
-      mounted = false;
-      clearTimeout(timeoutId);
-    };
-  }, [search]);
-
-  const rankedFeatured = useMemo(
-    () => featuredCommanders.map((commander, index) => ({ ...commander, rank: index + 1 })),
-    [featuredCommanders]
-  );
+  const {
+    browseLoading,
+    browseResults,
+    browseTotal,
+    featuredLoading,
+    rankedFeatured,
+    search,
+    setSearch
+  } = useCommanderHubData();
 
   const openCommander = (oracleId) => {
     navigate(`/commanders/${encodeURIComponent(oracleId)}`);

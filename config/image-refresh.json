@@ -1,0 +1,74 @@
+{
+  "jobs": [
+    {
+      "id": "mtg-images",
+      "label": "Mirror MTG images",
+      "command": "npm",
+      "args": ["run", "mtg:mirror:images", "--", "small,normal,art_crop", "server/data/mtg/source/all_cards-latest.json"],
+      "requires": [
+        { "type": "file-exists", "path": "server/data/mtg/source/all_cards-latest.json", "label": "MTG source export" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "fab-images",
+      "label": "Mirror FAB images",
+      "command": "npm",
+      "args": ["run", "fab:mirror:images"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/fab/cards.json", "label": "FAB cards catalog" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "lorcana-images",
+      "label": "Mirror Lorcana images",
+      "command": "npm",
+      "args": ["run", "lorcana:mirror:images"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/lorcana/cards.json", "label": "Lorcana cards catalog" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "pokemon-images",
+      "label": "Mirror Pokemon images",
+      "command": "npm",
+      "args": ["run", "pokemon:mirror:images"],
+      "requires": [
+        { "type": "file-exists", "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json", "label": "Pokemon source export" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "onepiece-images",
+      "label": "Mirror One Piece images",
+      "command": "npm",
+      "args": ["run", "onepiece:mirror:images"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/onepiece/cards.json", "label": "One Piece cards catalog" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "yugioh-images",
+      "label": "Mirror Yu-Gi-Oh images",
+      "command": "npm",
+      "args": ["run", "yugioh:mirror:images"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/yugioh/cards.json", "label": "Yu-Gi-Oh cards catalog" }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "starwars-images",
+      "label": "Mirror Star Wars images",
+      "command": "npm",
+      "args": ["run", "starwars:mirror:images"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/starwars/cards.json", "label": "Star Wars cards catalog" }
+      ],
+      "enabled": true
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import { getCardImageUrl } from '@/lib/cardImages';
+import { resolveCardPricing } from '@/services/pricing/pricingPipeline';
 
 function normalizeFinishKey(finish) {
   if (!finish || finish === 'normal') {
@@ -56,7 +57,8 @@ export function buildInventoryCardPayload({
     : normalizedFinish === 'etched'
       ? 'Etched Foil'
       : 'Normal');
-  const finalPrice = Math.max(1, Number(selectedCard.price || 0) || 0);
+  const pricing = resolveCardPricing(selectedCard, { floor: 1 });
+  const finalPrice = Math.max(1, Number(pricing.sellPrice || pricing.targetPrice || selectedCard.price || 0) || 0);
   const language = selectedCard.lang || 'en';
   const description = buildDescriptionParts(selectedCard, finishLabel).join(' | ');
   const setCode = buildSkuPart(selectedCard.set_code, 'unk');
@@ -72,6 +74,8 @@ export function buildInventoryCardPayload({
     rarity: selectedCard.rarity,
     condition: selectedCondition,
     price: finalPrice,
+    market_price: pricing.marketPrice,
+    target_price: pricing.targetPrice,
     cost: Number(fallbackCost) || 0,
     quantity: quantity || 1,
     image_url: getCardImageUrl(selectedCard),
@@ -81,6 +85,8 @@ export function buildInventoryCardPayload({
     raw_image_url: selectedCard.raw_image_url || selectedCard.source_image_url || null,
     oracle_id: selectedCard.oracle_id || null,
     description,
+    pricing_sources: pricing.sources,
+    pricing_source_count: pricing.sourceCount,
     sku: `${setCode}-${collectorNumber}-${finishPart}-${languagePart}`,
     featured: false,
     status: 'active',

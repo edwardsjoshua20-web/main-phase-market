@@ -16,6 +16,11 @@ export function normalizeDeckGame(game) {
   return game || 'magic';
 }
 
+export function getDeckSectionOrder(game) {
+  const normalizedGame = normalizeDeckGame(game);
+  return SECTION_ORDERS[normalizedGame] || SECTION_ORDERS.magic;
+}
+
 export function getDeckItemSection(item, game) {
   const normalizedGame = normalizeDeckGame(game);
   const typeLine = String(
@@ -113,8 +118,8 @@ export function groupDeckItems(items = [], game) {
   }, {});
 
   const orderedLabels = [
-    ...(SECTION_ORDERS[normalizedGame] || []),
-    ...Object.keys(grouped).filter((label) => !(SECTION_ORDERS[normalizedGame] || []).includes(label))
+    ...getDeckSectionOrder(normalizedGame),
+    ...Object.keys(grouped).filter((label) => !getDeckSectionOrder(normalizedGame).includes(label))
   ].filter((label, index, array) => array.indexOf(label) === index);
 
   return orderedLabels

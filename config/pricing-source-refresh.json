@@ -1,0 +1,19 @@
+{
+  "jobs": [
+    {
+      "source": "cardkingdom",
+      "input": "docs/cardkingdom-source-template.csv",
+      "enabled": true
+    },
+    {
+      "source": "tcgplayer",
+      "input": "docs/tcgplayer-source-template.csv",
+      "enabled": true
+    },
+    {
+      "source": "starcitygames",
+      "input": "docs/starcitygames-source-template.csv",
+      "enabled": true
+    }
+  ]
+}

@@ -22,6 +22,7 @@ export const supabaseBackend = {
     hasSessionToken() {
       return false;
     },
+    getHealthStatus: failAsync('system health'),
     getPublicSettings: failAsync('app public settings')
   },
   auth: {

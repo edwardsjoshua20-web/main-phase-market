@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { backend } from '@/services/backend';
 import { toast } from 'sonner';
 import LocationInput from '@/components/admin/LocationInput';
-import { searchMtgCatalog } from '@/lib/mtgLocalCatalog';
 import { buildInventoryCardPayload } from '@/components/admin/cardInventorySnapshot';
+import { searchInventoryCards } from '@/services/inventory/inventoryCardSearch';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const scanStyle = `
@@ -134,73 +134,8 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
     setShowResults(true);
     
     try {
-      let formattedResults = [];
-
-      if (selectedGame === 'magic') {
-        formattedResults = await searchMtgCatalog(query, 100);
-      } else if (selectedGame === 'yugioh') {
-        const response = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}`);
-        const data = await response.json();
-        
-        if (data.data) {
-          formattedResults = data.data.map(card => {
-            const cardSet = card.card_sets?.[0];
-            return {
-              id: card.id,
-              name: card.name,
-              set_name: cardSet?.set_name || 'Unknown Set',
-              set_code: cardSet?.set_code || '',
-              card_number: cardSet?.set_code || card.id,
-              rarity: cardSet?.set_rarity || 'common',
-              image_url: card.card_images?.[0]?.image_url,
-              price: card.card_prices?.[0]?.tcgplayer_price ? parseFloat(card.card_prices[0].tcgplayer_price) : null,
-              type: card.type,
-              game: 'yugioh'
-            };
-          });
-        }
-      } else if (selectedGame === 'pokemon') {
-        const apiResponse = await backend.actions.invoke('searchPokemonCards', { query, page: 1, pageSize: 100 });
-        const pokemonCards = apiResponse.data?.data || [];
-
-        formattedResults = pokemonCards.map(card => ({
-          id: card.id,
-          name: card.name,
-          set_name: card.set?.name || 'Unknown Set',
-          set_code: card.set?.id ? card.set.id.toUpperCase() : 'UNK',
-          card_number: card.number || '',
-          rarity: card.rarity || 'Common',
-          image_url: card.images?.small,
-          price: null,
-          type: 'Pokemon',
-          game: 'pokemon',
-          finish: 'normal',
-          finishLabel: 'Normal',
-          availableFinishes: [],
-          allPrices: {}
-        }));
-      }
-
-      // Sort results: exact matches first, then starts with, then contains
-      const sortedResults = formattedResults.sort((a, b) => {
-        const aName = a.name.toLowerCase();
-        const bName = b.name.toLowerCase();
-        const searchLower = query.toLowerCase();
-        
-        const aExact = aName === searchLower ? 0 : 1;
-        const bExact = bName === searchLower ? 0 : 1;
-        
-        if (aExact !== bExact) return aExact - bExact;
-        
-        const aStarts = aName.startsWith(searchLower) ? 0 : 1;
-        const bStarts = bName.startsWith(searchLower) ? 0 : 1;
-        
-        if (aStarts !== bStarts) return aStarts - bStarts;
-        
-        return aName.localeCompare(bName);
-      });
-
-      setSearchResults(sortedResults);
+      const results = await searchInventoryCards(query, selectedGame);
+      setSearchResults(results);
     } catch (error) {
       console.error('Search failed:', error);
       setSearchResults([]);

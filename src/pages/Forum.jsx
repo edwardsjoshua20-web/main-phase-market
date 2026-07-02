@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Plus, Search, Loader2, MessageSquare, Clock, Flame, Pin, ArrowUpRight } from 'lucide-react';
 import ContentShellWide from '@/components/layout/ContentShellWide';
 import { START_HERE_THREADS } from '@/components/forum/forumSeedData';
+import { useForumData } from '@/hooks/useForumData';
+import { createForumThread } from '@/services/community/forumService';
 import { toast } from 'sonner';
 
 const GAMES = [
@@ -46,7 +48,6 @@ function railButton(active) {
 
 export default function Forum() {
   const qc = useQueryClient();
-  const [user, setUser] = useState(null);
   const [game, setGame] = useState('all');
   const [category, setCategory] = useState('all');
   const [sort, setSort] = useState('latest');
@@ -57,48 +58,18 @@ export default function Forum() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    backend.auth.isAuthenticated().then(async (auth) => {
-      if (auth) setUser(await backend.auth.getCurrentUser());
-    });
     const params = new URLSearchParams(window.location.search);
     if (params.get('category')) setCategory(params.get('category'));
   }, []);
 
-  const { data: posts = [], isLoading } = useQuery({
-    queryKey: ['forum-posts', game, category, sort],
-    queryFn: () => {
-      const filter = {};
-      if (game !== 'all') filter.game = game;
-      if (category !== 'all') filter.category = category;
-      return backend.data.ForumPost.filter(filter, sort === 'hot' ? '-likes' : '-created_date', 50);
-    },
-    refetchInterval: 30000
-  });
-
-  const filtered = useMemo(() => posts.filter((post) => (
-    !search
-      || post.title?.toLowerCase().includes(search.toLowerCase())
-      || post.content?.toLowerCase().includes(search.toLowerCase())
-      || (post.tags || []).some((tag) => tag.toLowerCase().includes(search.toLowerCase()))
-  )), [posts, search]);
-
-  const pinned = filtered.filter((post) => post.is_pinned).slice(0, 3);
-  const feed = filtered.filter((post) => !post.is_pinned);
-  const unanswered = filtered
-    .filter((post) => ['rules_qa', 'card_identification'].includes(post.category) && (post.reply_count || 0) === 0)
-    .slice(0, 5)
-    .map((post) => ({
-      ...post,
-      category_label: post.category === 'rules_qa' ? 'Rules' : 'Card Help',
-      game_label:
-        post.game === 'magic' ? 'Magic'
-          : post.game === 'pokemon' ? 'Pokemon'
-            : post.game === 'yugioh' ? 'Yu-Gi-Oh!'
-              : post.game === 'lorcana' ? 'Lorcana'
-                : post.game === 'onepiece' ? 'One Piece'
-                  : post.game === 'flesh_and_blood' ? 'Flesh & Blood'
-                    : 'General'
-    }));
+  const {
+    user,
+    filtered,
+    pinned,
+    feed,
+    unanswered,
+    isLoading
+  } = useForumData({ game, category, sort, search });
 
   const _stats = useMemo(() => ({
     threads: filtered.length,
@@ -114,15 +85,7 @@ export default function Forum() {
     if (!form.title.trim() || !form.content.trim()) return;
     setSubmitting(true);
     try {
-      await backend.data.ForumPost.create({
-        ...form,
-        author_email: user.email,
-        author_name: user.full_name || user.email,
-        view_count: 0,
-        reply_count: 0,
-        likes: 0,
-        liked_by: []
-      });
+      await createForumThread({ form, user });
       qc.invalidateQueries(['forum-posts']);
       setShowNew(false);
       setForm({ title: '', content: '', game: 'magic', category: 'general', tags: [] });

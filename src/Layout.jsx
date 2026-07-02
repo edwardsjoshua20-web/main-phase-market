@@ -43,18 +43,11 @@ import CartDrawer from '@/components/store/CartDrawer';
 import WishlistDrawer from '@/components/store/WishlistDrawer';
 import HeaderShell from '@/components/layout/HeaderShell';
 import FooterShell from '@/components/layout/FooterShell';
-import { searchCards } from '@/components/lib/cardSearch';
-import { searchLorcanaCatalog } from '@/lib/lorcanaLocalCatalog';
-import { searchFabCatalog } from '@/lib/fabLocalCatalog';
-import { searchMtgCatalogSuggestions } from '@/lib/mtgLocalCatalog';
-import { searchOnePieceCatalog } from '@/lib/onePieceLocalCatalog';
-import { searchPokemonCatalog } from '@/lib/pokemonLocalCatalog';
-import { searchStarWarsCatalog } from '@/lib/starwarsLocalCatalog';
-import { searchYugiohCatalog } from '@/lib/yugiohLocalCatalog';
+import { useHeaderCardSearch } from '@/hooks/useHeaderCardSearch';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { getGuestCart, getGuestWishlist, removeFromGuestCart, removeFromGuestWishlist } from '@/components/utils/guestStorage';
 
-const adminPages = ['AdminInventory', 'AdminOrders'];
+const adminPages = ['AdminInventory', 'AdminOrders', 'AdminOperations'];
 
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
@@ -64,14 +57,22 @@ export default function Layout({ children, currentPageName }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [guestCart, setGuestCart] = useState([]);
   const [guestWishlist, setGuestWishlist] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [showSearchResults, setShowSearchResults] = useState(false);
-  const [searching, setSearching] = useState(false);
   const [selectedGame, setSelectedGame] = useState('magic');
   const [isMobile, setIsMobile] = useState(false);
   const queryClient = useQueryClient();
-  const searchTimeoutRef = React.useRef(null);
+  const {
+    searchQuery,
+    searchResults,
+    showSearchResults,
+    setShowSearchResults,
+    searching,
+    handleSearchChange: handleHeaderSearchChange,
+    resetSearch
+  } = useHeaderCardSearch({
+    selectedGame,
+    searchAcrossAllGames: isMobile,
+    delayMs: 500
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -94,133 +95,8 @@ export default function Layout({ children, currentPageName }) {
     };
   }, []);
 
-  const performSearch = async (query, searchAcrossAllGames = false) => {
-   setSearching(true);
-   setShowSearchResults(true);
-
-   let results = [];
-
-   if (searchAcrossAllGames) {
-     // Search across all games
-     const allResults = [];
-
-     const pokemonCards = await searchPokemonCatalog(query, 2);
-     allResults.push(...pokemonCards.map(card => ({
-       ...card,
-       set_code: card.set_code || 'UNK',
-       card_number: card.card_number || '',
-       rarity: card.rarity || 'Common',
-       game: 'pokemon'
-     })));
-
-     // Search Magic from the local MTG catalog.
-     const magicResults = await searchMtgCatalogSuggestions(query, 2);
-     allResults.push(...magicResults.map(card => ({
-       ...card,
-       set_code: card.set_code || card.set_id || 'UNK',
-       card_number: card.card_number || '',
-       rarity: card.rarity || 'Common'
-     })));
-
-     // Search Yu-Gi-Oh
-     const yugiohResults = await searchCards(query, 'yugioh', 2);
-     allResults.push(...yugiohResults.map(card => ({
-       ...card,
-       set_code: card.set_code || card.set_id || 'UNK',
-       card_number: card.card_number || '',
-       rarity: card.rarity || 'Common'
-     })));
-
-     // Search Lorcana
-     const lorcanaCards = await searchLorcanaCatalog(query, 2);
-     allResults.push(...lorcanaCards.map(card => ({
-       ...card,
-       set_code: card.set_code || 'UNK',
-       card_number: card.card_number || '',
-       rarity: card.rarity || 'Common',
-       game: 'lorcana'
-     })));
-
-     // Search One Piece
-     const opCards = await searchOnePieceCatalog(query, 2);
-     allResults.push(...opCards.map(card => ({
-       ...card,
-       set_code: card.set_code || 'OP',
-       card_number: card.card_number || '',
-       rarity: card.rarity || '',
-       game: 'onepiece'
-     })));
-
-     // Search Flesh and Blood
-     const fabCards = await searchFabCatalog(query, 2);
-     allResults.push(...fabCards.slice(0, 2).map(card => ({
-       ...card,
-       game: 'flesh_and_blood'
-     })));
-
-     const starWarsCards = await searchStarWarsCatalog(query, 2);
-     allResults.push(...starWarsCards.slice(0, 2).map(card => ({
-       ...card,
-       game: 'starwars'
-     })));
-
-     results = allResults.slice(0, 10);
-   } else if (selectedGame === 'pokemon') {
-     results = await searchPokemonCatalog(query, 5);
-     results = results.map(card => ({
-       ...card,
-       set_code: card.set_code || 'UNK',
-       card_number: card.card_number || '',
-       rarity: card.rarity || 'Common',
-       game: 'pokemon'
-     }));
-    } else if (selectedGame === 'yugioh') {
-      results = await searchYugiohCatalog(query, 5);
-      results = results.map(card => ({
-        ...card,
-        set_code: card.set_code || 'UNK',
-        card_number: card.card_number || '',
-        rarity: card.rarity || ''
-      }));
-    } else if (selectedGame === 'starwars') {
-      results = await searchStarWarsCatalog(query, 5);
-      results = results.map(card => ({
-        ...card,
-        set_code: card.set_code || 'SWU',
-        card_number: card.card_number || '',
-        rarity: card.rarity || ''
-      }));
-    } else {
-     if (selectedGame === 'magic') {
-       results = await searchMtgCatalogSuggestions(query, 5);
-     } else {
-       results = await searchCards(query, selectedGame, 5);
-     }
-     results = results.map(card => ({
-       ...card,
-       set_code: card.set_code || card.set_id || 'UNK',
-       card_number: card.card_number || '',
-       rarity: card.rarity || 'Common'
-     }));
-   }
-
-   setSearchResults(results);
-   setSearching(false);
-  };
-
   const handleSearchChange = (e) => {
-   const value = e.target.value;
-   setSearchQuery(value);
-
-   if (!value.trim()) {
-     setSearchResults([]);
-     setShowSearchResults(false);
-     return;
-   }
-
-   if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-   const searchAcrossAll = isMobile;
-   searchTimeoutRef.current = setTimeout(() => performSearch(value, searchAcrossAll), 500);
+    handleHeaderSearchChange(e.target.value, isMobile);
   };
 
   const handleSearchButton = () => {
@@ -254,9 +130,7 @@ export default function Layout({ children, currentPageName }) {
   }, [showSearchResults]);
 
   useEffect(() => {
-    setSearchResults([]);
-    setShowSearchResults(false);
-    setSearchQuery('');
+    resetSearch();
   }, [selectedGame]);
 
   useEffect(() => {
@@ -404,11 +278,7 @@ export default function Layout({ children, currentPageName }) {
             const game = result.game || 'pokemon';
             navigate(createPageUrl('Shop') + `?type=single_card&search=${encodeURIComponent(result.name)}&game=${game}`);
           }}
-          onClearSearch={() => {
-            setSearchResults([]);
-            setShowSearchResults(false);
-            setSearchQuery('');
-          }}
+          onClearSearch={resetSearch}
           searching={searching}
         />
         <main className="flex-1 w-full">{children}</main>
@@ -511,6 +381,7 @@ export default function Layout({ children, currentPageName }) {
                       {user.role === 'admin' && (
                         <>
                           <DropdownMenuItem asChild className="text-gray-700 font-semibold"><Link to="/AdminInventory"><Package className="w-4 h-4 mr-2" />Inventory</Link></DropdownMenuItem>
+                          <DropdownMenuItem asChild className="text-gray-700 font-semibold"><Link to="/AdminOperations"><Activity className="w-4 h-4 mr-2" />Operations</Link></DropdownMenuItem>
                           <DropdownMenuSeparator className="bg-gray-200" />
                         </>
                       )}
@@ -538,6 +409,7 @@ export default function Layout({ children, currentPageName }) {
                         <>
                           <Link to={createPageUrl('AdminInventory')} onClick={() => setMobileMenuOpen(false)} className="text-lg text-gray-700 hover:text-blue-600">Inventory</Link>
                           <Link to={createPageUrl('AdminOrders')} onClick={() => setMobileMenuOpen(false)} className="text-lg text-gray-700 hover:text-blue-600">Orders</Link>
+                          <Link to="/AdminOperations" onClick={() => setMobileMenuOpen(false)} className="text-lg text-gray-700 hover:text-blue-600">Operations</Link>
                         </>
                       )}
                     </nav>
@@ -583,7 +455,7 @@ export default function Layout({ children, currentPageName }) {
                           {searchResults.map((result, idx) => (
                             <button
                               key={`${result.id}-${result.set_code}-${idx}`}
-                              onClick={() => { setShowSearchResults(false); setSearchQuery(''); navigate(`/Shop?type=single_card&search=${encodeURIComponent(result.name)}&game=${selectedGame}`); }}
+                              onClick={() => { resetSearch(); navigate(`/Shop?type=single_card&search=${encodeURIComponent(result.name)}&game=${selectedGame}`); }}
                               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 border-b last:border-b-0 transition-colors text-left"
                             >
                               <div className="w-12 h-16 shrink-0 rounded border border-gray-200 bg-gray-100 overflow-hidden">
@@ -681,6 +553,7 @@ export default function Layout({ children, currentPageName }) {
                     {user.role === 'admin' && (
                       <>
                         <DropdownMenuItem asChild className="text-gray-700 font-semibold"><Link to="/AdminInventory"><Package className="w-4 h-4 mr-2" />Inventory</Link></DropdownMenuItem>
+                        <DropdownMenuItem asChild className="text-gray-700 font-semibold"><Link to="/AdminOperations"><Activity className="w-4 h-4 mr-2" />Operations</Link></DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-gray-200" />
                       </>
                     )}

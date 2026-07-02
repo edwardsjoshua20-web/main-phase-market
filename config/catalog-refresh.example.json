@@ -1,0 +1,14 @@
+{
+  "jobs": [
+    {
+      "id": "mtg-build",
+      "label": "Build MTG catalog",
+      "command": "npm",
+      "args": ["run", "mtg:build"],
+      "requires": [
+        { "type": "file-exists", "path": "server/data/mtg/source/all_cards-latest.json", "label": "MTG source export" }
+      ],
+      "enabled": true
+    }
+  ]
+}

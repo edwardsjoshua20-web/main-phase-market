@@ -5,6 +5,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import ForumReplyItem from '@/components/forum/ForumReplyItem';
 import ContentShellWide from '@/components/layout/ContentShellWide';
+import { useForumThreadData } from '@/hooks/useForumThreadData';
+import {
+  acceptForumReply,
+  createForumReply,
+  toggleForumPostLike,
+  toggleForumReplyLike
+} from '@/services/community/forumService';
 import {
   ArrowLeft,
   ThumbsUp,
@@ -30,54 +37,15 @@ export default function ForumThread() {
   const params = new URLSearchParams(window.location.search);
   const postId = params.get('id');
   const qc = useQueryClient();
-  const [user, setUser] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    backend.auth.isAuthenticated().then(async (auth) => {
-      if (auth) setUser(await backend.auth.getCurrentUser());
-    });
-  }, []);
-
-  const { data: post, isLoading: postLoading } = useQuery({
-    queryKey: ['forum-post', postId],
-    queryFn: async () => {
-      const posts = await backend.data.ForumPost.filter({ id: postId }, '-created_date', 1);
-      const currentPost = posts[0];
-      if (currentPost) {
-        backend.data.ForumPost.update(currentPost.id, { view_count: (currentPost.view_count || 0) + 1 }).catch(() => {});
-      }
-      return currentPost;
-    },
-    enabled: !!postId
-  });
-
-  const { data: replies = [], isLoading: repliesLoading } = useQuery({
-    queryKey: ['forum-replies', postId],
-    queryFn: () => backend.data.ForumReply.filter({ post_id: postId }, 'created_date', 200),
-    enabled: !!postId,
-    refetchInterval: 15000
-  });
+  const { user, post, replies, sortedReplies, postLoading, repliesLoading } = useForumThreadData(postId);
 
   const handleReply = async () => {
     if (!replyText.trim() || !user) return;
     setSubmitting(true);
     try {
-      await backend.data.ForumReply.create({
-        post_id: postId,
-        content: replyText,
-        author_email: user.email,
-        author_name: user.full_name || user.email,
-        likes: 0,
-        liked_by: [],
-        is_accepted_answer: false
-      });
-      await backend.data.ForumPost.update(postId, {
-        reply_count: (post?.reply_count || 0) + 1,
-        last_reply_at: new Date().toISOString(),
-        last_reply_by: user.full_name || user.email
-      });
+      await createForumReply({ postId, replyText, user, post });
       qc.invalidateQueries(['forum-replies', postId]);
       qc.invalidateQueries(['forum-post', postId]);
       setReplyText('');
@@ -92,33 +60,19 @@ export default function ForumThread() {
 
   const handleLikePost = async () => {
     if (!user || !post) return;
-    const liked = (post.liked_by || []).includes(user.email);
-    const likedBy = liked
-      ? post.liked_by.filter((email) => email !== user.email)
-      : [...(post.liked_by || []), user.email];
-    await backend.data.ForumPost.update(post.id, { likes: likedBy.length, liked_by: likedBy });
+    await toggleForumPostLike({ post, user });
     qc.invalidateQueries(['forum-post', postId]);
   };
 
   const handleLikeReply = async (reply) => {
     if (!user) return;
-    const liked = (reply.liked_by || []).includes(user.email);
-    const likedBy = liked
-      ? reply.liked_by.filter((email) => email !== user.email)
-      : [...(reply.liked_by || []), user.email];
-    await backend.data.ForumReply.update(reply.id, { likes: likedBy.length, liked_by: likedBy });
+    await toggleForumReplyLike({ reply, user });
     qc.invalidateQueries(['forum-replies', postId]);
   };
 
   const handleAcceptAnswer = async (reply) => {
     if (!post || user?.email !== post.author_email) return;
-    for (const currentReply of replies) {
-      if (currentReply.is_accepted_answer) {
-        await backend.data.ForumReply.update(currentReply.id, { is_accepted_answer: false });
-      }
-    }
-    await backend.data.ForumReply.update(reply.id, { is_accepted_answer: true });
-    await backend.data.ForumPost.update(postId, { is_solved: true });
+    await acceptForumReply({ reply, replies, postId });
     qc.invalidateQueries(['forum-replies', postId]);
     qc.invalidateQueries(['forum-post', postId]);
   };
@@ -144,12 +98,6 @@ export default function ForumThread() {
   const cat = CATEGORY_META[post.category] || CATEGORY_META.general;
   const isPostAuthor = user?.email === post.author_email;
   const hasLikedPost = (post.liked_by || []).includes(user?.email);
-  const sortedReplies = [...replies].sort((a, b) => {
-    if (a.is_accepted_answer && !b.is_accepted_answer) return -1;
-    if (!a.is_accepted_answer && b.is_accepted_answer) return 1;
-    return new Date(a.created_date) - new Date(b.created_date);
-  });
-
   return (
     <div className="min-h-screen bg-[#edf3f8] text-[#172033]">
       <ContentShellWide className="py-6 md:py-8">

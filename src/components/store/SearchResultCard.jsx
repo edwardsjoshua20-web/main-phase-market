@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Heart, ShoppingCart } from 'lucide-react';
-import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import CardImage from '@/components/cards/CardImage';
+import { getCardImageUrl } from '@/lib/cardImages';
 
 export default function SearchResultCard({ result, user, onQuickView, onHoverImage }) {
   const [popupOpen, setPopupOpen] = useState(false);
@@ -64,19 +65,14 @@ export default function SearchResultCard({ result, user, onQuickView, onHoverIma
   return (
     <div className="group bg-white rounded-lg border border-gray-200 overflow-visible hover:shadow-lg hover:border-gray-400 transition-all duration-200 relative">
       <div className="aspect-square bg-gray-100 relative overflow-hidden rounded-t-lg">
-        {getCardImageUrl(result) ? (
-          <img
-            src={getCardImageUrl(result)}
-            alt={result.name}
-            className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300 cursor-pointer"
-            onMouseEnter={() => onHoverImage?.(getCardImageUrl(result))}
-            onMouseLeave={() => onHoverImage?.(null)}
-            onError={(event) => handleCardImageError(event, result, (image) => {
-              image.parentElement?.querySelector('[data-image-fallback]')?.classList.remove('hidden');
-            })}
-          />
-        ) : null}
-        <div data-image-fallback className={`${getCardImageUrl(result) ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-gray-400`}>No Image</div>
+        <CardImage
+          card={result}
+          alt={result.name}
+          className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300 cursor-pointer"
+          fallbackClassName="flex w-full h-full items-center justify-center text-gray-400"
+          onMouseEnter={() => onHoverImage?.(getCardImageUrl(result))}
+          onMouseLeave={() => onHoverImage?.(null)}
+        />
 
         {/* Heart button */}
         <div className="absolute top-2 right-2">

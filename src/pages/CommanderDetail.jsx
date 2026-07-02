@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { ResponsiveContainer, Tooltip, XAxis, YAxis, BarChart, Bar, CartesianGrid } from 'recharts';
+import CardImage from '@/components/cards/CardImage';
 import ColorIdentity from '@/components/commander/ColorIdentity';
-import { getMtgCommanderPage } from '@/lib/mtgCommanderCatalog';
-import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { useCommanderDetailPage } from '@/hooks/useCommanderDetailPage';
 
 const TYPE_COLORS = {
   Land: '#d4a017',
@@ -110,18 +110,12 @@ function CardTile({ card }) {
   return (
     <button type="button" className="text-left">
       <div className="overflow-hidden rounded-md border border-white/10 bg-slate-950">
-        {getCardImageUrl(card) ? (
-          <img
-            src={getCardImageUrl(card)}
-            alt={card.card_name}
-            className="aspect-[0.715] h-auto w-full object-contain"
-            loading="lazy"
-            onError={(event) => handleCardImageError(event, card, (image) => {
-              image.parentElement?.querySelector('[data-card-tile-fallback]')?.classList.remove('hidden');
-            })}
-          />
-        ) : null}
-        <div data-card-tile-fallback className={`${getCardImageUrl(card) ? 'hidden' : 'flex'} aspect-[0.715] items-center justify-center text-xs text-white/25`}>No image</div>
+        <CardImage
+          card={card}
+          alt={card.card_name}
+          className="aspect-[0.715] h-auto w-full object-contain"
+          fallbackClassName="flex aspect-[0.715] items-center justify-center text-xs text-white/25"
+        />
       </div>
       <div className="mt-2 grid grid-cols-3 gap-0 border border-white/10 bg-white/[0.02] text-center">
         <div className="min-w-0 px-1.5 py-2 sm:px-2">
@@ -148,18 +142,12 @@ function AverageDeckCardTile({ card }) {
   return (
     <button type="button" className="text-left">
       <div className="relative overflow-hidden rounded-md border border-white/10 bg-slate-950">
-        {getCardImageUrl(card) ? (
-          <img
-            src={getCardImageUrl(card)}
-            alt={card.card_name}
-            className="aspect-[0.715] h-auto w-full object-contain"
-            loading="lazy"
-            onError={(event) => handleCardImageError(event, card, (image) => {
-              image.parentElement?.querySelector('[data-average-card-fallback]')?.classList.remove('hidden');
-            })}
-          />
-        ) : null}
-        <div data-average-card-fallback className={`${getCardImageUrl(card) ? 'hidden' : 'flex'} aspect-[0.715] items-center justify-center text-xs text-white/25`}>No image</div>
+        <CardImage
+          card={card}
+          alt={card.card_name}
+          className="aspect-[0.715] h-auto w-full object-contain"
+          fallbackClassName="flex aspect-[0.715] items-center justify-center text-xs text-white/25"
+        />
         <div className="absolute left-2 top-2 rounded bg-black/80 px-2 py-1 text-xs font-black uppercase tracking-[0.14em] text-white">
           {card.quantity}x
         </div>
@@ -175,18 +163,12 @@ function AverageDeckCardTile({ card }) {
 function DeckPreviewTile({ card }) {
   return (
     <div className="relative overflow-hidden rounded-md border border-white/10 bg-slate-950">
-      {getCardImageUrl(card) ? (
-        <img
-          src={getCardImageUrl(card)}
-          alt={card.card_name}
-          className="aspect-[0.715] h-auto w-full object-contain"
-          loading="lazy"
-          onError={(event) => handleCardImageError(event, card, (image) => {
-            image.parentElement?.querySelector('[data-deck-preview-fallback]')?.classList.remove('hidden');
-          })}
-        />
-      ) : null}
-      <div data-deck-preview-fallback className={`${getCardImageUrl(card) ? 'hidden' : 'flex'} aspect-[0.715] items-center justify-center text-xs text-white/25`}>No image</div>
+      <CardImage
+        card={card}
+        alt={card.card_name}
+        className="aspect-[0.715] h-auto w-full object-contain"
+        fallbackClassName="flex aspect-[0.715] items-center justify-center text-xs text-white/25"
+      />
       <div className="absolute left-2 top-2 rounded bg-black/80 px-2 py-1 text-xs font-black uppercase tracking-[0.14em] text-white">
         {card.quantity}x
       </div>
@@ -198,18 +180,16 @@ function CommanderUsageTile({ commander, onOpen }) {
   return (
     <button type="button" onClick={onOpen} className="text-left">
       <div className="overflow-hidden rounded-md border border-white/10 bg-slate-950">
-        {getCardImageUrl(commander) ? (
-          <img
-            src={getCardImageUrl(commander)}
-            alt={commander.name}
-            className="aspect-[0.715] h-auto w-full object-contain"
-            loading="lazy"
-            onError={(event) => handleCardImageError(event, commander, (image) => {
-              image.parentElement?.querySelector('[data-commander-usage-fallback]')?.classList.remove('hidden');
-            })}
-          />
-        ) : null}
-        <div data-commander-usage-fallback className={`${getCardImageUrl(commander) ? 'hidden' : 'flex'} aspect-[0.715] items-center justify-center text-xs text-white/25`}>{commander.name}</div>
+        <CardImage
+          card={commander}
+          alt={commander.name}
+          className="aspect-[0.715] h-auto w-full object-contain"
+          renderFallback={() => (
+            <div className="flex aspect-[0.715] items-center justify-center text-xs text-white/25">
+              {commander.name}
+            </div>
+          )}
+        />
       </div>
       <div className="mt-2 border border-white/10 bg-white/[0.02] px-3 py-2">
         <p className="truncate text-sm font-semibold text-white">{commander.name}</p>
@@ -236,137 +216,31 @@ export default function CommanderDetail() {
   const asideRef = useRef(null);
   const commanderRailRef = useRef(null);
   const browseRef = useRef(null);
-  const [commander, setCommander] = useState(null);
-  const [topSynergy, setTopSynergy] = useState([]);
-  const [newCards, setNewCards] = useState([]);
-  const [gameChangers, setGameChangers] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [averageDeckSections, setAverageDeckSections] = useState([]);
-  const [deckRows, setDeckRows] = useState([]);
-  const [topCommanders, setTopCommanders] = useState([]);
-  const [averageDeckProfile, setAverageDeckProfile] = useState({
-    total_decks: 0,
-    average_cards: 0,
-    type_distribution: [],
-    mana_curve: []
-  });
-  const [themeOptions, setThemeOptions] = useState([]);
-  const [activeTheme, setActiveTheme] = useState('');
-  const [activeMode, setActiveMode] = useState('commander');
-  const [totalDecks, setTotalDecks] = useState(0);
-  const [hasLocalData, setHasLocalData] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [browseFloat, setBrowseFloat] = useState({
     mode: 'normal',
     width: 0,
     left: 0,
     height: 0
   });
-
-  useEffect(() => {
-    let mounted = true;
-    const requestedTheme = searchParams.get('theme') || '';
-    const requestedMode = searchParams.get('mode') || 'commander';
-
-    async function load() {
-      try {
-        const pagePayload = await getMtgCommanderPage(oracleId, {
-          theme: requestedTheme,
-          mode: requestedMode
-        });
-        if (!mounted) return;
-        setCommander(pagePayload?.commander || null);
-        setTopSynergy(pagePayload?.top_synergy_cards || []);
-        setNewCards(pagePayload?.new_cards || []);
-        setGameChangers(pagePayload?.game_changers || []);
-        setCategories(pagePayload?.categories || []);
-        setAverageDeckSections(pagePayload?.average_deck_sections || []);
-        setDeckRows(pagePayload?.deck_rows || []);
-        setTopCommanders(pagePayload?.top_commanders || []);
-        setThemeOptions(pagePayload?.theme_options || []);
-        setActiveTheme(pagePayload?.active_theme || '');
-        setActiveMode(pagePayload?.active_mode || 'commander');
-        setAverageDeckProfile(pagePayload?.average_deck_profile || {
-          total_decks: 0,
-          average_cards: 0,
-          type_distribution: [],
-          mana_curve: []
-        });
-        setTotalDecks(pagePayload?.total_decks || 0);
-        setHasLocalData(Boolean(pagePayload?.has_local_data));
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [oracleId, searchParams]);
-
-  const navSections = useMemo(() => {
-    const allowedCategoryOrder = [
-      'Creatures',
-      'Instants',
-      'Sorceries',
-      'Artifacts',
-      'Utility Artifacts',
-      'Mana Artifacts',
-      'Enchantments',
-      'Planeswalkers',
-      'Lands',
-      'Utility Lands'
-    ];
-
-    const sections = [];
-    if (activeMode === 'average-deck') {
-      return averageDeckSections.map((section) => ({
-        id: `average-${section.type.toLowerCase()}`,
-        label: section.label
-      }));
-    }
-    if (activeMode === 'decks') {
-      return [];
-    }
-    if (activeMode === 'card') {
-      const sections = [];
-      if (topCommanders.length > 0) sections.push({ id: 'top-commanders', label: 'Top Commanders' });
-      if (topSynergy.length > 0) sections.push({ id: 'recommended', label: 'Recommended Cards' });
-      if (newCards.length > 0) sections.push({ id: 'new-cards', label: 'New Cards' });
-      if (gameChangers.length > 0) sections.push({ id: 'game-changers', label: 'Game Changers' });
-      return sections;
-    }
-    if (topSynergy.length > 0) sections.push({ id: 'recommended', label: 'Recommended by Synergy' });
-    if (newCards.length > 0) sections.push({ id: 'new-cards', label: 'New Cards' });
-    if (gameChangers.length > 0) sections.push({ id: 'game-changers', label: 'Game Changers' });
-    for (const label of allowedCategoryOrder) {
-      const section = categories.find((entry) => entry.label === label);
-      if (section) {
-        sections.push({ id: `category-${section.category}`, label: section.label });
-      }
-    }
-    return sections;
-  }, [activeMode, averageDeckSections, categories, gameChangers, newCards, topCommanders, topSynergy]);
-
-  const visibleCategories = useMemo(() => {
-    const allowedLabels = new Set([
-      'Creatures',
-      'Instants',
-      'Sorceries',
-      'Artifacts',
-      'Utility Artifacts',
-      'Mana Artifacts',
-      'Enchantments',
-      'Planeswalkers',
-      'Lands',
-      'Utility Lands'
-    ]);
-
-    return categories.filter((section) => allowedLabels.has(section.label));
-  }, [categories]);
+  const {
+    commander,
+    topSynergy,
+    newCards,
+    gameChangers,
+    categories,
+    averageDeckSections,
+    deckRows,
+    topCommanders,
+    averageDeckProfile,
+    themeOptions,
+    activeTheme,
+    activeMode,
+    totalDecks,
+    hasLocalData,
+    navSections,
+    visibleCategories,
+    loading
+  } = useCommanderDetailPage({ oracleId, searchParams });
 
   const chartData = useMemo(() => {
     const typeDistribution = (averageDeckProfile?.type_distribution || []).map((entry, index) => ({
@@ -509,16 +383,16 @@ export default function CommanderDetail() {
           <aside ref={asideRef} className="space-y-5 xl:relative xl:self-start">
             <div ref={commanderRailRef} className="border border-white/10 bg-white/[0.02] p-5">
               <div className="overflow-hidden rounded-md border border-white/10 bg-slate-950">
-                {getCardImageUrl(commander) ? (
-                  <img
-                    src={getCardImageUrl(commander)}
-                    alt={commander.name}
-                    className="h-auto w-full object-contain"
-                    onError={(event) => handleCardImageError(event, commander)}
-                  />
-                ) : (
-                  <div className="flex aspect-[0.715] items-center justify-center text-white/20">{commander.name}</div>
-                )}
+                <CardImage
+                  card={commander}
+                  alt={commander.name}
+                  className="h-auto w-full object-contain"
+                  renderFallback={() => (
+                    <div className="flex aspect-[0.715] items-center justify-center text-white/20">
+                      {commander.name}
+                    </div>
+                  )}
+                />
               </div>
 
               <div className="mt-5">

@@ -1,36 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { backend } from '@/services/backend';
-import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import {
-  fallbackHeroReleases,
-  getHeroCtas,
-  getHeroImage,
-  getHeroSupportLine,
-} from '@/components/home/heroData';
-import { getUpcomingHeroReleases } from '@/components/home/getUpcomingHeroReleases';
+import { fallbackHomepageReleases } from '@/services/homepage/homepageReleaseFeed';
 
-export default function HeroBanner() {
+export default function HeroBanner({ releases = fallbackHomepageReleases }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [animating, setAnimating] = useState(false);
   const animatingRef = React.useRef(false);
 
-  const { data: preorders = [] } = useQuery({
-    queryKey: ['hero-preorders'],
-    queryFn: async () => {
-      try {
-        const products = await backend.data.Product.filter({ is_preorder: true }, 'release_date', 20);
-        return getUpcomingHeroReleases(products);
-      } catch {
-        return [];
-      }
-    },
-    refetchInterval: 60000,
-  });
-
-  const releases = preorders.length > 0 ? preorders : fallbackHeroReleases;
+  const safeReleases = releases.length > 0 ? releases : fallbackHomepageReleases;
 
   const goTo = (idx) => {
     if (animatingRef.current) return;
@@ -45,18 +24,18 @@ export default function HeroBanner() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % releases.length);
+      setCurrentIndex(prev => (prev + 1) % safeReleases.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, [releases.length]);
+  }, [safeReleases.length]);
 
-  const goNext = () => goTo((currentIndex + 1) % releases.length);
-  const goPrev = () => goTo((currentIndex - 1 + releases.length) % releases.length);
+  const goNext = () => goTo((currentIndex + 1) % safeReleases.length);
+  const goPrev = () => goTo((currentIndex - 1 + safeReleases.length) % safeReleases.length);
 
-  const current = releases[currentIndex] || fallbackHeroReleases[0];
-  const bannerImage = getHeroImage(current);
-  const supportLine = getHeroSupportLine(current);
-  const { singlesHref } = getHeroCtas(current);
+  const current = safeReleases[currentIndex] || fallbackHomepageReleases[0];
+  const bannerImage = current.imageUrl || fallbackHomepageReleases[0].imageUrl;
+  const supportLine = current.supportLine || current.gameLabel || 'Upcoming release';
+  const singlesHref = current.links?.shopSearch || '/Shop';
 
   return (
     <section className="relative overflow-hidden w-full bg-slate-950" style={{ height: '248px' }}>
@@ -90,12 +69,12 @@ export default function HeroBanner() {
           </div>
         </div>
 
-        {releases.length > 1 && (
+        {safeReleases.length > 1 && (
           <div className="absolute bottom-4 left-4 flex items-center gap-2">
             <button onClick={goPrev} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/20 text-white/70 hover:text-white hover:bg-white/10 transition-colors backdrop-blur-sm">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            {releases.map((_, idx) => (
+            {safeReleases.map((_, idx) => (
               <button
                 key={idx}
                 onClick={() => goTo(idx)}

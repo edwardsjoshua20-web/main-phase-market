@@ -2,67 +2,7 @@ import React from 'react';
 import CardStack from './CardStack';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { buildPackedColumns } from '@/lib/deckColumnLayout';
-
-const cardTypeCategories = {
-  magic: ['Creatures', 'Instants', 'Sorceries', 'Artifacts', 'Enchantments', 'Planeswalkers', 'Battles', 'Lands'],
-  pokemon: ['Pokemon', 'Trainer', 'Energy'],
-  yugioh: ['Monsters', 'Spells', 'Traps'],
-  lorcana: ['Characters', 'Actions', 'Songs', 'Items', 'Locations'],
-  onepiece: ['Leader', 'Characters', 'Events', 'Stages', 'DON!!'],
-  flesh_and_blood: ['Hero', 'Weapon', 'Equipment', 'Actions', 'Instants', 'Allies'],
-  starwars: ['Leader', 'Base', 'Units', 'Events', 'Upgrades']
-};
-
-const getCardType = (cardTypeString, game) => {
-  if (!cardTypeString) return 'Other';
-  const frontFace = cardTypeString.split('//')[0];
-  const t = frontFace.toLowerCase();
-
-  if (game === 'magic') {
-    if (t.includes('land')) return 'Lands';
-    if (t.includes('creature')) return 'Creatures';
-    if (t.includes('planeswalker')) return 'Planeswalkers';
-    if (t.includes('battle')) return 'Battles';
-    if (t.includes('instant')) return 'Instants';
-    if (t.includes('sorcery')) return 'Sorceries';
-    if (t.includes('enchantment')) return 'Enchantments';
-    if (t.includes('artifact')) return 'Artifacts';
-  } else if (game === 'pokemon') {
-    if (t.includes('energy')) return 'Energy';
-    if (t.includes('trainer')) return 'Trainer';
-    if (t.includes('pok')) return 'Pokemon';
-  } else if (game === 'yugioh') {
-    if (t.includes('spell')) return 'Spells';
-    if (t.includes('trap')) return 'Traps';
-    if (t.includes('monster') || t.includes('effect') || t.includes('fusion') || t.includes('synchro') || t.includes('xyz') || t.includes('link') || t.includes('ritual') || t.includes('normal') || t.includes('gemini') || t.includes('union') || t.includes('spirit') || t.includes('toon') || t.includes('flip')) return 'Monsters';
-  } else if (game === 'lorcana') {
-    if (t.includes('location')) return 'Locations';
-    if (t.includes('item')) return 'Items';
-    if (t.includes('song')) return 'Songs';
-    if (t.includes('action')) return 'Actions';
-    if (t.includes('character')) return 'Characters';
-  } else if (game === 'onepiece') {
-    if (t.includes('leader')) return 'Leader';
-    if (t.includes('stage')) return 'Stages';
-    if (t.includes('event')) return 'Events';
-    if (t.includes('don')) return 'DON!!';
-    if (t.includes('character')) return 'Characters';
-  } else if (game === 'flesh_and_blood') {
-    if (t.includes('hero')) return 'Hero';
-    if (t.includes('weapon')) return 'Weapon';
-    if (t.includes('equipment')) return 'Equipment';
-    if (t.includes('ally')) return 'Allies';
-    if (t.includes('instant')) return 'Instants';
-    if (t.includes('action') || t.includes('attack reaction') || t.includes('reaction')) return 'Actions';
-  } else if (game === 'starwars') {
-    if (t.includes('leader')) return 'Leader';
-    if (t.includes('base')) return 'Base';
-    if (t.includes('upgrade')) return 'Upgrades';
-    if (t.includes('event')) return 'Events';
-    if (t.includes('unit')) return 'Units';
-  }
-  return 'Other';
-};
+import { getDeckSectionOrder, groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
 
 function CommanderStack({ commanderItem }) {
   return (
@@ -129,20 +69,16 @@ export default function DeckStackView({
     ? (deck?.items || []).filter(i => !i.is_commander)
     : (deck?.items || []);
 
-  const groupedCards = nonCommanderItems.reduce((acc, item) => {
-    const type = getCardType(item.type || item.type_line, game);
-    if (!acc[type]) acc[type] = [];
-    acc[type].push(item);
-    return acc;
-  }, {});
-
+  const normalizedGame = normalizeDeckGame(game);
+  const deckGroups = groupDeckItems(nonCommanderItems, normalizedGame);
+  const groupedCards = Object.fromEntries(deckGroups.map((group) => [group.label, group.items]));
   const stackSectionHeight = (section) => estimateSectionHeight(section, groupedCards);
-  const orderedTypes = cardTypeCategories[game] || [];
+  const orderedTypes = getDeckSectionOrder(normalizedGame).filter((label) => label !== 'Commander' && label !== 'Other');
   const stackColumns = (() => {
     const makeStack = (type) => groupedCards[type]?.length ? { type: 'stack', label: type } : null;
     const commanderSection = isCommanderFormat ? { type: 'commander', anchorColumn: 0 } : null;
 
-    if (game === 'magic') {
+    if (normalizedGame === 'magic') {
       const orderedSections = [
         commanderSection,
         makeStack('Creatures'),

@@ -2,21 +2,23 @@ import React from 'react';
 import { backend } from '@/services/backend';
 import { useQuery } from '@tanstack/react-query';
 import HeroBanner from '@/components/home/HeroBanner';
+import NewReleasesBar from '@/components/home/NewReleasesBar';
 import ProductSection from '@/components/home/ProductSection';
 import GameTabs from '@/components/home/GameTabs';
 import TrendingCards from '@/components/home/TrendingCards';
 import CoreActionsSection from '@/components/home/CoreActionsSection';
 import { createPageUrl } from '@/utils';
 import { inventoryListings } from '@/services/inventoryListings';
+import { useHomepageContent } from '@/hooks/useHomepageContent';
 
 export default function Home() {
-  // Fetch products - using Card entity for now, will migrate to Product
+  const { data: homepageContent } = useHomepageContent();
+
   const { data: cards = [] } = useQuery({
     queryKey: ['home-cards'],
     queryFn: () => inventoryListings.filter({ status: 'active' }, '-price'),
   });
 
-  // Try to fetch products if entity exists
   const { data: products = [] } = useQuery({
     queryKey: ['home-products'],
     queryFn: async () => {
@@ -28,13 +30,11 @@ export default function Home() {
     },
   });
 
-  // Combine cards and products, prefer products if available
   const allProducts = products.length > 0 ? products : cards.map(card => ({
     ...card,
     product_type: 'single_card'
   }));
 
-  // Filter by categories
   const featuredProducts = allProducts.filter(p => p.featured).slice(0, 6);
   const sealedProducts = allProducts.filter(p => ['booster_box', 'starter_deck', 'bundle', 'sealed_product'].includes(p.product_type)).slice(0, 6);
   const diceAccessories = allProducts.filter(p => ['dice', 'accessories'].includes(p.product_type)).slice(0, 6);
@@ -43,8 +43,10 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-slate-50/40 to-white w-full">
       <div className="hidden md:block">
-        <HeroBanner />
+        <HeroBanner releases={homepageContent?.heroReleases} />
       </div>
+
+      <NewReleasesBar upcomingSets={homepageContent?.upcomingReleases || []} />
 
       <CoreActionsSection />
       <div className="hidden md:block">
@@ -72,7 +74,6 @@ export default function Home() {
         />
       )}
 
-      {/* Empty State */}
       {allProducts.length === 0 && (
         <div className="py-20 text-center">
           <div className="max-w-md mx-auto">
@@ -89,5 +90,3 @@ export default function Home() {
     </div>
   );
 }
-
-

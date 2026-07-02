@@ -4,6 +4,7 @@ import {
   getInventoryCardFinish,
   getInventoryCardLanguage
 } from '@/components/admin/cardInventorySnapshot';
+import { normalizeInventoryPricing } from '@/services/pricing/pricingPipeline';
 
 function extractOracleId(card) {
   const match = String(card?.description || '').match(/Oracle ID:\s*([a-f0-9-]{8,})/i);
@@ -14,6 +15,7 @@ function normalizeInventoryListing(card) {
   const finish = getInventoryCardFinish(card) || 'nonfoil';
   const language = getInventoryCardLanguage(card);
   const oracleId = extractOracleId(card);
+  const pricing = normalizeInventoryPricing(card);
 
   return {
     ...card,
@@ -25,8 +27,7 @@ function normalizeInventoryListing(card) {
     catalog_oracle_id: oracleId,
     catalog_lang: language,
     catalog_finish: finish,
-    cost_basis: Number(card.cost || 0),
-    sell_price: Number(card.price || 0),
+    ...pricing,
     in_stock: Number(card.quantity || 0) > 0 && card.status === 'active'
   };
 }

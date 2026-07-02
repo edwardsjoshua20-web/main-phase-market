@@ -1,0 +1,14 @@
+{
+  "jobs": [
+    {
+      "id": "fab-images",
+      "label": "Mirror FAB images",
+      "command": "npm",
+      "args": ["run", "fab:mirror:images"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/fab/cards.json", "label": "FAB cards catalog" }
+      ],
+      "enabled": true
+    }
+  ]
+}

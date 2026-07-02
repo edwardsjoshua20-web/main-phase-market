@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
 import { searchGameLocal } from '@/lib/localSearch';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { calculateDeckValue } from '@/services/pricing/pricingPipeline';
 
 const GAME_OPTIONS = [
   { value: 'magic', label: 'Magic: The Gathering' },
@@ -198,7 +199,7 @@ export default function DeckBuilder() {
 
   const syncDeckItems = async (updatedItems) => {
     if (!activeDeck) return;
-    const estimated_cost = updatedItems.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
+    const estimated_cost = calculateDeckValue(updatedItems);
     await updateDeckMutation.mutateAsync({
       id: activeDeck.id,
       data: { items: updatedItems, estimated_cost }

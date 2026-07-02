@@ -712,6 +712,12 @@ export const localBackend = {
       }
       return !staticGuestMode;
     },
+    getHealthStatus() {
+      if (hostedSupabaseMode) {
+        return apiRequest('/health');
+      }
+      return apiRequest('/health');
+    },
     getPublicSettings() {
       return Promise.resolve({
         app_name: 'Main Phase Market',

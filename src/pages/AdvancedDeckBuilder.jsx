@@ -11,88 +11,14 @@ import DeckImportModal from '@/components/deckbuilder/DeckImportModal';
 import DeckListSidebar from '@/components/deckbuilder/DeckListSidebar';
 import DeckStackView from '@/components/deckbuilder/DeckStackView';
 import AISimulationResults from '@/components/deckbuilder/AISimulationResults';
+import CardImage from '@/components/cards/CardImage';
 import { simulateMtgCommanderDeck } from '@/lib/mtgCommanderCatalog';
 import { getMtgPrintingsByOracleId, searchMtgCatalog } from '@/lib/mtgLocalCatalog';
-import { normalizeDeckGame } from '@/lib/deckSections';
-import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
+import { getCardImageUrl } from '@/lib/cardImages';
 import { buildPackedColumns } from '@/lib/deckColumnLayout';
 import { toast } from 'sonner';
-
-const DECK_TYPE_LABELS = {
-  magic: ['Creatures', 'Instants', 'Sorceries', 'Artifacts', 'Enchantments', 'Planeswalkers', 'Battles', 'Lands'],
-  pokemon: ['Pokemon', 'Trainer', 'Energy'],
-  yugioh: ['Monsters', 'Spells', 'Traps'],
-  lorcana: ['Characters', 'Actions', 'Items', 'Songs', 'Locations'],
-  onepiece: ['Leaders', 'Characters', 'Events', 'Stages'],
-  flesh_and_blood: ['Heroes', 'Weapons', 'Equipment', 'Actions', 'Instants', 'Attacks', 'Reactions'],
-  starwars: ['Leaders', 'Bases', 'Units', 'Events', 'Upgrades']
-};
-
-function getCompactDeckTypeLabel(typeLine, game) {
-  const normalizedGame = normalizeDeckGame(game);
-  const frontFace = String(typeLine || '').split('//')[0].toLowerCase();
-  if (!frontFace) return 'Other';
-
-  if (normalizedGame === 'magic') {
-    if (frontFace.includes('land')) return 'Lands';
-    if (frontFace.includes('creature')) return 'Creatures';
-    if (frontFace.includes('planeswalker')) return 'Planeswalkers';
-    if (frontFace.includes('battle')) return 'Battles';
-    if (frontFace.includes('instant')) return 'Instants';
-    if (frontFace.includes('sorcery')) return 'Sorceries';
-    if (frontFace.includes('enchantment')) return 'Enchantments';
-    if (frontFace.includes('artifact')) return 'Artifacts';
-  }
-
-  if (normalizedGame === 'pokemon') {
-    if (frontFace.includes('energy')) return 'Energy';
-    if (frontFace.includes('trainer')) return 'Trainer';
-    if (frontFace.includes('pok')) return 'Pokemon';
-  }
-
-  if (normalizedGame === 'yugioh') {
-    if (frontFace.includes('spell')) return 'Spells';
-    if (frontFace.includes('trap')) return 'Traps';
-    if (frontFace.includes('monster') || frontFace.includes('effect') || frontFace.includes('fusion') || frontFace.includes('synchro') || frontFace.includes('xyz') || frontFace.includes('link') || frontFace.includes('ritual') || frontFace.includes('normal')) {
-      return 'Monsters';
-    }
-  }
-
-  if (normalizedGame === 'lorcana') {
-    if (frontFace.includes('character')) return 'Characters';
-    if (frontFace.includes('action')) return 'Actions';
-    if (frontFace.includes('item')) return 'Items';
-    if (frontFace.includes('song')) return 'Songs';
-    if (frontFace.includes('location')) return 'Locations';
-  }
-
-  if (normalizedGame === 'onepiece') {
-    if (frontFace.includes('leader')) return 'Leaders';
-    if (frontFace.includes('character')) return 'Characters';
-    if (frontFace.includes('event')) return 'Events';
-    if (frontFace.includes('stage')) return 'Stages';
-  }
-
-  if (normalizedGame === 'flesh_and_blood') {
-    if (frontFace.includes('hero')) return 'Heroes';
-    if (frontFace.includes('weapon')) return 'Weapons';
-    if (frontFace.includes('equipment')) return 'Equipment';
-    if (frontFace.includes('instant')) return 'Instants';
-    if (frontFace.includes('attack')) return 'Attacks';
-    if (frontFace.includes('reaction')) return 'Reactions';
-    if (frontFace.includes('action')) return 'Actions';
-  }
-
-  if (normalizedGame === 'starwars') {
-    if (frontFace.includes('leader')) return 'Leaders';
-    if (frontFace.includes('base')) return 'Bases';
-    if (frontFace.includes('unit')) return 'Units';
-    if (frontFace.includes('event')) return 'Events';
-    if (frontFace.includes('upgrade')) return 'Upgrades';
-  }
-
-  return 'Other';
-}
+import { calculateDeckValue } from '@/services/pricing/pricingPipeline';
 
 const DECK_FORMATS_BY_GAME = {
   magic: {
@@ -534,7 +460,7 @@ export default function AdvancedDeckBuilder() {
       }];
     }
     
-    const newCost = updatedItems.reduce((sum, i) => sum + ((i.price || 0) * (i.quantity || 1)), 0);
+    const newCost = calculateDeckValue(updatedItems);
     await backend.data.CardList.update(activeDeck.id, { items: updatedItems, estimated_cost: newCost });
     const updatedDeck = { ...activeDeck, items: updatedItems, estimated_cost: newCost };
     setActiveDeck(updatedDeck);
@@ -612,7 +538,7 @@ export default function AdvancedDeckBuilder() {
         ? { ...i, product_id: newVariant.id, product_image: newVariant.image_url, price: newVariant.price || i.price }
         : i
     );
-    const newCost = updatedItems.reduce((sum, i) => sum + ((i.price || 0) * (i.quantity || 1)), 0);
+    const newCost = calculateDeckValue(updatedItems);
     await backend.data.CardList.update(activeDeck.id, { items: updatedItems, estimated_cost: newCost });
     setActiveDeck({ ...activeDeck, items: updatedItems, estimated_cost: newCost });
     setShowSetModal(null);
@@ -898,24 +824,8 @@ export default function AdvancedDeckBuilder() {
     const sourceItems = isCommanderFormat
       ? activeDeck.items.filter((item) => !item.is_commander)
       : activeDeck.items;
-
-    const groupedItems = sourceItems.reduce((acc, item) => {
-      const typeLabel = getCompactDeckTypeLabel(item.type || item.type_line, deckGame);
-      if (!acc[typeLabel]) {
-        acc[typeLabel] = [];
-      }
-      acc[typeLabel].push(item);
-      return acc;
-    }, {});
-
-    const preferredOrder = DECK_TYPE_LABELS[deckGame] || [];
-    const orderedLabels = [...preferredOrder.filter((label) => groupedItems[label]?.length), ...Object.keys(groupedItems).filter((label) => !preferredOrder.includes(label))];
-
-    return orderedLabels.map((label) => ({
-      label,
-      items: groupedItems[label],
-      totalCards: groupedItems[label].reduce((sum, item) => sum + (item.quantity || 1), 0),
-    }));
+    return groupDeckItems(sourceItems, deckGame)
+      .filter((group) => group.label !== 'Commander');
   })();
 
   const deckListColumns = (() => {
@@ -966,7 +876,7 @@ export default function AdvancedDeckBuilder() {
         addedCount += item.quantity || 1;
       }
     }
-    const newCost = updatedItems.reduce((sum, i) => sum + ((i.price || 0) * (i.quantity || 1)), 0);
+    const newCost = calculateDeckValue(updatedItems);
     await backend.data.CardList.update(activeDeck.id, { items: updatedItems, estimated_cost: newCost });
     setActiveDeck({ ...activeDeck, items: updatedItems, estimated_cost: newCost });
     queryClient.invalidateQueries(['cardlists']);
@@ -1182,11 +1092,16 @@ export default function AdvancedDeckBuilder() {
                             className="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-gray-700 transition-colors"
                           >
                             <div className="w-12 h-16 rounded overflow-hidden bg-gray-700 shrink-0">
-                              {getCardImageUrl(card) ? (
-                                <img src={getCardImageUrl(card)} alt={card.name} onError={(event) => handleCardImageError(event, card)} className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 px-1 text-center">{card.name}</div>
-                              )}
+                              <CardImage
+                                card={card}
+                                alt={card.name}
+                                className="w-full h-full object-cover"
+                                renderFallback={() => (
+                                  <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 px-1 text-center">
+                                    {card.name}
+                                  </div>
+                                )}
+                              />
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-white truncate">{card.name}</p>
@@ -1208,13 +1123,16 @@ export default function AdvancedDeckBuilder() {
                             onClick={() => addCardToDeck(card)}
                             title={card.name}
                           >
-                            {getCardImageUrl(card) ? (
-                              <img src={getCardImageUrl(card)} alt={card.name} onError={(event) => handleCardImageError(event, card)} className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity" />
-                            ) : (
-                              <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
-                                {card.name}
-                              </div>
-                            )}
+                            <CardImage
+                              card={card}
+                              alt={card.name}
+                              className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity"
+                              renderFallback={() => (
+                                <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
+                                  {card.name}
+                                </div>
+                              )}
+                            />
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
                               <Plus className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>
@@ -1286,13 +1204,16 @@ export default function AdvancedDeckBuilder() {
                     {group.items.map((item) => (
                       <div key={item.product_id} className="flex items-center gap-3 px-4 py-3">
                         <div className="w-10 h-14 rounded overflow-hidden bg-gray-700 shrink-0">
-                          {getCardImageUrl(item) ? (
-                            <img src={getCardImageUrl(item)} alt={item.product_name} onError={(event) => handleCardImageError(event, item)} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 px-1 text-center">
-                              {item.product_name}
-                            </div>
-                          )}
+                          <CardImage
+                            card={item}
+                            alt={item.product_name}
+                            className="w-full h-full object-cover"
+                            renderFallback={() => (
+                              <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 px-1 text-center">
+                                {item.product_name}
+                              </div>
+                            )}
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-white truncate">{item.product_name}</p>
@@ -1556,13 +1477,16 @@ export default function AdvancedDeckBuilder() {
                               key={item.product_id}
                               className="relative group rounded overflow-hidden border-4 border-black hover:border-gray-600 hover:shadow-lg transition-all bg-gray-800"
                             >
-                              {getCardImageUrl(item) ? (
-                                <img src={getCardImageUrl(item)} alt={item.product_name} onError={(event) => handleCardImageError(event, item)} className="w-full aspect-[2/3] object-cover group-hover:opacity-70 transition-opacity" />
-                              ) : (
-                                <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
-                                  {item.product_name}
-                                </div>
-                              )}
+                              <CardImage
+                                card={item}
+                                alt={item.product_name}
+                                className="w-full aspect-[2/3] object-cover group-hover:opacity-70 transition-opacity"
+                                renderFallback={() => (
+                                  <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
+                                    {item.product_name}
+                                  </div>
+                                )}
+                              />
                               <div className="absolute top-1 right-1 bg-blue-600 text-white font-bold text-xs w-6 h-6 rounded-full flex items-center justify-center shadow-lg">
                                 {item.quantity || 1}
                               </div>
@@ -1611,13 +1535,16 @@ export default function AdvancedDeckBuilder() {
                                 className="relative group rounded overflow-hidden border border-gray-700 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer bg-gray-800"
                                 onClick={() => addCardToDeck(card)}
                               >
-                                {getCardImageUrl(card) ? (
-                                  <img src={getCardImageUrl(card)} alt={card.name} onError={(event) => handleCardImageError(event, card)} className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity" />
-                                ) : (
-                                  <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
-                                    {card.name}
-                                  </div>
-                                )}
+                                <CardImage
+                                  card={card}
+                                  alt={card.name}
+                                  className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity"
+                                  renderFallback={() => (
+                                    <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
+                                      {card.name}
+                                    </div>
+                                  )}
+                                />
                                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
                                   <Plus className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>

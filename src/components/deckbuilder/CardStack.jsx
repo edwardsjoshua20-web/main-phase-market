@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { resolveCardPricing } from '@/services/pricing/pricingPipeline';
 
 const CARD_WIDTH = 223;
 const CARD_HEIGHT = 311;
@@ -7,8 +8,9 @@ const PEEK = 42;
 const CONTROLS_WIDTH = 48;
 
 function PriceBar({ item, storeProducts }) {
-  const price = item.price;
-  const hasPrice = price !== null && price !== undefined && price > 0;
+  const pricing = resolveCardPricing(item);
+  const marketPrice = pricing.marketPrice;
+  const hasMarketPrice = marketPrice !== null && marketPrice !== undefined && marketPrice > 0;
 
   // Look up actual store inventory by card name (case-insensitive, partial match)
   const cardName = item.product_name?.toLowerCase().trim() || '';
@@ -19,6 +21,7 @@ function PriceBar({ item, storeProducts }) {
   });
   const inStock = !!storeMatch;
   const storePrice = storeMatch?.price;
+  const displayStorePrice = storePrice ?? pricing.sellPrice;
 
   return (
     <div style={{
@@ -33,8 +36,8 @@ function PriceBar({ item, storeProducts }) {
       gap: 6,
       border: '1px solid #374151',
     }}>
-      <span style={{ color: hasPrice ? '#34d399' : '#6b7280', fontSize: 11, fontWeight: 700 }}>
-        {storePrice ? `Store: $${storePrice.toFixed(2)}` : hasPrice ? `Mkt: $${price.toFixed(2)}` : 'N/A'}
+      <span style={{ color: displayStorePrice || hasMarketPrice ? '#34d399' : '#6b7280', fontSize: 11, fontWeight: 700 }}>
+        {displayStorePrice ? `Store: $${displayStorePrice.toFixed(2)}` : hasMarketPrice ? `Mkt: $${marketPrice.toFixed(2)}` : 'N/A'}
       </span>
       <span style={{
         fontSize: 9,

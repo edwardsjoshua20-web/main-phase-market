@@ -49,6 +49,7 @@ import ProductForm from '@/components/admin/ProductForm';
 import StatsCard from '@/components/admin/StatsCard';
 import DollarCardStatsCard from '@/components/admin/DollarCardStatsCard';
 import { getInventoryCardFinish, getInventoryCardMergeKey } from '@/components/admin/cardInventorySnapshot';
+import { upsertInventoryCards } from '@/services/inventory/inventoryMutationPipeline';
 import { inventoryListings } from '@/services/inventoryListings';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
@@ -105,26 +106,7 @@ export default function AdminInventory() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data) => {
-      const cardsToAdd = Array.isArray(data) ? data : [data];
-      
-      for (const cardData of cardsToAdd) {
-        const mergeKey = getInventoryCardMergeKey(cardData);
-        const existingCard = cards.find((c) => getInventoryCardMergeKey(c) === mergeKey);
-        
-        if (existingCard) {
-          // Update quantity and location if provided
-          await inventoryListings.update(existingCard.id, {
-            quantity: existingCard.quantity + cardData.quantity,
-            location: cardData.location || existingCard.location
-          });
-        } else {
-          await inventoryListings.create(cardData);
-        }
-      }
-      
-      return cardsToAdd.length;
-    },
+    mutationFn: (data) => upsertInventoryCards(data, cards),
     onSuccess: (count) => {
       queryClient.invalidateQueries(['admin-cards']);
       setShowForm(false);
