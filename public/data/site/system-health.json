@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-02T22:32:46.770Z",
+  "generatedAt": "2026-07-02T23:41:14.687Z",
   "overallStatus": "missing",
   "sections": {
     "homepage": {
@@ -10,17 +10,17 @@
         "size": 1112,
         "modifiedAt": "2026-07-02T07:56:12.832Z"
       },
-      "modifiedHoursAgo": 14.61,
+      "modifiedHoursAgo": 15.75,
       "releaseCount": 3
     },
     "catalogs": {
       "area": "catalogs",
       "overallStatus": "missing",
       "counts": {
-        "ok": 0,
+        "ok": 2,
         "degraded": 0,
         "stale": 0,
-        "missing": 7
+        "missing": 5
       },
       "entries": [
         {
@@ -65,44 +65,63 @@
         },
         {
           "game": "yugioh",
-          "status": "missing",
+          "status": "ok",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://db.ygoprodeck.com/api/v7"
           },
           "cards": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\yugioh\\cards.json",
+              "size": 26428983,
+              "modifiedAt": "2026-07-02T23:33:33.632Z"
+            },
+            "count": 14422
           },
           "sets": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\yugioh\\sets.json",
+              "size": 206618,
+              "modifiedAt": "2026-07-02T23:36:16.466Z"
+            },
+            "count": 1020
           },
-          "modifiedHoursAgo": null
+          "modifiedHoursAgo": 0.13
         },
         {
           "game": "onepiece",
-          "status": "missing",
+          "status": "ok",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://raw.githubusercontent.com/buhbbl/punk-records/main/english/cards"
           },
           "cards": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\onepiece\\cards.json",
+              "size": 1200395,
+              "modifiedAt": "2026-07-02T23:39:32.468Z"
+            },
+            "count": 1996
           },
           "sets": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\onepiece\\sets.json",
+              "size": 4087,
+              "modifiedAt": "2026-07-02T23:40:06.216Z"
+            },
+            "count": 43
           },
-          "modifiedHoursAgo": null
+          "modifiedHoursAgo": 0.03
         },
         {
           "game": "lorcana",
           "status": "missing",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://api.lorcast.com/v0/cards/search"
           },
           "cards": {
             "file": null,
@@ -118,8 +137,9 @@
           "game": "fab",
           "status": "missing",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "fab-pipeline-local-backfill"
           },
           "cards": {
             "file": null,
@@ -135,8 +155,9 @@
           "game": "starwars",
           "status": "missing",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://api.swuapi.com/export/all"
           },
           "cards": {
             "file": null,
@@ -154,10 +175,10 @@
       "area": "images",
       "overallStatus": "missing",
       "counts": {
-        "ok": 0,
+        "ok": 2,
         "degraded": 0,
         "stale": 0,
-        "missing": 7
+        "missing": 5
       },
       "entries": [
         {
@@ -198,30 +219,40 @@
         },
         {
           "game": "yugioh",
-          "status": "missing",
+          "status": "ok",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://db.ygoprodeck.com/api/v7"
           },
-          "file": null,
-          "modifiedHoursAgo": null,
-          "cardsSeen": 0,
-          "downloaded": 0,
-          "skippedExisting": 0,
+          "file": {
+            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\yugioh\\images\\mirror-manifest.json",
+            "size": 353,
+            "modifiedAt": "2026-07-02T23:37:38.525Z"
+          },
+          "modifiedHoursAgo": 0.06,
+          "cardsSeen": 14422,
+          "downloaded": 844,
+          "skippedExisting": 28000,
           "missingSourceUrl": 0,
           "failed": 0
         },
         {
           "game": "onepiece",
-          "status": "missing",
+          "status": "ok",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://raw.githubusercontent.com/buhbbl/punk-records/main/english/cards"
           },
-          "file": null,
-          "modifiedHoursAgo": null,
-          "cardsSeen": 0,
-          "downloaded": 0,
+          "file": {
+            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\onepiece\\images\\mirror-manifest.json",
+            "size": 310,
+            "modifiedAt": "2026-07-02T23:40:57.661Z"
+          },
+          "modifiedHoursAgo": 0,
+          "cardsSeen": 1996,
+          "downloaded": 1996,
           "skippedExisting": 0,
           "missingSourceUrl": 0,
           "failed": 0
@@ -230,8 +261,9 @@
           "game": "lorcana",
           "status": "missing",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://api.lorcast.com/v0/cards/search"
           },
           "file": null,
           "modifiedHoursAgo": null,
@@ -245,8 +277,9 @@
           "game": "fab",
           "status": "missing",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "fab-pipeline-local-backfill"
           },
           "file": null,
           "modifiedHoursAgo": null,
@@ -260,8 +293,9 @@
           "game": "starwars",
           "status": "missing",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://api.swuapi.com/export/all"
           },
           "file": null,
           "modifiedHoursAgo": null,
@@ -282,7 +316,7 @@
           "size": 5106,
           "modifiedAt": "2026-07-02T09:07:11.884Z"
         },
-        "modifiedHoursAgo": 13.43,
+        "modifiedHoursAgo": 14.57,
         "status": "merged-source-snapshots",
         "sourceSnapshots": {
           "cardkingdom": 4,
@@ -300,7 +334,7 @@
             "size": 951,
             "modifiedAt": "2026-07-02T09:07:11.543Z"
           },
-          "modifiedHoursAgo": 13.43,
+          "modifiedHoursAgo": 14.57,
           "rows": 4
         },
         {
@@ -311,7 +345,7 @@
             "size": 953,
             "modifiedAt": "2026-07-02T09:07:11.547Z"
           },
-          "modifiedHoursAgo": 13.43,
+          "modifiedHoursAgo": 14.57,
           "rows": 4
         },
         {
@@ -322,7 +356,7 @@
             "size": 953,
             "modifiedAt": "2026-07-02T09:07:11.549Z"
           },
-          "modifiedHoursAgo": 13.43,
+          "modifiedHoursAgo": 14.57,
           "rows": 4
         }
       ],
@@ -338,8 +372,8 @@
     },
     "readiness": {
       "area": "readiness",
-      "overallStatus": "missing",
-      "averageScore": 6,
+      "overallStatus": "degraded",
+      "averageScore": 43,
       "entries": [
         {
           "game": "magic",
@@ -379,42 +413,45 @@
         },
         {
           "game": "yugioh",
-          "stage": "source-missing",
-          "readinessScore": 0,
-          "nextAction": "Configure a source for this game.",
+          "stage": "storefront-ready",
+          "readinessScore": 100,
+          "nextAction": "Operational. Keep the scheduled refresh jobs healthy.",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://db.ygoprodeck.com/api/v7"
           },
-          "cardsCount": 0,
-          "setsCount": 0,
-          "imageCardsSeen": 0,
-          "catalogStatus": "missing",
-          "imageStatus": "missing"
+          "cardsCount": 14422,
+          "setsCount": 1020,
+          "imageCardsSeen": 14422,
+          "catalogStatus": "ok",
+          "imageStatus": "ok"
         },
         {
           "game": "onepiece",
-          "stage": "source-missing",
-          "readinessScore": 0,
-          "nextAction": "Configure a source for this game.",
+          "stage": "storefront-ready",
+          "readinessScore": 100,
+          "nextAction": "Operational. Keep the scheduled refresh jobs healthy.",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://raw.githubusercontent.com/buhbbl/punk-records/main/english/cards"
           },
-          "cardsCount": 0,
-          "setsCount": 0,
-          "imageCardsSeen": 0,
-          "catalogStatus": "missing",
-          "imageStatus": "missing"
+          "cardsCount": 1996,
+          "setsCount": 43,
+          "imageCardsSeen": 1996,
+          "catalogStatus": "ok",
+          "imageStatus": "ok"
         },
         {
           "game": "lorcana",
-          "stage": "source-missing",
-          "readinessScore": 0,
-          "nextAction": "Configure a source for this game.",
+          "stage": "backfill-needed",
+          "readinessScore": 20,
+          "nextAction": "Run card backfill to generate cards.json.",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://api.lorcast.com/v0/cards/search"
           },
           "cardsCount": 0,
           "setsCount": 0,
@@ -424,12 +461,13 @@
         },
         {
           "game": "fab",
-          "stage": "source-missing",
-          "readinessScore": 0,
-          "nextAction": "Configure a source for this game.",
+          "stage": "backfill-needed",
+          "readinessScore": 20,
+          "nextAction": "Run card backfill to generate cards.json.",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "fab-pipeline-local-backfill"
           },
           "cardsCount": 0,
           "setsCount": 0,
@@ -439,12 +477,13 @@
         },
         {
           "game": "starwars",
-          "stage": "source-missing",
-          "readinessScore": 0,
-          "nextAction": "Configure a source for this game.",
+          "stage": "backfill-needed",
+          "readinessScore": 20,
+          "nextAction": "Run card backfill to generate cards.json.",
           "source": {
-            "configured": false,
-            "type": "missing"
+            "configured": true,
+            "type": "remote",
+            "url": "https://api.swuapi.com/export/all"
           },
           "cardsCount": 0,
           "setsCount": 0,

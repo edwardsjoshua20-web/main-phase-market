@@ -7,6 +7,7 @@
     "dev:backend": "node server/index.mjs",
     "dev:backend:watch": "node --watch server/index.mjs",
     "dev": "vite",
+    "prebuild": "npm.cmd run snapshots:embed",
     "build": "vite build",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
@@ -60,6 +61,7 @@
     "automation:images": "node scripts/run-site-automation.mjs images",
     "automation:pricing": "node scripts/run-site-automation.mjs pricing",
     "automation:health": "node scripts/run-site-automation.mjs health",
+    "snapshots:embed": "node scripts/build-site-static-snapshots.mjs",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview"
   },
