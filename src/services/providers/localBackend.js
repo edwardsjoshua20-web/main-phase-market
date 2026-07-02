@@ -25,6 +25,8 @@ const LOCAL_API_BASE = normalizedApiOrigin ? `${normalizedApiOrigin}/api/local` 
 const SUPABASE_URL = String(rawSupabaseUrl || '').trim().replace(/\/+$/, '');
 const SUPABASE_ANON_KEY = String(rawSupabaseAnonKey || '').trim();
 const SUPABASE_SESSION_KEY = 'mpm.supabase.session';
+const CANONICAL_HOST = 'www.mainphasemarket.net';
+const SUPPORTED_PUBLIC_HOSTS = new Set(['mainphasemarket.net', 'www.mainphasemarket.net']);
 const localAdminUser = {
   id: 'local-admin',
   full_name: 'Local Admin',
@@ -164,6 +166,35 @@ function storeSession(session) {
 
 function getSessionToken() {
   return getStoredSession()?.access_token || '';
+}
+
+function normalizeHostedReturnPath(returnTo) {
+  if (typeof window === 'undefined') {
+    return '/';
+  }
+
+  try {
+    const resolved = new URL(returnTo || '/', window.location.origin);
+    if (!SUPPORTED_PUBLIC_HOSTS.has(resolved.hostname)) {
+      return '/';
+    }
+    return `${resolved.pathname || '/'}${resolved.search || ''}${resolved.hash || ''}` || '/';
+  } catch {
+    return '/';
+  }
+}
+
+export function getCanonicalHostedUrl(pathname = '/') {
+  const normalizedPath = String(pathname || '/').trim() || '/';
+  if (normalizedPath.startsWith('http://') || normalizedPath.startsWith('https://')) {
+    try {
+      const resolved = new URL(normalizedPath);
+      return `https://${CANONICAL_HOST}${resolved.pathname || '/'}${resolved.search || ''}${resolved.hash || ''}`;
+    } catch {
+      return `https://${CANONICAL_HOST}/`;
+    }
+  }
+  return `https://${CANONICAL_HOST}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}`;
 }
 
 function requireHostedSession() {
@@ -814,7 +845,7 @@ export const localBackend = {
     redirectToLogin(returnTo) {
       if (hostedSupabaseMode && typeof window !== 'undefined') {
         const params = new URLSearchParams();
-        if (returnTo) params.set('returnTo', returnTo);
+        params.set('returnTo', normalizeHostedReturnPath(returnTo));
         window.location.href = `/MemberLogin?${params.toString()}`;
       }
       return Promise.resolve();

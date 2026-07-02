@@ -4,6 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { useState, useEffect } from 'react';
+import { getCanonicalHostedUrl } from '@/services/providers/localBackend';
 import OrderStatus from './pages/OrderStatus';
 import MemberBenefits from './pages/MemberBenefits';
 import MemberLogin from './pages/MemberLogin';
@@ -43,6 +44,10 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
 
 const AuthenticatedApp = () => {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [isCanonicalHostReady, setIsCanonicalHostReady] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.location.hostname !== 'mainphasemarket.net';
+  });
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -50,9 +55,22 @@ const AuthenticatedApp = () => {
     return () => window.removeEventListener('resize', check);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.location.hostname === 'mainphasemarket.net') {
+      window.location.replace(
+        getCanonicalHostedUrl(
+          `${window.location.pathname || '/'}${window.location.search || ''}${window.location.hash || ''}`
+        )
+      );
+      return;
+    }
+    setIsCanonicalHostReady(true);
+  }, []);
+
   const { isLoadingAuth, isLoadingPublicSettings, authError } = useAppAuth();
 
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  if (!isCanonicalHostReady || isLoadingPublicSettings || isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>

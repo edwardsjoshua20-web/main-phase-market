@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LogIn, Loader2, ShieldCheck } from 'lucide-react';
 import { backend } from '@/services/backend';
+import { getCanonicalHostedUrl } from '@/services/providers/localBackend';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -18,6 +19,20 @@ export default function MemberLogin() {
 
   const returnTo = searchParams.get('returnTo') || '/MemberBenefits';
   const isSignup = mode === 'signup';
+
+  const resolveSafeReturnTo = () => {
+    try {
+      const resolved = new URL(returnTo, window.location.origin);
+      const pathname = `${resolved.pathname || '/'}${resolved.search || ''}${resolved.hash || ''}` || '/';
+      const host = window.location.hostname;
+      if (host === 'mainphasemarket.net' || host === 'www.mainphasemarket.net') {
+        return getCanonicalHostedUrl(pathname);
+      }
+      return pathname;
+    } catch {
+      return '/MemberBenefits';
+    }
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -55,7 +70,7 @@ export default function MemberLogin() {
       }
 
       toast.success('Signed in.');
-      window.location.href = returnTo;
+      window.location.href = resolveSafeReturnTo();
     } catch (err) {
       console.error('Member login failed:', err);
       setError(err.message || 'Sign in failed. Please try again.');
