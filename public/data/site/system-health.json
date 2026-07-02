@@ -1,0 +1,458 @@
+{
+  "generatedAt": "2026-07-02T22:32:46.770Z",
+  "overallStatus": "missing",
+  "sections": {
+    "homepage": {
+      "area": "homepage",
+      "status": "ok",
+      "file": {
+        "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\site\\upcoming-releases.json",
+        "size": 1112,
+        "modifiedAt": "2026-07-02T07:56:12.832Z"
+      },
+      "modifiedHoursAgo": 14.61,
+      "releaseCount": 3
+    },
+    "catalogs": {
+      "area": "catalogs",
+      "overallStatus": "missing",
+      "counts": {
+        "ok": 0,
+        "degraded": 0,
+        "stale": 0,
+        "missing": 7
+      },
+      "entries": [
+        {
+          "game": "magic",
+          "status": "missing",
+          "source": {
+            "configured": true,
+            "type": "file",
+            "envVar": "MTG_SOURCE_PATH",
+            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\server\\data\\mtg\\source\\all_cards-latest.json",
+            "exists": true
+          },
+          "cards": {
+            "file": null,
+            "count": 0
+          },
+          "sets": {
+            "file": null,
+            "count": 0
+          },
+          "modifiedHoursAgo": null
+        },
+        {
+          "game": "pokemon",
+          "status": "missing",
+          "source": {
+            "configured": true,
+            "type": "file",
+            "envVar": "POKEMON_SOURCE_PATH",
+            "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json",
+            "exists": true
+          },
+          "cards": {
+            "file": null,
+            "count": 0
+          },
+          "sets": {
+            "file": null,
+            "count": 0
+          },
+          "modifiedHoursAgo": null
+        },
+        {
+          "game": "yugioh",
+          "status": "missing",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "cards": {
+            "file": null,
+            "count": 0
+          },
+          "sets": {
+            "file": null,
+            "count": 0
+          },
+          "modifiedHoursAgo": null
+        },
+        {
+          "game": "onepiece",
+          "status": "missing",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "cards": {
+            "file": null,
+            "count": 0
+          },
+          "sets": {
+            "file": null,
+            "count": 0
+          },
+          "modifiedHoursAgo": null
+        },
+        {
+          "game": "lorcana",
+          "status": "missing",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "cards": {
+            "file": null,
+            "count": 0
+          },
+          "sets": {
+            "file": null,
+            "count": 0
+          },
+          "modifiedHoursAgo": null
+        },
+        {
+          "game": "fab",
+          "status": "missing",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "cards": {
+            "file": null,
+            "count": 0
+          },
+          "sets": {
+            "file": null,
+            "count": 0
+          },
+          "modifiedHoursAgo": null
+        },
+        {
+          "game": "starwars",
+          "status": "missing",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "cards": {
+            "file": null,
+            "count": 0
+          },
+          "sets": {
+            "file": null,
+            "count": 0
+          },
+          "modifiedHoursAgo": null
+        }
+      ]
+    },
+    "images": {
+      "area": "images",
+      "overallStatus": "missing",
+      "counts": {
+        "ok": 0,
+        "degraded": 0,
+        "stale": 0,
+        "missing": 7
+      },
+      "entries": [
+        {
+          "game": "magic",
+          "status": "missing",
+          "source": {
+            "configured": true,
+            "type": "file",
+            "envVar": "MTG_SOURCE_PATH",
+            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\server\\data\\mtg\\source\\all_cards-latest.json",
+            "exists": true
+          },
+          "file": null,
+          "modifiedHoursAgo": null,
+          "cardsSeen": 0,
+          "downloaded": 0,
+          "skippedExisting": 0,
+          "missingSourceUrl": 0,
+          "failed": 0
+        },
+        {
+          "game": "pokemon",
+          "status": "missing",
+          "source": {
+            "configured": true,
+            "type": "file",
+            "envVar": "POKEMON_SOURCE_PATH",
+            "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json",
+            "exists": true
+          },
+          "file": null,
+          "modifiedHoursAgo": null,
+          "cardsSeen": 0,
+          "downloaded": 0,
+          "skippedExisting": 0,
+          "missingSourceUrl": 0,
+          "failed": 0
+        },
+        {
+          "game": "yugioh",
+          "status": "missing",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "file": null,
+          "modifiedHoursAgo": null,
+          "cardsSeen": 0,
+          "downloaded": 0,
+          "skippedExisting": 0,
+          "missingSourceUrl": 0,
+          "failed": 0
+        },
+        {
+          "game": "onepiece",
+          "status": "missing",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "file": null,
+          "modifiedHoursAgo": null,
+          "cardsSeen": 0,
+          "downloaded": 0,
+          "skippedExisting": 0,
+          "missingSourceUrl": 0,
+          "failed": 0
+        },
+        {
+          "game": "lorcana",
+          "status": "missing",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "file": null,
+          "modifiedHoursAgo": null,
+          "cardsSeen": 0,
+          "downloaded": 0,
+          "skippedExisting": 0,
+          "missingSourceUrl": 0,
+          "failed": 0
+        },
+        {
+          "game": "fab",
+          "status": "missing",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "file": null,
+          "modifiedHoursAgo": null,
+          "cardsSeen": 0,
+          "downloaded": 0,
+          "skippedExisting": 0,
+          "missingSourceUrl": 0,
+          "failed": 0
+        },
+        {
+          "game": "starwars",
+          "status": "missing",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "file": null,
+          "modifiedHoursAgo": null,
+          "cardsSeen": 0,
+          "downloaded": 0,
+          "skippedExisting": 0,
+          "missingSourceUrl": 0,
+          "failed": 0
+        }
+      ]
+    },
+    "pricing": {
+      "area": "pricing",
+      "status": "ok",
+      "snapshot": {
+        "file": {
+          "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\site\\pricing-snapshot.json",
+          "size": 5106,
+          "modifiedAt": "2026-07-02T09:07:11.884Z"
+        },
+        "modifiedHoursAgo": 13.43,
+        "status": "merged-source-snapshots",
+        "sourceSnapshots": {
+          "cardkingdom": 4,
+          "tcgplayer": 4,
+          "starcitygames": 4
+        },
+        "previewCount": 4
+      },
+      "sources": [
+        {
+          "source": "cardkingdom",
+          "status": "ok",
+          "file": {
+            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\site\\pricing-sources\\cardkingdom.json",
+            "size": 951,
+            "modifiedAt": "2026-07-02T09:07:11.543Z"
+          },
+          "modifiedHoursAgo": 13.43,
+          "rows": 4
+        },
+        {
+          "source": "tcgplayer",
+          "status": "ok",
+          "file": {
+            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\site\\pricing-sources\\tcgplayer.json",
+            "size": 953,
+            "modifiedAt": "2026-07-02T09:07:11.547Z"
+          },
+          "modifiedHoursAgo": 13.43,
+          "rows": 4
+        },
+        {
+          "source": "starcitygames",
+          "status": "ok",
+          "file": {
+            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\site\\pricing-sources\\starcitygames.json",
+            "size": 953,
+            "modifiedAt": "2026-07-02T09:07:11.549Z"
+          },
+          "modifiedHoursAgo": 13.43,
+          "rows": 4
+        }
+      ],
+      "sourceSummary": {
+        "overallStatus": "ok",
+        "counts": {
+          "ok": 3,
+          "degraded": 0,
+          "stale": 0,
+          "missing": 0
+        }
+      }
+    },
+    "readiness": {
+      "area": "readiness",
+      "overallStatus": "missing",
+      "averageScore": 6,
+      "entries": [
+        {
+          "game": "magic",
+          "stage": "backfill-needed",
+          "readinessScore": 20,
+          "nextAction": "Run card backfill to generate cards.json.",
+          "source": {
+            "configured": true,
+            "type": "file",
+            "envVar": "MTG_SOURCE_PATH",
+            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\server\\data\\mtg\\source\\all_cards-latest.json",
+            "exists": true
+          },
+          "cardsCount": 0,
+          "setsCount": 0,
+          "imageCardsSeen": 0,
+          "catalogStatus": "missing",
+          "imageStatus": "missing"
+        },
+        {
+          "game": "pokemon",
+          "stage": "backfill-needed",
+          "readinessScore": 20,
+          "nextAction": "Run card backfill to generate cards.json.",
+          "source": {
+            "configured": true,
+            "type": "file",
+            "envVar": "POKEMON_SOURCE_PATH",
+            "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json",
+            "exists": true
+          },
+          "cardsCount": 0,
+          "setsCount": 0,
+          "imageCardsSeen": 0,
+          "catalogStatus": "missing",
+          "imageStatus": "missing"
+        },
+        {
+          "game": "yugioh",
+          "stage": "source-missing",
+          "readinessScore": 0,
+          "nextAction": "Configure a source for this game.",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "cardsCount": 0,
+          "setsCount": 0,
+          "imageCardsSeen": 0,
+          "catalogStatus": "missing",
+          "imageStatus": "missing"
+        },
+        {
+          "game": "onepiece",
+          "stage": "source-missing",
+          "readinessScore": 0,
+          "nextAction": "Configure a source for this game.",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "cardsCount": 0,
+          "setsCount": 0,
+          "imageCardsSeen": 0,
+          "catalogStatus": "missing",
+          "imageStatus": "missing"
+        },
+        {
+          "game": "lorcana",
+          "stage": "source-missing",
+          "readinessScore": 0,
+          "nextAction": "Configure a source for this game.",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "cardsCount": 0,
+          "setsCount": 0,
+          "imageCardsSeen": 0,
+          "catalogStatus": "missing",
+          "imageStatus": "missing"
+        },
+        {
+          "game": "fab",
+          "stage": "source-missing",
+          "readinessScore": 0,
+          "nextAction": "Configure a source for this game.",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "cardsCount": 0,
+          "setsCount": 0,
+          "imageCardsSeen": 0,
+          "catalogStatus": "missing",
+          "imageStatus": "missing"
+        },
+        {
+          "game": "starwars",
+          "stage": "source-missing",
+          "readinessScore": 0,
+          "nextAction": "Configure a source for this game.",
+          "source": {
+            "configured": false,
+            "type": "missing"
+          },
+          "cardsCount": 0,
+          "setsCount": 0,
+          "imageCardsSeen": 0,
+          "catalogStatus": "missing",
+          "imageStatus": "missing"
+        }
+      ]
+    }
+  }
+}

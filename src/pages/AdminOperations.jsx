@@ -32,7 +32,8 @@ const sectionIcons = {
   homepage: Activity,
   catalogs: Database,
   images: ImageIcon,
-  pricing: HardDriveDownload
+  pricing: HardDriveDownload,
+  readiness: CheckCircle2
 };
 
 function formatSourceSummary(source) {
@@ -107,6 +108,62 @@ function SummaryValue({ label, value }) {
       <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
       <p className="mt-1 text-sm font-semibold text-gray-900">{value}</p>
     </div>
+  );
+}
+
+function ReadinessCard({ section }) {
+  const entries = Array.isArray(section?.entries) ? section.entries : [];
+  const averageScore = Number(section?.averageScore || 0);
+
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-slate-100 p-2.5">
+              <CheckCircle2 className="h-5 w-5 text-slate-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Game readiness</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">The next operational step for each game on the road to storefront-ready.</p>
+            </div>
+          </div>
+          <StatusBadge status={section?.overallStatus || 'missing'} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <SummaryValue label="Average readiness" value={`${averageScore}%`} />
+          <SummaryValue label="Games tracked" value={entries.length} />
+          <SummaryValue label="Storefront ready" value={entries.filter((entry) => entry.readinessScore >= 100).length} />
+        </div>
+
+        {entries.length > 0 && (
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Game</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Readiness</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Stage</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Next action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {entries.map((entry) => (
+                  <tr key={entry.game}>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{entry.game}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{entry.readinessScore}%</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{entry.stage}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{entry.nextAction}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -343,6 +400,7 @@ export default function AdminOperations() {
 
         <div className="grid gap-6">
           <SectionCard title="Homepage feed" sectionKey="homepage" section={sections.homepage} />
+          <ReadinessCard section={sections.readiness} />
           <SectionCard title="Catalog pipelines" sectionKey="catalogs" section={sections.catalogs} />
           <SectionCard title="Image pipelines" sectionKey="images" section={sections.images} />
           <SectionCard title="Pricing pipelines" sectionKey="pricing" section={sections.pricing} />

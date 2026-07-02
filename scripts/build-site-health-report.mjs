@@ -222,6 +222,81 @@ function buildPricingHealth() {
   };
 }
 
+function buildGameReadiness(catalogs, images) {
+  const catalogMap = new Map((catalogs?.entries || []).map((entry) => [entry.game, entry]));
+  const imageMap = new Map((images?.entries || []).map((entry) => [entry.game, entry]));
+
+  const entries = GAMES.map((game) => {
+    const catalogEntry = catalogMap.get(game) || {};
+    const imageEntry = imageMap.get(game) || {};
+    const source = catalogEntry.source || imageEntry.source || { configured: false, type: 'missing' };
+    const cardsCount = Number(catalogEntry?.cards?.count || 0);
+    const setsCount = Number(catalogEntry?.sets?.count || 0);
+    const imageCardsSeen = Number(imageEntry?.cardsSeen || 0);
+
+    let stage = 'source-missing';
+    let score = 0;
+    let nextAction = 'Configure a source for this game.';
+
+    const sourceReady = source.type === 'remote' || (source.type === 'file' && source.exists);
+    if (sourceReady) {
+      stage = 'backfill-needed';
+      score = 20;
+      nextAction = 'Run card backfill to generate cards.json.';
+    }
+
+    if (cardsCount > 0) {
+      stage = 'sets-needed';
+      score = 45;
+      nextAction = 'Run set extraction to generate sets.json.';
+    }
+
+    if (cardsCount > 0 && setsCount > 0) {
+      stage = 'images-needed';
+      score = 70;
+      nextAction = 'Run image mirror to generate image manifests and hosted card art.';
+    }
+
+    if (cardsCount > 0 && setsCount > 0 && imageCardsSeen > 0) {
+      stage = 'storefront-ready';
+      score = 100;
+      nextAction = 'Operational. Keep the scheduled refresh jobs healthy.';
+    }
+
+    if (catalogEntry?.status === 'stale' || imageEntry?.status === 'stale') {
+      stage = 'maintenance-needed';
+      score = Math.max(score, 85);
+      nextAction = 'Refresh stale outputs so the storefront stays current.';
+    }
+
+    return {
+      game,
+      stage,
+      readinessScore: score,
+      nextAction,
+      source,
+      cardsCount,
+      setsCount,
+      imageCardsSeen,
+      catalogStatus: catalogEntry?.status || 'missing',
+      imageStatus: imageEntry?.status || 'missing'
+    };
+  });
+
+  return {
+    area: 'readiness',
+    overallStatus: entries.every((entry) => entry.readinessScore >= 100)
+      ? 'ok'
+      : entries.some((entry) => entry.readinessScore <= 0)
+        ? 'missing'
+        : 'degraded',
+    averageScore: entries.length
+      ? Math.round(entries.reduce((total, entry) => total + entry.readinessScore, 0) / entries.length)
+      : 0,
+    entries
+  };
+}
+
 function buildSummary(sections) {
   const statuses = sections.map((section) => section?.status || section?.overallStatus || 'missing');
 
@@ -236,15 +311,17 @@ function main() {
   const catalogs = buildCatalogHealth();
   const images = buildImagesHealth();
   const pricing = buildPricingHealth();
+  const readiness = buildGameReadiness(catalogs, images);
 
   const payload = {
     generatedAt: new Date().toISOString(),
-    overallStatus: buildSummary([homepage, catalogs, images, pricing]),
+    overallStatus: buildSummary([homepage, catalogs, images, pricing, readiness]),
     sections: {
       homepage,
       catalogs,
       images,
-      pricing
+      pricing,
+      readiness
     }
   };
 
@@ -256,7 +333,8 @@ function main() {
     homepage: homepage.status,
     catalogs: catalogs.overallStatus,
     images: images.overallStatus,
-    pricing: pricing.status
+    pricing: pricing.status,
+    readiness: readiness.overallStatus
   }, null, 2));
 }
 
