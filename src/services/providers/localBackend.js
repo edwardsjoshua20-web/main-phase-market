@@ -55,6 +55,24 @@ async function apiRequest(path, options = {}) {
   return response.json();
 }
 
+async function fetchStaticSystemHealth() {
+  const response = await fetch('/data/site/system-health.json', {
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    const error = new Error(errorText || `Static system health request failed: ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  const payload = await response.json();
+  return {
+    systemHealth: payload
+  };
+}
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -714,7 +732,7 @@ export const localBackend = {
     },
     getHealthStatus() {
       if (hostedSupabaseMode) {
-        return apiRequest('/health');
+        return fetchStaticSystemHealth();
       }
       return apiRequest('/health');
     },
