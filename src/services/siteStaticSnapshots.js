@@ -1,6 +1,8 @@
-import embeddedSystemHealth from '../../public/data/site/system-health.json';
-import embeddedUpcomingReleases from '../../public/data/site/upcoming-releases.json';
-import embeddedPricingSnapshot from '../../public/data/site/pricing-snapshot.json';
+import {
+  embeddedPricingSnapshot,
+  embeddedSystemHealth,
+  embeddedUpcomingReleases
+} from '@/services/siteStaticSnapshots.generated';
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
