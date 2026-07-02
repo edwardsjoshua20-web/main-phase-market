@@ -1,14 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import { getGameSourceConfig, resolveConfiguredSourcePath } from './lib/source-registry.mjs';
 
-const BULK_API_URL = 'https://api.scryfall.com/bulk-data';
-const OUTPUT_DIR = path.resolve(process.cwd(), 'server/data/mtg/source');
-const OUTPUT_PATH = path.join(OUTPUT_DIR, 'all_cards-latest.json');
+const BULK_API_URL = getGameSourceConfig('magic', 'bulkApi')?.url || 'https://api.scryfall.com/bulk-data';
+const OUTPUT_PATH = resolveConfiguredSourcePath('magic', 'catalogSource');
+const OUTPUT_DIR = path.dirname(OUTPUT_PATH);
 
 function parseArgs(argv) {
   const args = {
-    type: 'all_cards'
+    type: getGameSourceConfig('magic', 'bulkApi')?.bulkType || 'all_cards'
   };
 
   for (let i = 0; i < argv.length; i += 1) {

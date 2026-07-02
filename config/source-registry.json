@@ -1,0 +1,60 @@
+{
+  "games": {
+    "magic": {
+      "dataAliases": ["magic", "mtg"],
+      "catalogSource": {
+        "type": "file",
+        "envVar": "MTG_SOURCE_PATH",
+        "path": "server/data/mtg/source/all_cards-latest.json"
+      },
+      "bulkApi": {
+        "type": "remote",
+        "url": "https://api.scryfall.com/bulk-data",
+        "bulkType": "all_cards"
+      }
+    },
+    "pokemon": {
+      "dataAliases": ["pokemon"],
+      "catalogSource": {
+        "type": "file",
+        "envVar": "POKEMON_SOURCE_PATH",
+        "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json"
+      },
+      "api": {
+        "type": "remote",
+        "url": "https://api.pokemontcg.io/v2"
+      }
+    },
+    "yugioh": {
+      "dataAliases": ["yugioh"],
+      "api": {
+        "type": "remote",
+        "url": "https://db.ygoprodeck.com/api/v7"
+      }
+    },
+    "onepiece": {
+      "dataAliases": ["onepiece"],
+      "cardsApi": {
+        "type": "remote",
+        "url": "https://raw.githubusercontent.com/buhbbl/punk-records/main/english/cards"
+      }
+    },
+    "lorcana": {
+      "dataAliases": ["lorcana"],
+      "api": {
+        "type": "remote",
+        "url": "https://api.lorcast.com/v0/cards/search"
+      }
+    },
+    "fab": {
+      "dataAliases": ["fab"]
+    },
+    "starwars": {
+      "dataAliases": ["starwars"],
+      "exportApi": {
+        "type": "remote",
+        "url": "https://api.swuapi.com/export/all"
+      }
+    }
+  }
+}

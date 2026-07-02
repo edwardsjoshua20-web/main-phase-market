@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getGameSourceConfig } from './lib/source-registry.mjs';
 
 const OUTPUT_ROOT = path.resolve(process.cwd(), 'public/data/starwars');
 const OUTPUT_SETS_PATH = path.join(OUTPUT_ROOT, 'sets.json');
-const EXPORT_URL = 'https://api.swuapi.com/export/all';
+const EXPORT_URL = getGameSourceConfig('starwars', 'exportApi')?.url || 'https://api.swuapi.com/export/all';
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });

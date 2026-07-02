@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getGameDataAliases, sourceRequirementStatus } from './lib/source-registry.mjs';
 
 const ROOT = process.cwd();
 const PUBLIC_DATA_ROOT = path.join(ROOT, 'public', 'data');
@@ -9,16 +10,6 @@ const OUTPUT_PATH = path.join(SITE_DATA_ROOT, 'system-health.json');
 const GAMES = ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
 const IMAGE_MIRROR_GAMES = ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
 const PRICING_SOURCES = ['cardkingdom', 'tcgplayer', 'starcitygames'];
-
-const DATA_DIR_ALIASES = {
-  magic: ['magic', 'mtg'],
-  pokemon: ['pokemon'],
-  yugioh: ['yugioh'],
-  onepiece: ['onepiece'],
-  lorcana: ['lorcana'],
-  fab: ['fab'],
-  starwars: ['starwars']
-};
 
 const AGE_LIMITS_HOURS = {
   homepage: 48,
@@ -48,7 +39,7 @@ function getFileStats(filePath) {
 }
 
 function resolveDataFile(game, relativePath) {
-  const aliases = DATA_DIR_ALIASES[game] || [game];
+  const aliases = getGameDataAliases(game);
   for (const alias of aliases) {
     const candidate = path.join(PUBLIC_DATA_ROOT, alias, relativePath);
     if (fs.existsSync(candidate)) {
@@ -128,10 +119,12 @@ function buildCatalogHealth() {
     const stale = modifiedHoursAgo != null && modifiedHoursAgo > AGE_LIMITS_HOURS.catalog;
     const exists = Boolean(cardsStats || setsStats);
     const degraded = !cardsStats || !setsStats || (Array.isArray(cards) && cards.length === 0 && game !== 'magic');
+    const source = sourceRequirementStatus(game, 'catalogSource');
 
     return {
       game,
       status: statusFromChecks({ exists, stale, degraded }),
+      source,
       cards: {
         file: cardsStats,
         count: Array.isArray(cards) ? cards.length : 0
@@ -160,10 +153,12 @@ function buildImagesHealth() {
     const stale = modifiedHoursAgo != null && modifiedHoursAgo > AGE_LIMITS_HOURS.imageManifest;
     const exists = Boolean(stats);
     const degraded = Boolean(manifest) && Number(manifest.failed || 0) > 0;
+    const source = sourceRequirementStatus(game, 'catalogSource');
 
     return {
       game,
       status: statusFromChecks({ exists, stale, degraded }),
+      source,
       file: stats,
       modifiedHoursAgo,
       cardsSeen: Number(manifest?.cards_seen || manifest?.cardsSeen || 0),

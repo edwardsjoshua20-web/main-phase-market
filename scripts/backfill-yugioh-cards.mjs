@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getGameSourceConfig } from './lib/source-registry.mjs';
 
 const OUTPUT_ROOT = path.resolve(process.cwd(), 'public/data/yugioh');
 const OUTPUT_CARDS_PATH = path.join(OUTPUT_ROOT, 'cards.json');
 const OUTPUT_MANIFEST_PATH = path.join(OUTPUT_ROOT, 'cards-manifest.json');
-const API_ROOT = 'https://db.ygoprodeck.com/api/v7';
+const API_ROOT = getGameSourceConfig('yugioh', 'api')?.url || 'https://db.ygoprodeck.com/api/v7';
 const PAGE_SIZE = Number(process.env.YUGIOH_PAGE_SIZE || 250);
 
 function ensureDir(dirPath) {

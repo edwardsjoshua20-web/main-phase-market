@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import { resolveConfiguredSourcePath } from './lib/source-registry.mjs';
 
 const IMAGE_ROOT = path.resolve(process.cwd(), 'public/data/mtg/images');
-const DEFAULT_SOURCE_PATH = 'C:/Users/Admin/Desktop/Base44 MTG Import/source_copy/all_cards-latest.json';
+const DEFAULT_SOURCE_PATH = resolveConfiguredSourcePath('magic', 'catalogSource');
 const DEFAULT_KINDS = ['small', 'normal', 'art_crop'];
 const CONCURRENCY = Number(process.env.MTG_IMAGE_CONCURRENCY || 8);
 const KIND_MAP = ['small', 'normal', 'art_crop', 'png'];

@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import { resolveConfiguredSourcePath } from './lib/source-registry.mjs';
 
-const DEFAULT_SOURCE_PATH = path.resolve(process.cwd(), 'server/data/mtg/source/all_cards-latest.json');
+const DEFAULT_SOURCE_PATH = resolveConfiguredSourcePath('magic', 'catalogSource');
 const OUTPUT_ROOT = path.resolve(process.cwd(), 'public/data/mtg');
 const SEARCH_OUTPUT = path.join(OUTPUT_ROOT, 'search');
 const IMAGE_OUTPUT = path.join(OUTPUT_ROOT, 'images');

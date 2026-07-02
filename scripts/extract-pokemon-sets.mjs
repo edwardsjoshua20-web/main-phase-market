@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { resolveConfiguredSourcePath } from './lib/source-registry.mjs';
 
-const DEFAULT_SOURCE_PATH = 'C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json';
+const DEFAULT_SOURCE_PATH = resolveConfiguredSourcePath('pokemon', 'catalogSource');
 const DEFAULT_CARDS_PATH = path.resolve(process.cwd(), 'public/data/pokemon/cards.json');
 const OUTPUT_ROOT = path.resolve(process.cwd(), 'public/data/pokemon');
 const OUTPUT_SETS_PATH = path.join(OUTPUT_ROOT, 'sets.json');

@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { resolveConfiguredSourcePath } from './lib/source-registry.mjs';
 
-const DEFAULT_SOURCE_PATH = 'C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json';
+const DEFAULT_SOURCE_PATH = resolveConfiguredSourcePath('pokemon', 'catalogSource');
 const IMAGE_ROOT = path.resolve(process.cwd(), 'public/data/pokemon/images');
 const DEFAULT_KINDS = ['small', 'large'];
 const KIND_MAP = ['small', 'large'];

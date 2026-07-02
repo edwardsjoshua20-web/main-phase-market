@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getGameSourceConfig } from './lib/source-registry.mjs';
 
 const OUTPUT_ROOT = path.resolve(process.cwd(), 'public/data/onepiece');
 const OUTPUT_CARDS_PATH = path.join(OUTPUT_ROOT, 'cards.json');
 const OUTPUT_MANIFEST_PATH = path.join(OUTPUT_ROOT, 'cards-manifest.json');
-const RAW_BASE = 'https://raw.githubusercontent.com/buhbbl/punk-records/main/english/cards';
+const RAW_BASE = getGameSourceConfig('onepiece', 'cardsApi')?.url || 'https://raw.githubusercontent.com/buhbbl/punk-records/main/english/cards';
 const CONCURRENCY = Number(process.env.ONEPIECE_BACKFILL_CONCURRENCY || 8);
 
 const PACKS = [

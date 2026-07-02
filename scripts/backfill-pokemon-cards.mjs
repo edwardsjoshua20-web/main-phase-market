@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getGameSourceConfig, resolveConfiguredSourcePath } from './lib/source-registry.mjs';
 
-const DEFAULT_SOURCE_PATH = 'C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json';
 const OUTPUT_ROOT = path.resolve(process.cwd(), 'public/data/pokemon');
 const OUTPUT_CARDS_PATH = path.join(OUTPUT_ROOT, 'cards.json');
 const OUTPUT_MANIFEST_PATH = path.join(OUTPUT_ROOT, 'cards-manifest.json');
-const API_ROOT = 'https://api.pokemontcg.io/v2';
+const DEFAULT_SOURCE_PATH = resolveConfiguredSourcePath('pokemon', 'catalogSource');
+const API_ROOT = getGameSourceConfig('pokemon', 'api')?.url || 'https://api.pokemontcg.io/v2';
 const PAGE_SIZE = 250;
 const CONCURRENCY = Number(process.env.POKEMON_BACKFILL_CONCURRENCY || 8);
 

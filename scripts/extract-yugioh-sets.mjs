@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getGameSourceConfig } from './lib/source-registry.mjs';
 
 const OUTPUT_ROOT = path.resolve(process.cwd(), 'public/data/yugioh');
 const OUTPUT_SETS_PATH = path.join(OUTPUT_ROOT, 'sets.json');
-const API_ROOT = 'https://db.ygoprodeck.com/api/v7';
+const API_ROOT = getGameSourceConfig('yugioh', 'api')?.url || 'https://db.ygoprodeck.com/api/v7';
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });

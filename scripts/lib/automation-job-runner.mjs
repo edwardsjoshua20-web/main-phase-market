@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { sourceRequirementStatus } from './source-registry.mjs';
 
 function resolvePathMaybe(value) {
   if (!value) return null;
@@ -19,6 +20,16 @@ function requirementSatisfied(requirement = {}) {
       type: requirement.type,
       label: requirement.label || requirement.path,
       path: resolved
+    };
+  }
+
+  if (requirement.type === 'source-exists') {
+    const status = sourceRequirementStatus(requirement.game, requirement.key || 'catalogSource');
+    return {
+      ok: status.type === 'remote' ? true : Boolean(status.exists),
+      type: requirement.type,
+      label: requirement.label || `${requirement.game}:${requirement.key || 'catalogSource'}`,
+      source: status
     };
   }
 

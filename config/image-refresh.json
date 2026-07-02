@@ -4,9 +4,9 @@
       "id": "mtg-images",
       "label": "Mirror MTG images",
       "command": "npm",
-      "args": ["run", "mtg:mirror:images", "--", "small,normal,art_crop", "server/data/mtg/source/all_cards-latest.json"],
+      "args": ["run", "mtg:mirror:images", "--", "small,normal,art_crop"],
       "requires": [
-        { "type": "file-exists", "path": "server/data/mtg/source/all_cards-latest.json", "label": "MTG source export" }
+        { "type": "source-exists", "game": "magic", "key": "catalogSource", "label": "MTG source export" }
       ],
       "enabled": true
     },
@@ -36,7 +36,7 @@
       "command": "npm",
       "args": ["run", "pokemon:mirror:images"],
       "requires": [
-        { "type": "file-exists", "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json", "label": "Pokemon source export" }
+        { "type": "source-exists", "game": "pokemon", "key": "catalogSource", "label": "Pokemon source export" }
       ],
       "enabled": true
     },
