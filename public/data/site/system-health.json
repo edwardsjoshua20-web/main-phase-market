@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-02T23:41:14.687Z",
+  "generatedAt": "2026-07-03T02:54:42.769Z",
   "overallStatus": "missing",
   "sections": {
     "homepage": {
@@ -10,17 +10,17 @@
         "size": 1112,
         "modifiedAt": "2026-07-02T07:56:12.832Z"
       },
-      "modifiedHoursAgo": 15.75,
+      "modifiedHoursAgo": 18.97,
       "releaseCount": 3
     },
     "catalogs": {
       "area": "catalogs",
       "overallStatus": "missing",
       "counts": {
-        "ok": 2,
+        "ok": 3,
         "degraded": 0,
         "stale": 0,
-        "missing": 5
+        "missing": 4
       },
       "entries": [
         {
@@ -87,7 +87,7 @@
             },
             "count": 1020
           },
-          "modifiedHoursAgo": 0.13
+          "modifiedHoursAgo": 3.35
         },
         {
           "game": "onepiece",
@@ -113,7 +113,7 @@
             },
             "count": 43
           },
-          "modifiedHoursAgo": 0.03
+          "modifiedHoursAgo": 3.25
         },
         {
           "game": "lorcana",
@@ -153,21 +153,29 @@
         },
         {
           "game": "starwars",
-          "status": "missing",
+          "status": "ok",
           "source": {
             "configured": true,
             "type": "remote",
             "url": "https://api.swuapi.com/export/all"
           },
           "cards": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\starwars\\cards.json",
+              "size": 11990115,
+              "modifiedAt": "2026-07-03T02:38:23.417Z"
+            },
+            "count": 9057
           },
           "sets": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\starwars\\sets.json",
+              "size": 7317,
+              "modifiedAt": "2026-07-03T02:38:23.255Z"
+            },
+            "count": 28
           },
-          "modifiedHoursAgo": null
+          "modifiedHoursAgo": 0.27
         }
       ]
     },
@@ -175,10 +183,10 @@
       "area": "images",
       "overallStatus": "missing",
       "counts": {
-        "ok": 2,
+        "ok": 3,
         "degraded": 0,
         "stale": 0,
-        "missing": 5
+        "missing": 4
       },
       "entries": [
         {
@@ -230,7 +238,7 @@
             "size": 353,
             "modifiedAt": "2026-07-02T23:37:38.525Z"
           },
-          "modifiedHoursAgo": 0.06,
+          "modifiedHoursAgo": 3.28,
           "cardsSeen": 14422,
           "downloaded": 844,
           "skippedExisting": 28000,
@@ -250,7 +258,7 @@
             "size": 310,
             "modifiedAt": "2026-07-02T23:40:57.661Z"
           },
-          "modifiedHoursAgo": 0,
+          "modifiedHoursAgo": 3.23,
           "cardsSeen": 1996,
           "downloaded": 1996,
           "skippedExisting": 0,
@@ -291,16 +299,20 @@
         },
         {
           "game": "starwars",
-          "status": "missing",
+          "status": "ok",
           "source": {
             "configured": true,
             "type": "remote",
             "url": "https://api.swuapi.com/export/all"
           },
-          "file": null,
-          "modifiedHoursAgo": null,
-          "cardsSeen": 0,
-          "downloaded": 0,
+          "file": {
+            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\starwars\\images\\mirror-manifest.json",
+            "size": 338,
+            "modifiedAt": "2026-07-03T02:53:16.231Z"
+          },
+          "modifiedHoursAgo": 0.02,
+          "cardsSeen": 9057,
+          "downloaded": 9510,
           "skippedExisting": 0,
           "missingSourceUrl": 0,
           "failed": 0
@@ -316,7 +328,7 @@
           "size": 5106,
           "modifiedAt": "2026-07-02T09:07:11.884Z"
         },
-        "modifiedHoursAgo": 14.57,
+        "modifiedHoursAgo": 17.79,
         "status": "merged-source-snapshots",
         "sourceSnapshots": {
           "cardkingdom": 4,
@@ -334,7 +346,7 @@
             "size": 951,
             "modifiedAt": "2026-07-02T09:07:11.543Z"
           },
-          "modifiedHoursAgo": 14.57,
+          "modifiedHoursAgo": 17.79,
           "rows": 4
         },
         {
@@ -345,7 +357,7 @@
             "size": 953,
             "modifiedAt": "2026-07-02T09:07:11.547Z"
           },
-          "modifiedHoursAgo": 14.57,
+          "modifiedHoursAgo": 17.79,
           "rows": 4
         },
         {
@@ -356,7 +368,7 @@
             "size": 953,
             "modifiedAt": "2026-07-02T09:07:11.549Z"
           },
-          "modifiedHoursAgo": 14.57,
+          "modifiedHoursAgo": 17.79,
           "rows": 4
         }
       ],
@@ -373,7 +385,7 @@
     "readiness": {
       "area": "readiness",
       "overallStatus": "degraded",
-      "averageScore": 43,
+      "averageScore": 54,
       "entries": [
         {
           "game": "magic",
@@ -477,19 +489,19 @@
         },
         {
           "game": "starwars",
-          "stage": "backfill-needed",
-          "readinessScore": 20,
-          "nextAction": "Run card backfill to generate cards.json.",
+          "stage": "storefront-ready",
+          "readinessScore": 100,
+          "nextAction": "Operational. Keep the scheduled refresh jobs healthy.",
           "source": {
             "configured": true,
             "type": "remote",
             "url": "https://api.swuapi.com/export/all"
           },
-          "cardsCount": 0,
-          "setsCount": 0,
-          "imageCardsSeen": 0,
-          "catalogStatus": "missing",
-          "imageStatus": "missing"
+          "cardsCount": 9057,
+          "setsCount": 28,
+          "imageCardsSeen": 9057,
+          "catalogStatus": "ok",
+          "imageStatus": "ok"
         }
       ]
     }
