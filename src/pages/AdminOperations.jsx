@@ -669,6 +669,26 @@ function buildLaunchReadinessRows(sections, automationRuns, controlStatus) {
   ];
 }
 
+function buildDataContractRows(automationRuns) {
+  return siteAutomationRegistry.map((job) => {
+    const run = getRunRecord(automationRuns, job.id);
+    const consumers = [
+      ...(job.blocks || []).map((blockedId) => getJobDetails(blockedId)?.label || blockedId),
+      ...Object.entries(sectionJobMap)
+        .filter(([, jobIds]) => jobIds.includes(job.id))
+        .map(([sectionKey]) => `${sectionKey.charAt(0).toUpperCase()}${sectionKey.slice(1)} dashboard`)
+    ];
+
+    return {
+      ...job,
+      run,
+      status: run?.lastStatus || 'missing',
+      consumers: [...new Set(consumers)],
+      contract: getBusinessImpact(job.id)
+    };
+  });
+}
+
 function StatusBadge({ status }) {
   const normalized = String(status || 'missing').toLowerCase();
   return (
@@ -1203,6 +1223,72 @@ function LaunchReadinessCard({ sections, automationRuns, controlStatus }) {
               </p>
             </div>
           ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DataContractsCard({ automationRuns }) {
+  const rows = useMemo(() => buildDataContractRows(automationRuns), [automationRuns]);
+
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-slate-100 p-2.5">
+              <Database className="h-5 w-5 text-slate-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Data contracts and lineage</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                The map of what each automation owns, what files it produces, and which downstream systems depend on it.
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={rows.some((row) => String(row.status).toLowerCase() !== 'ok') ? 'degraded' : 'ok'} />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Owner</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Producer</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Outputs</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Consumers</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Contract</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900 align-top">{row.owner}</td>
+                  <td className="px-4 py-3 align-top">
+                    <p className="text-sm font-semibold text-gray-900">{row.label}</p>
+                    <p className="mt-1 break-all font-mono text-xs text-gray-500">{row.script}</p>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top">
+                    <ul className="space-y-1">
+                      {row.outputs.map((output) => (
+                        <li key={output} className="break-all font-mono text-xs">{output}</li>
+                      ))}
+                    </ul>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top">
+                    {row.consumers.length > 0 ? row.consumers.join(', ') : 'Direct admin visibility'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top max-w-sm">{row.contract}</td>
+                  <td className="px-4 py-3 text-sm align-top">
+                    <StatusBadge status={row.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </CardContent>
     </Card>
@@ -1766,6 +1852,7 @@ export default function AdminOperations() {
           automationRuns={automationRuns}
           controlStatus={controlStatus}
         />
+        <DataContractsCard automationRuns={automationRuns} />
         <AutomationHistoryCard automationRuns={automationRuns} />
         <BridgeReadinessCard controlStatus={controlStatus} />
         <PipelineControlsCard
