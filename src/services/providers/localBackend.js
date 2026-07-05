@@ -141,6 +141,17 @@ function buildHostedAutomationControlUnavailable() {
     available: false,
     mode: 'hosted-static',
     reason: 'Manual automation controls require the operations backend bridge.',
+    scheduler: {
+      enabled: false,
+      configured: false,
+      intervalMs: null,
+      startedAt: null,
+      lastCheckedAt: null,
+      lastTriggeredAt: null,
+      checks: 0,
+      dueJobs: [],
+      jobs: []
+    },
     bridge: {
       configured: Boolean(normalizedApiOrigin),
       apiOrigin: normalizedApiOrigin || null,

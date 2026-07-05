@@ -1006,7 +1006,49 @@ const AUTOMATION_CONTROL_LOG_PATH = path.join(SITE_DATA_ROOT, 'automation-contro
 const AUTOMATION_LOCK_ROOT = path.join(SITE_DATA_ROOT, 'automation-locks');
 const AUTOMATION_RUN_HISTORY_PATH = path.join(SITE_DATA_ROOT, 'automation-runs.json');
 const AUTOMATION_LOCK_TTL_MS = 12 * 60 * 60 * 1000;
+const AUTOMATION_SCHEDULER_INTERVAL_MS = 60 * 1000;
 const automationJobMap = getAutomationControlJobMap();
+const automationSchedulerState = {
+  enabled: false,
+  startedAt: null,
+  lastCheckedAt: null,
+  lastTriggeredAt: null,
+  timer: null,
+  checks: 0
+};
+
+const automationSchedule = {
+  'card-backfill-refresh': {
+    intervalMs: 24 * 60 * 60 * 1000,
+    cadence: 'daily',
+    reason: 'Keeps raw card source feeds fresh for every downstream catalog, image, and pricing pipeline.'
+  },
+  'catalog-refresh': {
+    intervalMs: 48 * 60 * 60 * 1000,
+    cadence: 'every-2-days',
+    reason: 'Normalizes card and set data after source feed refreshes.'
+  },
+  'image-repair-sync': {
+    intervalMs: 24 * 60 * 60 * 1000,
+    cadence: 'daily',
+    reason: 'Repairs hosted image coverage from normalized catalogs.'
+  },
+  'pricing-refresh': {
+    intervalMs: 24 * 60 * 60 * 1000,
+    cadence: 'daily-morning',
+    reason: 'Refreshes source pricing snapshots and Main Phase target pricing.'
+  },
+  'homepage-upcoming-releases': {
+    intervalMs: 24 * 60 * 60 * 1000,
+    cadence: 'daily',
+    reason: 'Keeps the public upcoming-release feed current.'
+  },
+  'system-health-report': {
+    intervalMs: 60 * 60 * 1000,
+    cadence: 'hourly',
+    reason: 'Keeps Admin Operations health and readiness reporting fresh.'
+  }
+};
 
 function readJsonFile(filePath, fallback) {
   if (!fs.existsSync(filePath)) {
@@ -1104,6 +1146,55 @@ function readAutomationRuns() {
   return {
     generatedAt: payload?.generatedAt || null,
     jobs: payload?.jobs && typeof payload.jobs === 'object' ? payload.jobs : {}
+  };
+}
+
+function isAutomationSchedulerEnabled() {
+  return String(getEnvValue('MPM_AUTOMATION_SCHEDULER_ENABLED') || '').trim().toLowerCase() === 'true';
+}
+
+function getAutomationRunTimestamp(run) {
+  const candidates = [run?.lastStartedAt, run?.lastSucceededAt, run?.lastFinishedAt].filter(Boolean);
+  for (const candidate of candidates) {
+    const timestamp = Date.parse(candidate);
+    if (Number.isFinite(timestamp)) {
+      return timestamp;
+    }
+  }
+  return null;
+}
+
+function buildAutomationScheduleStatus() {
+  const automationRuns = readAutomationRuns();
+  const now = Date.now();
+  const jobs = Object.entries(automationSchedule).map(([jobId, schedule]) => {
+    const run = automationRuns.jobs?.[jobId] || null;
+    const lastRunAtMs = getAutomationRunTimestamp(run);
+    const nextRunAtMs = lastRunAtMs ? lastRunAtMs + schedule.intervalMs : now;
+    const lock = readAutomationLock(jobId);
+    const due = !lock && nextRunAtMs <= now;
+    return {
+      jobId,
+      cadence: schedule.cadence,
+      intervalMs: schedule.intervalMs,
+      reason: schedule.reason,
+      lastRunAt: lastRunAtMs ? new Date(lastRunAtMs).toISOString() : null,
+      nextRunAt: new Date(nextRunAtMs).toISOString(),
+      due,
+      lock
+    };
+  });
+
+  return {
+    enabled: automationSchedulerState.enabled,
+    configured: isAutomationSchedulerEnabled(),
+    intervalMs: AUTOMATION_SCHEDULER_INTERVAL_MS,
+    startedAt: automationSchedulerState.startedAt,
+    lastCheckedAt: automationSchedulerState.lastCheckedAt,
+    lastTriggeredAt: automationSchedulerState.lastTriggeredAt,
+    checks: automationSchedulerState.checks,
+    dueJobs: jobs.filter((job) => job.due).map((job) => job.jobId),
+    jobs
   };
 }
 
@@ -1223,6 +1314,7 @@ function buildOpsBridgeReadiness() {
     automation: {
       allowedJobCount: Object.keys(automationJobMap).length,
       lockTtlHours: AUTOMATION_LOCK_TTL_MS / (60 * 60 * 1000),
+      scheduler: buildAutomationScheduleStatus(),
       siteDataRoot: SITE_DATA_ROOT
     },
     checks,
@@ -1235,9 +1327,11 @@ function buildAutomationControlStatus() {
     available: true,
     mode: 'local-runner',
     bridge: buildOpsBridgeReadiness(),
+    scheduler: buildAutomationScheduleStatus(),
     allowedJobs: Object.entries(automationJobMap).map(([jobId, runnerJob]) => ({
       jobId,
       runnerJob,
+      schedule: automationSchedule[jobId] || null,
       lock: readAutomationLock(jobId),
       preflight: buildAutomationPreflight(jobId)
     })),
@@ -1380,6 +1474,62 @@ function startAutomationJob(jobId, actor = localAdminUser.email) {
 
   return lock;
 }
+
+function runAutomationSchedulerTick() {
+  automationSchedulerState.lastCheckedAt = new Date().toISOString();
+  automationSchedulerState.checks += 1;
+
+  const scheduleStatus = buildAutomationScheduleStatus();
+  for (const job of scheduleStatus.jobs) {
+    if (!job.due) {
+      continue;
+    }
+
+    const preflight = buildAutomationPreflight(job.jobId);
+    if (!preflight.ready) {
+      continue;
+    }
+
+    try {
+      startAutomationJob(job.jobId, 'automation-scheduler');
+      automationSchedulerState.lastTriggeredAt = new Date().toISOString();
+    } catch (error) {
+      const status = Number(error?.status || 500);
+      if (status === 409 || status === 422) {
+        continue;
+      }
+
+      appendAutomationControlLog({
+        runId: null,
+        jobId: job.jobId,
+        runnerJob: automationJobMap[job.jobId] || null,
+        actor: 'automation-scheduler',
+        status: 'scheduler-error',
+        checkedAt: automationSchedulerState.lastCheckedAt,
+        error: error?.message || 'Scheduler failed to start automation job.'
+      });
+    }
+  }
+}
+
+function startAutomationScheduler() {
+  if (!isAutomationSchedulerEnabled()) {
+    automationSchedulerState.enabled = false;
+    return;
+  }
+
+  if (automationSchedulerState.timer) {
+    return;
+  }
+
+  automationSchedulerState.enabled = true;
+  automationSchedulerState.startedAt = new Date().toISOString();
+  automationSchedulerState.timer = setInterval(runAutomationSchedulerTick, AUTOMATION_SCHEDULER_INTERVAL_MS);
+  automationSchedulerState.timer.unref?.();
+  setTimeout(runAutomationSchedulerTick, 5000).unref?.();
+}
+
+startAutomationScheduler();
 
 app.get('/api/local/health', (_req, res) => {
   const systemHealthPath = path.join(process.cwd(), 'public', 'data', 'site', 'system-health.json');

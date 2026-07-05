@@ -171,6 +171,11 @@ async function main() {
   const runningJobs = jobs.filter((job) => job?.lock);
   console.log(`Automation controls: ${controlStatus.payload?.available ? 'available' : 'unavailable'}`);
   console.log(`Runner mode: ${controlStatus.payload?.mode || 'unknown'}`);
+  if (controlStatus.payload?.scheduler) {
+    const scheduler = controlStatus.payload.scheduler;
+    console.log(`Scheduler: ${scheduler.enabled ? 'enabled' : 'disabled'} (${scheduler.configured ? 'configured' : 'not configured'})`);
+    console.log(`Due jobs: ${Array.isArray(scheduler.dueJobs) && scheduler.dueJobs.length ? scheduler.dueJobs.join(', ') : 'none'}`);
+  }
   console.log(`Allowed jobs: ${jobs.length}`);
   console.log(`Running jobs: ${runningJobs.length}`);
 

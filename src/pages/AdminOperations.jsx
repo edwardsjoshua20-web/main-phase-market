@@ -753,6 +753,58 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
           </div>
         </div>
 
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="font-semibold text-slate-900">Automation scheduler</p>
+              <p className="mt-1 text-sm text-slate-600">
+                Opt-in autopilot for the business pipelines. It runs through the same lock, audit, and preflight rules as manual controls.
+              </p>
+            </div>
+            <StatusBadge status={controlStatus?.scheduler?.enabled ? 'ok' : 'degraded'} />
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <SummaryValue label="State" value={controlStatus?.scheduler?.enabled ? 'enabled' : 'disabled'} />
+            <SummaryValue label="Configured" value={controlStatus?.scheduler?.configured ? 'yes' : 'no'} />
+            <SummaryValue label="Last checked" value={formatDate(controlStatus?.scheduler?.lastCheckedAt)} />
+            <SummaryValue label="Due jobs" value={(controlStatus?.scheduler?.dueJobs || []).length} />
+          </div>
+          <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Job</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Cadence</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Last run</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Next run</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">State</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {(controlStatus?.scheduler?.jobs || []).map((job) => (
+                  <tr key={job.jobId}>
+                    <td className="px-4 py-3 align-top">
+                      <p className="text-sm font-medium text-gray-900">{getJobDetails(job.jobId)?.label || job.jobId}</p>
+                      <p className="mt-1 text-xs text-gray-500">{job.reason}</p>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 align-top">{job.cadence}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDate(job.lastRunAt)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDate(job.nextRunAt)}</td>
+                    <td className="px-4 py-3 text-sm align-top">
+                      <StatusBadge status={job.lock ? 'running' : job.due ? 'degraded' : 'ok'} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!controlStatus?.scheduler?.configured ? (
+            <p className="mt-3 text-sm text-slate-500">
+              Enable this on the operations backend with <span className="font-mono text-slate-700">MPM_AUTOMATION_SCHEDULER_ENABLED=true</span> after the bridge is hosted and verified.
+            </p>
+          ) : null}
+        </div>
+
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
