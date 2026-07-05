@@ -23,6 +23,14 @@ export const supabaseBackend = {
       return false;
     },
     getHealthStatus: failAsync('system health'),
+    getAutomationControlStatus() {
+      return Promise.resolve({
+        available: false,
+        mode: 'supabase-provider',
+        reason: 'Manual automation controls require the local operations backend.'
+      });
+    },
+    runAutomationJob: failAsync('manual automation controls'),
     getPublicSettings: failAsync('app public settings')
   },
   auth: {

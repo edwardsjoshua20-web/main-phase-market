@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { backend } from '@/services/backend';
 import { siteAutomationRegistry } from '@/services/automation/siteAutomationRegistry';
 import { Button } from "@/components/ui/button";
@@ -485,7 +486,10 @@ function AutomationHistoryCard({ automationRuns }) {
   );
 }
 
-function PipelineControlsCard({ automationRuns }) {
+function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startingJobId }) {
+  const controlsAvailable = Boolean(controlStatus?.available);
+  const lockByJobId = new Map((controlStatus?.allowedJobs || []).map((entry) => [entry.jobId, entry.lock || null]));
+
   return (
     <Card className="border-gray-200">
       <CardHeader className="pb-4">
@@ -497,28 +501,38 @@ function PipelineControlsCard({ automationRuns }) {
             <div>
               <CardTitle className="text-lg text-gray-900">Pipeline controls</CardTitle>
               <p className="mt-1 text-sm text-gray-500">
-                Manual control surface for the business automations. Execution is locked until the server runner, audit log, and single-run guard are connected.
+                Manual control surface for the business automations. Jobs run through the backend runner with audit logging and single-run locks.
               </p>
             </div>
           </div>
-          <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">safe preview</Badge>
+          <Badge variant="outline" className={controlsAvailable ? 'border-green-200 bg-green-50 text-green-700' : 'border-blue-200 bg-blue-50 text-blue-700'}>
+            {controlsAvailable ? 'runner connected' : 'runner unavailable'}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+        <div className={`rounded-2xl border p-4 ${controlsAvailable ? 'border-green-100 bg-green-50' : 'border-blue-100 bg-blue-50'}`}>
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="flex gap-3">
               <div className="rounded-xl bg-white p-2.5">
-                <Lock className="h-5 w-5 text-blue-700" />
+                {controlsAvailable ? (
+                  <ShieldCheck className="h-5 w-5 text-green-700" />
+                ) : (
+                  <Lock className="h-5 w-5 text-blue-700" />
+                )}
               </div>
               <div>
-                <p className="font-semibold text-blue-950">Manual runs are intentionally locked right now.</p>
-                <p className="mt-1 text-sm text-blue-800">
-                  This gives us the real control-room layout first. The next backend step is a runner that records who clicked, prevents duplicate runs, and writes success or failure back into this page.
+                <p className={controlsAvailable ? 'font-semibold text-green-950' : 'font-semibold text-blue-950'}>
+                  {controlsAvailable ? 'Manual pipeline runner is connected.' : 'Manual runs require the local operations backend.'}
+                </p>
+                <p className={`mt-1 text-sm ${controlsAvailable ? 'text-green-800' : 'text-blue-800'}`}>
+                  {controlsAvailable
+                    ? 'Clicking a run button starts the known automation job, records an audit entry, and prevents duplicate runs with a lock file.'
+                    : controlStatus?.reason || 'Hosted static pages cannot execute Node automation jobs directly.'}
                 </p>
               </div>
             </div>
-            <StatusBadge status="degraded" />
+            <StatusBadge status={controlsAvailable ? 'ok' : 'degraded'} />
           </div>
         </div>
 
@@ -526,6 +540,9 @@ function PipelineControlsCard({ automationRuns }) {
           {siteAutomationRegistry.map((job) => {
             const run = getRunRecord(automationRuns, job.id);
             const readiness = getControlReadiness(run);
+            const lock = lockByJobId.get(job.id);
+            const isStarting = startingJobId === job.id;
+            const canRun = controlsAvailable && !lock && !isStarting;
 
             return (
               <div key={job.id} className="rounded-2xl border border-gray-200 bg-white p-4">
@@ -557,11 +574,25 @@ function PipelineControlsCard({ automationRuns }) {
                 <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className={`text-sm font-semibold ${readiness.tone}`}>{readiness.label}</p>
-                    <p className="mt-1 text-sm text-gray-500">{readiness.note}</p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {lock
+                        ? `Locked by run ${lock.runId || 'unknown'} started ${formatDate(lock.startedAt)}.`
+                        : readiness.note}
+                    </p>
                   </div>
-                  <Button type="button" disabled variant="outline" className="border-gray-200 bg-gray-50 text-gray-500">
-                    <Play className="mr-2 h-4 w-4" />
-                    Run locked
+                  <Button
+                    type="button"
+                    disabled={!canRun}
+                    variant={canRun ? 'default' : 'outline'}
+                    className={canRun ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-500'}
+                    onClick={() => onRunJob(job.id)}
+                  >
+                    {isStarting ? (
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className="mr-2 h-4 w-4" />
+                    )}
+                    {isStarting ? 'Starting...' : canRun ? 'Run now' : lock ? 'Run locked' : 'Unavailable'}
                   </Button>
                 </div>
               </div>
@@ -747,11 +778,45 @@ export default function AdminOperations() {
     refetchInterval: 30000
   });
 
+  const controlQuery = useQuery({
+    queryKey: ['admin-automation-control-status'],
+    queryFn: () => backend.app.getAutomationControlStatus(),
+    enabled: !loading,
+    refetchInterval: 10000,
+    retry: false
+  });
+
+  const runJobMutation = useMutation({
+    mutationFn: (jobId) => backend.app.runAutomationJob(jobId),
+    onSuccess: (payload, jobId) => {
+      const job = getJobDetails(jobId);
+      toast.success(`${job?.label || 'Pipeline'} started`);
+      controlQuery.refetch();
+      healthQuery.refetch({ cancelRefetch: false });
+      window.setTimeout(() => {
+        controlQuery.refetch();
+        healthQuery.refetch({ cancelRefetch: false });
+      }, 3000);
+    },
+    onError: (error) => {
+      toast.error(error?.message || 'Failed to start pipeline');
+      controlQuery.refetch();
+    }
+  });
+
   const systemHealth = healthQuery.data?.systemHealth || null;
   const sections = systemHealth?.sections || {};
   const generatedAt = systemHealth?.generatedAt || null;
   const automationRuns = systemHealth?.automationRuns || { generatedAt: null, jobs: {} };
   const automationSummary = useMemo(() => summarizeAutomationRuns(automationRuns), [automationRuns]);
+  const controlStatus = controlQuery.data || {
+    available: false,
+    mode: 'unknown',
+    reason: controlQuery.isError
+      ? (controlQuery.error?.message || 'Automation control backend is not reachable.')
+      : 'Checking automation control backend...'
+  };
+  const startingJobId = runJobMutation.isPending ? runJobMutation.variables : null;
 
   const summary = useMemo(() => {
     const sectionStatuses = Object.values(sections).map((section) => String(section?.status || section?.overallStatus || 'missing').toLowerCase());
@@ -873,7 +938,12 @@ export default function AdminOperations() {
         </Card>
 
         <AutomationHistoryCard automationRuns={automationRuns} />
-        <PipelineControlsCard automationRuns={automationRuns} />
+        <PipelineControlsCard
+          automationRuns={automationRuns}
+          controlStatus={controlStatus}
+          onRunJob={(jobId) => runJobMutation.mutate(jobId)}
+          startingJobId={startingJobId}
+        />
 
         <div className="grid gap-6">
           <ActionCenterCard systemHealth={systemHealth} sections={sections} automationRuns={automationRuns} />

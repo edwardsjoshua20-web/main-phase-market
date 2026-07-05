@@ -4,6 +4,7 @@ import { URL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
 import Stripe from 'stripe';
 import {
   createEntity,
@@ -991,6 +992,206 @@ const localAdminUser = {
   role: 'admin'
 };
 
+const SITE_DATA_ROOT = path.join(process.cwd(), 'public', 'data', 'site');
+const AUTOMATION_CONTROL_LOG_PATH = path.join(SITE_DATA_ROOT, 'automation-control-log.json');
+const AUTOMATION_LOCK_ROOT = path.join(SITE_DATA_ROOT, 'automation-locks');
+const AUTOMATION_LOCK_TTL_MS = 12 * 60 * 60 * 1000;
+const automationJobMap = {
+  'homepage-upcoming-releases': 'homepage',
+  'card-backfill-refresh': 'cards',
+  'catalog-refresh': 'catalog',
+  'image-repair-sync': 'images',
+  'pricing-refresh': 'pricing',
+  'system-health-report': 'health'
+};
+
+function readJsonFile(filePath, fallback) {
+  if (!fs.existsSync(filePath)) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJsonFile(filePath, payload) {
+  ensureDir(path.dirname(filePath));
+  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
+}
+
+function getAutomationLockPath(jobId) {
+  return path.join(AUTOMATION_LOCK_ROOT, `${jobId}.json`);
+}
+
+function isProcessAlive(pid) {
+  const numericPid = Number(pid);
+  if (!Number.isInteger(numericPid) || numericPid <= 0) {
+    return false;
+  }
+
+  try {
+    process.kill(numericPid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readAutomationLock(jobId) {
+  const lockPath = getAutomationLockPath(jobId);
+  const lock = readJsonFile(lockPath, null);
+  if (!lock) {
+    return null;
+  }
+
+  const startedAt = Date.parse(lock.startedAt || '');
+  const stale = Number.isFinite(startedAt) && Date.now() - startedAt > AUTOMATION_LOCK_TTL_MS;
+  if (stale || !isProcessAlive(lock.pid)) {
+    try {
+      fs.unlinkSync(lockPath);
+    } catch {
+      // If the lock vanished between read and cleanup, treat it as clear.
+    }
+    return null;
+  }
+
+  return lock;
+}
+
+function writeAutomationLock(jobId, lock) {
+  writeJsonFile(getAutomationLockPath(jobId), lock);
+}
+
+function clearAutomationLock(jobId, runId) {
+  const lock = readJsonFile(getAutomationLockPath(jobId), null);
+  if (lock?.runId && lock.runId !== runId) {
+    return;
+  }
+
+  try {
+    fs.unlinkSync(getAutomationLockPath(jobId));
+  } catch {
+    // Lock may already be removed by a stale-lock cleanup.
+  }
+}
+
+function readAutomationControlLog() {
+  const payload = readJsonFile(AUTOMATION_CONTROL_LOG_PATH, { generatedAt: null, entries: [] });
+  return {
+    generatedAt: payload?.generatedAt || null,
+    entries: Array.isArray(payload?.entries) ? payload.entries : []
+  };
+}
+
+function appendAutomationControlLog(entry) {
+  const log = readAutomationControlLog();
+  const next = {
+    generatedAt: new Date().toISOString(),
+    entries: [entry, ...log.entries].slice(0, 100)
+  };
+  writeJsonFile(AUTOMATION_CONTROL_LOG_PATH, next);
+  return next;
+}
+
+function buildAutomationControlStatus() {
+  return {
+    available: true,
+    mode: 'local-runner',
+    allowedJobs: Object.entries(automationJobMap).map(([jobId, runnerJob]) => ({
+      jobId,
+      runnerJob,
+      lock: readAutomationLock(jobId)
+    })),
+    audit: readAutomationControlLog()
+  };
+}
+
+function startAutomationJob(jobId, actor = localAdminUser.email) {
+  const runnerJob = automationJobMap[jobId];
+  if (!runnerJob) {
+    const error = new Error(`Unknown automation job "${jobId}".`);
+    error.status = 404;
+    throw error;
+  }
+
+  const existingLock = readAutomationLock(jobId);
+  if (existingLock) {
+    const error = new Error(`Automation job "${jobId}" is already running.`);
+    error.status = 409;
+    error.lock = existingLock;
+    throw error;
+  }
+
+  const runId = crypto.randomUUID();
+  const startedAt = new Date().toISOString();
+  const child = spawn('node', ['scripts/run-site-automation.mjs', runnerJob], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      MPM_MANUAL_AUTOMATION_RUN_ID: runId,
+      MPM_MANUAL_AUTOMATION_ACTOR: actor
+    },
+    stdio: 'ignore',
+    shell: process.platform === 'win32'
+  });
+
+  const lock = {
+    runId,
+    jobId,
+    runnerJob,
+    pid: child.pid || null,
+    startedAt,
+    actor
+  };
+
+  writeAutomationLock(jobId, lock);
+  appendAutomationControlLog({
+    runId,
+    jobId,
+    runnerJob,
+    actor,
+    status: 'started',
+    startedAt
+  });
+
+  child.once('error', (error) => {
+    const failedAt = new Date().toISOString();
+    clearAutomationLock(jobId, runId);
+    appendAutomationControlLog({
+      runId,
+      jobId,
+      runnerJob,
+      actor,
+      status: 'failed-to-start',
+      startedAt,
+      finishedAt: failedAt,
+      error: error?.message || 'Failed to start automation job.'
+    });
+  });
+
+  child.once('close', (exitCode) => {
+    const finishedAt = new Date().toISOString();
+    clearAutomationLock(jobId, runId);
+    appendAutomationControlLog({
+      runId,
+      jobId,
+      runnerJob,
+      actor,
+      status: exitCode === 0 ? 'completed' : 'failed',
+      startedAt,
+      finishedAt,
+      exitCode
+    });
+  });
+
+  child.unref?.();
+
+  return lock;
+}
+
 app.get('/api/local/health', (_req, res) => {
   const systemHealthPath = path.join(process.cwd(), 'public', 'data', 'site', 'system-health.json');
   const systemHealth = fs.existsSync(systemHealthPath)
@@ -1003,6 +1204,30 @@ app.get('/api/local/health', (_req, res) => {
     dbPath: getDbPath(),
     systemHealth
   });
+});
+
+app.get('/api/local/admin/automation/control-status', (_req, res) => {
+  res.json(buildAutomationControlStatus());
+});
+
+app.post('/api/local/admin/automation/:jobId/run', (req, res) => {
+  try {
+    const jobId = String(req.params.jobId || '').trim();
+    const actor = String(req.body?.actor || localAdminUser.email).trim() || localAdminUser.email;
+    const lock = startAutomationJob(jobId, actor);
+    res.status(202).json({
+      accepted: true,
+      lock,
+      controlStatus: buildAutomationControlStatus()
+    });
+  } catch (error) {
+    const status = Number(error?.status || 500);
+    res.status(status).json({
+      error: error?.message || 'Failed to start automation job.',
+      lock: error?.lock || null,
+      controlStatus: buildAutomationControlStatus()
+    });
+  }
 });
 
 app.get('/api/local/app/public-settings', (_req, res) => {

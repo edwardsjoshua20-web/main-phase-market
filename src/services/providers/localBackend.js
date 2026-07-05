@@ -763,6 +763,25 @@ export const localBackend = {
       }
       return apiRequest('/health');
     },
+    getAutomationControlStatus() {
+      if (hostedSupabaseMode) {
+        return Promise.resolve({
+          available: false,
+          mode: 'hosted-static',
+          reason: 'Manual automation controls require the local operations backend.'
+        });
+      }
+      return apiRequest('/admin/automation/control-status');
+    },
+    runAutomationJob(jobId) {
+      if (hostedSupabaseMode) {
+        return Promise.reject(new Error('Manual automation controls require the local operations backend.'));
+      }
+      return apiRequest(`/admin/automation/${encodeURIComponent(jobId)}/run`, {
+        method: 'POST',
+        body: JSON.stringify({ actor: localAdminUser.email })
+      });
+    },
     getPublicSettings() {
       return Promise.resolve({
         app_name: 'Main Phase Market',
