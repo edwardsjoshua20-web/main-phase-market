@@ -61,6 +61,7 @@
     "automation:images": "npm run automation:images:refresh",
     "automation:pricing": "node scripts/run-site-automation.mjs pricing",
     "automation:health": "node scripts/run-site-automation.mjs health",
+    "ops:check": "node scripts/check-ops-bridge.mjs",
     "snapshots:embed": "node scripts/build-site-static-snapshots.mjs",
     "clean:build": "node scripts/clean-build-output.cjs",
     "typecheck": "tsc -p ./jsconfig.json",
