@@ -17,8 +17,12 @@ import {
   HardDriveDownload,
   Image as ImageIcon,
   ListChecks,
+  Lock,
+  Play,
   RefreshCw,
   ServerCrash,
+  ShieldCheck,
+  Terminal,
   Wrench
 } from 'lucide-react';
 
@@ -95,9 +99,9 @@ function classifyEntryIssue(entry) {
 const ADMIN_TIMEZONE = 'America/New_York';
 
 function formatDate(value) {
-  if (!value) return '—';
+  if (!value) return 'â€”';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return 'â€”';
   return date.toLocaleString('en-US', {
     timeZone: ADMIN_TIMEZONE,
     year: 'numeric',
@@ -152,6 +156,40 @@ function summarizeAutomationRuns(automationRuns) {
     failed: runs.filter((run) => run?.lastStatus === 'failed').length,
     running: runs.filter((run) => run?.lastStatus === 'running').length,
     missing: siteAutomationRegistry.filter((job) => !automationRuns?.jobs?.[job.id]?.lastStatus).length
+  };
+}
+
+function getControlReadiness(run) {
+  const status = String(run?.lastStatus || 'missing').toLowerCase();
+
+  if (status === 'ok') {
+    return {
+      label: 'Ready when runner is wired',
+      tone: 'text-green-700',
+      note: 'Latest recorded run completed successfully.'
+    };
+  }
+
+  if (status === 'running') {
+    return {
+      label: 'Run in progress',
+      tone: 'text-blue-700',
+      note: 'Wait for this job to finish before allowing another run.'
+    };
+  }
+
+  if (status === 'failed') {
+    return {
+      label: 'Needs review before rerun',
+      tone: 'text-red-700',
+      note: run?.lastError || 'The last run failed and should be reviewed before manual execution.'
+    };
+  }
+
+  return {
+    label: 'Needs first recorded run',
+    tone: 'text-amber-700',
+    note: 'No run history has been captured yet.'
   };
 }
 
@@ -441,6 +479,94 @@ function AutomationHistoryCard({ automationRuns }) {
               })}
             </tbody>
           </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PipelineControlsCard({ automationRuns }) {
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-blue-50 p-2.5">
+              <ShieldCheck className="h-5 w-5 text-blue-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Pipeline controls</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                Manual control surface for the business automations. Execution is locked until the server runner, audit log, and single-run guard are connected.
+              </p>
+            </div>
+          </div>
+          <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">safe preview</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="flex gap-3">
+              <div className="rounded-xl bg-white p-2.5">
+                <Lock className="h-5 w-5 text-blue-700" />
+              </div>
+              <div>
+                <p className="font-semibold text-blue-950">Manual runs are intentionally locked right now.</p>
+                <p className="mt-1 text-sm text-blue-800">
+                  This gives us the real control-room layout first. The next backend step is a runner that records who clicked, prevents duplicate runs, and writes success or failure back into this page.
+                </p>
+              </div>
+            </div>
+            <StatusBadge status="degraded" />
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          {siteAutomationRegistry.map((job) => {
+            const run = getRunRecord(automationRuns, job.id);
+            const readiness = getControlReadiness(run);
+
+            return (
+              <div key={job.id} className="rounded-2xl border border-gray-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-gray-900">{job.label}</p>
+                      <StatusBadge status={run?.lastStatus || 'missing'} />
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">{job.purpose}</p>
+                  </div>
+                  <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">{job.cadence}</Badge>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <SummaryValue label="Owner" value={job.owner} />
+                  <SummaryValue label="Last success" value={formatDate(run?.lastSucceededAt)} />
+                  <SummaryValue label="Duration" value={formatDuration(run?.lastDurationMs)} />
+                </div>
+
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <Terminal className="h-4 w-4" />
+                    Command
+                  </div>
+                  <p className="mt-2 break-all font-mono text-xs text-slate-700">{job.script}</p>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className={`text-sm font-semibold ${readiness.tone}`}>{readiness.label}</p>
+                    <p className="mt-1 text-sm text-gray-500">{readiness.note}</p>
+                  </div>
+                  <Button type="button" disabled variant="outline" className="border-gray-200 bg-gray-50 text-gray-500">
+                    <Play className="mr-2 h-4 w-4" />
+                    Run locked
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
@@ -747,6 +873,7 @@ export default function AdminOperations() {
         </Card>
 
         <AutomationHistoryCard automationRuns={automationRuns} />
+        <PipelineControlsCard automationRuns={automationRuns} />
 
         <div className="grid gap-6">
           <ActionCenterCard systemHealth={systemHealth} sections={sections} automationRuns={automationRuns} />
