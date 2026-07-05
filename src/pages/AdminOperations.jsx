@@ -382,6 +382,154 @@ function buildActionItems(systemHealth, sections, automationRuns) {
   return items.sort((a, b) => b.severity - a.severity || b.affectedCount - a.affectedCount);
 }
 
+function buildOperationIncidents(systemHealth, sections, automationRuns, controlStatus) {
+  const incidents = [];
+  const severityRank = { critical: 4, warning: 3, watch: 2, info: 1 };
+  const addIncident = (incident) => {
+    incidents.push({
+      id: incident.id,
+      severity: incident.severity || 'warning',
+      status: incident.status || 'degraded',
+      title: incident.title,
+      owner: incident.owner || 'operations',
+      evidence: incident.evidence || 'No evidence captured.',
+      fix: incident.fix || 'Review the owning pipeline and rerun after dependencies are healthy.',
+      job: incident.job || null
+    });
+  };
+
+  if (!controlStatus?.available) {
+    addIncident({
+      id: 'bridge-unavailable',
+      severity: 'warning',
+      status: 'degraded',
+      title: 'Operations bridge is not connected',
+      owner: 'operations',
+      evidence: controlStatus?.reason || 'Hosted admin page cannot reach the local operations backend.',
+      fix: 'Connect the operations backend, set VITE_API_ORIGIN on Cloudflare Pages, then redeploy.'
+    });
+  }
+
+  const bridgeChecks = Array.isArray(controlStatus?.bridge?.checks) ? controlStatus.bridge.checks : [];
+  bridgeChecks
+    .filter((check) => String(check?.status || 'missing').toLowerCase() !== 'ok')
+    .forEach((check) => {
+      addIncident({
+        id: `bridge-check-${check.id || check.label}`,
+        severity: 'warning',
+        status: check.status || 'degraded',
+        title: `Bridge readiness check: ${check.label || check.id || 'unknown check'}`,
+        owner: 'operations',
+        evidence: check.detail || 'Backend readiness check is not green.',
+        fix: 'Fix the backend readiness check before relying on hosted manual controls.'
+      });
+    });
+
+  if (controlStatus?.scheduler && !controlStatus.scheduler.enabled) {
+    addIncident({
+      id: 'scheduler-disabled',
+      severity: controlStatus.scheduler.configured ? 'watch' : 'info',
+      status: 'degraded',
+      title: 'Automation scheduler is disabled',
+      owner: 'operations',
+      evidence: controlStatus.scheduler.configured
+        ? 'Scheduler is configured but currently not enabled.'
+        : 'Scheduler is waiting for MPM_AUTOMATION_SCHEDULER_ENABLED=true.',
+      fix: 'Enable the scheduler only after the bridge and pipeline controls are verified.'
+    });
+  }
+
+  const dueJobs = Array.isArray(controlStatus?.scheduler?.dueJobs) ? controlStatus.scheduler.dueJobs : [];
+  if (dueJobs.length > 0) {
+    const labels = dueJobs
+      .map((jobId) => getJobDetails(jobId)?.label || jobId)
+      .join(', ');
+    addIncident({
+      id: 'scheduler-due-jobs',
+      severity: 'watch',
+      status: 'degraded',
+      title: 'Scheduler has due jobs',
+      owner: 'operations',
+      evidence: labels,
+      fix: 'Let the scheduler run, or trigger the recommended pipeline order manually if the runner is connected.'
+    });
+  }
+
+  Object.entries(automationRuns?.jobs || {}).forEach(([jobId, run]) => {
+    const status = String(run?.lastStatus || 'missing').toLowerCase();
+    if (status !== 'failed') return;
+    const job = getJobDetails(jobId);
+    addIncident({
+      id: `failed-run-${jobId}`,
+      severity: 'critical',
+      status: 'failed',
+      title: `${job?.label || jobId} failed`,
+      owner: job?.owner || 'operations',
+      evidence: run?.lastError || `Last failed at ${formatDate(run?.lastFailedAt)}.`,
+      fix: 'Review the error, confirm upstream dependencies are healthy, then rerun the job.',
+      job
+    });
+  });
+
+  const orderedSections = [
+    ['catalogs', 'Catalog pipelines'],
+    ['images', 'Image pipelines'],
+    ['pricing', 'Pricing pipelines'],
+    ['homepage', 'Homepage feed'],
+    ['readiness', 'Game readiness']
+  ];
+
+  orderedSections.forEach(([sectionKey, label]) => {
+    const section = sections?.[sectionKey];
+    if (!section) return;
+    const status = String(section?.status || section?.overallStatus || 'missing').toLowerCase();
+    if (status === 'ok') return;
+
+    const entries = Array.isArray(section.entries) ? section.entries : [];
+    const affected = entries.filter((entry) => String(entry?.status || 'missing').toLowerCase() !== 'ok');
+    const owningJobs = (sectionJobMap[sectionKey] || []).map((jobId) => getJobDetails(jobId)).filter(Boolean);
+    const owners = [...new Set(owningJobs.map((job) => job.owner))].join(', ') || 'operations';
+    const evidence = affected.length > 0
+      ? `${affected.length} affected target${affected.length === 1 ? '' : 's'}: ${summarizeTargets(affected)}`
+      : `Section status is ${status}.`;
+
+    addIncident({
+      id: `section-${sectionKey}-${status}`,
+      severity: status === 'missing' ? 'critical' : status === 'degraded' ? 'warning' : 'watch',
+      status,
+      title: `${label} needs attention`,
+      owner: owners,
+      evidence,
+      fix: owningJobs.length > 0
+        ? `Use ${owningJobs.map((job) => job.label).join(' -> ')} after preflight is clear.`
+        : 'Review this section diagnostics and repair the source data.'
+    });
+  });
+
+  if (systemHealth?.overallStatus && String(systemHealth.overallStatus).toLowerCase() !== 'ok') {
+    addIncident({
+      id: 'system-overall-status',
+      severity: String(systemHealth.overallStatus).toLowerCase() === 'missing' ? 'critical' : 'warning',
+      status: systemHealth.overallStatus,
+      title: 'Overall system health is not green',
+      owner: 'operations',
+      evidence: `System health reports ${systemHealth.overallStatus}.`,
+      fix: 'Start with the highest severity incident in this queue, then rerun System health report.'
+    });
+  }
+
+  const unique = new Map();
+  incidents.forEach((incident) => {
+    if (!unique.has(incident.id)) unique.set(incident.id, incident);
+  });
+
+  return [...unique.values()].sort((a, b) => {
+    const severityDiff = (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0);
+    if (severityDiff !== 0) return severityDiff;
+    return String(a.title).localeCompare(String(b.title));
+  });
+}
+
 function StatusBadge({ status }) {
   const normalized = String(status || 'missing').toLowerCase();
   return (
@@ -695,6 +843,90 @@ function AutomationHistoryCard({ automationRuns }) {
             </tbody>
           </table>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function OperationsIncidentCard({ systemHealth, sections, automationRuns, controlStatus }) {
+  const incidents = useMemo(
+    () => buildOperationIncidents(systemHealth, sections, automationRuns, controlStatus),
+    [systemHealth, sections, automationRuns, controlStatus]
+  );
+  const critical = incidents.filter((incident) => incident.severity === 'critical').length;
+  const warning = incidents.filter((incident) => incident.severity === 'warning').length;
+  const watch = incidents.filter((incident) => incident.severity === 'watch').length;
+  const topStatus = critical > 0 ? 'failed' : warning > 0 ? 'degraded' : watch > 0 ? 'stale' : 'ok';
+
+  return (
+    <Card className={incidents.length > 0 ? 'border-amber-200 bg-amber-50/40' : 'border-green-200 bg-green-50/40'}>
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className={incidents.length > 0 ? 'rounded-xl bg-amber-100 p-2.5' : 'rounded-xl bg-green-100 p-2.5'}>
+              {incidents.length > 0 ? (
+                <AlertTriangle className="h-5 w-5 text-amber-700" />
+              ) : (
+                <ShieldCheck className="h-5 w-5 text-green-700" />
+              )}
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Operations incident queue</CardTitle>
+              <p className="mt-1 text-sm text-gray-600">
+                The smoke alarm layer: failed jobs, stale outputs, bridge issues, scheduler due work, and missing coverage roll up here first.
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={topStatus} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+          <SummaryValue label="Active incidents" value={incidents.length} />
+          <SummaryValue label="Critical" value={critical} />
+          <SummaryValue label="Warnings" value={warning} />
+          <SummaryValue label="Watch" value={watch} />
+        </div>
+
+        {incidents.length === 0 ? (
+          <div className="rounded-2xl border border-green-200 bg-white p-4">
+            <p className="font-semibold text-green-900">No active incidents. Beast is calm.</p>
+            <p className="mt-1 text-sm text-green-700">
+              Nothing is currently screaming for attention. We can spend the next work block on product quality instead of ops firefighting.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {incidents.map((incident) => (
+              <div key={incident.id} className="rounded-2xl border border-gray-200 bg-white p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-gray-900">{incident.title}</p>
+                      <StatusBadge status={incident.status} />
+                      <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">
+                        {incident.severity}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-600">
+                      <span className="font-medium text-gray-800">Evidence:</span> {incident.evidence}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      <span className="font-medium text-gray-800">Fix:</span> {incident.fix}
+                    </p>
+                  </div>
+                  <div className="min-w-48 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Owner</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">{incident.owner}</p>
+                    {incident.job?.script ? (
+                      <p className="mt-2 break-all font-mono text-xs text-slate-600">{incident.job.script}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -1171,8 +1403,15 @@ export default function AdminOperations() {
                 Last checked: <span className="font-medium text-gray-800">{formatDate(healthQuery.dataUpdatedAt)}</span>
               </div>
             </div>
-            <Button type="button" onClick={() => healthQuery.refetch({ cancelRefetch: false })} className="bg-blue-600 hover:bg-blue-700 text-white">
-              <RefreshCw className={`mr-2 h-4 w-4 ${healthQuery.isFetching ? 'animate-spin' : ''}`} />
+            <Button
+              type="button"
+              onClick={() => {
+                healthQuery.refetch({ cancelRefetch: false });
+                controlQuery.refetch({ cancelRefetch: false });
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${healthQuery.isFetching || controlQuery.isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
@@ -1238,6 +1477,12 @@ export default function AdminOperations() {
           </CardContent>
         </Card>
 
+        <OperationsIncidentCard
+          systemHealth={systemHealth}
+          sections={sections}
+          automationRuns={automationRuns}
+          controlStatus={controlStatus}
+        />
         <AutomationHistoryCard automationRuns={automationRuns} />
         <BridgeReadinessCard controlStatus={controlStatus} />
         <PipelineControlsCard
