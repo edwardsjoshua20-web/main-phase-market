@@ -43,7 +43,8 @@ import {
   updateSupabaseEntityRecord,
   updateSupabaseCardList,
   updateSupabaseForumPost,
-  updateSupabaseForumReply
+  updateSupabaseForumReply,
+  verifySupabaseAccessToken
 } from './supabaseBridge.mjs';
 import { getDbPath } from './db.mjs';
 import { ensureMtgCommanderEngine, getMtgCommanderPage, refreshMtgCommanderEngine, searchMtgCommanderEngine, simulateMtgDeckGauntlet } from './mtgCommanderEngine.mjs';
@@ -90,7 +91,14 @@ const app = express();
 const port = Number(process.env.PORT || process.env.LOCAL_API_PORT || 8787);
 const host = process.env.LOCAL_API_HOST || '0.0.0.0';
 const allowedOriginHosts = new Set(
-  ['localhost', '127.0.0.1', ...(getEnvValue('ALLOWED_ORIGIN_HOSTS').split(',').map((value) => value.trim()).filter(Boolean))]
+  [
+    'localhost',
+    '127.0.0.1',
+    'mainphasemarket.net',
+    'www.mainphasemarket.net',
+    'main-phase-market.pages.dev',
+    ...(getEnvValue('ALLOWED_ORIGIN_HOSTS').split(',').map((value) => value.trim()).filter(Boolean))
+  ]
 );
 const mtgSearchDir = path.join(process.cwd(), 'public', 'data', 'mtg', 'search');
 const mtgImageDir = path.join(process.cwd(), 'public', 'data', 'mtg', 'images');
@@ -1109,6 +1117,42 @@ function buildAutomationControlStatus() {
   };
 }
 
+function extractBearerToken(req) {
+  const header = String(req.headers.authorization || '');
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : '';
+}
+
+async function requireAutomationAdmin(req, res, next) {
+  if (isLoopbackAddress(req.socket.remoteAddress)) {
+    req.automationActor = localAdminUser;
+    next();
+    return;
+  }
+
+  try {
+    const auth = await verifySupabaseAccessToken(extractBearerToken(req));
+    const role = String(auth.role || '').toLowerCase();
+
+    if (role !== 'admin') {
+      res.status(403).json({ error: 'Admin role is required for automation controls.' });
+      return;
+    }
+
+    req.automationActor = {
+      id: auth.profile?.id || auth.user?.id || null,
+      email: auth.profile?.email || auth.user?.email || '',
+      full_name: auth.profile?.full_name || auth.user?.email || 'Admin',
+      role
+    };
+    next();
+  } catch (error) {
+    res.status(Number(error?.status || 401)).json({
+      error: error?.message || 'Automation control authentication failed.'
+    });
+  }
+}
+
 function startAutomationJob(jobId, actor = localAdminUser.email) {
   const runnerJob = automationJobMap[jobId];
   if (!runnerJob) {
@@ -1206,14 +1250,14 @@ app.get('/api/local/health', (_req, res) => {
   });
 });
 
-app.get('/api/local/admin/automation/control-status', (_req, res) => {
+app.get('/api/local/admin/automation/control-status', requireAutomationAdmin, (_req, res) => {
   res.json(buildAutomationControlStatus());
 });
 
-app.post('/api/local/admin/automation/:jobId/run', (req, res) => {
+app.post('/api/local/admin/automation/:jobId/run', requireAutomationAdmin, (req, res) => {
   try {
     const jobId = String(req.params.jobId || '').trim();
-    const actor = String(req.body?.actor || localAdminUser.email).trim() || localAdminUser.email;
+    const actor = String(req.automationActor?.email || req.body?.actor || localAdminUser.email).trim() || localAdminUser.email;
     const lock = startAutomationJob(jobId, actor);
     res.status(202).json({
       accepted: true,

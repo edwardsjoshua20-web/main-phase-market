@@ -664,10 +664,54 @@ function normalizeUserProfile(row, fallback = {}) {
     id: row?.id || fallback.id || 'local-admin',
     full_name: row?.full_name || fallback.full_name || 'Local Admin',
     email: row?.email || fallback.email || 'admin@localhost',
-    role: fallback.role || 'admin',
+    role: row?.role || fallback.role || 'admin',
     avatar_url: row?.avatar_url || fallback.avatar_url || '',
     bio: row?.bio || fallback.bio || '',
     favorite_game: row?.favorite_game || fallback.favorite_game || ''
+  };
+}
+
+export async function verifySupabaseAccessToken(accessToken) {
+  const token = String(accessToken || '').trim();
+  const { url, serviceRoleKey } = getBridgeConfig();
+
+  if (!url || !serviceRoleKey) {
+    throw new Error('Supabase bridge is not configured.');
+  }
+
+  if (!token) {
+    const error = new Error('Missing Supabase access token.');
+    error.status = 401;
+    throw error;
+  }
+
+  const response = await fetch(`${url}/auth/v1/user`, {
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    const error = new Error('Invalid Supabase access token.');
+    error.status = 401;
+    throw error;
+  }
+
+  const user = await response.json();
+  const profile = await getSupabaseUserProfileByEmail(user?.email || '', {
+    id: user?.id,
+    email: user?.email,
+    full_name: user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Member',
+    role: user?.user_metadata?.role || 'member',
+    avatar_url: user?.user_metadata?.avatar_url || ''
+  });
+
+  return {
+    user,
+    profile,
+    role: profile?.role || user?.user_metadata?.role || 'member'
   };
 }
 

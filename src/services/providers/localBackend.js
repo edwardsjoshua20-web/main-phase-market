@@ -37,9 +37,11 @@ const localAdminUser = {
 };
 
 async function apiRequest(path, options = {}) {
+  const sessionToken = getSessionToken();
   const response = await fetch(`${LOCAL_API_BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
       ...(options.headers || {})
     },
     ...options
@@ -124,8 +126,15 @@ const runningOnLocalHost = (() => {
   return host === 'localhost' || host === '127.0.0.1';
 })();
 
-const staticGuestMode = !normalizedApiOrigin && !runningOnLocalHost;
-const hostedSupabaseMode = staticGuestMode && Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const hostedPublicHost = (() => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return SUPPORTED_PUBLIC_HOSTS.has(window.location.hostname);
+})();
+const hostedSupabaseMode = hostedPublicHost && Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const staticGuestMode = !normalizedApiOrigin && !runningOnLocalHost && !hostedSupabaseMode;
+const hostedStaticDataMode = hostedSupabaseMode && !normalizedApiOrigin;
 
 function getStoredSession() {
   if (typeof window === 'undefined') return null;
@@ -758,13 +767,13 @@ export const localBackend = {
       return !staticGuestMode;
     },
     getHealthStatus() {
-      if (hostedSupabaseMode) {
+      if (hostedStaticDataMode) {
         return fetchStaticSystemHealth();
       }
       return apiRequest('/health');
     },
     getAutomationControlStatus() {
-      if (hostedSupabaseMode) {
+      if (hostedStaticDataMode) {
         return Promise.resolve({
           available: false,
           mode: 'hosted-static',
@@ -774,7 +783,7 @@ export const localBackend = {
       return apiRequest('/admin/automation/control-status');
     },
     runAutomationJob(jobId) {
-      if (hostedSupabaseMode) {
+      if (hostedStaticDataMode) {
         return Promise.reject(new Error('Manual automation controls require the local operations backend.'));
       }
       return apiRequest(`/admin/automation/${encodeURIComponent(jobId)}/run`, {
