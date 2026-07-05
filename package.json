@@ -6,6 +6,7 @@
   "scripts": {
     "dev:backend": "node server/index.mjs",
     "dev:backend:watch": "node --watch server/index.mjs",
+    "ops:serve": "node server/index.mjs",
     "dev": "vite",
     "prebuild": "npm run clean:build && npm run snapshots:embed",
     "build": "vite build",

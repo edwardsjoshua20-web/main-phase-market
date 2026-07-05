@@ -93,6 +93,31 @@ Expected healthy result:
 - allowed jobs are listed
 - running jobs are shown if any locks exist
 
+## Render blueprint
+
+`render.yaml` is configured as the recommended backend blueprint:
+
+```text
+buildCommand: npm ci
+startCommand: npm run ops:serve
+healthCheckPath: /api/local/health
+NODE_VERSION=22
+LOCAL_API_HOST=0.0.0.0
+ALLOW_REMOTE_CONNECTIONS=true
+```
+
+After Render reports the service healthy, copy the Render service URL into Cloudflare Pages:
+
+```text
+VITE_API_ORIGIN=https://<render-service>.onrender.com
+```
+
+Then redeploy the Cloudflare Pages frontend and verify:
+
+```powershell
+npm.cmd run ops:check -- --origin https://<render-service>.onrender.com --token <admin-supabase-access-token>
+```
+
 ## Admin Operations page expectations
 
 When the bridge is connected, `/AdminOperations` should show:

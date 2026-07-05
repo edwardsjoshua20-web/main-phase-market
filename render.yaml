@@ -3,12 +3,15 @@ services:
     name: main-phase-market-api
     runtime: node
     rootDir: .
-    buildCommand: npm install
-    startCommand: npm run dev:backend
+    buildCommand: npm ci
+    startCommand: npm run ops:serve
+    healthCheckPath: /api/local/health
     plan: starter
     envVars:
       - key: NODE_VERSION
-        value: 24
+        value: 22
+      - key: LOCAL_API_HOST
+        value: 0.0.0.0
       - key: VITE_APP_BACKEND_PROVIDER
         value: local
       - key: ALLOW_REMOTE_CONNECTIONS
