@@ -92,11 +92,23 @@ function classifyEntryIssue(entry) {
   return 'Needs review';
 }
 
+const ADMIN_TIMEZONE = 'America/New_York';
+
 function formatDate(value) {
-  if (!value) return 'â€”';
+  if (!value) return '—';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'â€”';
-  return date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('en-US', {
+    timeZone: ADMIN_TIMEZONE,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+    timeZoneName: 'short'
+  });
 }
 
 function formatHours(value) {
@@ -141,6 +153,13 @@ function summarizeAutomationRuns(automationRuns) {
     running: runs.filter((run) => run?.lastStatus === 'running').length,
     missing: siteAutomationRegistry.filter((job) => !automationRuns?.jobs?.[job.id]?.lastStatus).length
   };
+}
+
+function deriveAreaStatus(sectionStatuses, automationSummary) {
+  if (sectionStatuses.includes('missing') || automationSummary.missing > 0) return 'missing';
+  if (sectionStatuses.includes('degraded') || automationSummary.failed > 0 || automationSummary.running > 0) return 'degraded';
+  if (sectionStatuses.includes('stale')) return 'stale';
+  return 'ok';
 }
 
 function buildActionItems(systemHealth, sections, automationRuns) {
@@ -606,18 +625,27 @@ export default function AdminOperations() {
   const sections = systemHealth?.sections || {};
   const generatedAt = systemHealth?.generatedAt || null;
   const automationRuns = systemHealth?.automationRuns || { generatedAt: null, jobs: {} };
+  const automationSummary = useMemo(() => summarizeAutomationRuns(automationRuns), [automationRuns]);
 
   const summary = useMemo(() => {
-    const topStatus = String(systemHealth?.overallStatus || 'missing').toLowerCase();
     const sectionStatuses = Object.values(sections).map((section) => String(section?.status || section?.overallStatus || 'missing').toLowerCase());
+    const automationAreaStatus = automationSummary.failed > 0
+      ? 'degraded'
+      : automationSummary.running > 0
+        ? 'degraded'
+        : automationSummary.missing > 0
+          ? 'missing'
+          : 'ok';
+    const combinedStatuses = [...sectionStatuses, automationAreaStatus];
     return {
-      ok: sectionStatuses.filter((status) => status === 'ok').length,
-      degraded: sectionStatuses.filter((status) => status === 'degraded').length,
-      stale: sectionStatuses.filter((status) => status === 'stale').length,
-      missing: sectionStatuses.filter((status) => status === 'missing').length,
-      topStatus
+      ok: combinedStatuses.filter((status) => status === 'ok').length,
+      degraded: combinedStatuses.filter((status) => status === 'degraded').length,
+      stale: combinedStatuses.filter((status) => status === 'stale').length,
+      missing: combinedStatuses.filter((status) => status === 'missing').length,
+      topStatus: deriveAreaStatus(sectionStatuses, automationSummary),
+      automationAreaStatus
     };
-  }, [sections, systemHealth]);
+  }, [sections, automationSummary]);
 
   if (loading) {
     return (
@@ -643,10 +671,15 @@ export default function AdminOperations() {
             <p className="text-gray-500 mt-1">A visual pulse for the pipelines, downloads, catalog feeds, image sync, pricing, and system health.</p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="text-sm text-gray-500">
-              Last report: <span className="font-medium text-gray-800">{formatDate(generatedAt)}</span>
+            <div className="text-sm text-gray-500 text-right space-y-1">
+              <div>
+                Report generated: <span className="font-medium text-gray-800">{formatDate(generatedAt)}</span>
+              </div>
+              <div>
+                Last checked: <span className="font-medium text-gray-800">{formatDate(healthQuery.dataUpdatedAt)}</span>
+              </div>
             </div>
-            <Button type="button" onClick={() => healthQuery.refetch()} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button type="button" onClick={() => healthQuery.refetch({ cancelRefetch: false })} className="bg-blue-600 hover:bg-blue-700 text-white">
               <RefreshCw className={`mr-2 h-4 w-4 ${healthQuery.isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
@@ -727,3 +760,4 @@ export default function AdminOperations() {
     </div>
   );
 }
+
