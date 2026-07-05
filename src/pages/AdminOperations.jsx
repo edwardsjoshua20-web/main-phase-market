@@ -423,6 +423,7 @@ function BridgeReadinessCard({ controlStatus }) {
   const bridge = controlStatus?.bridge || {};
   const expectedEndpoints = Array.isArray(bridge.expectedEndpoints) ? bridge.expectedEndpoints : [];
   const nextSteps = Array.isArray(bridge.nextSteps) ? bridge.nextSteps : [];
+  const checks = Array.isArray(bridge.checks) ? bridge.checks : [];
 
   return (
     <Card className={controlsAvailable ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'}>
@@ -453,9 +454,26 @@ function BridgeReadinessCard({ controlStatus }) {
       <CardContent className="space-y-4">
         <div className="grid gap-3 md:grid-cols-3">
           <SummaryValue label="Mode" value={controlStatus?.mode || 'unknown'} />
-          <SummaryValue label="Bridge origin" value={bridge.apiOrigin || 'not configured'} />
-          <SummaryValue label="Cloudflare variable" value={bridge.expectedVariable || 'VITE_API_ORIGIN'} />
+          <SummaryValue label="Bridge origin" value={bridge.apiOrigin || bridge.publicAppUrl || 'not configured'} />
+          <SummaryValue label="Cloudflare variable" value={bridge.expectedVariable || bridge.expectedCloudflareVariable || 'VITE_API_ORIGIN'} />
         </div>
+
+        {checks.length > 0 ? (
+          <div className="rounded-xl border border-white bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Backend readiness checks</p>
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              {checks.map((check) => (
+                <div key={check.id || check.label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-900">{check.label}</p>
+                    <StatusBadge status={check.status} />
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600">{check.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {!controlsAvailable ? (
           <div className="grid gap-4 lg:grid-cols-2">

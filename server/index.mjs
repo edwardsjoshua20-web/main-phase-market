@@ -1133,10 +1133,108 @@ function buildAutomationPreflight(jobId) {
   };
 }
 
+function buildOpsBridgeReadiness() {
+  const systemHealthPath = path.join(SITE_DATA_ROOT, 'system-health.json');
+  const allowedHosts = [...allowedOriginHosts].sort();
+  const requiredPublicHosts = ['mainphasemarket.net', 'www.mainphasemarket.net'];
+  const missingPublicHosts = requiredPublicHosts.filter((hostname) => !allowedOriginHosts.has(hostname));
+  const remoteConnectionsEnabled = allowRemoteConnections();
+  const supabaseUrlConfigured = Boolean(getEnvValue('SUPABASE_URL') || getEnvValue('VITE_SUPABASE_URL'));
+  const serviceRoleConfigured = Boolean(getEnvValue('SUPABASE_SERVICE_ROLE_KEY'));
+  const publicAppUrl = getEnvValue('PUBLIC_APP_URL') || '';
+  const systemHealthAvailable = fs.existsSync(systemHealthPath);
+  const checks = [
+    {
+      id: 'remote-connections',
+      label: 'Remote connections',
+      status: remoteConnectionsEnabled ? 'ok' : 'degraded',
+      detail: remoteConnectionsEnabled
+        ? 'Remote browser/API traffic is allowed.'
+        : 'Only loopback clients can use the bridge until ALLOW_REMOTE_CONNECTIONS=true.'
+    },
+    {
+      id: 'allowed-origins',
+      label: 'Allowed origins',
+      status: missingPublicHosts.length === 0 ? 'ok' : 'missing',
+      detail: missingPublicHosts.length === 0
+        ? 'Main Phase Market public hosts are allowlisted.'
+        : `Missing allowlisted host(s): ${missingPublicHosts.join(', ')}.`
+    },
+    {
+      id: 'supabase-url',
+      label: 'Supabase URL',
+      status: supabaseUrlConfigured ? 'ok' : 'missing',
+      detail: supabaseUrlConfigured
+        ? 'Supabase project URL is configured.'
+        : 'SUPABASE_URL is required for remote admin-token verification.'
+    },
+    {
+      id: 'supabase-service-role',
+      label: 'Supabase service role',
+      status: serviceRoleConfigured ? 'ok' : 'missing',
+      detail: serviceRoleConfigured
+        ? 'Service role key is configured on the backend only.'
+        : 'SUPABASE_SERVICE_ROLE_KEY is required on the backend for remote admin verification.'
+    },
+    {
+      id: 'system-health-report',
+      label: 'System health report',
+      status: systemHealthAvailable ? 'ok' : 'missing',
+      detail: systemHealthAvailable
+        ? 'System health report exists for Admin Operations.'
+        : 'Run npm run automation:health to create public/data/site/system-health.json.'
+    }
+  ];
+  const counts = checks.reduce((acc, check) => {
+    const status = String(check.status || 'missing').toLowerCase();
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+  const overallStatus = counts.missing > 0
+    ? 'missing'
+    : counts.degraded > 0
+      ? 'degraded'
+      : 'ok';
+
+  return {
+    configured: overallStatus === 'ok',
+    overallStatus,
+    mode: 'local-runner',
+    generatedAt: new Date().toISOString(),
+    remoteConnectionsEnabled,
+    allowedOriginHosts: allowedHosts,
+    publicAppUrl: publicAppUrl || null,
+    expectedCloudflareVariable: 'VITE_API_ORIGIN',
+    expectedEndpoints: [
+      '/api/local/health',
+      '/api/local/ops/bridge-readiness',
+      '/api/local/admin/automation/control-status',
+      '/api/local/admin/automation/:jobId/run'
+    ],
+    supabase: {
+      urlConfigured: supabaseUrlConfigured,
+      serviceRoleConfigured,
+      profileBridgeConfigured: isSupabaseProfileBridgeConfigured(),
+      entityStoreConfigured: isSupabaseEntityStoreConfigured(),
+      deckBridgeConfigured: isSupabaseDeckBridgeConfigured(),
+      forumBridgeConfigured: isSupabaseForumBridgeConfigured(),
+      storageConfigured: isSupabaseStorageConfigured()
+    },
+    automation: {
+      allowedJobCount: Object.keys(automationJobMap).length,
+      lockTtlHours: AUTOMATION_LOCK_TTL_MS / (60 * 60 * 1000),
+      siteDataRoot: SITE_DATA_ROOT
+    },
+    checks,
+    counts
+  };
+}
+
 function buildAutomationControlStatus() {
   return {
     available: true,
     mode: 'local-runner',
+    bridge: buildOpsBridgeReadiness(),
     allowedJobs: Object.entries(automationJobMap).map(([jobId, runnerJob]) => ({
       jobId,
       runnerJob,
@@ -1295,6 +1393,10 @@ app.get('/api/local/health', (_req, res) => {
     dbPath: getDbPath(),
     systemHealth
   });
+});
+
+app.get('/api/local/ops/bridge-readiness', (_req, res) => {
+  res.json(buildOpsBridgeReadiness());
 });
 
 app.get('/api/local/admin/automation/control-status', requireAutomationAdmin, (_req, res) => {

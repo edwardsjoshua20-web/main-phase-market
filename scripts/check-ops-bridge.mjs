@@ -136,6 +136,23 @@ async function main() {
     console.log(`System health report: ${health.payload.systemHealth.generatedAt}`);
   }
 
+  const readiness = await requestJson(`${origin}/api/local/ops/bridge-readiness`);
+  if (!readiness.ok) {
+    console.error(`Bridge readiness check failed: HTTP ${readiness.status} ${readiness.statusText}`);
+    if (readiness.payload?.error) {
+      console.error(`Reason: ${readiness.payload.error}`);
+    }
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`Bridge readiness: ${readiness.payload?.overallStatus || 'unknown'}`);
+  if (Array.isArray(readiness.payload?.checks)) {
+    for (const check of readiness.payload.checks) {
+      console.log(`- ${check.label}: ${check.status} — ${check.detail}`);
+    }
+  }
+
   const controlStatus = await requestJson(`${origin}/api/local/admin/automation/control-status`, token);
   if (!controlStatus.ok) {
     console.error(`Automation controls: unavailable (HTTP ${controlStatus.status} ${controlStatus.statusText})`);

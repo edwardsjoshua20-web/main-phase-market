@@ -147,6 +147,7 @@ function buildHostedAutomationControlUnavailable() {
       expectedVariable: 'VITE_API_ORIGIN',
       expectedEndpoints: [
         '/api/local/health',
+        '/api/local/ops/bridge-readiness',
         '/api/local/admin/automation/control-status',
         '/api/local/admin/automation/:jobId/run'
       ],
