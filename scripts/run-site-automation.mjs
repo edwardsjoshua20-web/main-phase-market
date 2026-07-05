@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { getAutomationJobById, siteAutomationPipelines } from '../src/services/automation/siteAutomationRegistry.js';
 
 const ROOT = process.cwd();
 const SITE_DATA_ROOT = path.join(ROOT, 'public', 'data', 'site');
@@ -8,116 +9,26 @@ const RUN_HISTORY_PATH = path.join(SITE_DATA_ROOT, 'automation-runs.json');
 
 const job = String(process.argv[2] || '').trim().toLowerCase();
 
-const JOBS = {
-  homepage: {
-    label: 'Homepage pipeline',
-    steps: [
-      {
-        jobId: 'homepage-upcoming-releases',
-        label: 'Homepage upcoming releases refresh',
-        commands: [
-          ['node', 'scripts/run-homepage-refresh.mjs']
-        ]
-      },
-      {
-        jobId: 'system-health-report',
-        label: 'System health report',
-        commands: [
-          ['node', 'scripts/build-site-health-report.mjs']
-        ]
-      }
-    ]
-  },
-  cards: {
-    label: 'Card backfill pipeline',
-    steps: [
-      {
-        jobId: 'card-backfill-refresh',
-        label: 'Card backfill refresh',
-        commands: [
-          ['node', 'scripts/run-card-backfill-refresh.mjs']
-        ]
-      },
-      {
-        jobId: 'system-health-report',
-        label: 'System health report',
-        commands: [
-          ['node', 'scripts/build-site-health-report.mjs']
-        ]
-      }
-    ]
-  },
-  catalog: {
-    label: 'Catalog pipeline',
-    steps: [
-      {
-        jobId: 'catalog-refresh',
-        label: 'Catalog refresh',
-        commands: [
-          ['node', 'scripts/run-catalog-refresh.mjs']
-        ]
-      },
-      {
-        jobId: 'system-health-report',
-        label: 'System health report',
-        commands: [
-          ['node', 'scripts/build-site-health-report.mjs']
-        ]
-      }
-    ]
-  },
-  images: {
-    label: 'Image pipeline',
-    steps: [
-      {
-        jobId: 'image-repair-sync',
-        label: 'Image repair and sync',
-        commands: [
-          ['node', 'scripts/run-image-refresh.mjs']
-        ]
-      },
-      {
-        jobId: 'system-health-report',
-        label: 'System health report',
-        commands: [
-          ['node', 'scripts/build-site-health-report.mjs']
-        ]
-      }
-    ]
-  },
-  pricing: {
-    label: 'Pricing pipeline',
-    steps: [
-      {
-        jobId: 'pricing-refresh',
-        label: 'Pricing refresh',
-        commands: [
-          ['node', 'scripts/run-pricing-source-refresh.mjs'],
-          ['node', 'scripts/build-pricing-snapshot.mjs']
-        ]
-      },
-      {
-        jobId: 'system-health-report',
-        label: 'System health report',
-        commands: [
-          ['node', 'scripts/build-site-health-report.mjs']
-        ]
-      }
-    ]
-  },
-  health: {
-    label: 'Health pipeline',
-    steps: [
-      {
-        jobId: 'system-health-report',
-        label: 'System health report',
-        commands: [
-          ['node', 'scripts/build-site-health-report.mjs']
-        ]
-      }
-    ]
-  }
-};
+const JOBS = Object.fromEntries(
+  Object.entries(siteAutomationPipelines).map(([pipelineId, pipeline]) => [
+    pipelineId,
+    {
+      ...pipeline,
+      steps: pipeline.steps.map((jobId) => {
+        const jobDefinition = getAutomationJobById(jobId);
+        if (!jobDefinition) {
+          throw new Error(`Automation pipeline "${pipelineId}" references unknown job "${jobId}".`);
+        }
+
+        return {
+          jobId: jobDefinition.id,
+          label: jobDefinition.label,
+          commands: jobDefinition.commands
+        };
+      })
+    }
+  ])
+);
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });

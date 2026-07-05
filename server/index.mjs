@@ -47,6 +47,7 @@ import {
   verifySupabaseAccessToken
 } from './supabaseBridge.mjs';
 import { getDbPath } from './db.mjs';
+import { getAutomationControlJobMap } from '../src/services/automation/siteAutomationRegistry.js';
 import { ensureMtgCommanderEngine, getMtgCommanderPage, refreshMtgCommanderEngine, searchMtgCommanderEngine, simulateMtgDeckGauntlet } from './mtgCommanderEngine.mjs';
 import { importCommanderDeckText } from './mtgCommanderCorpus.mjs';
 import { ensureFabSearchIndex, searchFabAdvancedIndex, searchFabIndex } from './fabSearchIndex.mjs';
@@ -1004,14 +1005,7 @@ const SITE_DATA_ROOT = path.join(process.cwd(), 'public', 'data', 'site');
 const AUTOMATION_CONTROL_LOG_PATH = path.join(SITE_DATA_ROOT, 'automation-control-log.json');
 const AUTOMATION_LOCK_ROOT = path.join(SITE_DATA_ROOT, 'automation-locks');
 const AUTOMATION_LOCK_TTL_MS = 12 * 60 * 60 * 1000;
-const automationJobMap = {
-  'homepage-upcoming-releases': 'homepage',
-  'card-backfill-refresh': 'cards',
-  'catalog-refresh': 'catalog',
-  'image-repair-sync': 'images',
-  'pricing-refresh': 'pricing',
-  'system-health-report': 'health'
-};
+const automationJobMap = getAutomationControlJobMap();
 
 function readJsonFile(filePath, fallback) {
   if (!fs.existsSync(filePath)) {

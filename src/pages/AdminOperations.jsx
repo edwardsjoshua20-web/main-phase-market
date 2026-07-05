@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { backend } from '@/services/backend';
-import { siteAutomationRegistry } from '@/services/automation/siteAutomationRegistry';
+import { siteAutomationRegistry, siteAutomationSections } from '@/services/automation/siteAutomationRegistry';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,13 +44,7 @@ const sectionIcons = {
   readiness: CheckCircle2
 };
 
-const sectionJobMap = {
-  homepage: ['homepage-upcoming-releases', 'system-health-report'],
-  catalogs: ['card-backfill-refresh', 'catalog-refresh'],
-  images: ['image-repair-sync'],
-  pricing: ['pricing-refresh'],
-  readiness: ['system-health-report']
-};
+const sectionJobMap = siteAutomationSections;
 
 function formatSourceSummary(source) {
   if (!source || source.configured === false || source.type === 'missing') {

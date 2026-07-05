@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { getGameDataAliases, sourceRequirementStatus } from './lib/source-registry.mjs';
+import { siteAutomationSections } from '../src/services/automation/siteAutomationRegistry.js';
 
 const ROOT = process.cwd();
 const PUBLIC_DATA_ROOT = path.join(ROOT, 'public', 'data');
@@ -11,13 +12,7 @@ const RUN_HISTORY_PATH = path.join(SITE_DATA_ROOT, 'automation-runs.json');
 const GAMES = ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
 const IMAGE_MIRROR_GAMES = ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
 const PRICING_SOURCES = ['cardkingdom', 'tcgplayer', 'starcitygames'];
-const SECTION_JOB_MAP = {
-  homepage: ['homepage-upcoming-releases', 'system-health-report'],
-  catalogs: ['card-backfill-refresh', 'catalog-refresh'],
-  images: ['image-repair-sync'],
-  pricing: ['pricing-refresh'],
-  readiness: ['system-health-report']
-};
+const SECTION_JOB_MAP = siteAutomationSections;
 
 const AGE_LIMITS_HOURS = {
   homepage: 48,
