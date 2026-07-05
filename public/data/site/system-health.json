@@ -1,67 +1,210 @@
 {
-  "generatedAt": "2026-07-03T02:54:42.769Z",
-  "overallStatus": "missing",
+  "generatedAt": "2026-07-04T22:55:49.875Z",
+  "overallStatus": "ok",
+  "automationRuns": {
+    "generatedAt": "2026-07-04T22:55:48.929Z",
+    "jobs": {
+      "system-health-report": {
+        "jobId": "system-health-report",
+        "label": "System health report",
+        "lastStatus": "ok",
+        "lastStartedAt": "2026-07-04T22:55:47.967Z",
+        "lastFinishedAt": "2026-07-04T22:55:48.927Z",
+        "lastSucceededAt": "2026-07-04T22:55:48.927Z",
+        "lastFailedAt": null,
+        "lastDurationMs": 957,
+        "lastExitCode": 0,
+        "lastError": null,
+        "recentRuns": [
+          {
+            "pipeline": "health",
+            "status": "ok",
+            "startedAt": "2026-07-04T22:55:47.967Z",
+            "finishedAt": "2026-07-04T22:55:48.927Z",
+            "durationMs": 957,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/build-site-health-report.mjs",
+                "exitCode": 0,
+                "durationMs": 957,
+                "error": null
+              }
+            ]
+          },
+          {
+            "pipeline": "health",
+            "status": "ok",
+            "startedAt": "2026-07-04T22:54:27.154Z",
+            "finishedAt": "2026-07-04T22:54:28.092Z",
+            "durationMs": 919,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/build-site-health-report.mjs",
+                "exitCode": 0,
+                "durationMs": 919,
+                "error": null
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
   "sections": {
     "homepage": {
       "area": "homepage",
       "status": "ok",
       "file": {
-        "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\site\\upcoming-releases.json",
-        "size": 1112,
-        "modifiedAt": "2026-07-02T07:56:12.832Z"
+        "path": "D:\\main-phase-market\\public\\data\\site\\upcoming-releases.json",
+        "size": 4246,
+        "modifiedAt": "2026-07-03T03:21:06.869Z"
       },
-      "modifiedHoursAgo": 18.97,
-      "releaseCount": 3
+      "modifiedHoursAgo": 43.58,
+      "releaseCount": 12,
+      "diagnostics": [
+        "Homepage feed is current."
+      ],
+      "automation": {
+        "jobIds": [
+          "homepage-upcoming-releases",
+          "system-health-report"
+        ],
+        "totalJobs": 2,
+        "missingJobs": 1,
+        "failedJobs": 0,
+        "runningJobs": 0,
+        "lastSuccessfulRunAt": "2026-07-04T22:55:48.927Z",
+        "lastFailedRunAt": null,
+        "jobs": [
+          {
+            "jobId": "homepage-upcoming-releases"
+          },
+          {
+            "jobId": "system-health-report",
+            "label": "System health report",
+            "lastStatus": "ok",
+            "lastStartedAt": "2026-07-04T22:55:47.967Z",
+            "lastFinishedAt": "2026-07-04T22:55:48.927Z",
+            "lastSucceededAt": "2026-07-04T22:55:48.927Z",
+            "lastFailedAt": null,
+            "lastDurationMs": 957,
+            "lastExitCode": 0,
+            "lastError": null,
+            "recentRuns": [
+              {
+                "pipeline": "health",
+                "status": "ok",
+                "startedAt": "2026-07-04T22:55:47.967Z",
+                "finishedAt": "2026-07-04T22:55:48.927Z",
+                "durationMs": 957,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 957,
+                    "error": null
+                  }
+                ]
+              },
+              {
+                "pipeline": "health",
+                "status": "ok",
+                "startedAt": "2026-07-04T22:54:27.154Z",
+                "finishedAt": "2026-07-04T22:54:28.092Z",
+                "durationMs": 919,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 919,
+                    "error": null
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
     },
     "catalogs": {
       "area": "catalogs",
-      "overallStatus": "missing",
+      "overallStatus": "ok",
       "counts": {
-        "ok": 3,
+        "ok": 7,
         "degraded": 0,
         "stale": 0,
-        "missing": 4
+        "missing": 0
       },
       "entries": [
         {
           "game": "magic",
-          "status": "missing",
+          "status": "ok",
           "source": {
             "configured": true,
             "type": "file",
             "envVar": "MTG_SOURCE_PATH",
-            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\server\\data\\mtg\\source\\all_cards-latest.json",
+            "path": "D:\\main-phase-market\\server\\data\\mtg\\source\\all_cards-latest.json",
             "exists": true
           },
           "cards": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "D:\\main-phase-market\\public\\data\\mtg\\manifest.json",
+              "size": 2488,
+              "modifiedAt": "2026-07-03T03:26:32.922Z"
+            },
+            "count": 504891
           },
           "sets": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "D:\\main-phase-market\\public\\data\\mtg\\sets.json",
+              "size": 73095,
+              "modifiedAt": "2026-07-03T03:26:32.924Z"
+            },
+            "count": 618
           },
-          "modifiedHoursAgo": null
+          "modifiedHoursAgo": 43.49,
+          "diagnostics": [
+            "Catalog output is current."
+          ]
         },
         {
           "game": "pokemon",
-          "status": "missing",
+          "status": "ok",
           "source": {
             "configured": true,
             "type": "file",
             "envVar": "POKEMON_SOURCE_PATH",
-            "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json",
+            "path": "D:\\main-phase-market\\server\\data\\pokemon\\source\\all_pokemon_cards.json",
             "exists": true
           },
           "cards": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "D:\\main-phase-market\\public\\data\\pokemon\\cards.json",
+              "size": 26290088,
+              "modifiedAt": "2026-07-03T14:58:43.689Z"
+            },
+            "count": 20225
           },
           "sets": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "D:\\main-phase-market\\public\\data\\pokemon\\sets.json",
+              "size": 118835,
+              "modifiedAt": "2026-07-03T03:26:36.831Z"
+            },
+            "count": 360
           },
-          "modifiedHoursAgo": null
+          "modifiedHoursAgo": 31.95,
+          "diagnostics": [
+            "Catalog output is current."
+          ]
         },
         {
           "game": "yugioh",
@@ -73,21 +216,24 @@
           },
           "cards": {
             "file": {
-              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\yugioh\\cards.json",
+              "path": "D:\\main-phase-market\\public\\data\\yugioh\\cards.json",
               "size": 26428983,
-              "modifiedAt": "2026-07-02T23:33:33.632Z"
+              "modifiedAt": "2026-07-03T21:24:31.683Z"
             },
             "count": 14422
           },
           "sets": {
             "file": {
-              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\yugioh\\sets.json",
+              "path": "D:\\main-phase-market\\public\\data\\yugioh\\sets.json",
               "size": 206618,
-              "modifiedAt": "2026-07-02T23:36:16.466Z"
+              "modifiedAt": "2026-07-03T03:26:38.660Z"
             },
             "count": 1020
           },
-          "modifiedHoursAgo": 3.35
+          "modifiedHoursAgo": 25.52,
+          "diagnostics": [
+            "Catalog output is current."
+          ]
         },
         {
           "game": "onepiece",
@@ -99,57 +245,82 @@
           },
           "cards": {
             "file": {
-              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\onepiece\\cards.json",
+              "path": "D:\\main-phase-market\\public\\data\\onepiece\\cards.json",
               "size": 1200395,
-              "modifiedAt": "2026-07-02T23:39:32.468Z"
+              "modifiedAt": "2026-07-03T21:24:21.333Z"
             },
             "count": 1996
           },
           "sets": {
             "file": {
-              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\onepiece\\sets.json",
+              "path": "D:\\main-phase-market\\public\\data\\onepiece\\sets.json",
               "size": 4087,
-              "modifiedAt": "2026-07-02T23:40:06.216Z"
+              "modifiedAt": "2026-07-03T03:26:37.643Z"
             },
             "count": 43
           },
-          "modifiedHoursAgo": 3.25
+          "modifiedHoursAgo": 25.52,
+          "diagnostics": [
+            "Catalog output is current."
+          ]
         },
         {
           "game": "lorcana",
-          "status": "missing",
+          "status": "ok",
           "source": {
             "configured": true,
             "type": "remote",
             "url": "https://api.lorcast.com/v0/cards/search"
           },
           "cards": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "D:\\main-phase-market\\public\\data\\lorcana\\cards.json",
+              "size": 3328366,
+              "modifiedAt": "2026-07-03T21:25:06.915Z"
+            },
+            "count": 3054
           },
           "sets": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "D:\\main-phase-market\\public\\data\\lorcana\\sets.json",
+              "size": 1684,
+              "modifiedAt": "2026-07-03T03:26:35.589Z"
+            },
+            "count": 17
           },
-          "modifiedHoursAgo": null
+          "modifiedHoursAgo": 25.51,
+          "diagnostics": [
+            "Catalog output is current."
+          ]
         },
         {
           "game": "fab",
-          "status": "missing",
+          "status": "ok",
           "source": {
             "configured": true,
             "type": "remote",
             "url": "fab-pipeline-local-backfill"
           },
           "cards": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "D:\\main-phase-market\\public\\data\\fab\\cards.json",
+              "size": 19095774,
+              "modifiedAt": "2026-07-03T21:25:08.502Z"
+            },
+            "count": 4862
           },
           "sets": {
-            "file": null,
-            "count": 0
+            "file": {
+              "path": "D:\\main-phase-market\\public\\data\\fab\\sets.json",
+              "size": 45148,
+              "modifiedAt": "2026-07-03T03:26:34.552Z"
+            },
+            "count": 118
           },
-          "modifiedHoursAgo": null
+          "modifiedHoursAgo": 25.51,
+          "diagnostics": [
+            "Catalog output is current."
+          ]
         },
         {
           "game": "starwars",
@@ -161,69 +332,112 @@
           },
           "cards": {
             "file": {
-              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\starwars\\cards.json",
+              "path": "D:\\main-phase-market\\public\\data\\starwars\\cards.json",
               "size": 11990115,
-              "modifiedAt": "2026-07-03T02:38:23.417Z"
+              "modifiedAt": "2026-07-03T21:24:33.614Z"
             },
             "count": 9057
           },
           "sets": {
             "file": {
-              "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\starwars\\sets.json",
+              "path": "D:\\main-phase-market\\public\\data\\starwars\\sets.json",
               "size": 7317,
-              "modifiedAt": "2026-07-03T02:38:23.255Z"
+              "modifiedAt": "2026-07-03T03:26:40.340Z"
             },
             "count": 28
           },
-          "modifiedHoursAgo": 0.27
+          "modifiedHoursAgo": 25.52,
+          "diagnostics": [
+            "Catalog output is current."
+          ]
         }
-      ]
+      ],
+      "automation": {
+        "jobIds": [
+          "card-backfill-refresh",
+          "catalog-refresh"
+        ],
+        "totalJobs": 2,
+        "missingJobs": 2,
+        "failedJobs": 0,
+        "runningJobs": 0,
+        "lastSuccessfulRunAt": null,
+        "lastFailedRunAt": null,
+        "jobs": [
+          {
+            "jobId": "card-backfill-refresh"
+          },
+          {
+            "jobId": "catalog-refresh"
+          }
+        ]
+      }
     },
     "images": {
       "area": "images",
-      "overallStatus": "missing",
+      "overallStatus": "ok",
       "counts": {
-        "ok": 3,
+        "ok": 7,
         "degraded": 0,
         "stale": 0,
-        "missing": 4
+        "missing": 0
       },
       "entries": [
         {
           "game": "magic",
-          "status": "missing",
+          "status": "ok",
           "source": {
             "configured": true,
             "type": "file",
             "envVar": "MTG_SOURCE_PATH",
-            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\server\\data\\mtg\\source\\all_cards-latest.json",
+            "path": "D:\\main-phase-market\\server\\data\\mtg\\source\\all_cards-latest.json",
             "exists": true
           },
-          "file": null,
-          "modifiedHoursAgo": null,
-          "cardsSeen": 0,
-          "downloaded": 0,
-          "skippedExisting": 0,
+          "file": {
+            "path": "D:\\main-phase-market\\public\\data\\mtg\\images\\mirror-manifest.json",
+            "size": 342,
+            "modifiedAt": "2026-07-03T14:35:02.561Z"
+          },
+          "modifiedHoursAgo": 32.35,
+          "cardsSeen": 517253,
+          "downloaded": 250,
+          "skippedExisting": 4122,
           "missingSourceUrl": 0,
-          "failed": 0
+          "failed": 0,
+          "upstream404": 0,
+          "upstream403": 0,
+          "unexpectedFailures": 0,
+          "diagnostics": [
+            "Image mirror output is current."
+          ]
         },
         {
           "game": "pokemon",
-          "status": "missing",
+          "status": "ok",
           "source": {
             "configured": true,
             "type": "file",
             "envVar": "POKEMON_SOURCE_PATH",
-            "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json",
+            "path": "D:\\main-phase-market\\server\\data\\pokemon\\source\\all_pokemon_cards.json",
             "exists": true
           },
-          "file": null,
-          "modifiedHoursAgo": null,
-          "cardsSeen": 0,
+          "file": {
+            "path": "D:\\main-phase-market\\public\\data\\pokemon\\images\\mirror-manifest.json",
+            "size": 404,
+            "modifiedAt": "2026-07-04T01:38:01.361Z"
+          },
+          "modifiedHoursAgo": 21.3,
+          "cardsSeen": 20437,
           "downloaded": 0,
-          "skippedExisting": 0,
-          "missingSourceUrl": 0,
-          "failed": 0
+          "skippedExisting": 40051,
+          "missingSourceUrl": 718,
+          "failed": 105,
+          "upstream404": 105,
+          "upstream403": 0,
+          "unexpectedFailures": 0,
+          "diagnostics": [
+            "Known image fetch failures recorded: 105."
+          ]
         },
         {
           "game": "yugioh",
@@ -234,16 +448,22 @@
             "url": "https://db.ygoprodeck.com/api/v7"
           },
           "file": {
-            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\yugioh\\images\\mirror-manifest.json",
-            "size": 353,
-            "modifiedAt": "2026-07-02T23:37:38.525Z"
+            "path": "D:\\main-phase-market\\public\\data\\yugioh\\images\\mirror-manifest.json",
+            "size": 308,
+            "modifiedAt": "2026-07-03T21:25:56.515Z"
           },
-          "modifiedHoursAgo": 3.28,
+          "modifiedHoursAgo": 25.5,
           "cardsSeen": 14422,
-          "downloaded": 844,
-          "skippedExisting": 28000,
+          "downloaded": 402,
+          "skippedExisting": 28442,
           "missingSourceUrl": 0,
-          "failed": 0
+          "failed": 0,
+          "upstream404": 0,
+          "upstream403": 0,
+          "unexpectedFailures": 0,
+          "diagnostics": [
+            "Image mirror output is current."
+          ]
         },
         {
           "game": "onepiece",
@@ -254,48 +474,74 @@
             "url": "https://raw.githubusercontent.com/buhbbl/punk-records/main/english/cards"
           },
           "file": {
-            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\onepiece\\images\\mirror-manifest.json",
-            "size": 310,
-            "modifiedAt": "2026-07-02T23:40:57.661Z"
+            "path": "D:\\main-phase-market\\public\\data\\onepiece\\images\\mirror-manifest.json",
+            "size": 262,
+            "modifiedAt": "2026-07-03T21:25:57.424Z"
           },
-          "modifiedHoursAgo": 3.23,
+          "modifiedHoursAgo": 25.5,
           "cardsSeen": 1996,
-          "downloaded": 1996,
-          "skippedExisting": 0,
+          "downloaded": 0,
+          "skippedExisting": 1996,
           "missingSourceUrl": 0,
-          "failed": 0
+          "failed": 0,
+          "upstream404": 0,
+          "upstream403": 0,
+          "unexpectedFailures": 0,
+          "diagnostics": [
+            "Image mirror output is current."
+          ]
         },
         {
           "game": "lorcana",
-          "status": "missing",
+          "status": "ok",
           "source": {
             "configured": true,
             "type": "remote",
             "url": "https://api.lorcast.com/v0/cards/search"
           },
-          "file": null,
-          "modifiedHoursAgo": null,
-          "cardsSeen": 0,
-          "downloaded": 0,
-          "skippedExisting": 0,
-          "missingSourceUrl": 0,
-          "failed": 0
+          "file": {
+            "path": "D:\\main-phase-market\\public\\data\\lorcana\\images\\mirror-manifest.json",
+            "size": 309,
+            "modifiedAt": "2026-07-03T21:26:01.972Z"
+          },
+          "modifiedHoursAgo": 25.5,
+          "cardsSeen": 3054,
+          "downloaded": 804,
+          "skippedExisting": 5300,
+          "missingSourceUrl": 4,
+          "failed": 0,
+          "upstream404": 0,
+          "upstream403": 0,
+          "unexpectedFailures": 0,
+          "diagnostics": [
+            "Image mirror output is current."
+          ]
         },
         {
           "game": "fab",
-          "status": "missing",
+          "status": "ok",
           "source": {
             "configured": true,
             "type": "remote",
             "url": "fab-pipeline-local-backfill"
           },
-          "file": null,
-          "modifiedHoursAgo": null,
-          "cardsSeen": 0,
+          "file": {
+            "path": "D:\\main-phase-market\\public\\data\\fab\\images\\mirror-manifest.json",
+            "size": 327,
+            "modifiedAt": "2026-07-04T01:38:04.253Z"
+          },
+          "modifiedHoursAgo": 21.3,
+          "cardsSeen": 4862,
           "downloaded": 0,
-          "skippedExisting": 0,
-          "missingSourceUrl": 0,
-          "failed": 0
+          "skippedExisting": 4852,
+          "missingSourceUrl": 1,
+          "failed": 9,
+          "upstream404": 0,
+          "upstream403": 9,
+          "unexpectedFailures": 0,
+          "diagnostics": [
+            "Known image fetch failures recorded: 9."
+          ]
         },
         {
           "game": "starwars",
@@ -306,29 +552,51 @@
             "url": "https://api.swuapi.com/export/all"
           },
           "file": {
-            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\starwars\\images\\mirror-manifest.json",
-            "size": 338,
-            "modifiedAt": "2026-07-03T02:53:16.231Z"
+            "path": "D:\\main-phase-market\\public\\data\\starwars\\images\\mirror-manifest.json",
+            "size": 296,
+            "modifiedAt": "2026-07-03T21:26:44.171Z"
           },
-          "modifiedHoursAgo": 0.02,
+          "modifiedHoursAgo": 25.48,
           "cardsSeen": 9057,
-          "downloaded": 9510,
-          "skippedExisting": 0,
+          "downloaded": 1132,
+          "skippedExisting": 8378,
           "missingSourceUrl": 0,
-          "failed": 0
+          "failed": 0,
+          "upstream404": 0,
+          "upstream403": 0,
+          "unexpectedFailures": 0,
+          "diagnostics": [
+            "Image mirror output is current."
+          ]
         }
-      ]
+      ],
+      "automation": {
+        "jobIds": [
+          "image-repair-sync"
+        ],
+        "totalJobs": 1,
+        "missingJobs": 1,
+        "failedJobs": 0,
+        "runningJobs": 0,
+        "lastSuccessfulRunAt": null,
+        "lastFailedRunAt": null,
+        "jobs": [
+          {
+            "jobId": "image-repair-sync"
+          }
+        ]
+      }
     },
     "pricing": {
       "area": "pricing",
       "status": "ok",
       "snapshot": {
         "file": {
-          "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\site\\pricing-snapshot.json",
-          "size": 5106,
-          "modifiedAt": "2026-07-02T09:07:11.884Z"
+          "path": "D:\\main-phase-market\\public\\data\\site\\pricing-snapshot.json",
+          "size": 5123,
+          "modifiedAt": "2026-07-03T21:27:28.034Z"
         },
-        "modifiedHoursAgo": 17.79,
+        "modifiedHoursAgo": 25.47,
         "status": "merged-source-snapshots",
         "sourceSnapshots": {
           "cardkingdom": 4,
@@ -342,34 +610,43 @@
           "source": "cardkingdom",
           "status": "ok",
           "file": {
-            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\site\\pricing-sources\\cardkingdom.json",
+            "path": "D:\\main-phase-market\\public\\data\\site\\pricing-sources\\cardkingdom.json",
             "size": 951,
-            "modifiedAt": "2026-07-02T09:07:11.543Z"
+            "modifiedAt": "2026-07-03T21:27:27.299Z"
           },
-          "modifiedHoursAgo": 17.79,
-          "rows": 4
+          "modifiedHoursAgo": 25.47,
+          "rows": 4,
+          "diagnostics": [
+            "Pricing source snapshot is current."
+          ]
         },
         {
           "source": "tcgplayer",
           "status": "ok",
           "file": {
-            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\site\\pricing-sources\\tcgplayer.json",
+            "path": "D:\\main-phase-market\\public\\data\\site\\pricing-sources\\tcgplayer.json",
             "size": 953,
-            "modifiedAt": "2026-07-02T09:07:11.547Z"
+            "modifiedAt": "2026-07-03T21:27:27.302Z"
           },
-          "modifiedHoursAgo": 17.79,
-          "rows": 4
+          "modifiedHoursAgo": 25.47,
+          "rows": 4,
+          "diagnostics": [
+            "Pricing source snapshot is current."
+          ]
         },
         {
           "source": "starcitygames",
           "status": "ok",
           "file": {
-            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\public\\data\\site\\pricing-sources\\starcitygames.json",
+            "path": "D:\\main-phase-market\\public\\data\\site\\pricing-sources\\starcitygames.json",
             "size": 953,
-            "modifiedAt": "2026-07-02T09:07:11.549Z"
+            "modifiedAt": "2026-07-03T21:27:27.306Z"
           },
-          "modifiedHoursAgo": 17.79,
-          "rows": 4
+          "modifiedHoursAgo": 25.47,
+          "rows": 4,
+          "diagnostics": [
+            "Pricing source snapshot is current."
+          ]
         }
       ],
       "sourceSummary": {
@@ -380,48 +657,67 @@
           "stale": 0,
           "missing": 0
         }
+      },
+      "diagnostics": [
+        "Pricing pipeline is current."
+      ],
+      "automation": {
+        "jobIds": [
+          "pricing-refresh"
+        ],
+        "totalJobs": 1,
+        "missingJobs": 1,
+        "failedJobs": 0,
+        "runningJobs": 0,
+        "lastSuccessfulRunAt": null,
+        "lastFailedRunAt": null,
+        "jobs": [
+          {
+            "jobId": "pricing-refresh"
+          }
+        ]
       }
     },
     "readiness": {
       "area": "readiness",
-      "overallStatus": "degraded",
-      "averageScore": 54,
+      "overallStatus": "ok",
+      "averageScore": 100,
       "entries": [
         {
           "game": "magic",
-          "stage": "backfill-needed",
-          "readinessScore": 20,
-          "nextAction": "Run card backfill to generate cards.json.",
+          "stage": "storefront-ready",
+          "readinessScore": 100,
+          "nextAction": "Operational. Keep the scheduled refresh jobs healthy.",
           "source": {
             "configured": true,
             "type": "file",
             "envVar": "MTG_SOURCE_PATH",
-            "path": "C:\\Users\\Admin\\Documents\\New project\\main-phase-market-remote\\server\\data\\mtg\\source\\all_cards-latest.json",
+            "path": "D:\\main-phase-market\\server\\data\\mtg\\source\\all_cards-latest.json",
             "exists": true
           },
-          "cardsCount": 0,
-          "setsCount": 0,
-          "imageCardsSeen": 0,
-          "catalogStatus": "missing",
-          "imageStatus": "missing"
+          "cardsCount": 504891,
+          "setsCount": 618,
+          "imageCardsSeen": 517253,
+          "catalogStatus": "ok",
+          "imageStatus": "ok"
         },
         {
           "game": "pokemon",
-          "stage": "backfill-needed",
-          "readinessScore": 20,
-          "nextAction": "Run card backfill to generate cards.json.",
+          "stage": "storefront-ready",
+          "readinessScore": 100,
+          "nextAction": "Operational. Keep the scheduled refresh jobs healthy.",
           "source": {
             "configured": true,
             "type": "file",
             "envVar": "POKEMON_SOURCE_PATH",
-            "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json",
+            "path": "D:\\main-phase-market\\server\\data\\pokemon\\source\\all_pokemon_cards.json",
             "exists": true
           },
-          "cardsCount": 0,
-          "setsCount": 0,
-          "imageCardsSeen": 0,
-          "catalogStatus": "missing",
-          "imageStatus": "missing"
+          "cardsCount": 20225,
+          "setsCount": 360,
+          "imageCardsSeen": 20437,
+          "catalogStatus": "ok",
+          "imageStatus": "ok"
         },
         {
           "game": "yugioh",
@@ -457,35 +753,35 @@
         },
         {
           "game": "lorcana",
-          "stage": "backfill-needed",
-          "readinessScore": 20,
-          "nextAction": "Run card backfill to generate cards.json.",
+          "stage": "storefront-ready",
+          "readinessScore": 100,
+          "nextAction": "Operational. Keep the scheduled refresh jobs healthy.",
           "source": {
             "configured": true,
             "type": "remote",
             "url": "https://api.lorcast.com/v0/cards/search"
           },
-          "cardsCount": 0,
-          "setsCount": 0,
-          "imageCardsSeen": 0,
-          "catalogStatus": "missing",
-          "imageStatus": "missing"
+          "cardsCount": 3054,
+          "setsCount": 17,
+          "imageCardsSeen": 3054,
+          "catalogStatus": "ok",
+          "imageStatus": "ok"
         },
         {
           "game": "fab",
-          "stage": "backfill-needed",
-          "readinessScore": 20,
-          "nextAction": "Run card backfill to generate cards.json.",
+          "stage": "storefront-ready",
+          "readinessScore": 100,
+          "nextAction": "Operational. Keep the scheduled refresh jobs healthy.",
           "source": {
             "configured": true,
             "type": "remote",
             "url": "fab-pipeline-local-backfill"
           },
-          "cardsCount": 0,
-          "setsCount": 0,
-          "imageCardsSeen": 0,
-          "catalogStatus": "missing",
-          "imageStatus": "missing"
+          "cardsCount": 4862,
+          "setsCount": 118,
+          "imageCardsSeen": 4862,
+          "catalogStatus": "ok",
+          "imageStatus": "ok"
         },
         {
           "game": "starwars",
@@ -503,7 +799,68 @@
           "catalogStatus": "ok",
           "imageStatus": "ok"
         }
-      ]
+      ],
+      "automation": {
+        "jobIds": [
+          "system-health-report"
+        ],
+        "totalJobs": 1,
+        "missingJobs": 0,
+        "failedJobs": 0,
+        "runningJobs": 0,
+        "lastSuccessfulRunAt": "2026-07-04T22:55:48.927Z",
+        "lastFailedRunAt": null,
+        "jobs": [
+          {
+            "jobId": "system-health-report",
+            "label": "System health report",
+            "lastStatus": "ok",
+            "lastStartedAt": "2026-07-04T22:55:47.967Z",
+            "lastFinishedAt": "2026-07-04T22:55:48.927Z",
+            "lastSucceededAt": "2026-07-04T22:55:48.927Z",
+            "lastFailedAt": null,
+            "lastDurationMs": 957,
+            "lastExitCode": 0,
+            "lastError": null,
+            "recentRuns": [
+              {
+                "pipeline": "health",
+                "status": "ok",
+                "startedAt": "2026-07-04T22:55:47.967Z",
+                "finishedAt": "2026-07-04T22:55:48.927Z",
+                "durationMs": 957,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 957,
+                    "error": null
+                  }
+                ]
+              },
+              {
+                "pipeline": "health",
+                "status": "ok",
+                "startedAt": "2026-07-04T22:54:27.154Z",
+                "finishedAt": "2026-07-04T22:54:28.092Z",
+                "durationMs": 919,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 919,
+                    "error": null
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
     }
   }
 }

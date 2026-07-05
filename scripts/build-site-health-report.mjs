@@ -6,10 +6,18 @@ const ROOT = process.cwd();
 const PUBLIC_DATA_ROOT = path.join(ROOT, 'public', 'data');
 const SITE_DATA_ROOT = path.join(PUBLIC_DATA_ROOT, 'site');
 const OUTPUT_PATH = path.join(SITE_DATA_ROOT, 'system-health.json');
+const RUN_HISTORY_PATH = path.join(SITE_DATA_ROOT, 'automation-runs.json');
 
 const GAMES = ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
 const IMAGE_MIRROR_GAMES = ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
 const PRICING_SOURCES = ['cardkingdom', 'tcgplayer', 'starcitygames'];
+const SECTION_JOB_MAP = {
+  homepage: ['homepage-upcoming-releases', 'system-health-report'],
+  catalogs: ['card-backfill-refresh', 'catalog-refresh'],
+  images: ['image-repair-sync'],
+  pricing: ['pricing-refresh'],
+  readiness: ['system-health-report']
+};
 
 const AGE_LIMITS_HOURS = {
   homepage: 48,
@@ -90,19 +98,62 @@ function summarizeSection(entries = []) {
   };
 }
 
+function readAutomationRuns() {
+  const payload = readJsonIfExists(RUN_HISTORY_PATH, { generatedAt: null, jobs: {} });
+  return {
+    generatedAt: payload?.generatedAt || null,
+    jobs: payload?.jobs && typeof payload.jobs === 'object' ? payload.jobs : {}
+  };
+}
+
+function buildAutomationSummary(jobIds, automationRuns) {
+  const entries = jobIds.map((jobId) => {
+    const run = automationRuns?.jobs?.[jobId] || null;
+    return {
+      jobId,
+      ...run
+    };
+  });
+
+  return {
+    jobIds,
+    totalJobs: entries.length,
+    missingJobs: entries.filter((entry) => !entry.lastStatus).length,
+    failedJobs: entries.filter((entry) => entry.lastStatus === 'failed').length,
+    runningJobs: entries.filter((entry) => entry.lastStatus === 'running').length,
+    lastSuccessfulRunAt: entries
+      .map((entry) => entry.lastSucceededAt)
+      .filter(Boolean)
+      .sort()
+      .at(-1) || null,
+    lastFailedRunAt: entries
+      .map((entry) => entry.lastFailedAt)
+      .filter(Boolean)
+      .sort()
+      .at(-1) || null,
+    jobs: entries
+  };
+}
+
 function buildHomepageHealth() {
   const filePath = path.join(SITE_DATA_ROOT, 'upcoming-releases.json');
   const payload = readJsonIfExists(filePath, { releases: [] });
   const stats = getFileStats(filePath);
   const modifiedHoursAgo = hoursSince(stats?.modifiedAt);
   const stale = modifiedHoursAgo != null && modifiedHoursAgo > AGE_LIMITS_HOURS.homepage;
+  const releaseCount = Array.isArray(payload?.releases) ? payload.releases.length : 0;
 
   return {
     area: 'homepage',
-    status: statusFromChecks({ exists: Boolean(stats), stale, degraded: !Array.isArray(payload?.releases) || payload.releases.length === 0 }),
+    status: statusFromChecks({ exists: Boolean(stats), stale, degraded: releaseCount === 0 }),
     file: stats,
     modifiedHoursAgo,
-    releaseCount: Array.isArray(payload?.releases) ? payload.releases.length : 0
+    releaseCount,
+    diagnostics: releaseCount === 0
+      ? ['Homepage feed has no releases to render.']
+      : stale
+        ? ['Homepage feed exists but is older than the freshness target.']
+        : ['Homepage feed is current.']
   };
 }
 
@@ -114,26 +165,56 @@ function buildCatalogHealth() {
     const sets = readJsonIfExists(setsPath, []);
     const cardsStats = getFileStats(cardsPath);
     const setsStats = getFileStats(setsPath);
-    const freshestModifiedAt = cardsStats?.modifiedAt || setsStats?.modifiedAt || null;
+    const mtgManifestPath = game === 'magic' ? resolveDataFile(game, 'manifest.json') : null;
+    const mtgManifest = mtgManifestPath ? readJsonIfExists(mtgManifestPath, null) : null;
+    const mtgManifestStats = mtgManifestPath ? getFileStats(mtgManifestPath) : null;
+    const effectiveCardsStats = cardsStats || mtgManifestStats;
+    const effectiveCardsCount = game === 'magic'
+      ? Number(mtgManifest?.imported_cards || (Array.isArray(cards) ? cards.length : 0))
+      : (Array.isArray(cards) ? cards.length : 0);
+    const freshestModifiedAt = effectiveCardsStats?.modifiedAt || setsStats?.modifiedAt || null;
     const modifiedHoursAgo = hoursSince(freshestModifiedAt);
     const stale = modifiedHoursAgo != null && modifiedHoursAgo > AGE_LIMITS_HOURS.catalog;
-    const exists = Boolean(cardsStats || setsStats);
-    const degraded = !cardsStats || !setsStats || (Array.isArray(cards) && cards.length === 0 && game !== 'magic');
+    const exists = Boolean(effectiveCardsStats || setsStats);
+    const degraded = game === 'magic'
+      ? (!effectiveCardsStats || !setsStats || effectiveCardsCount === 0)
+      : (!cardsStats || !setsStats || (Array.isArray(cards) && cards.length === 0));
     const source = sourceRequirementStatus(game, 'catalogSource');
+
+    const diagnostics = [];
+    if (!source || source.configured === false || source.type === 'missing') {
+      diagnostics.push('Catalog source is not configured yet.');
+    }
+    if (source?.type === 'file' && source.exists === false) {
+      diagnostics.push('Expected local source file is missing.');
+    }
+    if (!effectiveCardsStats) {
+      diagnostics.push('cards.json or manifest output is missing.');
+    }
+    if (!setsStats) {
+      diagnostics.push('sets.json output is missing.');
+    }
+    if (stale) {
+      diagnostics.push('Catalog output is stale and needs a refresh run.');
+    }
+    if (diagnostics.length === 0) {
+      diagnostics.push('Catalog output is current.');
+    }
 
     return {
       game,
       status: statusFromChecks({ exists, stale, degraded }),
       source,
       cards: {
-        file: cardsStats,
-        count: Array.isArray(cards) ? cards.length : 0
+        file: effectiveCardsStats,
+        count: effectiveCardsCount
       },
       sets: {
         file: setsStats,
         count: Array.isArray(sets) ? sets.length : 0
       },
-      modifiedHoursAgo
+      modifiedHoursAgo,
+      diagnostics
     };
   });
 
@@ -152,8 +233,26 @@ function buildImagesHealth() {
     const modifiedHoursAgo = hoursSince(stats?.modifiedAt);
     const stale = modifiedHoursAgo != null && modifiedHoursAgo > AGE_LIMITS_HOURS.imageManifest;
     const exists = Boolean(stats);
-    const degraded = Boolean(manifest) && Number(manifest.failed || 0) > 0;
+    const unexpectedFailures = Number(manifest?.unexpected_failures || manifest?.unexpectedFailures || 0);
+    const degraded = Boolean(manifest) && unexpectedFailures > 0;
     const source = sourceRequirementStatus(game, 'catalogSource');
+
+    const diagnostics = [];
+    if (!stats) {
+      diagnostics.push('Image mirror manifest is missing.');
+    }
+    if (stale) {
+      diagnostics.push('Image mirror manifest is stale and should be rebuilt.');
+    }
+    if (unexpectedFailures > 0) {
+      diagnostics.push(`Unexpected image failures detected: ${unexpectedFailures}.`);
+    }
+    if (Number(manifest?.failed || 0) > 0) {
+      diagnostics.push(`Known image fetch failures recorded: ${Number(manifest.failed)}.`);
+    }
+    if (diagnostics.length === 0) {
+      diagnostics.push('Image mirror output is current.');
+    }
 
     return {
       game,
@@ -165,7 +264,11 @@ function buildImagesHealth() {
       downloaded: Number(manifest?.downloaded || 0),
       skippedExisting: Number(manifest?.skipped_existing || manifest?.skippedExisting || 0),
       missingSourceUrl: Number(manifest?.missing_source_url || manifest?.missingSourceUrl || 0),
-      failed: Number(manifest?.failed || 0)
+      failed: Number(manifest?.failed || 0),
+      upstream404: Number(manifest?.upstream_404 || manifest?.upstream404 || 0),
+      upstream403: Number(manifest?.upstream_403 || manifest?.upstream403 || 0),
+      unexpectedFailures,
+      diagnostics
     };
   });
 
@@ -190,18 +293,53 @@ function buildPricingHealth() {
     const modifiedHoursAgo = hoursSince(stats?.modifiedAt);
     const stale = modifiedHoursAgo != null && modifiedHoursAgo > AGE_LIMITS_HOURS.pricingSource;
     const exists = Boolean(stats);
+    const diagnostics = [];
+
+    if (!stats) {
+      diagnostics.push('Pricing source snapshot is missing.');
+    }
+    if (stale) {
+      diagnostics.push('Pricing source snapshot is stale.');
+    }
+    if (exists && Array.isArray(rows) && rows.length === 0) {
+      diagnostics.push('Pricing source snapshot exists but has no rows.');
+    }
+    if (diagnostics.length === 0) {
+      diagnostics.push('Pricing source snapshot is current.');
+    }
 
     return {
       source,
       status: statusFromChecks({ exists, stale, degraded: exists && Array.isArray(rows) && rows.length === 0 }),
       file: stats,
       modifiedHoursAgo,
-      rows: Array.isArray(rows) ? rows.length : 0
+      rows: Array.isArray(rows) ? rows.length : 0,
+      diagnostics
     };
   });
 
   const sourceSummary = summarizeSection(sourceEntries);
   const snapshotDegraded = !snapshotStats || !Array.isArray(snapshot?.mergedPricingPreview);
+  const diagnostics = [];
+
+  if (!snapshotStats) {
+    diagnostics.push('Merged pricing snapshot is missing.');
+  }
+  if (snapshotStale) {
+    diagnostics.push('Merged pricing snapshot is stale.');
+  }
+  if (sourceSummary.overallStatus === 'missing') {
+    diagnostics.push('One or more pricing source snapshots are missing.');
+  }
+  if (sourceSummary.overallStatus === 'stale') {
+    diagnostics.push('One or more pricing source snapshots are stale.');
+  }
+  if (sourceSummary.overallStatus === 'degraded') {
+    diagnostics.push('One or more pricing source snapshots are degraded.');
+  }
+  if (diagnostics.length === 0) {
+    diagnostics.push('Pricing pipeline is current.');
+  }
 
   return {
     area: 'pricing',
@@ -218,7 +356,8 @@ function buildPricingHealth() {
       previewCount: Array.isArray(snapshot?.mergedPricingPreview) ? snapshot.mergedPricingPreview.length : 0
     },
     sources: sourceEntries,
-    sourceSummary
+    sourceSummary,
+    diagnostics
   };
 }
 
@@ -306,23 +445,36 @@ function buildSummary(sections) {
   return 'ok';
 }
 
+function attachAutomationSummaries(sections, automationRuns) {
+  for (const [sectionKey, jobIds] of Object.entries(SECTION_JOB_MAP)) {
+    if (!sections[sectionKey]) continue;
+    sections[sectionKey].automation = buildAutomationSummary(jobIds, automationRuns);
+  }
+}
+
 function main() {
+  const automationRuns = readAutomationRuns();
   const homepage = buildHomepageHealth();
   const catalogs = buildCatalogHealth();
   const images = buildImagesHealth();
   const pricing = buildPricingHealth();
   const readiness = buildGameReadiness(catalogs, images);
 
+  const sections = {
+    homepage,
+    catalogs,
+    images,
+    pricing,
+    readiness
+  };
+
+  attachAutomationSummaries(sections, automationRuns);
+
   const payload = {
     generatedAt: new Date().toISOString(),
     overallStatus: buildSummary([homepage, catalogs, images, pricing, readiness]),
-    sections: {
-      homepage,
-      catalogs,
-      images,
-      pricing,
-      readiness
-    }
+    automationRuns,
+    sections
   };
 
   ensureDir(SITE_DATA_ROOT);

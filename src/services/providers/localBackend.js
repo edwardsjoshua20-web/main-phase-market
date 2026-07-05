@@ -62,7 +62,7 @@ async function fetchStaticSystemHealth() {
   const payload = await fetchJsonWithEmbeddedFallback(
     '/data/site/system-health.json',
     getEmbeddedSystemHealth(),
-    { cache: 'no-store' }
+    { cache: 'no-store', bustCache: true }
   );
   return {
     systemHealth: payload
@@ -943,3 +943,4 @@ export const localBackend = {
     }
   }
 };
+

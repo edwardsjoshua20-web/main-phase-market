@@ -16,6 +16,7 @@ import {
   Database,
   HardDriveDownload,
   Image as ImageIcon,
+  ListChecks,
   RefreshCw,
   ServerCrash,
   Wrench
@@ -25,7 +26,9 @@ const statusTone = {
   ok: 'bg-green-100 text-green-700 border-green-200',
   degraded: 'bg-amber-100 text-amber-700 border-amber-200',
   stale: 'bg-orange-100 text-orange-700 border-orange-200',
-  missing: 'bg-red-100 text-red-700 border-red-200'
+  missing: 'bg-red-100 text-red-700 border-red-200',
+  failed: 'bg-red-100 text-red-700 border-red-200',
+  running: 'bg-blue-100 text-blue-700 border-blue-200'
 };
 
 const sectionIcons = {
@@ -34,6 +37,14 @@ const sectionIcons = {
   images: ImageIcon,
   pricing: HardDriveDownload,
   readiness: CheckCircle2
+};
+
+const sectionJobMap = {
+  homepage: ['homepage-upcoming-releases', 'system-health-report'],
+  catalogs: ['card-backfill-refresh', 'catalog-refresh'],
+  images: ['image-repair-sync'],
+  pricing: ['pricing-refresh'],
+  readiness: ['system-health-report']
 };
 
 function formatSourceSummary(source) {
@@ -93,6 +104,106 @@ function formatHours(value) {
   return `${Number(value).toFixed(1)}h ago`;
 }
 
+function formatDuration(value) {
+  if (value == null || Number.isNaN(Number(value))) return '—';
+  const ms = Number(value);
+  if (ms < 1000) return `${ms}ms`;
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${seconds}s`;
+  return `${minutes}m ${seconds}s`;
+}
+
+function getJobDetails(jobId) {
+  return siteAutomationRegistry.find((job) => job.id === jobId) || null;
+}
+
+function getRunRecord(automationRuns, jobId) {
+  return automationRuns?.jobs?.[jobId] || null;
+}
+
+function summarizeTargets(entries) {
+  const names = entries
+    .map((entry) => entry.game || entry.source || entry.id)
+    .filter(Boolean);
+
+  if (names.length === 0) return 'No affected targets listed';
+  if (names.length <= 3) return names.join(', ');
+  return `${names.slice(0, 3).join(', ')} +${names.length - 3} more`;
+}
+
+function summarizeAutomationRuns(automationRuns) {
+  const runs = Object.values(automationRuns?.jobs || {});
+  return {
+    ok: runs.filter((run) => run?.lastStatus === 'ok').length,
+    failed: runs.filter((run) => run?.lastStatus === 'failed').length,
+    running: runs.filter((run) => run?.lastStatus === 'running').length,
+    missing: siteAutomationRegistry.filter((job) => !automationRuns?.jobs?.[job.id]?.lastStatus).length
+  };
+}
+
+function buildActionItems(systemHealth, sections, automationRuns) {
+  const items = [];
+  const orderedKeys = ['catalogs', 'images', 'pricing', 'homepage', 'readiness'];
+
+  orderedKeys.forEach((sectionKey) => {
+    const section = sections?.[sectionKey];
+    if (!section) return;
+
+    const topStatus = String(section?.status || section?.overallStatus || 'missing').toLowerCase();
+    if (topStatus === 'ok') return;
+
+    const entries = Array.isArray(section?.entries) ? section.entries : [];
+    const affected = entries.filter((entry) => String(entry?.status || 'missing').toLowerCase() !== 'ok');
+    const jobs = (sectionJobMap[sectionKey] || [])
+      .map((jobId) => {
+        const job = getJobDetails(jobId);
+        if (!job) return null;
+        return {
+          ...job,
+          run: getRunRecord(automationRuns, jobId)
+        };
+      })
+      .filter(Boolean);
+
+    const severityRank = { missing: 3, degraded: 2, stale: 1 };
+
+    items.push({
+      sectionKey,
+      label: sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1),
+      status: topStatus,
+      severity: severityRank[topStatus] || 0,
+      affectedCount: affected.length,
+      affectedSummary: summarizeTargets(affected),
+      jobs,
+      note:
+        affected.length > 0
+          ? `Affected targets: ${summarizeTargets(affected)}`
+          : topStatus === 'missing'
+            ? 'Pipeline output is missing and needs a refresh.'
+            : topStatus === 'stale'
+              ? 'Pipeline output exists but is older than target freshness.'
+              : 'Pipeline output exists but has degraded quality or coverage.'
+    });
+  });
+
+  if (items.length === 0) {
+    items.push({
+      sectionKey: 'all-systems',
+      label: 'All systems',
+      status: 'ok',
+      severity: 0,
+      affectedCount: 0,
+      affectedSummary: 'All pipeline families are healthy right now.',
+      jobs: [],
+      note: 'No blocking operations work is needed right now. We can focus on product, storefront, and business-facing improvements.'
+    });
+  }
+
+  return items.sort((a, b) => b.severity - a.severity || b.affectedCount - a.affectedCount);
+}
+
 function StatusBadge({ status }) {
   const normalized = String(status || 'missing').toLowerCase();
   return (
@@ -108,6 +219,89 @@ function SummaryValue({ label, value }) {
       <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
       <p className="mt-1 text-sm font-semibold text-gray-900">{value}</p>
     </div>
+  );
+}
+
+function JobRunSummary({ run }) {
+  if (!run) {
+    return <p className="text-xs text-gray-500">No run history yet.</p>;
+  }
+
+  return (
+    <div className="space-y-1 text-xs text-gray-600">
+      <div className="flex items-center gap-2">
+        <StatusBadge status={run.lastStatus || 'missing'} />
+        <span>Duration: {formatDuration(run.lastDurationMs)}</span>
+      </div>
+      <p>Last success: {formatDate(run.lastSucceededAt)}</p>
+      <p>Last failure: {formatDate(run.lastFailedAt)}</p>
+      {run.lastError ? <p className="text-red-600">Why: {run.lastError}</p> : null}
+    </div>
+  );
+}
+
+function ActionCenterCard({ systemHealth, sections, automationRuns }) {
+  const items = useMemo(() => buildActionItems(systemHealth, sections, automationRuns), [systemHealth, sections, automationRuns]);
+
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-slate-100 p-2.5">
+              <ListChecks className="h-5 w-5 text-slate-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Operations action center</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">A prioritized view of what needs attention first, which pipeline owns it, and what happened last.</p>
+            </div>
+          </div>
+          <StatusBadge status={systemHealth?.overallStatus || 'missing'} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {items.map((item) => (
+          <div key={item.sectionKey} className="rounded-2xl border border-gray-200 bg-white p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <p className="text-base font-semibold text-gray-900">{item.label}</p>
+                  <StatusBadge status={item.status} />
+                </div>
+                <p className="text-sm text-gray-600">{item.note}</p>
+                {item.affectedCount > 0 ? (
+                  <p className="text-sm text-gray-500">
+                    <span className="font-medium text-gray-700">Targets:</span> {item.affectedSummary}
+                  </p>
+                ) : null}
+              </div>
+
+              {item.jobs.length > 0 ? (
+                <div className="min-w-80 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Owned by</p>
+                  <div className="mt-2 space-y-2">
+                    {item.jobs.map((job) => (
+                      <div key={job.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{job.label}</p>
+                            <p className="mt-1 text-xs text-slate-600">{job.script}</p>
+                            <p className="mt-1 text-xs text-slate-500">{job.cadence} • {job.owner}</p>
+                          </div>
+                        </div>
+                        <div className="mt-2">
+                          <JobRunSummary run={job.run} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -167,10 +361,87 @@ function ReadinessCard({ section }) {
   );
 }
 
-function SectionCard({ title, sectionKey, section }) {
+function AutomationHistoryCard({ automationRuns }) {
+  const summary = useMemo(() => summarizeAutomationRuns(automationRuns), [automationRuns]);
+
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-lg text-gray-900">Pipeline run history</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">Last success, last failure, duration, and run state for each automation job.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <StatusBadge status={summary.failed > 0 ? 'failed' : summary.running > 0 ? 'running' : summary.missing > 0 ? 'missing' : 'ok'} />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+          <SummaryValue label="Healthy jobs" value={summary.ok} />
+          <SummaryValue label="Failed jobs" value={summary.failed} />
+          <SummaryValue label="Running jobs" value={summary.running} />
+          <SummaryValue label="No history yet" value={summary.missing} />
+        </div>
+
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Job</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Owner</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Cadence</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Last status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Last success</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Last failure</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Duration</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Diagnostics</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {siteAutomationRegistry.map((job) => {
+                const run = getRunRecord(automationRuns, job.id);
+                return (
+                  <tr key={job.id}>
+                    <td className="px-4 py-3 align-top">
+                      <p className="text-sm font-medium text-gray-900">{job.label}</p>
+                      <p className="mt-1 text-xs text-gray-500">{job.script}</p>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 align-top">{job.owner}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 align-top">{job.cadence}</td>
+                    <td className="px-4 py-3 text-sm align-top"><StatusBadge status={run?.lastStatus || 'missing'} /></td>
+                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDate(run?.lastSucceededAt)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDate(run?.lastFailedAt)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDuration(run?.lastDurationMs)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 align-top max-w-sm">
+                      {run?.lastError ? run.lastError : run ? 'Latest run completed without a recorded error.' : 'No run history has been captured for this job yet.'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SectionCard({ title, sectionKey, section, automationRuns }) {
   const Icon = sectionIcons[sectionKey] || Wrench;
   const entries = Array.isArray(section?.entries) ? section.entries : [];
   const topLevelStatus = section?.status || section?.overallStatus || 'missing';
+  const jobs = (sectionJobMap[sectionKey] || [])
+    .map((jobId) => {
+      const job = getJobDetails(jobId);
+      if (!job) return null;
+      return {
+        ...job,
+        run: getRunRecord(automationRuns, jobId)
+      };
+    })
+    .filter(Boolean);
 
   return (
     <Card className="border-gray-200">
@@ -201,10 +472,10 @@ function SectionCard({ title, sectionKey, section }) {
 
         {section?.snapshot && (
           <div className="grid gap-3 md:grid-cols-4">
-            <SummaryValue label="Snapshot Status" value={section.snapshot.status || '—'} />
+            <SummaryValue label="Snapshot status" value={section.snapshot.status || '—'} />
             <SummaryValue label="Updated" value={formatDate(section.snapshot.file?.modifiedAt)} />
             <SummaryValue label="Freshness" value={formatHours(section.snapshot.modifiedHoursAgo)} />
-            <SummaryValue label="Preview Rows" value={section.snapshot.previewCount ?? 0} />
+            <SummaryValue label="Preview rows" value={section.snapshot.previewCount ?? 0} />
           </div>
         )}
 
@@ -217,6 +488,43 @@ function SectionCard({ title, sectionKey, section }) {
           </div>
         )}
 
+        {Array.isArray(section?.diagnostics) && section.diagnostics.length > 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Diagnostics</p>
+            <ul className="mt-2 space-y-1 text-sm text-gray-700">
+              {section.diagnostics.map((diagnostic) => (
+                <li key={diagnostic}>• {diagnostic}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {jobs.length > 0 ? (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {jobs.map((job) => (
+              <div key={job.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{job.label}</p>
+                    <p className="mt-1 text-xs text-gray-500">{job.cadence} • {job.owner}</p>
+                  </div>
+                  <StatusBadge status={job.run?.lastStatus || 'missing'} />
+                </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <SummaryValue label="Last success" value={formatDate(job.run?.lastSucceededAt)} />
+                  <SummaryValue label="Last failure" value={formatDate(job.run?.lastFailedAt)} />
+                  <SummaryValue label="Duration" value={formatDuration(job.run?.lastDurationMs)} />
+                </div>
+                {job.run?.lastError ? (
+                  <p className="mt-3 text-sm text-red-600">Why: {job.run.lastError}</p>
+                ) : (
+                  <p className="mt-3 text-sm text-gray-500">No recorded error on the latest run.</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {entries.length > 0 && (
           <div className="overflow-x-auto rounded-xl border border-gray-200">
             <table className="min-w-full divide-y divide-gray-200">
@@ -225,6 +533,7 @@ function SectionCard({ title, sectionKey, section }) {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Target</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Issue</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Diagnostics</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Source</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Updated</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Freshness</th>
@@ -239,6 +548,11 @@ function SectionCard({ title, sectionKey, section }) {
                     </td>
                     <td className="px-4 py-3 text-sm"><StatusBadge status={entry.status} /></td>
                     <td className="px-4 py-3 text-sm text-gray-600">{classifyEntryIssue(entry)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 max-w-xs">
+                      {Array.isArray(entry.diagnostics) && entry.diagnostics.length > 0
+                        ? entry.diagnostics.join(' • ')
+                        : 'No extra diagnostics recorded.'}
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-600 break-all max-w-xs">{formatSourceSummary(entry.source)}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{formatDate(entry.file?.modifiedAt || entry.cards?.file?.modifiedAt || entry.sets?.file?.modifiedAt)}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{formatHours(entry.modifiedHoursAgo)}</td>
@@ -291,6 +605,7 @@ export default function AdminOperations() {
   const systemHealth = healthQuery.data?.systemHealth || null;
   const sections = systemHealth?.sections || {};
   const generatedAt = systemHealth?.generatedAt || null;
+  const automationRuns = systemHealth?.automationRuns || { generatedAt: null, jobs: {} };
 
   const summary = useMemo(() => {
     const topStatus = String(systemHealth?.overallStatus || 'missing').toLowerCase();
@@ -398,12 +713,15 @@ export default function AdminOperations() {
           </CardContent>
         </Card>
 
+        <AutomationHistoryCard automationRuns={automationRuns} />
+
         <div className="grid gap-6">
-          <SectionCard title="Homepage feed" sectionKey="homepage" section={sections.homepage} />
+          <ActionCenterCard systemHealth={systemHealth} sections={sections} automationRuns={automationRuns} />
+          <SectionCard title="Homepage feed" sectionKey="homepage" section={sections.homepage} automationRuns={automationRuns} />
           <ReadinessCard section={sections.readiness} />
-          <SectionCard title="Catalog pipelines" sectionKey="catalogs" section={sections.catalogs} />
-          <SectionCard title="Image pipelines" sectionKey="images" section={sections.images} />
-          <SectionCard title="Pricing pipelines" sectionKey="pricing" section={sections.pricing} />
+          <SectionCard title="Catalog pipelines" sectionKey="catalogs" section={sections.catalogs} automationRuns={automationRuns} />
+          <SectionCard title="Image pipelines" sectionKey="images" section={sections.images} automationRuns={automationRuns} />
+          <SectionCard title="Pricing pipelines" sectionKey="pricing" section={sections.pricing} automationRuns={automationRuns} />
         </div>
       </div>
     </div>
