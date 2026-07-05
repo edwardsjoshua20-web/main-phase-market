@@ -131,6 +131,34 @@ function formatDuration(value) {
   return `${minutes}m ${seconds}s`;
 }
 
+function getCadenceTargetHours(cadence) {
+  const normalized = String(cadence || '').toLowerCase();
+  if (normalized.includes('hourly')) return 1.5;
+  if (normalized.includes('every-2-days')) return 54;
+  if (normalized.includes('daily')) return 30;
+  return 30;
+}
+
+function getRunFreshnessHours(run) {
+  const lastRunAt = run?.lastSucceededAt || run?.lastFinishedAt || run?.lastStartedAt || null;
+  if (!lastRunAt) return null;
+  const time = new Date(lastRunAt).getTime();
+  if (Number.isNaN(time)) return null;
+  return Math.max(0, (Date.now() - time) / 36e5);
+}
+
+function getBusinessImpact(jobId) {
+  const impact = {
+    'card-backfill-refresh': 'Raw card data feeding catalog, images, pricing, search, and storefront accuracy.',
+    'catalog-refresh': 'Normalized card/search catalog used across storefront, deck tools, and admin inventory flows.',
+    'image-repair-sync': 'Card image coverage across shop, deck builder, commander hub, and inventory intake.',
+    'pricing-refresh': 'Storefront market price guidance and deck/card value calculations.',
+    'homepage-upcoming-releases': 'Public homepage hero/release feed staying current for upcoming products.',
+    'system-health-report': 'Admin visibility, incident detection, and freshness reporting.'
+  };
+  return impact[jobId] || 'Business automation health.';
+}
+
 function getJobDetails(jobId) {
   return siteAutomationRegistry.find((job) => job.id === jobId) || null;
 }
@@ -527,6 +555,44 @@ function buildOperationIncidents(systemHealth, sections, automationRuns, control
     const severityDiff = (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0);
     if (severityDiff !== 0) return severityDiff;
     return String(a.title).localeCompare(String(b.title));
+  });
+}
+
+function buildServiceLevelRows(automationRuns, controlStatus) {
+  const dueJobIds = new Set(controlStatus?.scheduler?.dueJobs || []);
+
+  return siteAutomationRegistry.map((job) => {
+    const run = getRunRecord(automationRuns, job.id);
+    const freshnessHours = getRunFreshnessHours(run);
+    const targetHours = getCadenceTargetHours(job.cadence);
+    const lock = getControlEntry(controlStatus, job.id)?.lock || null;
+    const runStatus = String(run?.lastStatus || 'missing').toLowerCase();
+    const isDue = dueJobIds.has(job.id);
+    const isOverdue = freshnessHours == null || freshnessHours > targetHours || isDue;
+    const status = lock
+      ? 'running'
+      : runStatus === 'failed'
+        ? 'failed'
+        : runStatus === 'missing'
+          ? 'missing'
+          : isOverdue
+            ? 'stale'
+            : 'ok';
+
+    return {
+      ...job,
+      run,
+      status,
+      freshnessHours,
+      targetHours,
+      overdueHours: freshnessHours == null ? null : Math.max(0, freshnessHours - targetHours),
+      nextDueAt: run?.lastSucceededAt
+        ? new Date(new Date(run.lastSucceededAt).getTime() + targetHours * 36e5).toISOString()
+        : null,
+      isDue,
+      lock,
+      impact: getBusinessImpact(job.id)
+    };
   });
 }
 
@@ -927,6 +993,85 @@ function OperationsIncidentCard({ systemHealth, sections, automationRuns, contro
             ))}
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ServiceLevelCard({ automationRuns, controlStatus }) {
+  const rows = useMemo(
+    () => buildServiceLevelRows(automationRuns, controlStatus),
+    [automationRuns, controlStatus]
+  );
+  const okCount = rows.filter((row) => row.status === 'ok').length;
+  const attentionCount = rows.length - okCount;
+  const nextDue = rows
+    .filter((row) => row.nextDueAt)
+    .sort((a, b) => new Date(a.nextDueAt).getTime() - new Date(b.nextDueAt).getTime())[0];
+
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-indigo-50 p-2.5">
+              <Clock3 className="h-5 w-5 text-indigo-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Automation SLA board</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                Freshness targets for each business pipeline so stale data cannot quietly rot behind a green-looking page.
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={attentionCount > 0 ? 'stale' : 'ok'} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+          <SummaryValue label="Within SLA" value={okCount} />
+          <SummaryValue label="Needs attention" value={attentionCount} />
+          <SummaryValue label="Next due job" value={nextDue?.label || 'none'} />
+          <SummaryValue label="Next due at" value={formatDate(nextDue?.nextDueAt)} />
+        </div>
+
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Pipeline</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">SLA</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Freshness</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Next due</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Business impact</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="px-4 py-3 align-top">
+                    <p className="text-sm font-semibold text-gray-900">{row.label}</p>
+                    <p className="mt-1 text-xs text-gray-500">{row.owner} â€¢ {row.script}</p>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 align-top">{row.cadence} / {row.targetHours}h</td>
+                  <td className="px-4 py-3 text-sm text-gray-700 align-top">
+                    {row.freshnessHours == null ? 'No successful run yet' : formatHours(row.freshnessHours)}
+                    {row.overdueHours > 0 ? (
+                      <p className="mt-1 text-xs font-medium text-orange-700">Over by {formatHours(row.overdueHours)}</p>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDate(row.nextDueAt)}</td>
+                  <td className="px-4 py-3 text-sm align-top">
+                    <StatusBadge status={row.status} />
+                    {row.isDue ? <p className="mt-1 text-xs text-orange-700">Scheduler says due</p> : null}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top max-w-sm">{row.impact}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -1483,6 +1628,7 @@ export default function AdminOperations() {
           automationRuns={automationRuns}
           controlStatus={controlStatus}
         />
+        <ServiceLevelCard automationRuns={automationRuns} controlStatus={controlStatus} />
         <AutomationHistoryCard automationRuns={automationRuns} />
         <BridgeReadinessCard controlStatus={controlStatus} />
         <PipelineControlsCard
