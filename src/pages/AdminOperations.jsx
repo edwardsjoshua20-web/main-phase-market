@@ -37,7 +37,8 @@ const statusTone = {
   stale: 'bg-orange-100 text-orange-700 border-orange-200',
   missing: 'bg-red-100 text-red-700 border-red-200',
   failed: 'bg-red-100 text-red-700 border-red-200',
-  running: 'bg-blue-100 text-blue-700 border-blue-200'
+  running: 'bg-blue-100 text-blue-700 border-blue-200',
+  blocked: 'bg-amber-100 text-amber-700 border-amber-200'
 };
 
 const sectionIcons = {
@@ -212,8 +213,65 @@ function getDependencyDiagnostics(job, automationRuns) {
   };
 }
 
-function DependencySummary({ job, automationRuns }) {
+function getControlEntry(controlStatus, jobId) {
+  return (controlStatus?.allowedJobs || []).find((entry) => entry.jobId === jobId) || null;
+}
+
+function getEffectivePreflight(job, automationRuns, controlStatus) {
+  const controlEntry = getControlEntry(controlStatus, job.id);
+  if (controlEntry?.preflight) {
+    return controlEntry.preflight;
+  }
+
   const diagnostics = getDependencyDiagnostics(job, automationRuns);
+  return {
+    ready: diagnostics.ready,
+    blockers: diagnostics.blockers.map((dependency) => ({
+      jobId: dependency.id,
+      label: dependency.label,
+      status: dependency.runStatus
+    })),
+    dependencies: diagnostics.dependencies.map((dependency) => ({
+      jobId: dependency.id,
+      label: dependency.label,
+      status: dependency.runStatus
+    })),
+    message: diagnostics.ready
+      ? 'Preflight passed. Upstream dependencies are healthy.'
+      : `Blocked until ${diagnostics.blockers.map((dependency) => `${dependency.label} (${dependency.runStatus})`).join(', ')} is healthy.`
+  };
+}
+
+function buildRecommendedRunOrder(automationRuns, controlStatus) {
+  const preferredOrder = [
+    'card-backfill-refresh',
+    'catalog-refresh',
+    'image-repair-sync',
+    'pricing-refresh',
+    'homepage-upcoming-releases',
+    'system-health-report'
+  ];
+
+  return preferredOrder
+    .map((jobId) => getJobDetails(jobId))
+    .filter(Boolean)
+    .map((job) => {
+      const run = getRunRecord(automationRuns, job.id);
+      const preflight = getEffectivePreflight(job, automationRuns, controlStatus);
+      const status = String(run?.lastStatus || 'missing').toLowerCase();
+      return {
+        ...job,
+        run,
+        status,
+        preflight,
+        recommended: status !== 'ok' || !preflight.ready
+      };
+    });
+}
+
+function DependencySummary({ job, automationRuns, controlStatus }) {
+  const diagnostics = getDependencyDiagnostics(job, automationRuns);
+  const preflight = getEffectivePreflight(job, automationRuns, controlStatus);
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -247,9 +305,9 @@ function DependencySummary({ job, automationRuns }) {
           )}
         </div>
       </div>
-      {!diagnostics.ready ? (
+      {!preflight.ready ? (
         <p className="mt-3 text-sm font-medium text-amber-700">
-          Recommended first: {diagnostics.blockers.map((dependency) => dependency.label).join(', ')}.
+          {preflight.message}
         </p>
       ) : null}
     </div>
@@ -360,7 +418,7 @@ function JobRunSummary({ run }) {
   );
 }
 
-function ActionCenterCard({ systemHealth, sections, automationRuns }) {
+function ActionCenterCard({ systemHealth, sections, automationRuns, controlStatus }) {
   const items = useMemo(() => buildActionItems(systemHealth, sections, automationRuns), [systemHealth, sections, automationRuns]);
 
   return (
@@ -413,7 +471,7 @@ function ActionCenterCard({ systemHealth, sections, automationRuns }) {
                           <JobRunSummary run={job.run} />
                         </div>
                         <div className="mt-2">
-                          <DependencySummary job={job} automationRuns={automationRuns} />
+                          <DependencySummary job={job} automationRuns={automationRuns} controlStatus={controlStatus} />
                         </div>
                       </div>
                     ))}
@@ -553,7 +611,10 @@ function AutomationHistoryCard({ automationRuns }) {
 
 function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startingJobId }) {
   const controlsAvailable = Boolean(controlStatus?.available);
-  const lockByJobId = new Map((controlStatus?.allowedJobs || []).map((entry) => [entry.jobId, entry.lock || null]));
+  const recommendedRunOrder = useMemo(
+    () => buildRecommendedRunOrder(automationRuns, controlStatus),
+    [automationRuns, controlStatus]
+  );
 
   return (
     <Card className="border-gray-200">
@@ -601,13 +662,39 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
           </div>
         </div>
 
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="font-semibold text-slate-900">Recommended run order</p>
+              <p className="mt-1 text-sm text-slate-600">
+                The safest automation sequence based on upstream dependencies and current run history.
+              </p>
+            </div>
+            <StatusBadge status={recommendedRunOrder.some((job) => !job.preflight.ready) ? 'blocked' : 'ok'} />
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+            {recommendedRunOrder.map((job, index) => (
+              <div key={job.id} className="rounded-xl border border-white bg-white px-3 py-2 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step {index + 1}</p>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">{job.label}</p>
+                  <StatusBadge status={job.preflight.ready ? job.status : 'blocked'} />
+                </div>
+                <p className="mt-1 text-xs text-slate-600">{job.preflight.message}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="grid gap-4 lg:grid-cols-2">
           {siteAutomationRegistry.map((job) => {
             const run = getRunRecord(automationRuns, job.id);
             const readiness = getControlReadiness(run);
-            const lock = lockByJobId.get(job.id);
+            const controlEntry = getControlEntry(controlStatus, job.id);
+            const lock = controlEntry?.lock || null;
+            const preflight = getEffectivePreflight(job, automationRuns, controlStatus);
             const isStarting = startingJobId === job.id;
-            const canRun = controlsAvailable && !lock && !isStarting;
+            const canRun = controlsAvailable && !lock && !isStarting && preflight.ready;
 
             return (
               <div key={job.id} className="rounded-2xl border border-gray-200 bg-white p-4">
@@ -637,7 +724,7 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
                 </div>
 
                 <div className="mt-4">
-                  <DependencySummary job={job} automationRuns={automationRuns} />
+                  <DependencySummary job={job} automationRuns={automationRuns} controlStatus={controlStatus} />
                 </div>
 
                 <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -646,6 +733,8 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
                     <p className="mt-1 text-sm text-gray-500">
                       {lock
                         ? `Locked by run ${lock.runId || 'unknown'} started ${formatDate(lock.startedAt)}.`
+                        : !preflight.ready
+                          ? preflight.message
                         : readiness.note}
                     </p>
                   </div>
@@ -661,7 +750,7 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
                     ) : (
                       <Play className="mr-2 h-4 w-4" />
                     )}
-                    {isStarting ? 'Starting...' : canRun ? 'Run now' : lock ? 'Run locked' : 'Unavailable'}
+                    {isStarting ? 'Starting...' : canRun ? 'Run now' : lock ? 'Run locked' : !preflight.ready ? 'Blocked' : 'Unavailable'}
                   </Button>
                 </div>
               </div>
@@ -1015,7 +1104,7 @@ export default function AdminOperations() {
         />
 
         <div className="grid gap-6">
-          <ActionCenterCard systemHealth={systemHealth} sections={sections} automationRuns={automationRuns} />
+          <ActionCenterCard systemHealth={systemHealth} sections={sections} automationRuns={automationRuns} controlStatus={controlQuery.data} />
           <SectionCard title="Homepage feed" sectionKey="homepage" section={sections.homepage} automationRuns={automationRuns} />
           <ReadinessCard section={sections.readiness} />
           <SectionCard title="Catalog pipelines" sectionKey="catalogs" section={sections.catalogs} automationRuns={automationRuns} />

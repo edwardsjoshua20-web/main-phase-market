@@ -47,7 +47,7 @@ import {
   verifySupabaseAccessToken
 } from './supabaseBridge.mjs';
 import { getDbPath } from './db.mjs';
-import { getAutomationControlJobMap } from '../src/services/automation/siteAutomationRegistry.js';
+import { getAutomationControlJobMap, getAutomationDependencySummary } from '../src/services/automation/siteAutomationRegistry.js';
 import { ensureMtgCommanderEngine, getMtgCommanderPage, refreshMtgCommanderEngine, searchMtgCommanderEngine, simulateMtgDeckGauntlet } from './mtgCommanderEngine.mjs';
 import { importCommanderDeckText } from './mtgCommanderCorpus.mjs';
 import { ensureFabSearchIndex, searchFabAdvancedIndex, searchFabIndex } from './fabSearchIndex.mjs';
@@ -1004,6 +1004,7 @@ const localAdminUser = {
 const SITE_DATA_ROOT = path.join(process.cwd(), 'public', 'data', 'site');
 const AUTOMATION_CONTROL_LOG_PATH = path.join(SITE_DATA_ROOT, 'automation-control-log.json');
 const AUTOMATION_LOCK_ROOT = path.join(SITE_DATA_ROOT, 'automation-locks');
+const AUTOMATION_RUN_HISTORY_PATH = path.join(SITE_DATA_ROOT, 'automation-runs.json');
 const AUTOMATION_LOCK_TTL_MS = 12 * 60 * 60 * 1000;
 const automationJobMap = getAutomationControlJobMap();
 
@@ -1098,6 +1099,40 @@ function appendAutomationControlLog(entry) {
   return next;
 }
 
+function readAutomationRuns() {
+  const payload = readJsonFile(AUTOMATION_RUN_HISTORY_PATH, { generatedAt: null, jobs: {} });
+  return {
+    generatedAt: payload?.generatedAt || null,
+    jobs: payload?.jobs && typeof payload.jobs === 'object' ? payload.jobs : {}
+  };
+}
+
+function buildAutomationPreflight(jobId) {
+  const dependencySummary = getAutomationDependencySummary(jobId);
+  const automationRuns = readAutomationRuns();
+  const dependencies = dependencySummary.dependsOn.map((dependency) => {
+    const run = automationRuns.jobs?.[dependency.id] || null;
+    const status = String(run?.lastStatus || 'missing').toLowerCase();
+    return {
+      jobId: dependency.id,
+      label: dependency.label,
+      status,
+      lastSucceededAt: run?.lastSucceededAt || null,
+      lastFailedAt: run?.lastFailedAt || null
+    };
+  });
+  const blockers = dependencies.filter((dependency) => dependency.status !== 'ok');
+
+  return {
+    ready: blockers.length === 0,
+    dependencies,
+    blockers,
+    message: blockers.length === 0
+      ? 'Preflight passed. Upstream dependencies are healthy.'
+      : `Blocked until ${blockers.map((dependency) => `${dependency.label} (${dependency.status})`).join(', ')} is healthy.`
+  };
+}
+
 function buildAutomationControlStatus() {
   return {
     available: true,
@@ -1105,7 +1140,8 @@ function buildAutomationControlStatus() {
     allowedJobs: Object.entries(automationJobMap).map(([jobId, runnerJob]) => ({
       jobId,
       runnerJob,
-      lock: readAutomationLock(jobId)
+      lock: readAutomationLock(jobId),
+      preflight: buildAutomationPreflight(jobId)
     })),
     audit: readAutomationControlLog()
   };
@@ -1160,6 +1196,23 @@ function startAutomationJob(jobId, actor = localAdminUser.email) {
     const error = new Error(`Automation job "${jobId}" is already running.`);
     error.status = 409;
     error.lock = existingLock;
+    throw error;
+  }
+
+  const preflight = buildAutomationPreflight(jobId);
+  if (!preflight.ready) {
+    const error = new Error(preflight.message);
+    error.status = 422;
+    error.preflight = preflight;
+    appendAutomationControlLog({
+      runId: null,
+      jobId,
+      runnerJob,
+      actor,
+      status: 'blocked',
+      blockedAt: new Date().toISOString(),
+      preflight
+    });
     throw error;
   }
 
@@ -1263,6 +1316,7 @@ app.post('/api/local/admin/automation/:jobId/run', requireAutomationAdmin, (req,
     res.status(status).json({
       error: error?.message || 'Failed to start automation job.',
       lock: error?.lock || null,
+      preflight: error?.preflight || null,
       controlStatus: buildAutomationControlStatus()
     });
   }
