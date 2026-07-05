@@ -49,3 +49,8 @@ export function getCatalogAssetUrl(game, relativePath = '') {
   const assetPath = rawPublicDataBaseUrl ? hostedAssetPath : localAssetPath;
   return getPublicAssetUrl(assetPath);
 }
+
+export function getSiteAssetUrl(relativePath = '') {
+  const normalizedPath = normalizeRelativePath(relativePath);
+  return getPublicAssetUrl(normalizedPath ? `site/${normalizedPath}` : 'site');
+}

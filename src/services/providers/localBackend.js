@@ -4,6 +4,7 @@ import {
   invokeSupabaseAction,
   uploadSupabaseFile
 } from '@/services/supabaseFunctions';
+import { getSiteAssetUrl } from '@/config/publicAssetUrls';
 import { fetchJsonWithEmbeddedFallback, getEmbeddedSystemHealth } from '@/services/siteStaticSnapshots';
 
 const fallbackSupabaseUrl = 'https://wwvvyrhlybwijqlhubdv.supabase.co';
@@ -60,7 +61,7 @@ async function apiRequest(path, options = {}) {
 
 async function fetchStaticSystemHealth() {
   const payload = await fetchJsonWithEmbeddedFallback(
-    '/data/site/system-health.json',
+    getSiteAssetUrl('system-health.json'),
     getEmbeddedSystemHealth(),
     { cache: 'no-store', bustCache: true }
   );

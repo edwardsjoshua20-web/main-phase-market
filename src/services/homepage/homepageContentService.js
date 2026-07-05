@@ -1,3 +1,4 @@
+import { getSiteAssetUrl } from '@/config/publicAssetUrls';
 import { backend } from '@/services/backend';
 import { fetchJsonWithEmbeddedFallback, getEmbeddedUpcomingReleasesManifest } from '@/services/siteStaticSnapshots';
 import {
@@ -10,7 +11,7 @@ import {
 async function fetchStaticUpcomingReleaseManifest() {
   try {
     const payload = await fetchJsonWithEmbeddedFallback(
-      '/data/site/upcoming-releases.json',
+      getSiteAssetUrl('upcoming-releases.json'),
       getEmbeddedUpcomingReleasesManifest(),
       { cache: 'no-store' }
     );
@@ -52,3 +53,4 @@ export async function getHomepageContent() {
     }
   };
 }
+

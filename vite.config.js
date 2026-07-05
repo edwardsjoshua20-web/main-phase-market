@@ -62,7 +62,7 @@ export default defineConfig(({ mode }) => {
   const localApiUrl = env.VITE_LOCAL_API_URL || 'http://127.0.0.1:8787';
   const backendProvider = env.VITE_APP_BACKEND_PROVIDER || 'local';
   const apiOrigin = env.VITE_API_ORIGIN || '';
-  const externalizePublicData = String(env.VITE_EXTERNALIZE_PUBLIC_DATA || '').trim() === '1';
+  const externalizePublicData = String(env.VITE_EXTERNALIZE_PUBLIC_DATA || (mode === 'production' ? '1' : '')).trim() === '1';
 
   return {
     logLevel: 'error',
@@ -101,3 +101,4 @@ export default defineConfig(({ mode }) => {
     }
   };
 });
+
