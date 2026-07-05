@@ -1,21 +1,38 @@
 {
-  "generatedAt": "2026-07-05T04:00:50.300Z",
+  "generatedAt": "2026-07-05T06:50:59.225Z",
   "overallStatus": "ok",
   "automationRuns": {
-    "generatedAt": "2026-07-05T04:00:49.408Z",
+    "generatedAt": "2026-07-05T06:50:58.451Z",
     "jobs": {
       "system-health-report": {
         "jobId": "system-health-report",
         "label": "System health report",
         "lastStatus": "ok",
-        "lastStartedAt": "2026-07-05T04:00:48.413Z",
-        "lastFinishedAt": "2026-07-05T04:00:49.405Z",
-        "lastSucceededAt": "2026-07-05T04:00:49.405Z",
+        "lastStartedAt": "2026-07-05T06:50:57.753Z",
+        "lastFinishedAt": "2026-07-05T06:50:58.449Z",
+        "lastSucceededAt": "2026-07-05T06:50:58.449Z",
         "lastFailedAt": null,
-        "lastDurationMs": 990,
+        "lastDurationMs": 694,
         "lastExitCode": 0,
         "lastError": null,
         "recentRuns": [
+          {
+            "pipeline": "cards",
+            "status": "ok",
+            "startedAt": "2026-07-05T06:50:57.753Z",
+            "finishedAt": "2026-07-05T06:50:58.449Z",
+            "durationMs": 694,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/build-site-health-report.mjs",
+                "exitCode": 0,
+                "durationMs": 694,
+                "error": null
+              }
+            ]
+          },
           {
             "pipeline": "images",
             "status": "ok",
@@ -222,15 +239,32 @@
       "card-backfill-refresh": {
         "jobId": "card-backfill-refresh",
         "label": "Card backfill refresh",
-        "lastStatus": "failed",
-        "lastStartedAt": "2026-07-05T03:17:40.154Z",
-        "lastFinishedAt": "2026-07-05T03:28:57.195Z",
-        "lastSucceededAt": null,
+        "lastStatus": "ok",
+        "lastStartedAt": "2026-07-05T06:48:48.169Z",
+        "lastFinishedAt": "2026-07-05T06:50:57.751Z",
+        "lastSucceededAt": "2026-07-05T06:50:57.751Z",
         "lastFailedAt": "2026-07-05T03:28:57.195Z",
-        "lastDurationMs": 1337385,
-        "lastExitCode": 1,
-        "lastError": "Command failed: node scripts/run-card-backfill-refresh.mjs",
+        "lastDurationMs": 129576,
+        "lastExitCode": 0,
+        "lastError": null,
         "recentRuns": [
+          {
+            "pipeline": "cards",
+            "status": "ok",
+            "startedAt": "2026-07-05T06:48:48.169Z",
+            "finishedAt": "2026-07-05T06:50:57.751Z",
+            "durationMs": 129576,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/run-card-backfill-refresh.mjs",
+                "exitCode": 0,
+                "durationMs": 129576,
+                "error": null
+              }
+            ]
+          },
           {
             "pipeline": "cards",
             "status": "failed",
@@ -309,7 +343,7 @@
         "size": 1112,
         "modifiedAt": "2026-07-05T03:00:12.345Z"
       },
-      "modifiedHoursAgo": 1.01,
+      "modifiedHoursAgo": 3.85,
       "releaseCount": 3,
       "diagnostics": [
         "Homepage feed is current."
@@ -323,7 +357,7 @@
         "missingJobs": 0,
         "failedJobs": 0,
         "runningJobs": 0,
-        "lastSuccessfulRunAt": "2026-07-05T04:00:49.405Z",
+        "lastSuccessfulRunAt": "2026-07-05T06:50:58.449Z",
         "lastFailedRunAt": null,
         "jobs": [
           {
@@ -361,14 +395,31 @@
             "jobId": "system-health-report",
             "label": "System health report",
             "lastStatus": "ok",
-            "lastStartedAt": "2026-07-05T04:00:48.413Z",
-            "lastFinishedAt": "2026-07-05T04:00:49.405Z",
-            "lastSucceededAt": "2026-07-05T04:00:49.405Z",
+            "lastStartedAt": "2026-07-05T06:50:57.753Z",
+            "lastFinishedAt": "2026-07-05T06:50:58.449Z",
+            "lastSucceededAt": "2026-07-05T06:50:58.449Z",
             "lastFailedAt": null,
-            "lastDurationMs": 990,
+            "lastDurationMs": 694,
             "lastExitCode": 0,
             "lastError": null,
             "recentRuns": [
+              {
+                "pipeline": "cards",
+                "status": "ok",
+                "startedAt": "2026-07-05T06:50:57.753Z",
+                "finishedAt": "2026-07-05T06:50:58.449Z",
+                "durationMs": 694,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 694,
+                    "error": null
+                  }
+                ]
+              },
               {
                 "pipeline": "images",
                 "status": "ok",
@@ -512,7 +563,7 @@
             },
             "count": 618
           },
-          "modifiedHoursAgo": 0.91,
+          "modifiedHoursAgo": 3.75,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -543,7 +594,7 @@
             },
             "count": 361
           },
-          "modifiedHoursAgo": 37.04,
+          "modifiedHoursAgo": 39.87,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -559,8 +610,8 @@
           "cards": {
             "file": {
               "path": "D:\\main-phase-market\\public\\data\\yugioh\\cards.json",
-              "size": 26428983,
-              "modifiedAt": "2026-07-03T21:24:31.683Z"
+              "size": 26427921,
+              "modifiedAt": "2026-07-05T06:50:56.124Z"
             },
             "count": 14422
           },
@@ -572,7 +623,7 @@
             },
             "count": 1020
           },
-          "modifiedHoursAgo": 30.61,
+          "modifiedHoursAgo": 0,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -589,7 +640,7 @@
             "file": {
               "path": "D:\\main-phase-market\\public\\data\\onepiece\\cards.json",
               "size": 1200395,
-              "modifiedAt": "2026-07-03T21:24:21.333Z"
+              "modifiedAt": "2026-07-05T06:50:53.171Z"
             },
             "count": 1996
           },
@@ -601,7 +652,7 @@
             },
             "count": 43
           },
-          "modifiedHoursAgo": 30.61,
+          "modifiedHoursAgo": 0,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -630,7 +681,7 @@
             },
             "count": 20
           },
-          "modifiedHoursAgo": 30.6,
+          "modifiedHoursAgo": 33.43,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -659,7 +710,7 @@
             },
             "count": 118
           },
-          "modifiedHoursAgo": 30.59,
+          "modifiedHoursAgo": 33.43,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -676,7 +727,7 @@
             "file": {
               "path": "D:\\main-phase-market\\public\\data\\starwars\\cards.json",
               "size": 11990115,
-              "modifiedAt": "2026-07-03T21:24:33.614Z"
+              "modifiedAt": "2026-07-05T06:50:57.693Z"
             },
             "count": 9057
           },
@@ -688,7 +739,7 @@
             },
             "count": 28
           },
-          "modifiedHoursAgo": 30.6,
+          "modifiedHoursAgo": 0,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -701,23 +752,40 @@
         ],
         "totalJobs": 2,
         "missingJobs": 0,
-        "failedJobs": 1,
+        "failedJobs": 0,
         "runningJobs": 0,
-        "lastSuccessfulRunAt": "2026-07-05T03:06:19.117Z",
+        "lastSuccessfulRunAt": "2026-07-05T06:50:57.751Z",
         "lastFailedRunAt": "2026-07-05T03:28:57.195Z",
         "jobs": [
           {
             "jobId": "card-backfill-refresh",
             "label": "Card backfill refresh",
-            "lastStatus": "failed",
-            "lastStartedAt": "2026-07-05T03:17:40.154Z",
-            "lastFinishedAt": "2026-07-05T03:28:57.195Z",
-            "lastSucceededAt": null,
+            "lastStatus": "ok",
+            "lastStartedAt": "2026-07-05T06:48:48.169Z",
+            "lastFinishedAt": "2026-07-05T06:50:57.751Z",
+            "lastSucceededAt": "2026-07-05T06:50:57.751Z",
             "lastFailedAt": "2026-07-05T03:28:57.195Z",
-            "lastDurationMs": 1337385,
-            "lastExitCode": 1,
-            "lastError": "Command failed: node scripts/run-card-backfill-refresh.mjs",
+            "lastDurationMs": 129576,
+            "lastExitCode": 0,
+            "lastError": null,
             "recentRuns": [
+              {
+                "pipeline": "cards",
+                "status": "ok",
+                "startedAt": "2026-07-05T06:48:48.169Z",
+                "finishedAt": "2026-07-05T06:50:57.751Z",
+                "durationMs": 129576,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/run-card-backfill-refresh.mjs",
+                    "exitCode": 0,
+                    "durationMs": 129576,
+                    "error": null
+                  }
+                ]
+              },
               {
                 "pipeline": "cards",
                 "status": "failed",
@@ -813,7 +881,7 @@
             "size": 345,
             "modifiedAt": "2026-07-05T04:00:19.557Z"
           },
-          "modifiedHoursAgo": 0.01,
+          "modifiedHoursAgo": 2.84,
           "cardsSeen": 517253,
           "downloaded": 4998,
           "skippedExisting": 6871,
@@ -841,7 +909,7 @@
             "size": 404,
             "modifiedAt": "2026-07-05T04:00:36.462Z"
           },
-          "modifiedHoursAgo": 0,
+          "modifiedHoursAgo": 2.84,
           "cardsSeen": 20437,
           "downloaded": 0,
           "skippedExisting": 40051,
@@ -867,7 +935,7 @@
             "size": 304,
             "modifiedAt": "2026-07-05T04:00:44.961Z"
           },
-          "modifiedHoursAgo": 0,
+          "modifiedHoursAgo": 2.84,
           "cardsSeen": 14422,
           "downloaded": 0,
           "skippedExisting": 28844,
@@ -893,7 +961,7 @@
             "size": 262,
             "modifiedAt": "2026-07-05T04:00:37.865Z"
           },
-          "modifiedHoursAgo": 0,
+          "modifiedHoursAgo": 2.84,
           "cardsSeen": 1996,
           "downloaded": 0,
           "skippedExisting": 1996,
@@ -919,7 +987,7 @@
             "size": 305,
             "modifiedAt": "2026-07-05T04:00:25.809Z"
           },
-          "modifiedHoursAgo": 0.01,
+          "modifiedHoursAgo": 2.84,
           "cardsSeen": 3054,
           "downloaded": 0,
           "skippedExisting": 6104,
@@ -945,7 +1013,7 @@
             "size": 327,
             "modifiedAt": "2026-07-05T04:00:23.639Z"
           },
-          "modifiedHoursAgo": 0.01,
+          "modifiedHoursAgo": 2.84,
           "cardsSeen": 4862,
           "downloaded": 0,
           "skippedExisting": 4852,
@@ -971,7 +1039,7 @@
             "size": 290,
             "modifiedAt": "2026-07-05T04:00:48.344Z"
           },
-          "modifiedHoursAgo": 0,
+          "modifiedHoursAgo": 2.84,
           "cardsSeen": 9057,
           "downloaded": 0,
           "skippedExisting": 9510,
@@ -1039,7 +1107,7 @@
           "size": 5123,
           "modifiedAt": "2026-07-05T03:00:32.041Z"
         },
-        "modifiedHoursAgo": 1.01,
+        "modifiedHoursAgo": 3.84,
         "status": "merged-source-snapshots",
         "sourceSnapshots": {
           "cardkingdom": 4,
@@ -1057,7 +1125,7 @@
             "size": 951,
             "modifiedAt": "2026-07-05T03:00:30.901Z"
           },
-          "modifiedHoursAgo": 1.01,
+          "modifiedHoursAgo": 3.84,
           "rows": 4,
           "diagnostics": [
             "Pricing source snapshot is current."
@@ -1071,7 +1139,7 @@
             "size": 953,
             "modifiedAt": "2026-07-05T03:00:30.904Z"
           },
-          "modifiedHoursAgo": 1.01,
+          "modifiedHoursAgo": 3.84,
           "rows": 4,
           "diagnostics": [
             "Pricing source snapshot is current."
@@ -1085,7 +1153,7 @@
             "size": 953,
             "modifiedAt": "2026-07-05T03:00:30.908Z"
           },
-          "modifiedHoursAgo": 1.01,
+          "modifiedHoursAgo": 3.84,
           "rows": 4,
           "diagnostics": [
             "Pricing source snapshot is current."
@@ -1285,21 +1353,38 @@
         "missingJobs": 0,
         "failedJobs": 0,
         "runningJobs": 0,
-        "lastSuccessfulRunAt": "2026-07-05T04:00:49.405Z",
+        "lastSuccessfulRunAt": "2026-07-05T06:50:58.449Z",
         "lastFailedRunAt": null,
         "jobs": [
           {
             "jobId": "system-health-report",
             "label": "System health report",
             "lastStatus": "ok",
-            "lastStartedAt": "2026-07-05T04:00:48.413Z",
-            "lastFinishedAt": "2026-07-05T04:00:49.405Z",
-            "lastSucceededAt": "2026-07-05T04:00:49.405Z",
+            "lastStartedAt": "2026-07-05T06:50:57.753Z",
+            "lastFinishedAt": "2026-07-05T06:50:58.449Z",
+            "lastSucceededAt": "2026-07-05T06:50:58.449Z",
             "lastFailedAt": null,
-            "lastDurationMs": 990,
+            "lastDurationMs": 694,
             "lastExitCode": 0,
             "lastError": null,
             "recentRuns": [
+              {
+                "pipeline": "cards",
+                "status": "ok",
+                "startedAt": "2026-07-05T06:50:57.753Z",
+                "finishedAt": "2026-07-05T06:50:58.449Z",
+                "durationMs": 694,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 694,
+                    "error": null
+                  }
+                ]
+              },
               {
                 "pipeline": "images",
                 "status": "ok",
