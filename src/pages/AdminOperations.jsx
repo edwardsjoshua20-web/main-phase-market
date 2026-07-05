@@ -418,6 +418,79 @@ function JobRunSummary({ run }) {
   );
 }
 
+function BridgeReadinessCard({ controlStatus }) {
+  const controlsAvailable = Boolean(controlStatus?.available);
+  const bridge = controlStatus?.bridge || {};
+  const expectedEndpoints = Array.isArray(bridge.expectedEndpoints) ? bridge.expectedEndpoints : [];
+  const nextSteps = Array.isArray(bridge.nextSteps) ? bridge.nextSteps : [];
+
+  return (
+    <Card className={controlsAvailable ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'}>
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-white p-2.5">
+              {controlsAvailable ? (
+                <ShieldCheck className="h-5 w-5 text-green-700" />
+              ) : (
+                <Lock className="h-5 w-5 text-blue-700" />
+              )}
+            </div>
+            <div>
+              <CardTitle className={controlsAvailable ? 'text-lg text-green-950' : 'text-lg text-blue-950'}>
+                Operations bridge readiness
+              </CardTitle>
+              <p className={controlsAvailable ? 'mt-1 text-sm text-green-800' : 'mt-1 text-sm text-blue-800'}>
+                {controlsAvailable
+                  ? 'The hosted admin page is connected to the automation runner.'
+                  : controlStatus?.reason || 'The hosted admin page can read reports, but cannot run Node automations until the bridge is connected.'}
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={controlsAvailable ? 'ok' : 'degraded'} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <SummaryValue label="Mode" value={controlStatus?.mode || 'unknown'} />
+          <SummaryValue label="Bridge origin" value={bridge.apiOrigin || 'not configured'} />
+          <SummaryValue label="Cloudflare variable" value={bridge.expectedVariable || 'VITE_API_ORIGIN'} />
+        </div>
+
+        {!controlsAvailable ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-xl border border-blue-100 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Expected backend endpoints</p>
+              <div className="mt-3 space-y-2">
+                {(expectedEndpoints.length > 0 ? expectedEndpoints : ['/api/local/health', '/api/local/admin/automation/control-status']).map((endpoint) => (
+                  <p key={endpoint} className="break-all rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">
+                    {endpoint}
+                  </p>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-xl border border-blue-100 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Next bridge steps</p>
+              <ol className="mt-3 space-y-2 text-sm text-slate-700">
+                {(nextSteps.length > 0 ? nextSteps : ['Deploy the Node operations backend.', 'Set VITE_API_ORIGIN in Cloudflare Pages.', 'Redeploy the hosted frontend.']).map((step, index) => (
+                  <li key={step} className="flex gap-2">
+                    <span className="font-semibold text-slate-900">{index + 1}.</span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        ) : (
+          <p className="rounded-xl border border-green-100 bg-white p-4 text-sm text-green-800">
+            Manual runs are available. The backend will still enforce admin auth, allowlisted jobs, single-run locks, audit logging, and dependency preflight.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ActionCenterCard({ systemHealth, sections, automationRuns, controlStatus }) {
   const items = useMemo(() => buildActionItems(systemHealth, sections, automationRuns), [systemHealth, sections, automationRuns]);
 
@@ -1096,6 +1169,7 @@ export default function AdminOperations() {
         </Card>
 
         <AutomationHistoryCard automationRuns={automationRuns} />
+        <BridgeReadinessCard controlStatus={controlStatus} />
         <PipelineControlsCard
           automationRuns={automationRuns}
           controlStatus={controlStatus}

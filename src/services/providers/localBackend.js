@@ -136,6 +136,30 @@ const hostedSupabaseMode = hostedPublicHost && Boolean(SUPABASE_URL && SUPABASE_
 const staticGuestMode = !normalizedApiOrigin && !runningOnLocalHost && !hostedSupabaseMode;
 const hostedStaticDataMode = hostedSupabaseMode && !normalizedApiOrigin;
 
+function buildHostedAutomationControlUnavailable() {
+  return {
+    available: false,
+    mode: 'hosted-static',
+    reason: 'Manual automation controls require the operations backend bridge.',
+    bridge: {
+      configured: Boolean(normalizedApiOrigin),
+      apiOrigin: normalizedApiOrigin || null,
+      expectedVariable: 'VITE_API_ORIGIN',
+      expectedEndpoints: [
+        '/api/local/health',
+        '/api/local/admin/automation/control-status',
+        '/api/local/admin/automation/:jobId/run'
+      ],
+      nextSteps: [
+        'Deploy the Node operations backend from render.yaml or another Node-capable host.',
+        'Set VITE_API_ORIGIN on Cloudflare Pages to the backend origin.',
+        'Redeploy Cloudflare Pages so the hosted admin page uses the bridge.',
+        'Verify the bridge with npm.cmd run ops:check -- --origin <backend-origin> --token <admin-token>.'
+      ]
+    }
+  };
+}
+
 function getStoredSession() {
   if (typeof window === 'undefined') return null;
 
@@ -774,17 +798,13 @@ export const localBackend = {
     },
     getAutomationControlStatus() {
       if (hostedStaticDataMode) {
-        return Promise.resolve({
-          available: false,
-          mode: 'hosted-static',
-          reason: 'Manual automation controls require the local operations backend.'
-        });
+        return Promise.resolve(buildHostedAutomationControlUnavailable());
       }
       return apiRequest('/admin/automation/control-status');
     },
     runAutomationJob(jobId) {
       if (hostedStaticDataMode) {
-        return Promise.reject(new Error('Manual automation controls require the local operations backend.'));
+        return Promise.reject(new Error('Manual automation controls require the operations backend bridge.'));
       }
       return apiRequest(`/admin/automation/${encodeURIComponent(jobId)}/run`, {
         method: 'POST',
