@@ -689,6 +689,39 @@ function buildDataContractRows(automationRuns) {
   });
 }
 
+function buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlStatus) {
+  const incidents = buildOperationIncidents(systemHealth, sections, automationRuns, controlStatus);
+  const recommendedOrder = buildRecommendedRunOrder(automationRuns, controlStatus);
+  const brokenSections = Object.entries(sections || {})
+    .filter(([, section]) => String(section?.status || section?.overallStatus || 'missing').toLowerCase() !== 'ok')
+    .map(([sectionKey]) => sectionKey);
+
+  const baseSteps = [
+    'Open the incident queue and handle critical failures first.',
+    'Run dependency-safe jobs in the recommended order.',
+    'Rerun System health report so the dashboard reflects the repair.',
+    'Refresh Admin Operations and verify incidents cleared.'
+  ];
+
+  const targetedSteps = recommendedOrder
+    .filter((job) => job.status !== 'ok' || !job.preflight.ready)
+    .map((job) => {
+      if (!job.preflight.ready) {
+        return `${job.label}: blocked until ${job.preflight.blockers.map((blocker) => `${blocker.label} (${blocker.status})`).join(', ')} is healthy.`;
+      }
+      return `${job.label}: ${job.script}`;
+    });
+
+  return {
+    status: incidents.length > 0 ? 'degraded' : 'ok',
+    incidentCount: incidents.length,
+    brokenSections,
+    nextIncident: incidents[0] || null,
+    steps: targetedSteps.length > 0 ? targetedSteps : baseSteps,
+    fallbackSteps: baseSteps
+  };
+}
+
 function StatusBadge({ status }) {
   const normalized = String(status || 'missing').toLowerCase();
   return (
@@ -1295,6 +1328,67 @@ function DataContractsCard({ automationRuns }) {
   );
 }
 
+function RecoveryPlaybookCard({ systemHealth, sections, automationRuns, controlStatus }) {
+  const playbook = useMemo(
+    () => buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlStatus),
+    [systemHealth, sections, automationRuns, controlStatus]
+  );
+
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-rose-50 p-2.5">
+              <Wrench className="h-5 w-5 text-rose-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Recovery playbook</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                The safe repair path when automations, freshness, or business capabilities drift out of line.
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={playbook.status} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <SummaryValue label="Active incidents" value={playbook.incidentCount} />
+          <SummaryValue label="Broken sections" value={playbook.brokenSections.length > 0 ? playbook.brokenSections.join(', ') : 'none'} />
+          <SummaryValue label="First focus" value={playbook.nextIncident?.title || 'No active recovery needed'} />
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <p className="font-semibold text-gray-900">Recommended recovery order</p>
+          <ol className="mt-3 space-y-2 text-sm text-gray-700">
+            {playbook.steps.map((step, index) => (
+              <li key={`${index}-${step}`} className="flex gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
+                  {index + 1}
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="font-semibold text-slate-900">If the page looks green but the site feels wrong</p>
+          <ol className="mt-3 space-y-2 text-sm text-slate-700">
+            {playbook.fallbackSteps.map((step, index) => (
+              <li key={`${index}-${step}`} className="flex gap-3">
+                <span className="font-semibold text-slate-900">{index + 1}.</span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startingJobId }) {
   const controlsAvailable = Boolean(controlStatus?.available);
   const recommendedRunOrder = useMemo(
@@ -1853,6 +1947,12 @@ export default function AdminOperations() {
           controlStatus={controlStatus}
         />
         <DataContractsCard automationRuns={automationRuns} />
+        <RecoveryPlaybookCard
+          systemHealth={systemHealth}
+          sections={sections}
+          automationRuns={automationRuns}
+          controlStatus={controlStatus}
+        />
         <AutomationHistoryCard automationRuns={automationRuns} />
         <BridgeReadinessCard controlStatus={controlStatus} />
         <PipelineControlsCard
