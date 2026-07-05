@@ -167,6 +167,7 @@ Target seams:
 Goal:
 
 - every bot has a job, owner, trigger, input, output, and failure surface
+- every bot declares upstream dependencies and downstream consumers so operations can explain what should run first
 
 ## Design rule going forward
 

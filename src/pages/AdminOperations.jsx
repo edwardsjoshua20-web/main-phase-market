@@ -3,7 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { backend } from '@/services/backend';
-import { siteAutomationRegistry, siteAutomationSections } from '@/services/automation/siteAutomationRegistry';
+import {
+  getAutomationDependencySummary,
+  siteAutomationRegistry,
+  siteAutomationSections
+} from '@/services/automation/siteAutomationRegistry';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -188,6 +192,70 @@ function getControlReadiness(run) {
   };
 }
 
+function dependencyRunStatus(automationRuns, jobId) {
+  return String(getRunRecord(automationRuns, jobId)?.lastStatus || 'missing').toLowerCase();
+}
+
+function getDependencyDiagnostics(job, automationRuns) {
+  const dependencySummary = getAutomationDependencySummary(job.id);
+  const dependencies = dependencySummary.dependsOn.map((dependency) => ({
+    ...dependency,
+    runStatus: dependencyRunStatus(automationRuns, dependency.id)
+  }));
+  const blockers = dependencies.filter((dependency) => dependency.runStatus !== 'ok');
+
+  return {
+    dependencies,
+    blocks: dependencySummary.blocks,
+    blockers,
+    ready: blockers.length === 0
+  };
+}
+
+function DependencySummary({ job, automationRuns }) {
+  const diagnostics = getDependencyDiagnostics(job, automationRuns);
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Run logic</p>
+      <p className="mt-2 text-sm text-slate-700">{job.readiness || 'No readiness note registered.'}</p>
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Depends on</p>
+          {diagnostics.dependencies.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {diagnostics.dependencies.map((dependency) => (
+                <Badge
+                  key={dependency.id}
+                  variant="outline"
+                  className={dependency.runStatus === 'ok' ? statusTone.ok : statusTone.missing}
+                >
+                  {dependency.label}: {dependency.runStatus}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-slate-600">No upstream dependency.</p>
+          )}
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Feeds</p>
+          {diagnostics.blocks.length > 0 ? (
+            <p className="mt-2 text-sm text-slate-600">{diagnostics.blocks.map((blocked) => blocked.label).join(', ')}</p>
+          ) : (
+            <p className="mt-2 text-sm text-slate-600">End-of-chain or reporting job.</p>
+          )}
+        </div>
+      </div>
+      {!diagnostics.ready ? (
+        <p className="mt-3 text-sm font-medium text-amber-700">
+          Recommended first: {diagnostics.blockers.map((dependency) => dependency.label).join(', ')}.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function deriveAreaStatus(sectionStatuses, automationSummary) {
   if (sectionStatuses.includes('missing') || automationSummary.missing > 0) return 'missing';
   if (sectionStatuses.includes('degraded') || automationSummary.failed > 0 || automationSummary.running > 0) return 'degraded';
@@ -343,6 +411,9 @@ function ActionCenterCard({ systemHealth, sections, automationRuns }) {
                         </div>
                         <div className="mt-2">
                           <JobRunSummary run={job.run} />
+                        </div>
+                        <div className="mt-2">
+                          <DependencySummary job={job} automationRuns={automationRuns} />
                         </div>
                       </div>
                     ))}
@@ -563,6 +634,10 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
                     Command
                   </div>
                   <p className="mt-2 break-all font-mono text-xs text-slate-700">{job.script}</p>
+                </div>
+
+                <div className="mt-4">
+                  <DependencySummary job={job} automationRuns={automationRuns} />
                 </div>
 
                 <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

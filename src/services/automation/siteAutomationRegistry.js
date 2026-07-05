@@ -9,6 +9,9 @@ export const siteAutomationRegistry = [
     commands: [
       ['node', 'scripts/run-card-backfill-refresh.mjs']
     ],
+    dependsOn: [],
+    blocks: ['catalog-refresh', 'image-repair-sync', 'pricing-refresh'],
+    readiness: 'Safe first step. Run this when raw card feeds are missing, stale, or newly configured.',
     outputs: ['public/data/*/cards.json', 'public/data/*/cards-manifest.json'],
     purpose: 'Refresh raw card catalogs for game pipelines before set extraction, image mirroring, and storefront consumption.'
   },
@@ -22,6 +25,9 @@ export const siteAutomationRegistry = [
     commands: [
       ['node', 'scripts/run-homepage-refresh.mjs']
     ],
+    dependsOn: [],
+    blocks: [],
+    readiness: 'Safe to run independently. Keeps the public hero/release feed current.',
     outputs: ['public/data/site/upcoming-releases.json'],
     purpose: 'Build one normalized upcoming-release feed for the hero banner and release bar.'
   },
@@ -35,6 +41,9 @@ export const siteAutomationRegistry = [
     commands: [
       ['node', 'scripts/run-catalog-refresh.mjs']
     ],
+    dependsOn: ['card-backfill-refresh'],
+    blocks: ['image-repair-sync', 'pricing-refresh'],
+    readiness: 'Best after card backfill. This produces normalized cards and sets used by storefront, images, and pricing.',
     outputs: ['public/data/*/cards.json', 'public/data/*/sets.json'],
     purpose: 'Refresh local card catalogs and normalized set data for all supported games.'
   },
@@ -48,6 +57,9 @@ export const siteAutomationRegistry = [
     commands: [
       ['node', 'scripts/run-image-refresh.mjs']
     ],
+    dependsOn: ['catalog-refresh'],
+    blocks: [],
+    readiness: 'Best after catalog refresh. This repairs image coverage from normalized card outputs.',
     outputs: ['public/data/*/images', 'public/data/*/mirror-manifest.json'],
     purpose: 'Backfill or repair hosted image mirrors so all user-facing surfaces share the same image pipeline.'
   },
@@ -62,6 +74,9 @@ export const siteAutomationRegistry = [
       ['node', 'scripts/run-pricing-source-refresh.mjs'],
       ['node', 'scripts/build-pricing-snapshot.mjs']
     ],
+    dependsOn: ['catalog-refresh'],
+    blocks: [],
+    readiness: 'Best after catalog refresh. Pricing needs stable card identity and source snapshots before storefront use.',
     outputs: ['public/data/site/pricing-sources/*.json', 'public/data/site/pricing-snapshot.json'],
     purpose: 'Refresh normalized source snapshots, then compute Main Phase Market target pricing from the merged source pipeline.'
   },
@@ -75,6 +90,9 @@ export const siteAutomationRegistry = [
     commands: [
       ['node', 'scripts/build-site-health-report.mjs']
     ],
+    dependsOn: [],
+    blocks: [],
+    readiness: 'Safe after any pipeline. Rebuilds the operational report Admin Operations reads.',
     outputs: ['public/data/site/system-health.json'],
     purpose: 'Track freshness and coverage for homepage feeds, catalogs, image mirrors, and pricing so problems are visible before users find them.'
   }
@@ -129,4 +147,19 @@ export function getAutomationControlJobMap() {
       .filter((job) => job.id && job.runnerJob)
       .map((job) => [job.id, job.runnerJob])
   );
+}
+
+export function getAutomationDependencySummary(jobId) {
+  const job = getAutomationJobById(jobId);
+  if (!job) {
+    return {
+      dependsOn: [],
+      blocks: []
+    };
+  }
+
+  return {
+    dependsOn: (job.dependsOn || []).map((dependencyId) => getAutomationJobById(dependencyId)).filter(Boolean),
+    blocks: (job.blocks || []).map((blockedId) => getAutomationJobById(blockedId)).filter(Boolean)
+  };
 }
