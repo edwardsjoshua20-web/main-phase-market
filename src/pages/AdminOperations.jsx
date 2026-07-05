@@ -596,6 +596,79 @@ function buildServiceLevelRows(automationRuns, controlStatus) {
   });
 }
 
+function buildLaunchReadinessRows(sections, automationRuns, controlStatus) {
+  const controlsConnected = Boolean(controlStatus?.available);
+  const schedulerEnabled = Boolean(controlStatus?.scheduler?.enabled);
+  const jobOk = (jobId) => String(getRunRecord(automationRuns, jobId)?.lastStatus || 'missing').toLowerCase() === 'ok';
+  const sectionOk = (sectionKey) => {
+    const section = sections?.[sectionKey];
+    return String(section?.status || section?.overallStatus || 'missing').toLowerCase() === 'ok';
+  };
+
+  return [
+    {
+      id: 'public-storefront',
+      label: 'Public storefront',
+      owner: 'storefront',
+      status: sectionOk('catalogs') && sectionOk('images') && sectionOk('pricing') ? 'ok' : 'degraded',
+      evidence: 'Catalogs, images, and pricing all need to stay green for buyers to trust product pages.',
+      nextStep: 'Repair whichever pipeline is not green, then rerun System health report.'
+    },
+    {
+      id: 'search-and-discovery',
+      label: 'Search and discovery',
+      owner: 'catalog',
+      status: sectionOk('catalogs') && jobOk('catalog-refresh') ? 'ok' : 'degraded',
+      evidence: 'Search depends on normalized catalog outputs and successful catalog refresh history.',
+      nextStep: 'Run Card backfill refresh, then Catalog refresh.'
+    },
+    {
+      id: 'card-images',
+      label: 'Card image coverage',
+      owner: 'images',
+      status: sectionOk('images') && jobOk('image-repair-sync') ? 'ok' : 'degraded',
+      evidence: 'Shop, deck builder, commander hub, and inventory intake share the image pipeline.',
+      nextStep: 'Run Image repair and sync after Catalog refresh is healthy.'
+    },
+    {
+      id: 'market-pricing',
+      label: 'Market pricing',
+      owner: 'pricing',
+      status: sectionOk('pricing') && jobOk('pricing-refresh') ? 'ok' : 'degraded',
+      evidence: 'Deck values and storefront values need a fresh merged pricing snapshot.',
+      nextStep: 'Run Pricing refresh after Catalog refresh is healthy.'
+    },
+    {
+      id: 'homepage-merchandising',
+      label: 'Homepage merchandising',
+      owner: 'homepage',
+      status: sectionOk('homepage') && jobOk('homepage-upcoming-releases') ? 'ok' : 'degraded',
+      evidence: 'The hero/release banner should automatically reflect upcoming sets.',
+      nextStep: 'Run Homepage upcoming releases refresh.'
+    },
+    {
+      id: 'operations-control',
+      label: 'Operations control',
+      owner: 'operations',
+      status: controlsConnected ? 'ok' : 'degraded',
+      evidence: controlsConnected
+        ? 'Manual pipeline controls can reach the backend runner.'
+        : 'Hosted admin can read reports, but cannot manually run automations until the bridge is connected.',
+      nextStep: 'Host/connect the operations backend and set VITE_API_ORIGIN.'
+    },
+    {
+      id: 'autopilot',
+      label: 'Autopilot scheduler',
+      owner: 'operations',
+      status: schedulerEnabled ? 'ok' : 'degraded',
+      evidence: schedulerEnabled
+        ? 'Scheduler is enabled and can keep routine jobs moving.'
+        : 'Scheduler is intentionally disabled until the runner is fully verified.',
+      nextStep: 'Enable MPM_AUTOMATION_SCHEDULER_ENABLED=true after bridge verification.'
+    }
+  ];
+}
+
 function StatusBadge({ status }) {
   const normalized = String(status || 'missing').toLowerCase();
   return (
@@ -1071,6 +1144,65 @@ function ServiceLevelCard({ automationRuns, controlStatus }) {
               ))}
             </tbody>
           </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LaunchReadinessCard({ sections, automationRuns, controlStatus }) {
+  const rows = useMemo(
+    () => buildLaunchReadinessRows(sections, automationRuns, controlStatus),
+    [sections, automationRuns, controlStatus]
+  );
+  const readyCount = rows.filter((row) => row.status === 'ok').length;
+  const readinessScore = Math.round((readyCount / Math.max(rows.length, 1)) * 100);
+  const blockers = rows.filter((row) => row.status !== 'ok');
+
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-emerald-50 p-2.5">
+              <ListChecks className="h-5 w-5 text-emerald-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Launch readiness matrix</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                Business-facing readiness for advertising, inventory intake, storefront trust, and day-to-day operations.
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={blockers.length > 0 ? 'degraded' : 'ok'} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+          <SummaryValue label="Readiness score" value={`${readinessScore}%`} />
+          <SummaryValue label="Ready capabilities" value={`${readyCount}/${rows.length}`} />
+          <SummaryValue label="Blockers" value={blockers.length} />
+          <SummaryValue label="Next focus" value={blockers[0]?.label || 'Product polish'} />
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          {rows.map((row) => (
+            <div key={row.id} className="rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-900">{row.label}</p>
+                  <p className="mt-1 text-xs uppercase tracking-wide text-gray-500">Owner: {row.owner}</p>
+                </div>
+                <StatusBadge status={row.status} />
+              </div>
+              <p className="mt-3 text-sm text-gray-600">
+                <span className="font-medium text-gray-800">Evidence:</span> {row.evidence}
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                <span className="font-medium text-gray-800">Next step:</span> {row.nextStep}
+              </p>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -1629,6 +1761,11 @@ export default function AdminOperations() {
           controlStatus={controlStatus}
         />
         <ServiceLevelCard automationRuns={automationRuns} controlStatus={controlStatus} />
+        <LaunchReadinessCard
+          sections={sections}
+          automationRuns={automationRuns}
+          controlStatus={controlStatus}
+        />
         <AutomationHistoryCard automationRuns={automationRuns} />
         <BridgeReadinessCard controlStatus={controlStatus} />
         <PipelineControlsCard
