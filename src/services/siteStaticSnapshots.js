@@ -13,6 +13,22 @@ function isJsonResponse(response) {
   return contentType.includes('application/json');
 }
 
+async function readJsonLenient(response) {
+  if (!response) return null;
+
+  try {
+    if (isJsonResponse(response)) {
+      return await response.json();
+    }
+
+    const rawText = await response.text();
+    if (!rawText) return null;
+    return JSON.parse(rawText);
+  } catch {
+    return null;
+  }
+}
+
 function withCacheBust(url, enabled) {
   if (!enabled) return url;
 
@@ -44,10 +60,16 @@ export async function fetchJsonWithEmbeddedFallback(url, fallbackValue, { cache 
       }
     });
 
-    if (!response.ok || !isJsonResponse(response)) {
+    if (!response.ok) {
       return cloneJson(fallbackValue);
     }
-    return await response.json();
+
+    const payload = await readJsonLenient(response);
+    if (payload == null) {
+      return cloneJson(fallbackValue);
+    }
+
+    return payload;
   } catch {
     return cloneJson(fallbackValue);
   }

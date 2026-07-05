@@ -1,21 +1,89 @@
 {
-  "generatedAt": "2026-07-04T22:55:49.875Z",
+  "generatedAt": "2026-07-05T04:00:50.300Z",
   "overallStatus": "ok",
   "automationRuns": {
-    "generatedAt": "2026-07-04T22:55:48.929Z",
+    "generatedAt": "2026-07-05T04:00:49.408Z",
     "jobs": {
       "system-health-report": {
         "jobId": "system-health-report",
         "label": "System health report",
         "lastStatus": "ok",
-        "lastStartedAt": "2026-07-04T22:55:47.967Z",
-        "lastFinishedAt": "2026-07-04T22:55:48.927Z",
-        "lastSucceededAt": "2026-07-04T22:55:48.927Z",
+        "lastStartedAt": "2026-07-05T04:00:48.413Z",
+        "lastFinishedAt": "2026-07-05T04:00:49.405Z",
+        "lastSucceededAt": "2026-07-05T04:00:49.405Z",
         "lastFailedAt": null,
-        "lastDurationMs": 957,
+        "lastDurationMs": 990,
         "lastExitCode": 0,
         "lastError": null,
         "recentRuns": [
+          {
+            "pipeline": "images",
+            "status": "ok",
+            "startedAt": "2026-07-05T04:00:48.413Z",
+            "finishedAt": "2026-07-05T04:00:49.405Z",
+            "durationMs": 990,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/build-site-health-report.mjs",
+                "exitCode": 0,
+                "durationMs": 990,
+                "error": null
+              }
+            ]
+          },
+          {
+            "pipeline": "catalog",
+            "status": "ok",
+            "startedAt": "2026-07-05T03:06:19.121Z",
+            "finishedAt": "2026-07-05T03:06:20.021Z",
+            "durationMs": 898,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/build-site-health-report.mjs",
+                "exitCode": 0,
+                "durationMs": 898,
+                "error": null
+              }
+            ]
+          },
+          {
+            "pipeline": "pricing",
+            "status": "ok",
+            "startedAt": "2026-07-05T03:00:32.122Z",
+            "finishedAt": "2026-07-05T03:00:33.585Z",
+            "durationMs": 1461,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/build-site-health-report.mjs",
+                "exitCode": 0,
+                "durationMs": 1461,
+                "error": null
+              }
+            ]
+          },
+          {
+            "pipeline": "homepage",
+            "status": "ok",
+            "startedAt": "2026-07-05T03:00:12.394Z",
+            "finishedAt": "2026-07-05T03:00:13.474Z",
+            "durationMs": 1078,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/build-site-health-report.mjs",
+                "exitCode": 0,
+                "durationMs": 1078,
+                "error": null
+              }
+            ]
+          },
           {
             "pipeline": "health",
             "status": "ok",
@@ -51,6 +119,184 @@
             ]
           }
         ]
+      },
+      "homepage-upcoming-releases": {
+        "jobId": "homepage-upcoming-releases",
+        "label": "Homepage upcoming releases refresh",
+        "lastStatus": "ok",
+        "lastStartedAt": "2026-07-05T03:00:12.119Z",
+        "lastFinishedAt": "2026-07-05T03:00:12.391Z",
+        "lastSucceededAt": "2026-07-05T03:00:12.391Z",
+        "lastFailedAt": null,
+        "lastDurationMs": 265,
+        "lastExitCode": 0,
+        "lastError": null,
+        "recentRuns": [
+          {
+            "pipeline": "homepage",
+            "status": "ok",
+            "startedAt": "2026-07-05T03:00:12.119Z",
+            "finishedAt": "2026-07-05T03:00:12.391Z",
+            "durationMs": 265,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/run-homepage-refresh.mjs",
+                "exitCode": 0,
+                "durationMs": 265,
+                "error": null
+              }
+            ]
+          }
+        ]
+      },
+      "pricing-refresh": {
+        "jobId": "pricing-refresh",
+        "label": "Pricing refresh",
+        "lastStatus": "ok",
+        "lastStartedAt": "2026-07-05T03:00:30.690Z",
+        "lastFinishedAt": "2026-07-05T03:00:32.118Z",
+        "lastSucceededAt": "2026-07-05T03:00:32.118Z",
+        "lastFailedAt": null,
+        "lastDurationMs": 1422,
+        "lastExitCode": 0,
+        "lastError": null,
+        "recentRuns": [
+          {
+            "pipeline": "pricing",
+            "status": "ok",
+            "startedAt": "2026-07-05T03:00:30.690Z",
+            "finishedAt": "2026-07-05T03:00:32.118Z",
+            "durationMs": 1422,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/run-pricing-source-refresh.mjs",
+                "exitCode": 0,
+                "durationMs": 230,
+                "error": null
+              },
+              {
+                "command": "node scripts/build-pricing-snapshot.mjs",
+                "exitCode": 0,
+                "durationMs": 1191,
+                "error": null
+              }
+            ]
+          }
+        ]
+      },
+      "catalog-refresh": {
+        "jobId": "catalog-refresh",
+        "label": "Catalog refresh",
+        "lastStatus": "ok",
+        "lastStartedAt": "2026-07-05T03:01:12.804Z",
+        "lastFinishedAt": "2026-07-05T03:06:19.117Z",
+        "lastSucceededAt": "2026-07-05T03:06:19.117Z",
+        "lastFailedAt": null,
+        "lastDurationMs": 306307,
+        "lastExitCode": 0,
+        "lastError": null,
+        "recentRuns": [
+          {
+            "pipeline": "catalog",
+            "status": "ok",
+            "startedAt": "2026-07-05T03:01:12.804Z",
+            "finishedAt": "2026-07-05T03:06:19.117Z",
+            "durationMs": 306307,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/run-catalog-refresh.mjs",
+                "exitCode": 0,
+                "durationMs": 306306,
+                "error": null
+              }
+            ]
+          }
+        ]
+      },
+      "card-backfill-refresh": {
+        "jobId": "card-backfill-refresh",
+        "label": "Card backfill refresh",
+        "lastStatus": "failed",
+        "lastStartedAt": "2026-07-05T03:17:40.154Z",
+        "lastFinishedAt": "2026-07-05T03:28:57.195Z",
+        "lastSucceededAt": null,
+        "lastFailedAt": "2026-07-05T03:28:57.195Z",
+        "lastDurationMs": 1337385,
+        "lastExitCode": 1,
+        "lastError": "Command failed: node scripts/run-card-backfill-refresh.mjs",
+        "recentRuns": [
+          {
+            "pipeline": "cards",
+            "status": "failed",
+            "startedAt": "2026-07-05T03:06:39.807Z",
+            "finishedAt": "2026-07-05T03:28:57.195Z",
+            "durationMs": 1337385,
+            "exitCode": 1,
+            "error": "Command failed: node scripts/run-card-backfill-refresh.mjs",
+            "commands": [
+              {
+                "command": "node scripts/run-card-backfill-refresh.mjs",
+                "exitCode": 1,
+                "durationMs": 1337385,
+                "error": null
+              }
+            ]
+          },
+          {
+            "pipeline": "cards",
+            "status": "failed",
+            "startedAt": "2026-07-05T03:17:40.154Z",
+            "finishedAt": "2026-07-05T03:28:47.280Z",
+            "durationMs": 667124,
+            "exitCode": 1,
+            "error": "Command failed: node scripts/run-card-backfill-refresh.mjs",
+            "commands": [
+              {
+                "command": "node scripts/run-card-backfill-refresh.mjs",
+                "exitCode": 1,
+                "durationMs": 667124,
+                "error": null
+              }
+            ]
+          }
+        ]
+      },
+      "image-repair-sync": {
+        "jobId": "image-repair-sync",
+        "label": "Image repair and sync",
+        "lastStatus": "ok",
+        "lastStartedAt": "2026-07-05T03:57:04.472Z",
+        "lastFinishedAt": "2026-07-05T04:00:48.410Z",
+        "lastSucceededAt": "2026-07-05T04:00:48.410Z",
+        "lastFailedAt": null,
+        "lastDurationMs": 223934,
+        "lastExitCode": 0,
+        "lastError": null,
+        "recentRuns": [
+          {
+            "pipeline": "images",
+            "status": "ok",
+            "startedAt": "2026-07-05T03:57:04.472Z",
+            "finishedAt": "2026-07-05T04:00:48.410Z",
+            "durationMs": 223934,
+            "exitCode": 0,
+            "error": null,
+            "commands": [
+              {
+                "command": "node scripts/run-image-refresh.mjs",
+                "exitCode": 0,
+                "durationMs": 223934,
+                "error": null
+              }
+            ]
+          }
+        ]
       }
     }
   },
@@ -60,11 +306,11 @@
       "status": "ok",
       "file": {
         "path": "D:\\main-phase-market\\public\\data\\site\\upcoming-releases.json",
-        "size": 4246,
-        "modifiedAt": "2026-07-03T03:21:06.869Z"
+        "size": 1112,
+        "modifiedAt": "2026-07-05T03:00:12.345Z"
       },
-      "modifiedHoursAgo": 43.58,
-      "releaseCount": 12,
+      "modifiedHoursAgo": 1.01,
+      "releaseCount": 3,
       "diagnostics": [
         "Homepage feed is current."
       ],
@@ -74,27 +320,123 @@
           "system-health-report"
         ],
         "totalJobs": 2,
-        "missingJobs": 1,
+        "missingJobs": 0,
         "failedJobs": 0,
         "runningJobs": 0,
-        "lastSuccessfulRunAt": "2026-07-04T22:55:48.927Z",
+        "lastSuccessfulRunAt": "2026-07-05T04:00:49.405Z",
         "lastFailedRunAt": null,
         "jobs": [
           {
-            "jobId": "homepage-upcoming-releases"
+            "jobId": "homepage-upcoming-releases",
+            "label": "Homepage upcoming releases refresh",
+            "lastStatus": "ok",
+            "lastStartedAt": "2026-07-05T03:00:12.119Z",
+            "lastFinishedAt": "2026-07-05T03:00:12.391Z",
+            "lastSucceededAt": "2026-07-05T03:00:12.391Z",
+            "lastFailedAt": null,
+            "lastDurationMs": 265,
+            "lastExitCode": 0,
+            "lastError": null,
+            "recentRuns": [
+              {
+                "pipeline": "homepage",
+                "status": "ok",
+                "startedAt": "2026-07-05T03:00:12.119Z",
+                "finishedAt": "2026-07-05T03:00:12.391Z",
+                "durationMs": 265,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/run-homepage-refresh.mjs",
+                    "exitCode": 0,
+                    "durationMs": 265,
+                    "error": null
+                  }
+                ]
+              }
+            ]
           },
           {
             "jobId": "system-health-report",
             "label": "System health report",
             "lastStatus": "ok",
-            "lastStartedAt": "2026-07-04T22:55:47.967Z",
-            "lastFinishedAt": "2026-07-04T22:55:48.927Z",
-            "lastSucceededAt": "2026-07-04T22:55:48.927Z",
+            "lastStartedAt": "2026-07-05T04:00:48.413Z",
+            "lastFinishedAt": "2026-07-05T04:00:49.405Z",
+            "lastSucceededAt": "2026-07-05T04:00:49.405Z",
             "lastFailedAt": null,
-            "lastDurationMs": 957,
+            "lastDurationMs": 990,
             "lastExitCode": 0,
             "lastError": null,
             "recentRuns": [
+              {
+                "pipeline": "images",
+                "status": "ok",
+                "startedAt": "2026-07-05T04:00:48.413Z",
+                "finishedAt": "2026-07-05T04:00:49.405Z",
+                "durationMs": 990,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 990,
+                    "error": null
+                  }
+                ]
+              },
+              {
+                "pipeline": "catalog",
+                "status": "ok",
+                "startedAt": "2026-07-05T03:06:19.121Z",
+                "finishedAt": "2026-07-05T03:06:20.021Z",
+                "durationMs": 898,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 898,
+                    "error": null
+                  }
+                ]
+              },
+              {
+                "pipeline": "pricing",
+                "status": "ok",
+                "startedAt": "2026-07-05T03:00:32.122Z",
+                "finishedAt": "2026-07-05T03:00:33.585Z",
+                "durationMs": 1461,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 1461,
+                    "error": null
+                  }
+                ]
+              },
+              {
+                "pipeline": "homepage",
+                "status": "ok",
+                "startedAt": "2026-07-05T03:00:12.394Z",
+                "finishedAt": "2026-07-05T03:00:13.474Z",
+                "durationMs": 1078,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 1078,
+                    "error": null
+                  }
+                ]
+              },
               {
                 "pipeline": "health",
                 "status": "ok",
@@ -158,7 +500,7 @@
             "file": {
               "path": "D:\\main-phase-market\\public\\data\\mtg\\manifest.json",
               "size": 2488,
-              "modifiedAt": "2026-07-03T03:26:32.922Z"
+              "modifiedAt": "2026-07-05T03:06:10.892Z"
             },
             "count": 504891
           },
@@ -166,11 +508,11 @@
             "file": {
               "path": "D:\\main-phase-market\\public\\data\\mtg\\sets.json",
               "size": 73095,
-              "modifiedAt": "2026-07-03T03:26:32.924Z"
+              "modifiedAt": "2026-07-05T03:06:10.894Z"
             },
             "count": 618
           },
-          "modifiedHoursAgo": 43.49,
+          "modifiedHoursAgo": 0.91,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -196,12 +538,12 @@
           "sets": {
             "file": {
               "path": "D:\\main-phase-market\\public\\data\\pokemon\\sets.json",
-              "size": 118835,
-              "modifiedAt": "2026-07-03T03:26:36.831Z"
+              "size": 119327,
+              "modifiedAt": "2026-07-05T03:06:15.249Z"
             },
-            "count": 360
+            "count": 361
           },
-          "modifiedHoursAgo": 31.95,
+          "modifiedHoursAgo": 37.04,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -226,11 +568,11 @@
             "file": {
               "path": "D:\\main-phase-market\\public\\data\\yugioh\\sets.json",
               "size": 206618,
-              "modifiedAt": "2026-07-03T03:26:38.660Z"
+              "modifiedAt": "2026-07-05T03:06:17.286Z"
             },
             "count": 1020
           },
-          "modifiedHoursAgo": 25.52,
+          "modifiedHoursAgo": 30.61,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -255,11 +597,11 @@
             "file": {
               "path": "D:\\main-phase-market\\public\\data\\onepiece\\sets.json",
               "size": 4087,
-              "modifiedAt": "2026-07-03T03:26:37.643Z"
+              "modifiedAt": "2026-07-05T03:06:16.109Z"
             },
             "count": 43
           },
-          "modifiedHoursAgo": 25.52,
+          "modifiedHoursAgo": 30.61,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -283,12 +625,12 @@
           "sets": {
             "file": {
               "path": "D:\\main-phase-market\\public\\data\\lorcana\\sets.json",
-              "size": 1684,
-              "modifiedAt": "2026-07-03T03:26:35.589Z"
+              "size": 1994,
+              "modifiedAt": "2026-07-05T03:06:13.724Z"
             },
-            "count": 17
+            "count": 20
           },
-          "modifiedHoursAgo": 25.51,
+          "modifiedHoursAgo": 30.6,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -313,11 +655,11 @@
             "file": {
               "path": "D:\\main-phase-market\\public\\data\\fab\\sets.json",
               "size": 45148,
-              "modifiedAt": "2026-07-03T03:26:34.552Z"
+              "modifiedAt": "2026-07-05T03:06:12.721Z"
             },
             "count": 118
           },
-          "modifiedHoursAgo": 25.51,
+          "modifiedHoursAgo": 30.59,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -342,11 +684,11 @@
             "file": {
               "path": "D:\\main-phase-market\\public\\data\\starwars\\sets.json",
               "size": 7317,
-              "modifiedAt": "2026-07-03T03:26:40.340Z"
+              "modifiedAt": "2026-07-05T03:06:19.049Z"
             },
             "count": 28
           },
-          "modifiedHoursAgo": 25.52,
+          "modifiedHoursAgo": 30.6,
           "diagnostics": [
             "Catalog output is current."
           ]
@@ -358,17 +700,90 @@
           "catalog-refresh"
         ],
         "totalJobs": 2,
-        "missingJobs": 2,
-        "failedJobs": 0,
+        "missingJobs": 0,
+        "failedJobs": 1,
         "runningJobs": 0,
-        "lastSuccessfulRunAt": null,
-        "lastFailedRunAt": null,
+        "lastSuccessfulRunAt": "2026-07-05T03:06:19.117Z",
+        "lastFailedRunAt": "2026-07-05T03:28:57.195Z",
         "jobs": [
           {
-            "jobId": "card-backfill-refresh"
+            "jobId": "card-backfill-refresh",
+            "label": "Card backfill refresh",
+            "lastStatus": "failed",
+            "lastStartedAt": "2026-07-05T03:17:40.154Z",
+            "lastFinishedAt": "2026-07-05T03:28:57.195Z",
+            "lastSucceededAt": null,
+            "lastFailedAt": "2026-07-05T03:28:57.195Z",
+            "lastDurationMs": 1337385,
+            "lastExitCode": 1,
+            "lastError": "Command failed: node scripts/run-card-backfill-refresh.mjs",
+            "recentRuns": [
+              {
+                "pipeline": "cards",
+                "status": "failed",
+                "startedAt": "2026-07-05T03:06:39.807Z",
+                "finishedAt": "2026-07-05T03:28:57.195Z",
+                "durationMs": 1337385,
+                "exitCode": 1,
+                "error": "Command failed: node scripts/run-card-backfill-refresh.mjs",
+                "commands": [
+                  {
+                    "command": "node scripts/run-card-backfill-refresh.mjs",
+                    "exitCode": 1,
+                    "durationMs": 1337385,
+                    "error": null
+                  }
+                ]
+              },
+              {
+                "pipeline": "cards",
+                "status": "failed",
+                "startedAt": "2026-07-05T03:17:40.154Z",
+                "finishedAt": "2026-07-05T03:28:47.280Z",
+                "durationMs": 667124,
+                "exitCode": 1,
+                "error": "Command failed: node scripts/run-card-backfill-refresh.mjs",
+                "commands": [
+                  {
+                    "command": "node scripts/run-card-backfill-refresh.mjs",
+                    "exitCode": 1,
+                    "durationMs": 667124,
+                    "error": null
+                  }
+                ]
+              }
+            ]
           },
           {
-            "jobId": "catalog-refresh"
+            "jobId": "catalog-refresh",
+            "label": "Catalog refresh",
+            "lastStatus": "ok",
+            "lastStartedAt": "2026-07-05T03:01:12.804Z",
+            "lastFinishedAt": "2026-07-05T03:06:19.117Z",
+            "lastSucceededAt": "2026-07-05T03:06:19.117Z",
+            "lastFailedAt": null,
+            "lastDurationMs": 306307,
+            "lastExitCode": 0,
+            "lastError": null,
+            "recentRuns": [
+              {
+                "pipeline": "catalog",
+                "status": "ok",
+                "startedAt": "2026-07-05T03:01:12.804Z",
+                "finishedAt": "2026-07-05T03:06:19.117Z",
+                "durationMs": 306307,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/run-catalog-refresh.mjs",
+                    "exitCode": 0,
+                    "durationMs": 306306,
+                    "error": null
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -395,20 +810,20 @@
           },
           "file": {
             "path": "D:\\main-phase-market\\public\\data\\mtg\\images\\mirror-manifest.json",
-            "size": 342,
-            "modifiedAt": "2026-07-03T14:35:02.561Z"
+            "size": 345,
+            "modifiedAt": "2026-07-05T04:00:19.557Z"
           },
-          "modifiedHoursAgo": 32.35,
+          "modifiedHoursAgo": 0.01,
           "cardsSeen": 517253,
-          "downloaded": 250,
-          "skippedExisting": 4122,
-          "missingSourceUrl": 0,
-          "failed": 0,
+          "downloaded": 4998,
+          "skippedExisting": 6871,
+          "missingSourceUrl": 6,
+          "failed": 2,
           "upstream404": 0,
           "upstream403": 0,
           "unexpectedFailures": 0,
           "diagnostics": [
-            "Image mirror output is current."
+            "Known image fetch failures recorded: 2."
           ]
         },
         {
@@ -424,9 +839,9 @@
           "file": {
             "path": "D:\\main-phase-market\\public\\data\\pokemon\\images\\mirror-manifest.json",
             "size": 404,
-            "modifiedAt": "2026-07-04T01:38:01.361Z"
+            "modifiedAt": "2026-07-05T04:00:36.462Z"
           },
-          "modifiedHoursAgo": 21.3,
+          "modifiedHoursAgo": 0,
           "cardsSeen": 20437,
           "downloaded": 0,
           "skippedExisting": 40051,
@@ -449,13 +864,13 @@
           },
           "file": {
             "path": "D:\\main-phase-market\\public\\data\\yugioh\\images\\mirror-manifest.json",
-            "size": 308,
-            "modifiedAt": "2026-07-03T21:25:56.515Z"
+            "size": 304,
+            "modifiedAt": "2026-07-05T04:00:44.961Z"
           },
-          "modifiedHoursAgo": 25.5,
+          "modifiedHoursAgo": 0,
           "cardsSeen": 14422,
-          "downloaded": 402,
-          "skippedExisting": 28442,
+          "downloaded": 0,
+          "skippedExisting": 28844,
           "missingSourceUrl": 0,
           "failed": 0,
           "upstream404": 0,
@@ -476,9 +891,9 @@
           "file": {
             "path": "D:\\main-phase-market\\public\\data\\onepiece\\images\\mirror-manifest.json",
             "size": 262,
-            "modifiedAt": "2026-07-03T21:25:57.424Z"
+            "modifiedAt": "2026-07-05T04:00:37.865Z"
           },
-          "modifiedHoursAgo": 25.5,
+          "modifiedHoursAgo": 0,
           "cardsSeen": 1996,
           "downloaded": 0,
           "skippedExisting": 1996,
@@ -501,13 +916,13 @@
           },
           "file": {
             "path": "D:\\main-phase-market\\public\\data\\lorcana\\images\\mirror-manifest.json",
-            "size": 309,
-            "modifiedAt": "2026-07-03T21:26:01.972Z"
+            "size": 305,
+            "modifiedAt": "2026-07-05T04:00:25.809Z"
           },
-          "modifiedHoursAgo": 25.5,
+          "modifiedHoursAgo": 0.01,
           "cardsSeen": 3054,
-          "downloaded": 804,
-          "skippedExisting": 5300,
+          "downloaded": 0,
+          "skippedExisting": 6104,
           "missingSourceUrl": 4,
           "failed": 0,
           "upstream404": 0,
@@ -528,9 +943,9 @@
           "file": {
             "path": "D:\\main-phase-market\\public\\data\\fab\\images\\mirror-manifest.json",
             "size": 327,
-            "modifiedAt": "2026-07-04T01:38:04.253Z"
+            "modifiedAt": "2026-07-05T04:00:23.639Z"
           },
-          "modifiedHoursAgo": 21.3,
+          "modifiedHoursAgo": 0.01,
           "cardsSeen": 4862,
           "downloaded": 0,
           "skippedExisting": 4852,
@@ -553,13 +968,13 @@
           },
           "file": {
             "path": "D:\\main-phase-market\\public\\data\\starwars\\images\\mirror-manifest.json",
-            "size": 296,
-            "modifiedAt": "2026-07-03T21:26:44.171Z"
+            "size": 290,
+            "modifiedAt": "2026-07-05T04:00:48.344Z"
           },
-          "modifiedHoursAgo": 25.48,
+          "modifiedHoursAgo": 0,
           "cardsSeen": 9057,
-          "downloaded": 1132,
-          "skippedExisting": 8378,
+          "downloaded": 0,
+          "skippedExisting": 9510,
           "missingSourceUrl": 0,
           "failed": 0,
           "upstream404": 0,
@@ -575,14 +990,42 @@
           "image-repair-sync"
         ],
         "totalJobs": 1,
-        "missingJobs": 1,
+        "missingJobs": 0,
         "failedJobs": 0,
         "runningJobs": 0,
-        "lastSuccessfulRunAt": null,
+        "lastSuccessfulRunAt": "2026-07-05T04:00:48.410Z",
         "lastFailedRunAt": null,
         "jobs": [
           {
-            "jobId": "image-repair-sync"
+            "jobId": "image-repair-sync",
+            "label": "Image repair and sync",
+            "lastStatus": "ok",
+            "lastStartedAt": "2026-07-05T03:57:04.472Z",
+            "lastFinishedAt": "2026-07-05T04:00:48.410Z",
+            "lastSucceededAt": "2026-07-05T04:00:48.410Z",
+            "lastFailedAt": null,
+            "lastDurationMs": 223934,
+            "lastExitCode": 0,
+            "lastError": null,
+            "recentRuns": [
+              {
+                "pipeline": "images",
+                "status": "ok",
+                "startedAt": "2026-07-05T03:57:04.472Z",
+                "finishedAt": "2026-07-05T04:00:48.410Z",
+                "durationMs": 223934,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/run-image-refresh.mjs",
+                    "exitCode": 0,
+                    "durationMs": 223934,
+                    "error": null
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -594,9 +1037,9 @@
         "file": {
           "path": "D:\\main-phase-market\\public\\data\\site\\pricing-snapshot.json",
           "size": 5123,
-          "modifiedAt": "2026-07-03T21:27:28.034Z"
+          "modifiedAt": "2026-07-05T03:00:32.041Z"
         },
-        "modifiedHoursAgo": 25.47,
+        "modifiedHoursAgo": 1.01,
         "status": "merged-source-snapshots",
         "sourceSnapshots": {
           "cardkingdom": 4,
@@ -612,9 +1055,9 @@
           "file": {
             "path": "D:\\main-phase-market\\public\\data\\site\\pricing-sources\\cardkingdom.json",
             "size": 951,
-            "modifiedAt": "2026-07-03T21:27:27.299Z"
+            "modifiedAt": "2026-07-05T03:00:30.901Z"
           },
-          "modifiedHoursAgo": 25.47,
+          "modifiedHoursAgo": 1.01,
           "rows": 4,
           "diagnostics": [
             "Pricing source snapshot is current."
@@ -626,9 +1069,9 @@
           "file": {
             "path": "D:\\main-phase-market\\public\\data\\site\\pricing-sources\\tcgplayer.json",
             "size": 953,
-            "modifiedAt": "2026-07-03T21:27:27.302Z"
+            "modifiedAt": "2026-07-05T03:00:30.904Z"
           },
-          "modifiedHoursAgo": 25.47,
+          "modifiedHoursAgo": 1.01,
           "rows": 4,
           "diagnostics": [
             "Pricing source snapshot is current."
@@ -640,9 +1083,9 @@
           "file": {
             "path": "D:\\main-phase-market\\public\\data\\site\\pricing-sources\\starcitygames.json",
             "size": 953,
-            "modifiedAt": "2026-07-03T21:27:27.306Z"
+            "modifiedAt": "2026-07-05T03:00:30.908Z"
           },
-          "modifiedHoursAgo": 25.47,
+          "modifiedHoursAgo": 1.01,
           "rows": 4,
           "diagnostics": [
             "Pricing source snapshot is current."
@@ -666,14 +1109,48 @@
           "pricing-refresh"
         ],
         "totalJobs": 1,
-        "missingJobs": 1,
+        "missingJobs": 0,
         "failedJobs": 0,
         "runningJobs": 0,
-        "lastSuccessfulRunAt": null,
+        "lastSuccessfulRunAt": "2026-07-05T03:00:32.118Z",
         "lastFailedRunAt": null,
         "jobs": [
           {
-            "jobId": "pricing-refresh"
+            "jobId": "pricing-refresh",
+            "label": "Pricing refresh",
+            "lastStatus": "ok",
+            "lastStartedAt": "2026-07-05T03:00:30.690Z",
+            "lastFinishedAt": "2026-07-05T03:00:32.118Z",
+            "lastSucceededAt": "2026-07-05T03:00:32.118Z",
+            "lastFailedAt": null,
+            "lastDurationMs": 1422,
+            "lastExitCode": 0,
+            "lastError": null,
+            "recentRuns": [
+              {
+                "pipeline": "pricing",
+                "status": "ok",
+                "startedAt": "2026-07-05T03:00:30.690Z",
+                "finishedAt": "2026-07-05T03:00:32.118Z",
+                "durationMs": 1422,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/run-pricing-source-refresh.mjs",
+                    "exitCode": 0,
+                    "durationMs": 230,
+                    "error": null
+                  },
+                  {
+                    "command": "node scripts/build-pricing-snapshot.mjs",
+                    "exitCode": 0,
+                    "durationMs": 1191,
+                    "error": null
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -714,7 +1191,7 @@
             "exists": true
           },
           "cardsCount": 20225,
-          "setsCount": 360,
+          "setsCount": 361,
           "imageCardsSeen": 20437,
           "catalogStatus": "ok",
           "imageStatus": "ok"
@@ -762,7 +1239,7 @@
             "url": "https://api.lorcast.com/v0/cards/search"
           },
           "cardsCount": 3054,
-          "setsCount": 17,
+          "setsCount": 20,
           "imageCardsSeen": 3054,
           "catalogStatus": "ok",
           "imageStatus": "ok"
@@ -808,21 +1285,89 @@
         "missingJobs": 0,
         "failedJobs": 0,
         "runningJobs": 0,
-        "lastSuccessfulRunAt": "2026-07-04T22:55:48.927Z",
+        "lastSuccessfulRunAt": "2026-07-05T04:00:49.405Z",
         "lastFailedRunAt": null,
         "jobs": [
           {
             "jobId": "system-health-report",
             "label": "System health report",
             "lastStatus": "ok",
-            "lastStartedAt": "2026-07-04T22:55:47.967Z",
-            "lastFinishedAt": "2026-07-04T22:55:48.927Z",
-            "lastSucceededAt": "2026-07-04T22:55:48.927Z",
+            "lastStartedAt": "2026-07-05T04:00:48.413Z",
+            "lastFinishedAt": "2026-07-05T04:00:49.405Z",
+            "lastSucceededAt": "2026-07-05T04:00:49.405Z",
             "lastFailedAt": null,
-            "lastDurationMs": 957,
+            "lastDurationMs": 990,
             "lastExitCode": 0,
             "lastError": null,
             "recentRuns": [
+              {
+                "pipeline": "images",
+                "status": "ok",
+                "startedAt": "2026-07-05T04:00:48.413Z",
+                "finishedAt": "2026-07-05T04:00:49.405Z",
+                "durationMs": 990,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 990,
+                    "error": null
+                  }
+                ]
+              },
+              {
+                "pipeline": "catalog",
+                "status": "ok",
+                "startedAt": "2026-07-05T03:06:19.121Z",
+                "finishedAt": "2026-07-05T03:06:20.021Z",
+                "durationMs": 898,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 898,
+                    "error": null
+                  }
+                ]
+              },
+              {
+                "pipeline": "pricing",
+                "status": "ok",
+                "startedAt": "2026-07-05T03:00:32.122Z",
+                "finishedAt": "2026-07-05T03:00:33.585Z",
+                "durationMs": 1461,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 1461,
+                    "error": null
+                  }
+                ]
+              },
+              {
+                "pipeline": "homepage",
+                "status": "ok",
+                "startedAt": "2026-07-05T03:00:12.394Z",
+                "finishedAt": "2026-07-05T03:00:13.474Z",
+                "durationMs": 1078,
+                "exitCode": 0,
+                "error": null,
+                "commands": [
+                  {
+                    "command": "node scripts/build-site-health-report.mjs",
+                    "exitCode": 0,
+                    "durationMs": 1078,
+                    "error": null
+                  }
+                ]
+              },
               {
                 "pipeline": "health",
                 "status": "ok",
