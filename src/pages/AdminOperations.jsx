@@ -1119,24 +1119,35 @@ function BridgeReadinessCard({ controlStatus }) {
   const expectedEndpoints = Array.isArray(bridge.expectedEndpoints) ? bridge.expectedEndpoints : [];
   const nextSteps = Array.isArray(bridge.nextSteps) ? bridge.nextSteps : [];
   const checks = Array.isArray(bridge.checks) ? bridge.checks : [];
-  const activationContract = [
+  const fallbackActivationContract = [
     {
+      id: 'backend-host',
       label: 'Backend host',
-      value: 'Render service running npm run ops:serve'
+      value: 'Render service running npm run ops:serve',
+      proof: '/api/local/health returns ok'
     },
     {
+      id: 'cloudflare-origin',
       label: 'Cloudflare Pages',
-      value: 'VITE_API_ORIGIN=https://<render-service>.onrender.com'
+      value: 'VITE_API_ORIGIN=https://<render-service>.onrender.com',
+      proof: 'Hosted Admin Operations can reach /api/local/admin/automation/control-status'
     },
     {
+      id: 'backend-env',
       label: 'Backend env',
-      value: 'ALLOW_REMOTE_CONNECTIONS=true, PUBLIC_APP_URL=https://mainphasemarket.net'
+      value: 'ALLOW_REMOTE_CONNECTIONS=true, PUBLIC_APP_URL=https://mainphasemarket.net',
+      proof: 'Remote bridge readiness check reports remote connections ok'
     },
     {
+      id: 'admin-proof',
       label: 'Proof command',
-      value: 'npm run ops:check -- --origin https://<render-service>.onrender.com --token <admin-token>'
+      value: 'npm run ops:check -- --origin https://<render-service>.onrender.com --token <admin-token>',
+      proof: 'health ok and automation controls available'
     }
   ];
+  const activationContract = Array.isArray(bridge.activationContract) && bridge.activationContract.length > 0
+    ? bridge.activationContract
+    : fallbackActivationContract;
 
   return (
     <Card className={controlsAvailable ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'}>
@@ -1202,9 +1213,14 @@ function BridgeReadinessCard({ controlStatus }) {
               </div>
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 {activationContract.map((item) => (
-                  <div key={item.label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div key={item.id || item.label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
                     <p className="mt-1 break-all font-mono text-xs text-slate-700">{item.value}</p>
+                    {item.proof ? (
+                      <p className="mt-2 text-xs text-slate-500">
+                        <span className="font-semibold text-slate-600">Proof:</span> {item.proof}
+                      </p>
+                    ) : null}
                   </div>
                 ))}
               </div>

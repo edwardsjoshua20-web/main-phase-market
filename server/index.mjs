@@ -1235,6 +1235,37 @@ function buildAutomationPreflight(jobId) {
   };
 }
 
+function buildOpsBridgeActivationContract() {
+  const expectedOrigin = getEnvValue('PUBLIC_APP_URL') || 'https://mainphasemarket.net';
+
+  return [
+    {
+      id: 'backend-host',
+      label: 'Backend host',
+      value: 'Render service running npm run ops:serve',
+      proof: '/api/local/health returns ok'
+    },
+    {
+      id: 'cloudflare-origin',
+      label: 'Cloudflare Pages',
+      value: 'VITE_API_ORIGIN=https://<render-service>.onrender.com',
+      proof: 'Hosted Admin Operations can reach /api/local/admin/automation/control-status'
+    },
+    {
+      id: 'backend-env',
+      label: 'Backend env',
+      value: `ALLOW_REMOTE_CONNECTIONS=true, PUBLIC_APP_URL=${expectedOrigin}`,
+      proof: 'Remote bridge readiness check reports remote connections ok'
+    },
+    {
+      id: 'admin-proof',
+      label: 'Proof command',
+      value: 'npm run ops:check -- --origin https://<render-service>.onrender.com --token <admin-token>',
+      proof: 'health ok and automation controls available'
+    }
+  ];
+}
+
 function buildOpsBridgeReadiness() {
   const systemHealthPath = path.join(SITE_DATA_ROOT, 'system-health.json');
   const allowedHosts = [...allowedOriginHosts].sort();
@@ -1364,6 +1395,7 @@ function buildOpsBridgeReadiness() {
     remoteConnectionsEnabled,
     allowedOriginHosts: allowedHosts,
     publicAppUrl: publicAppUrl || null,
+    activationContract: buildOpsBridgeActivationContract(),
     expectedCloudflareVariable: 'VITE_API_ORIGIN',
     expectedEndpoints: [
       '/api/local/health',
