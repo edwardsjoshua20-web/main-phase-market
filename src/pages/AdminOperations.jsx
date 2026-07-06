@@ -1339,6 +1339,50 @@ function BridgeReadinessCard({ controlStatus }) {
   );
 }
 
+function DashboardAreaBoardCard({ areas }) {
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-slate-100 p-2.5">
+              <ListChecks className="h-5 w-5 text-slate-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Operations area board</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                The named business surfaces behind the top-level status counters.
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={areas.some((area) => area.status !== 'ok') ? 'degraded' : 'ok'} />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {areas.map((area) => (
+            <div key={area.id} className="rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-900">{area.label}</p>
+                  <p className="mt-1 text-xs uppercase tracking-wide text-gray-500">Owner: {area.owner}</p>
+                </div>
+                <StatusBadge status={area.status} />
+              </div>
+              <p className="mt-3 text-sm text-gray-600">
+                <span className="font-medium text-gray-800">Evidence:</span> {area.evidence}
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                <span className="font-medium text-gray-800">Next step:</span> {area.nextStep}
+              </p>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ActionCenterCard({ systemHealth, sections, automationRuns, controlStatus }) {
   const items = useMemo(() => buildActionItems(systemHealth, sections, automationRuns), [systemHealth, sections, automationRuns]);
 
@@ -2663,20 +2707,136 @@ export default function AdminOperations() {
         : automationSummary.missing > 0
           ? 'missing'
           : 'ok';
+    const incidentQueueStatus = deriveIncidentQueueStatus(operationIncidents);
+    const serviceLevelStatus = deriveServiceLevelStatus(serviceLevelRows);
+    const launchReadinessStatus = deriveLaunchReadinessStatus(launchReadiness);
+    const sourceGovernanceStatus = deriveSourceGovernanceStatus(sourceGovernanceRows);
+    const dataContractsStatus = deriveDataContractsStatus(dataContractRows);
+    const bridgeReadinessStatus = summarizeBridgeStatuses(getBridgeChecks(controlStatus).map((check) => check.status));
+    const controlPlaneStatus = deriveControlPlaneStatus(controlPlaneRows);
+    const capabilityConfidenceStatus = deriveCapabilityConfidenceStatus(capabilityConfidenceRows);
+    const recoveryPlaybookStatus = deriveRecoveryPlaybookStatus(recoveryPlaybook);
+    const pipelineControlsStatus = derivePipelineControlsStatus(controlStatus);
+
     return [
-      { id: 'automation-registry', label: 'Automation registry', status: deriveAreaStatus(sectionStatuses, automationSummary) },
-      { id: 'pipeline-run-history', label: 'Pipeline run history', status: deriveAutomationHistoryStatus(automationSummary) },
-      { id: 'operations-incident-queue', label: 'Operations incident queue', status: deriveIncidentQueueStatus(operationIncidents) },
-      { id: 'automation-sla-board', label: 'Automation SLA board', status: deriveServiceLevelStatus(serviceLevelRows) },
-      { id: 'launch-readiness-matrix', label: 'Launch readiness matrix', status: deriveLaunchReadinessStatus(launchReadiness) },
-      { id: 'source-governance', label: 'Source governance', status: deriveSourceGovernanceStatus(sourceGovernanceRows) },
-      { id: 'data-contracts-lineage', label: 'Data contracts and lineage', status: deriveDataContractsStatus(dataContractRows) },
-      { id: 'operations-bridge-readiness', label: 'Operations bridge readiness', status: summarizeBridgeStatuses(getBridgeChecks(controlStatus).map((check) => check.status)) },
-      { id: 'operations-control-plane', label: 'Operations control plane', status: deriveControlPlaneStatus(controlPlaneRows) },
-      { id: 'runner-audit-timeline', label: 'Runner audit timeline', status: runnerAuditSummary.status },
-      { id: 'business-capability-confidence', label: 'Business capability confidence', status: deriveCapabilityConfidenceStatus(capabilityConfidenceRows) },
-      { id: 'recovery-playbook', label: 'Recovery playbook', status: deriveRecoveryPlaybookStatus(recoveryPlaybook) },
-      { id: 'pipeline-controls', label: 'Pipeline controls', status: derivePipelineControlsStatus(controlStatus) }
+      {
+        id: 'automation-registry',
+        label: 'Automation registry',
+        owner: 'operations',
+        status: deriveAreaStatus(sectionStatuses, automationSummary),
+        evidence: `${siteAutomationRegistry.length} declared automation jobs are registered in the system.`,
+        nextStep: 'Keep registry ownership, cadence, and output contracts aligned with the real pipeline stack.'
+      },
+      {
+        id: 'pipeline-run-history',
+        label: 'Pipeline run history',
+        owner: 'operations',
+        status: deriveAutomationHistoryStatus(automationSummary),
+        evidence: `${automationSummary.ok} healthy, ${automationSummary.failed} failed, ${automationSummary.running} running, ${automationSummary.missing} with no recorded run yet.`,
+        nextStep: 'Use fresh run history as the source of truth before trusting manual reruns or scheduler decisions.'
+      },
+      {
+        id: 'operations-incident-queue',
+        label: 'Operations incident queue',
+        owner: 'operations',
+        status: incidentQueueStatus,
+        evidence: operationIncidents.length > 0
+          ? `${operationIncidents.length} incident${operationIncidents.length === 1 ? '' : 's'} are currently open.`
+          : 'No active incidents are blocking the operations surface right now.',
+        nextStep: operationIncidents[0]?.fix || 'Stay on normal watch and let routine cadence keep the system green.'
+      },
+      {
+        id: 'automation-sla-board',
+        label: 'Automation SLA board',
+        owner: 'operations',
+        status: serviceLevelStatus,
+        evidence: `${serviceLevelRows.filter((row) => row.status === 'ok').length}/${serviceLevelRows.length} automation jobs are currently inside their freshness target.`,
+        nextStep: 'Use cadence freshness and overdue evidence to decide what must run next.'
+      },
+      {
+        id: 'launch-readiness-matrix',
+        label: 'Launch readiness matrix',
+        owner: 'operations',
+        status: launchReadinessStatus,
+        evidence: launchReadiness.atRiskCapabilities.length > 0
+          ? `At-risk capabilities: ${launchReadiness.atRiskCapabilities.join(', ')}.`
+          : 'All tracked launch capabilities are currently green.',
+        nextStep: `Restore ${launchReadiness.topRisk || 'core pipeline health'} first when launch trust drops.`
+      },
+      {
+        id: 'source-governance',
+        label: 'Source governance',
+        owner: 'catalog',
+        status: sourceGovernanceStatus,
+        evidence: `${sourceGovernanceRows.filter((row) => row.status === 'ok').length}/${sourceGovernanceRows.length} source feeds are operational.`,
+        nextStep: 'Repair missing or drifting upstream feeds before rerunning dependent catalog/image/pricing jobs.'
+      },
+      {
+        id: 'data-contracts-lineage',
+        label: 'Data contracts and lineage',
+        owner: 'operations',
+        status: dataContractsStatus,
+        evidence: `${dataContractRows.filter((row) => String(row.status || '').toLowerCase() === 'ok').length}/${dataContractRows.length} producer contracts are backed by a healthy latest run.`,
+        nextStep: 'Keep ownership and downstream consumers honest so each output file has a clear producer.'
+      },
+      {
+        id: 'operations-bridge-readiness',
+        label: 'Operations bridge readiness',
+        owner: 'operations',
+        status: bridgeReadinessStatus,
+        evidence: `${getBridgeChecks(controlStatus).filter((check) => String(check.status || '').toLowerCase() === 'ok').length}/${getBridgeChecks(controlStatus).length} backend bridge readiness checks are green.`,
+        nextStep: controlStatus?.available
+          ? 'Keep the hosted bridge reachable and its backend checks green.'
+          : 'Host/connect the operations backend bridge and wire VITE_API_ORIGIN.'
+      },
+      {
+        id: 'operations-control-plane',
+        label: 'Operations control plane',
+        owner: 'operations',
+        status: controlPlaneStatus,
+        evidence: `${controlPlaneRows.filter((row) => row.status === 'ok').length}/${controlPlaneRows.length} control-plane surfaces are currently green.`,
+        nextStep: 'Clear any degraded control-plane surface before calling the dashboard truly command-ready.'
+      },
+      {
+        id: 'runner-audit-timeline',
+        label: 'Runner audit timeline',
+        owner: 'operations',
+        status: runnerAuditSummary.status,
+        evidence: runnerAuditSummary.entries.length > 0
+          ? `${runnerAuditSummary.entries.length} audit entr${runnerAuditSummary.entries.length === 1 ? 'y' : 'ies'} captured; latest status is ${runnerAuditSummary.latestStatus || 'unknown'}.`
+          : 'No visible runner audit trail has been captured yet.',
+        nextStep: 'Keep audit history visible enough that manual and scheduled execution can be trusted after the fact.'
+      },
+      {
+        id: 'business-capability-confidence',
+        label: 'Business capability confidence',
+        owner: 'operations',
+        status: capabilityConfidenceStatus,
+        evidence: `${capabilityConfidenceRows.filter((row) => row.status === 'ok').length}/${capabilityConfidenceRows.length} business capabilities are currently trusted.`,
+        nextStep: 'Treat any unproven capability as a launch risk until its sources, jobs, and proof lines are green.'
+      },
+      {
+        id: 'recovery-playbook',
+        label: 'Recovery playbook',
+        owner: 'operations',
+        status: recoveryPlaybookStatus,
+        evidence: recoveryPlaybook.incidentCount > 0
+          ? `${recoveryPlaybook.incidentCount} incident${recoveryPlaybook.incidentCount === 1 ? '' : 's'} currently shape the recovery order.`
+          : 'No recovery sequence is actively needed right now.',
+        nextStep: recoveryPlaybook.steps[0] || 'Keep the recovery order current as the control plane evolves.'
+      },
+      {
+        id: 'pipeline-controls',
+        label: 'Pipeline controls',
+        owner: 'operations',
+        status: pipelineControlsStatus,
+        evidence: controlStatus?.available
+          ? 'Hosted admin can reach the runner surface and evaluate dependency-safe manual runs.'
+          : 'Hosted admin is still read-only until the backend bridge is connected.',
+        nextStep: controlStatus?.available
+          ? 'Use dependency preflight and locks to keep manual runs disciplined.'
+          : 'Finish wiring the hosted runner bridge before expecting manual controls to work.'
+      }
     ];
   }, [
     sections,
@@ -2799,6 +2959,8 @@ export default function AdminOperations() {
           <StatsCard title="Missing Areas" value={summary.missing} icon={ServerCrash} color="red" />
         </div>
 
+        <DashboardAreaBoardCard areas={dashboardAreas} />
+
         {healthQuery.isError && (
           <Card className="border-amber-200 bg-amber-50">
             <CardContent className="flex flex-col gap-3 p-5 md:flex-row md:items-start md:justify-between">
@@ -2826,7 +2988,7 @@ export default function AdminOperations() {
                 <CardTitle className="text-xl text-gray-900">Automation registry</CardTitle>
                 <p className="text-sm text-gray-500 mt-1">These are the declared pipeline families currently registered in the system.</p>
               </div>
-              <StatusBadge status={summary.topStatus} />
+              <StatusBadge status={summary.automationAreaStatus} />
             </div>
           </CardHeader>
           <CardContent>
