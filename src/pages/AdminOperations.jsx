@@ -430,6 +430,27 @@ function deriveRunnerAuditStatus(controlStatus) {
   return 'ok';
 }
 
+function deriveIncidentQueueStatus(incidents) {
+  if (incidents.some((incident) => incident.status === 'failed')) return 'failed';
+  if (incidents.some((incident) => incident.status === 'missing')) return 'missing';
+  if (incidents.some((incident) => incident.status === 'degraded')) return 'degraded';
+  if (incidents.some((incident) => incident.status === 'stale')) return 'stale';
+  return 'ok';
+}
+
+function deriveCapabilityConfidenceStatus(rows) {
+  if (rows.some((row) => row.status === 'missing')) return 'missing';
+  if (rows.some((row) => row.status === 'stale')) return 'stale';
+  return 'ok';
+}
+
+function deriveControlPlaneStatus(rows) {
+  if (rows.some((row) => row.status === 'missing')) return 'missing';
+  if (rows.some((row) => row.status === 'degraded')) return 'degraded';
+  if (rows.some((row) => row.status === 'stale')) return 'stale';
+  return 'ok';
+}
+
 function buildActionItems(systemHealth, sections, automationRuns) {
   const items = [];
   const orderedKeys = ['catalogs', 'images', 'pricing', 'homepage', 'readiness'];
@@ -1017,6 +1038,10 @@ function buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlS
     steps: targetedSteps.length > 0 ? targetedSteps : baseSteps,
     fallbackSteps: baseSteps
   };
+}
+
+function deriveRecoveryPlaybookStatus(playbook) {
+  return String(playbook?.status || 'missing').toLowerCase();
 }
 
 function buildControlPlaneRows(controlStatus) {
@@ -2611,6 +2636,16 @@ export default function AdminOperations() {
     () => buildCapabilityConfidenceRows(sections, automationRuns, controlStatus),
     [sections, automationRuns, controlStatus]
   );
+  const operationIncidents = useMemo(
+    () => buildOperationIncidents(systemHealth, sections, automationRuns, controlStatus),
+    [systemHealth, sections, automationRuns, controlStatus]
+  );
+  const controlPlaneRows = useMemo(() => buildControlPlaneRows(controlStatus), [controlStatus]);
+  const runnerAuditSummary = useMemo(() => buildRunnerAuditSummary(controlStatus), [controlStatus]);
+  const recoveryPlaybook = useMemo(
+    () => buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlStatus),
+    [systemHealth, sections, automationRuns, controlStatus]
+  );
   const displayLastCheckedAt = useMemo(() => {
     const timestamps = [healthQuery.dataUpdatedAt, controlQuery.dataUpdatedAt, lastManualRefreshAt]
       .filter((value) => typeof value === 'number' && Number.isFinite(value));
@@ -2619,7 +2654,7 @@ export default function AdminOperations() {
     return new Date(Math.max(...timestamps)).toISOString();
   }, [controlQuery.dataUpdatedAt, healthQuery.dataUpdatedAt, lastManualRefreshAt]);
 
-  const summary = useMemo(() => {
+  const dashboardAreas = useMemo(() => {
     const sectionStatuses = Object.values(sections).map((section) => String(section?.status || section?.overallStatus || 'missing').toLowerCase());
     const automationAreaStatus = automationSummary.failed > 0
       ? 'degraded'
@@ -2628,22 +2663,38 @@ export default function AdminOperations() {
         : automationSummary.missing > 0
           ? 'missing'
           : 'ok';
-    const combinedStatuses = [
-      ...sectionStatuses,
-      automationAreaStatus,
-      deriveAutomationHistoryStatus(automationSummary),
-      deriveServiceLevelStatus(serviceLevelRows),
-      deriveLaunchReadinessStatus(launchReadiness),
-      deriveSourceGovernanceStatus(sourceGovernanceRows),
-      deriveDataContractsStatus(dataContractRows),
-      capabilityConfidenceRows.some((row) => row.status === 'missing')
-        ? 'missing'
-        : capabilityConfidenceRows.some((row) => row.status === 'stale')
-          ? 'stale'
-          : 'ok',
-      deriveRunnerAuditStatus(controlStatus),
-      derivePipelineControlsStatus(controlStatus)
+    return [
+      { id: 'automation-registry', label: 'Automation registry', status: deriveAreaStatus(sectionStatuses, automationSummary) },
+      { id: 'pipeline-run-history', label: 'Pipeline run history', status: deriveAutomationHistoryStatus(automationSummary) },
+      { id: 'operations-incident-queue', label: 'Operations incident queue', status: deriveIncidentQueueStatus(operationIncidents) },
+      { id: 'automation-sla-board', label: 'Automation SLA board', status: deriveServiceLevelStatus(serviceLevelRows) },
+      { id: 'launch-readiness-matrix', label: 'Launch readiness matrix', status: deriveLaunchReadinessStatus(launchReadiness) },
+      { id: 'source-governance', label: 'Source governance', status: deriveSourceGovernanceStatus(sourceGovernanceRows) },
+      { id: 'data-contracts-lineage', label: 'Data contracts and lineage', status: deriveDataContractsStatus(dataContractRows) },
+      { id: 'operations-bridge-readiness', label: 'Operations bridge readiness', status: summarizeBridgeStatuses(getBridgeChecks(controlStatus).map((check) => check.status)) },
+      { id: 'operations-control-plane', label: 'Operations control plane', status: deriveControlPlaneStatus(controlPlaneRows) },
+      { id: 'runner-audit-timeline', label: 'Runner audit timeline', status: runnerAuditSummary.status },
+      { id: 'business-capability-confidence', label: 'Business capability confidence', status: deriveCapabilityConfidenceStatus(capabilityConfidenceRows) },
+      { id: 'recovery-playbook', label: 'Recovery playbook', status: deriveRecoveryPlaybookStatus(recoveryPlaybook) },
+      { id: 'pipeline-controls', label: 'Pipeline controls', status: derivePipelineControlsStatus(controlStatus) }
     ];
+  }, [
+    sections,
+    automationSummary,
+    operationIncidents,
+    serviceLevelRows,
+    launchReadiness,
+    sourceGovernanceRows,
+    dataContractRows,
+    controlStatus,
+    controlPlaneRows,
+    runnerAuditSummary.status,
+    capabilityConfidenceRows,
+    recoveryPlaybook
+  ]);
+
+  const summary = useMemo(() => {
+    const combinedStatuses = dashboardAreas.map((area) => String(area.status || 'missing').toLowerCase());
     return {
       ok: combinedStatuses.filter((status) => status === 'ok').length,
       degraded: combinedStatuses.filter((status) => ['degraded', 'failed', 'running', 'blocked'].includes(status)).length,
@@ -2656,9 +2707,9 @@ export default function AdminOperations() {
           : combinedStatuses.includes('stale')
             ? 'stale'
             : 'ok',
-      automationAreaStatus
+      automationAreaStatus: dashboardAreas.find((area) => area.id === 'automation-registry')?.status || 'missing'
     };
-  }, [sections, automationSummary, serviceLevelRows, launchReadiness, sourceGovernanceRows, dataContractRows, capabilityConfidenceRows, controlStatus]);
+  }, [dashboardAreas]);
 
   const handleRefresh = async () => {
     const previousGeneratedAt = generatedAt;
