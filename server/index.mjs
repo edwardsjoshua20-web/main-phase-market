@@ -1067,6 +1067,17 @@ function writeJsonFile(filePath, payload) {
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
 }
 
+function canWriteAutomationPath(targetPath, { directory = false } = {}) {
+  try {
+    const resolvedPath = directory ? targetPath : path.dirname(targetPath);
+    ensureDir(resolvedPath);
+    fs.accessSync(resolvedPath, fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getAutomationLockPath(jobId) {
   return path.join(AUTOMATION_LOCK_ROOT, `${jobId}.json`);
 }
@@ -1234,6 +1245,14 @@ function buildOpsBridgeReadiness() {
   const serviceRoleConfigured = Boolean(getEnvValue('SUPABASE_SERVICE_ROLE_KEY'));
   const publicAppUrl = getEnvValue('PUBLIC_APP_URL') || '';
   const systemHealthAvailable = fs.existsSync(systemHealthPath);
+  const auditLogWritable = canWriteAutomationPath(AUTOMATION_CONTROL_LOG_PATH);
+  const lockStorageWritable = canWriteAutomationPath(AUTOMATION_LOCK_ROOT, { directory: true });
+  const runHistoryWritable = canWriteAutomationPath(AUTOMATION_RUN_HISTORY_PATH);
+  const allowedJobCount = Object.keys(automationJobMap).length;
+  const scheduledJobCount = Object.keys(automationSchedule).length;
+  const scheduledJobsWithoutRunner = Object.keys(automationSchedule).filter((jobId) => !automationJobMap[jobId]);
+  const preflightSamples = Object.keys(automationJobMap).map((jobId) => buildAutomationPreflight(jobId));
+  const preflightEngineReady = preflightSamples.every((sample) => Array.isArray(sample.dependencies) && Array.isArray(sample.blockers) && typeof sample.message === 'string');
   const checks = [
     {
       id: 'remote-connections',
@@ -1274,6 +1293,56 @@ function buildOpsBridgeReadiness() {
       detail: systemHealthAvailable
         ? 'System health report exists for Admin Operations.'
         : 'Run npm run automation:health to create public/data/site/system-health.json.'
+    },
+    {
+      id: 'audit-log',
+      label: 'Audit trail',
+      status: auditLogWritable ? 'ok' : 'missing',
+      detail: auditLogWritable
+        ? 'Automation control log storage is writable for manual and scheduled run history.'
+        : `Automation control log path is not writable: ${AUTOMATION_CONTROL_LOG_PATH}.`
+    },
+    {
+      id: 'single-run-locks',
+      label: 'Single-run locks',
+      status: lockStorageWritable ? 'ok' : 'missing',
+      detail: lockStorageWritable
+        ? 'Automation lock storage is writable, so duplicate run protection can be enforced.'
+        : `Automation lock directory is not writable: ${AUTOMATION_LOCK_ROOT}.`
+    },
+    {
+      id: 'run-history',
+      label: 'Run history',
+      status: runHistoryWritable ? 'ok' : 'missing',
+      detail: runHistoryWritable
+        ? 'Automation run history storage is writable for health reports and SLA tracking.'
+        : `Automation run history path is not writable: ${AUTOMATION_RUN_HISTORY_PATH}.`
+    },
+    {
+      id: 'allowed-job-map',
+      label: 'Allowed job map',
+      status: allowedJobCount > 0 && scheduledJobsWithoutRunner.length === 0 ? 'ok' : 'missing',
+      detail: allowedJobCount > 0 && scheduledJobsWithoutRunner.length === 0
+        ? `${allowedJobCount} automation job(s) are allowlisted and all scheduled jobs have runners.`
+        : scheduledJobsWithoutRunner.length > 0
+          ? `Scheduled job(s) without runners: ${scheduledJobsWithoutRunner.join(', ')}.`
+          : 'No automation jobs are allowlisted for the runner.'
+    },
+    {
+      id: 'dependency-preflight',
+      label: 'Dependency preflight',
+      status: preflightEngineReady ? 'ok' : 'missing',
+      detail: preflightEngineReady
+        ? `Dependency preflight can evaluate ${allowedJobCount} allowlisted job(s).`
+        : 'Dependency preflight did not return the expected readiness shape.'
+    },
+    {
+      id: 'scheduler-map',
+      label: 'Scheduler map',
+      status: scheduledJobCount > 0 ? 'ok' : 'missing',
+      detail: scheduledJobCount > 0
+        ? `${scheduledJobCount} automation cadence rule(s) are registered.`
+        : 'No automation cadence rules are registered.'
     }
   ];
   const counts = checks.reduce((acc, check) => {
@@ -1312,7 +1381,9 @@ function buildOpsBridgeReadiness() {
       storageConfigured: isSupabaseStorageConfigured()
     },
     automation: {
-      allowedJobCount: Object.keys(automationJobMap).length,
+      allowedJobCount,
+      scheduledJobCount,
+      scheduledJobsWithoutRunner,
       lockTtlHours: AUTOMATION_LOCK_TTL_MS / (60 * 60 * 1000),
       scheduler: buildAutomationScheduleStatus(),
       siteDataRoot: SITE_DATA_ROOT

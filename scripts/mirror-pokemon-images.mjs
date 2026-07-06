@@ -27,10 +27,6 @@ function getFileExtension(url) {
   }
 }
 
-function getCardSetId(card) {
-  return String(card?.id || '').split('-')[0] || 'unknown';
-}
-
 function getSafeCardFileName(cardId, extension) {
   return `${encodeURIComponent(String(cardId || 'unknown'))}${extension}`;
 }
@@ -48,7 +44,9 @@ async function downloadFile(url, destinationPath) {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to download ${url}: ${response.status}`);
+    const error = new Error(`Failed to download ${url}: ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   const arrayBuffer = await response.arrayBuffer();
@@ -109,7 +107,6 @@ async function main() {
       uniqueById.set(card.id, {
         id: card.id,
         name: card.name || '',
-        setId: getCardSetId(card),
         images: {
           small: card.images?.small || null,
           large: card.images?.large || null
@@ -125,7 +122,10 @@ async function main() {
     downloaded: 0,
     skippedExisting: 0,
     missingSourceUrl: 0,
-    failed: 0
+    failed: 0,
+    upstream404: 0,
+    upstream403: 0,
+    unexpectedFailures: 0
   };
 
   for (const row of uniqueById.values()) {
@@ -158,6 +158,13 @@ async function main() {
           }
         } catch (error) {
           stats.failed += 1;
+          if (error?.status === 404) {
+            stats.upstream404 += 1;
+          } else if (error?.status === 403) {
+            stats.upstream403 += 1;
+          } else {
+            stats.unexpectedFailures += 1;
+          }
           console.error(`Pokemon image download failed for ${row.name} [${row.id}] ${kind}: ${error.message}`);
         }
       });
@@ -178,7 +185,10 @@ async function main() {
     downloaded: stats.downloaded,
     skipped_existing: stats.skippedExisting,
     missing_source_url: stats.missingSourceUrl,
-    failed: stats.failed
+    failed: stats.failed,
+    upstream_404: stats.upstream404,
+    upstream_403: stats.upstream403,
+    unexpected_failures: stats.unexpectedFailures
   };
 
   fs.writeFileSync(path.join(IMAGE_ROOT, 'mirror-manifest.json'), JSON.stringify(manifest, null, 2));

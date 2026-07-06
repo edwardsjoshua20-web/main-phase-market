@@ -4,10 +4,10 @@ This project can now run against a desktop-owned backend instead of Base44.
 
 ## Pieces
 
-- API server: [server/index.mjs](/C:/Users/Admin/Desktop/main-phase-market/server/index.mjs)
+- API server: [server/index.mjs](/D:/main-phase-market/server/index.mjs)
 - SQLite database: `server/data/main-phase-market.db`
-- Entity store: [server/entityStore.mjs](/C:/Users/Admin/Desktop/main-phase-market/server/entityStore.mjs)
-- Frontend provider: [localBackend.js](/C:/Users/Admin/Desktop/main-phase-market/src/services/providers/localBackend.js)
+- Entity store: [server/entityStore.mjs](/D:/main-phase-market/server/entityStore.mjs)
+- Frontend provider: [localBackend.js](/D:/main-phase-market/src/services/providers/localBackend.js)
 
 ## Run it
 
@@ -43,7 +43,7 @@ npm.cmd run local:import:csv -- Card "Data Exports/Card_export.csv"
 Important:
 
 - `Card_export.csv` is currently muddy from Base44, so do not import it unless you explicitly want those rows.
-- The MTG catalog/search is already local and file-based under [public/data/mtg](/C:/Users/Admin/Desktop/main-phase-market/public/data/mtg).
+- The MTG catalog/search is already local and file-based under [public/data/mtg](/D:/main-phase-market/public/data/mtg).
 
 ## Current limitations
 

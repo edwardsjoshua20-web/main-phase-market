@@ -1,80 +1,95 @@
 {
-  "games": {
-    "magic": {
-      "dataAliases": ["magic", "mtg"],
-      "catalogSource": {
-        "type": "file",
-        "envVar": "MTG_SOURCE_PATH",
-        "path": "server/data/mtg/source/all_cards-latest.json"
-      },
-      "bulkApi": {
-        "type": "remote",
-        "url": "https://api.scryfall.com/bulk-data",
-        "bulkType": "all_cards"
-      }
-    },
-    "pokemon": {
-      "dataAliases": ["pokemon"],
-      "catalogSource": {
-        "type": "file",
-        "envVar": "POKEMON_SOURCE_PATH",
-        "path": "C:/Users/Admin/Desktop/Pokemon Cards/all_pokemon_cards.json"
-      },
-      "api": {
-        "type": "remote",
-        "url": "https://api.pokemontcg.io/v2"
-      }
-    },
-    "yugioh": {
-      "dataAliases": ["yugioh"],
-      "catalogSource": {
-        "type": "remote",
-        "url": "https://db.ygoprodeck.com/api/v7"
-      },
-      "api": {
-        "type": "remote",
-        "url": "https://db.ygoprodeck.com/api/v7"
-      }
-    },
-    "onepiece": {
-      "dataAliases": ["onepiece"],
-      "catalogSource": {
-        "type": "remote",
-        "url": "https://raw.githubusercontent.com/buhbbl/punk-records/main/english/cards"
-      },
-      "cardsApi": {
-        "type": "remote",
-        "url": "https://raw.githubusercontent.com/buhbbl/punk-records/main/english/cards"
-      }
-    },
-    "lorcana": {
-      "dataAliases": ["lorcana"],
-      "catalogSource": {
-        "type": "remote",
-        "url": "https://api.lorcast.com/v0/cards/search"
-      },
-      "api": {
-        "type": "remote",
-        "url": "https://api.lorcast.com/v0/cards/search"
-      }
-    },
-    "fab": {
-      "dataAliases": ["fab"],
-      "catalogSource": {
-        "type": "remote",
-        "url": "fab-pipeline-local-backfill"
-      }
-    },
-    "starwars": {
-      "dataAliases": ["starwars"],
-      "catalogSource": {
-        "type": "remote",
-        "url": "https://api.swuapi.com/export/all"
-      },
-      "exportApi": {
-        "type": "remote",
-        "url": "https://api.swuapi.com/export/all"
-      }
-    }
-  }
+    "games":  {
+                  "magic":  {
+                                "dataAliases":  [
+                                                    "magic",
+                                                    "mtg"
+                                                ],
+                                "catalogSource":  {
+                                                      "type":  "file",
+                                                      "envVar":  "MTG_SOURCE_PATH",
+                                                      "path":  "server/data/mtg/source/all_cards-latest.json"
+                                                  },
+                                "bulkApi":  {
+                                                "type":  "remote",
+                                                "url":  "https://api.scryfall.com/bulk-data",
+                                                "bulkType":  "all_cards"
+                                            }
+                            },
+                  "pokemon":  {
+                                  "dataAliases":  [
+                                                      "pokemon"
+                                                  ],
+                                  "catalogSource":  {
+                                                        "type":  "file",
+                                                        "envVar":  "POKEMON_SOURCE_PATH",
+                                                        "path":  "server/data/pokemon/source/all_pokemon_cards.json"
+                                                    },
+                                  "api":  {
+                                              "type":  "remote",
+                                              "url":  "https://api.pokemontcg.io/v2"
+                                          }
+                              },
+                  "yugioh":  {
+                                 "dataAliases":  [
+                                                     "yugioh"
+                                                 ],
+                                 "catalogSource":  {
+                                                       "type":  "remote",
+                                                       "url":  "https://db.ygoprodeck.com/api/v7"
+                                                   },
+                                 "api":  {
+                                             "type":  "remote",
+                                             "url":  "https://db.ygoprodeck.com/api/v7"
+                                         }
+                             },
+                  "onepiece":  {
+                                   "dataAliases":  [
+                                                       "onepiece"
+                                                   ],
+                                   "catalogSource":  {
+                                                         "type":  "remote",
+                                                         "url":  "https://raw.githubusercontent.com/buhbbl/punk-records/main/english/cards"
+                                                     },
+                                   "cardsApi":  {
+                                                    "type":  "remote",
+                                                    "url":  "https://raw.githubusercontent.com/buhbbl/punk-records/main/english/cards"
+                                                }
+                               },
+                  "lorcana":  {
+                                  "dataAliases":  [
+                                                      "lorcana"
+                                                  ],
+                                  "catalogSource":  {
+                                                        "type":  "remote",
+                                                        "url":  "https://api.lorcast.com/v0/cards/search"
+                                                    },
+                                  "api":  {
+                                              "type":  "remote",
+                                              "url":  "https://api.lorcast.com/v0/cards/search"
+                                          }
+                              },
+                  "fab":  {
+                              "dataAliases":  [
+                                                  "fab"
+                                              ],
+                              "catalogSource":  {
+                                                    "type":  "remote",
+                                                    "url":  "fab-pipeline-local-backfill"
+                                                }
+                          },
+                  "starwars":  {
+                                   "dataAliases":  [
+                                                       "starwars"
+                                                   ],
+                                   "catalogSource":  {
+                                                         "type":  "remote",
+                                                         "url":  "https://api.swuapi.com/export/all"
+                                                     },
+                                   "exportApi":  {
+                                                     "type":  "remote",
+                                                     "url":  "https://api.swuapi.com/export/all"
+                                                 }
+                               }
+              }
 }

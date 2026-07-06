@@ -25,8 +25,8 @@ npm.cmd run mtg:build
 
 ## What it does
 
-- Reads the MTG catalog rows under [public/data/mtg/search](/C:/Users/Admin/Desktop/main-phase-market/public/data/mtg/search)
-- Downloads image files into [public/data/mtg/images](/C:/Users/Admin/Desktop/main-phase-market/public/data/mtg/images)
+- Reads the MTG catalog rows under [public/data/mtg/search](/D:/main-phase-market/public/data/mtg/search)
+- Downloads image files into [public/data/mtg/images](/D:/main-phase-market/public/data/mtg/images)
 - Keeps the original Scryfall URL only when a local mirrored file does not exist yet
 
 ## Result

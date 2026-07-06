@@ -349,6 +349,56 @@ function deriveAreaStatus(sectionStatuses, automationSummary) {
   return 'ok';
 }
 
+function deriveAutomationHistoryStatus(automationSummary) {
+  if (automationSummary.failed > 0) return 'failed';
+  if (automationSummary.running > 0) return 'running';
+  if (automationSummary.missing > 0) return 'missing';
+  return 'ok';
+}
+
+function deriveServiceLevelStatus(rows) {
+  if (rows.some((row) => row.status === 'failed')) return 'failed';
+  if (rows.some((row) => row.status === 'missing')) return 'missing';
+  if (rows.some((row) => row.status === 'running')) return 'running';
+  if (rows.some((row) => row.status === 'stale')) return 'stale';
+  return 'ok';
+}
+
+function deriveLaunchReadinessStatus(readiness) {
+  return readiness.rows.some((row) => row.status !== 'ok') ? 'degraded' : 'ok';
+}
+
+function deriveSourceGovernanceStatus(rows) {
+  if (rows.some((row) => row.status === 'missing')) return 'missing';
+  if (rows.some((row) => row.status !== 'ok')) return 'degraded';
+  return 'ok';
+}
+
+function deriveDataContractsStatus(rows) {
+  if (rows.some((row) => String(row.status).toLowerCase() === 'missing')) return 'missing';
+  if (rows.some((row) => String(row.status).toLowerCase() !== 'ok')) return 'degraded';
+  return 'ok';
+}
+
+function derivePipelineControlsStatus(controlStatus) {
+  return controlStatus?.available ? 'ok' : 'degraded';
+}
+
+function deriveRunnerAuditStatus(controlStatus) {
+  const controlsAvailable = Boolean(controlStatus?.available);
+  const auditEntries = Array.isArray(controlStatus?.audit?.entries) ? controlStatus.audit.entries : [];
+  const activeLocks = Array.isArray(controlStatus?.allowedJobs)
+    ? controlStatus.allowedJobs.filter((job) => job?.lock).length
+    : 0;
+  const latestStatus = String(auditEntries[0]?.status || '').toLowerCase();
+
+  if (!controlsAvailable) return 'degraded';
+  if (['failed', 'failed-to-start', 'scheduler-error'].includes(latestStatus)) return 'degraded';
+  if (activeLocks > 0 || latestStatus === 'started') return 'running';
+  if (auditEntries.length === 0) return 'stale';
+  return 'ok';
+}
+
 function buildActionItems(systemHealth, sections, automationRuns) {
   const items = [];
   const orderedKeys = ['catalogs', 'images', 'pricing', 'homepage', 'readiness'];
@@ -422,7 +472,8 @@ function buildOperationIncidents(systemHealth, sections, automationRuns, control
       owner: incident.owner || 'operations',
       evidence: incident.evidence || 'No evidence captured.',
       fix: incident.fix || 'Review the owning pipeline and rerun after dependencies are healthy.',
-      job: incident.job || null
+      job: incident.job || null,
+      impactedCapabilities: Array.isArray(incident.impactedCapabilities) ? incident.impactedCapabilities : []
     });
   };
 
@@ -498,6 +549,24 @@ function buildOperationIncidents(systemHealth, sections, automationRuns, control
       job
     });
   });
+
+  const sourceRows = buildSourceGovernanceRows(sections);
+  sourceRows
+    .filter((row) => row.status !== 'ok')
+    .forEach((row) => {
+      addIncident({
+        id: `source-governance-${row.game}`,
+        severity: 'critical',
+        status: 'missing',
+        title: `${row.game} source is not operational`,
+        owner: row.controlModel === 'Managed locally' ? 'catalog' : 'operations',
+        evidence: `${row.sourceType} / ${row.controlModel}: ${row.upstream}`,
+        fix: row.controlModel === 'Managed locally'
+          ? `Restore the local source for ${row.game}, then run Card backfill refresh -> Catalog refresh -> Image repair and sync.`
+          : `Repair or replace the external ${row.game} feed, then rerun the dependent pipeline order.`,
+        impactedCapabilities: row.feeds
+      });
+    });
 
   const orderedSections = [
     ['catalogs', 'Catalog pipelines'],
@@ -604,8 +673,20 @@ function buildLaunchReadinessRows(sections, automationRuns, controlStatus) {
     const section = sections?.[sectionKey];
     return String(section?.status || section?.overallStatus || 'missing').toLowerCase() === 'ok';
   };
+  const capabilityOrder = ['Catalog', 'Images', 'Pricing', 'Homepage', 'Readiness'];
+  const capabilityRiskCounts = buildOperationIncidents(null, sections, automationRuns, controlStatus)
+    .reduce((acc, incident) => {
+      (incident.impactedCapabilities || []).forEach((capability) => {
+        acc[capability] = (acc[capability] || 0) + 1;
+      });
+      return acc;
+    }, {});
+  const atRiskCapabilities = capabilityOrder.filter((capability) => capabilityRiskCounts[capability] > 0);
 
-  return [
+  return {
+    atRiskCapabilities,
+    topRisk: atRiskCapabilities[0] || 'None',
+    rows: [
     {
       id: 'public-storefront',
       label: 'Public storefront',
@@ -666,7 +747,8 @@ function buildLaunchReadinessRows(sections, automationRuns, controlStatus) {
         : 'Scheduler is intentionally disabled until the runner is fully verified.',
       nextStep: 'Enable MPM_AUTOMATION_SCHEDULER_ENABLED=true after bridge verification.'
     }
-  ];
+  ]
+  };
 }
 
 function buildDataContractRows(automationRuns) {
@@ -689,12 +771,194 @@ function buildDataContractRows(automationRuns) {
   });
 }
 
+function describeSourceType(source) {
+  if (!source || source.configured === false || source.type === 'missing') return 'Missing source';
+  if (source.type === 'file') return 'Local file';
+  if (source.type === 'remote') return 'Remote feed';
+  return 'Unknown source';
+}
+
+function describeSourceControlModel(source) {
+  if (!source || source.configured === false || source.type === 'missing') return 'Unconfigured';
+  if (source.type === 'file') return 'Managed locally';
+  if (source.type === 'remote') {
+    const url = String(source.url || '').toLowerCase();
+    if (url.includes('githubusercontent') || url.includes('github.com')) return 'External raw feed';
+    if (url.includes('local-backfill')) return 'Local pipeline bridge';
+    return 'External API';
+  }
+  return 'Unknown';
+}
+
+function buildSourceGovernanceRows(sections) {
+  const catalogEntries = Array.isArray(sections?.catalogs?.entries) ? sections.catalogs.entries : [];
+  const imageEntries = Array.isArray(sections?.images?.entries) ? sections.images.entries : [];
+  const readinessEntries = Array.isArray(sections?.readiness?.entries) ? sections.readiness.entries : [];
+  const imageMap = new Map(imageEntries.map((entry) => [entry.game, entry]));
+  const readinessMap = new Map(readinessEntries.map((entry) => [entry.game, entry]));
+
+  return catalogEntries.map((entry) => {
+    const source = entry?.source || { configured: false, type: 'missing' };
+    const imageEntry = imageMap.get(entry.game) || null;
+    const readinessEntry = readinessMap.get(entry.game) || null;
+    const sourceReady = source.type === 'remote' || (source.type === 'file' && source.exists);
+    const feeds = ['Catalog'];
+
+    if (imageEntry) feeds.push('Images');
+    if (readinessEntry) feeds.push('Readiness');
+
+    return {
+      game: entry.game,
+      status: sourceReady ? 'ok' : 'missing',
+      sourceType: describeSourceType(source),
+      controlModel: describeSourceControlModel(source),
+      upstream: source.path || source.url || source.envVar || 'Not configured',
+      feeds,
+      cards: Number(entry?.cards?.count || 0),
+      sets: Number(entry?.sets?.count || 0),
+      nextRisk: !sourceReady
+        ? 'This game cannot refresh cleanly until its source is configured and reachable.'
+        : source.type === 'file'
+          ? 'Local source file must stay present before backfill/catalog/image jobs run.'
+          : 'External provider drift, schema changes, or rate limits can disrupt refreshes.'
+    };
+  });
+}
+
+function buildCapabilityConfidenceRows(sections, automationRuns, controlStatus) {
+  const sourceRows = buildSourceGovernanceRows(sections);
+  const serviceRows = buildServiceLevelRows(automationRuns, controlStatus);
+  const serviceRowMap = new Map(serviceRows.map((row) => [row.id, row]));
+  const sectionStatus = (sectionKey) => String(sections?.[sectionKey]?.status || sections?.[sectionKey]?.overallStatus || 'missing').toLowerCase();
+
+  const capabilityConfig = [
+    {
+      id: 'catalog',
+      label: 'Catalog',
+      sectionKey: 'catalogs',
+      sourceFeed: 'Catalog',
+      jobs: ['card-backfill-refresh', 'catalog-refresh']
+    },
+    {
+      id: 'images',
+      label: 'Images',
+      sectionKey: 'images',
+      sourceFeed: 'Images',
+      jobs: ['image-repair-sync']
+    },
+    {
+      id: 'pricing',
+      label: 'Pricing',
+      sectionKey: 'pricing',
+      sourceFeed: null,
+      jobs: ['pricing-refresh']
+    },
+    {
+      id: 'homepage',
+      label: 'Homepage',
+      sectionKey: 'homepage',
+      sourceFeed: null,
+      jobs: ['homepage-upcoming-releases']
+    },
+    {
+      id: 'readiness',
+      label: 'Readiness',
+      sectionKey: 'readiness',
+      sourceFeed: 'Readiness',
+      jobs: ['system-health-report']
+    }
+  ];
+
+  return capabilityConfig.map((capability) => {
+    const relatedSources = capability.sourceFeed
+      ? sourceRows.filter((row) => row.feeds.includes(capability.sourceFeed))
+      : [];
+    const relatedJobs = capability.jobs
+      .map((jobId) => serviceRowMap.get(jobId))
+      .filter(Boolean);
+    const sourcesMissing = relatedSources.filter((row) => row.status !== 'ok');
+    const section = sectionStatus(capability.sectionKey);
+    const runStatuses = relatedJobs.map((row) => row.status);
+    const hasMissing = section === 'missing' || sourcesMissing.length > 0 || runStatuses.some((status) => status === 'missing' || status === 'failed');
+    const hasWatch = section === 'degraded' || runStatuses.some((status) => status === 'stale' || status === 'running');
+    const status = hasMissing ? 'missing' : hasWatch ? 'stale' : 'ok';
+    const proofLabel = status === 'ok' ? 'trusted' : status === 'stale' ? 'watching' : 'unproven';
+    const freshestRun = relatedJobs
+      .map((row) => row.run?.lastSucceededAt || null)
+      .filter(Boolean)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
+
+    return {
+      ...capability,
+      status,
+      proofLabel,
+      section,
+      sourceCoverage: relatedSources.length,
+      missingSources: sourcesMissing.length,
+      jobsHealthy: relatedJobs.filter((row) => row.status === 'ok').length,
+      totalJobs: relatedJobs.length,
+      freshestRun,
+      evidence: status === 'ok'
+        ? `Section is green, ${relatedJobs.length}/${Math.max(relatedJobs.length, 1)} linked jobs are within SLA, and the latest proof was ${formatDate(freshestRun)}.`
+        : status === 'stale'
+          ? 'Capability is alive but not yet fully trustworthy. At least one linked job is stale/running or the section is degraded.'
+          : 'Capability is not yet trustworthy. A required source, section, or linked job is missing or failed.',
+      nextStep: status === 'ok'
+        ? 'No action needed beyond routine scheduled runs.'
+        : status === 'stale'
+          ? `Stabilize ${capability.label.toLowerCase()} by rerunning the linked pipeline chain and confirming the section returns to green.`
+          : `Repair upstream dependencies for ${capability.label.toLowerCase()} before treating this capability as launch-ready.`
+    };
+  });
+}
+
+function buildRunnerAuditSummary(controlStatus) {
+  const entries = Array.isArray(controlStatus?.audit?.entries) ? controlStatus.audit.entries : [];
+  const allowedJobs = Array.isArray(controlStatus?.allowedJobs) ? controlStatus.allowedJobs : [];
+  const activeLocks = allowedJobs.filter((job) => job?.lock).length;
+  const latestEntry = entries[0] || null;
+  const latestStatus = String(latestEntry?.status || '').toLowerCase();
+  const failureStatuses = new Set(['failed', 'failed-to-start', 'scheduler-error']);
+  const blockedStatuses = new Set(['blocked']);
+  const completedStatuses = new Set(['completed']);
+  const startedStatuses = new Set(['started']);
+
+  return {
+    status: deriveRunnerAuditStatus(controlStatus),
+    latestEntry,
+    entries,
+    activeLocks,
+    generatedAt: controlStatus?.audit?.generatedAt || null,
+    uniqueActors: [...new Set(entries.map((entry) => entry?.actor).filter(Boolean))],
+    completedCount: entries.filter((entry) => completedStatuses.has(String(entry?.status || '').toLowerCase())).length,
+    blockedCount: entries.filter((entry) => blockedStatuses.has(String(entry?.status || '').toLowerCase())).length,
+    failureCount: entries.filter((entry) => failureStatuses.has(String(entry?.status || '').toLowerCase())).length,
+    startedCount: entries.filter((entry) => startedStatuses.has(String(entry?.status || '').toLowerCase())).length,
+    latestStatus
+  };
+}
+
 function buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlStatus) {
   const incidents = buildOperationIncidents(systemHealth, sections, automationRuns, controlStatus);
   const recommendedOrder = buildRecommendedRunOrder(automationRuns, controlStatus);
   const brokenSections = Object.entries(sections || {})
     .filter(([, section]) => String(section?.status || section?.overallStatus || 'missing').toLowerCase() !== 'ok')
     .map(([sectionKey]) => sectionKey);
+
+  const capabilityOrder = ['Catalog', 'Images', 'Pricing', 'Homepage', 'Readiness'];
+  const capabilityCounts = incidents.reduce((acc, incident) => {
+    (incident.impactedCapabilities || []).forEach((capability) => {
+      acc[capability] = (acc[capability] || 0) + 1;
+    });
+    return acc;
+  }, {});
+  const capabilityPriorities = capabilityOrder
+    .filter((capability) => capabilityCounts[capability] > 0)
+    .map((capability) => ({
+      label: capability,
+      count: capabilityCounts[capability],
+      reason: `${capabilityCounts[capability]} incident${capabilityCounts[capability] === 1 ? '' : 's'} currently affects ${capability.toLowerCase()}.`
+    }));
 
   const baseSteps = [
     'Open the incident queue and handle critical failures first.',
@@ -717,9 +981,100 @@ function buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlS
     incidentCount: incidents.length,
     brokenSections,
     nextIncident: incidents[0] || null,
+    restoreFirst: capabilityPriorities[0]?.label || 'Core pipeline health',
+    capabilityPriorities,
     steps: targetedSteps.length > 0 ? targetedSteps : baseSteps,
     fallbackSteps: baseSteps
   };
+}
+
+function buildControlPlaneRows(controlStatus) {
+  const controlsAvailable = Boolean(controlStatus?.available);
+  const scheduler = controlStatus?.scheduler || {};
+  const bridge = controlStatus?.bridge || {};
+  const checks = Array.isArray(bridge.checks) ? bridge.checks : [];
+  const hasAuditCheck = checks.some((check) => String(check.label || '').toLowerCase().includes('audit'));
+  const hasLockCheck = checks.some((check) => String(check.label || '').toLowerCase().includes('lock'));
+  const hasPreflightCheck = checks.some((check) => String(check.label || '').toLowerCase().includes('preflight'));
+
+  return [
+    {
+      id: 'reporting',
+      label: 'Hosted reporting surface',
+      owner: 'operations',
+      status: 'ok',
+      evidence: 'Admin Operations can render health snapshots and pipeline diagnostics on the hosted site.',
+      nextStep: 'Keep the static health snapshot fresh so the reporting surface stays trustworthy.'
+    },
+    {
+      id: 'manual-runner',
+      label: 'Manual runner bridge',
+      owner: 'operations',
+      status: controlsAvailable ? 'ok' : 'degraded',
+      evidence: controlsAvailable
+        ? 'Hosted admin can reach the backend runner for manual job execution.'
+        : controlStatus?.reason || 'Hosted admin cannot currently reach the backend runner.',
+      nextStep: controlsAvailable
+        ? 'Keep the backend origin and auth bridge healthy.'
+        : 'Host/connect the operations backend and wire VITE_API_ORIGIN.'
+    },
+    {
+      id: 'scheduler',
+      label: 'Autopilot scheduler',
+      owner: 'operations',
+      status: scheduler.enabled ? 'ok' : scheduler.configured ? 'degraded' : 'missing',
+      evidence: scheduler.enabled
+        ? `Scheduler is enabled and checking due jobs. Last checked ${formatDate(scheduler.lastCheckedAt)}.`
+        : scheduler.configured
+          ? 'Scheduler exists but is not actively enabled.'
+          : 'Scheduler is not configured on the current control plane.',
+      nextStep: scheduler.enabled
+        ? 'Watch due jobs and lock behavior during normal cadence.'
+        : 'Enable MPM_AUTOMATION_SCHEDULER_ENABLED once runner verification is complete.'
+    },
+    {
+      id: 'audit-trail',
+      label: 'Run audit trail',
+      owner: 'operations',
+      status: controlsAvailable ? (hasAuditCheck ? 'ok' : 'stale') : 'degraded',
+      evidence: controlsAvailable
+        ? hasAuditCheck
+          ? 'Backend readiness checks include audit coverage verification.'
+          : 'Runner is connected, but audit-trail verification is not explicitly surfaced yet.'
+        : 'Audit records cannot be trusted from the hosted surface until the runner bridge is live.',
+      nextStep: hasAuditCheck
+        ? 'Keep audit output visible in the operations backend.'
+        : 'Expose audit verification in the backend bridge checks.'
+    },
+    {
+      id: 'single-run-locks',
+      label: 'Single-run locks',
+      owner: 'operations',
+      status: controlsAvailable ? (hasLockCheck ? 'ok' : 'stale') : 'degraded',
+      evidence: controlsAvailable
+        ? hasLockCheck
+          ? 'Runner checks explicitly verify single-run lock protection.'
+          : 'Runner is connected, but lock verification is not explicitly surfaced yet.'
+        : 'Duplicate-run protection cannot be exercised from hosted admin until the runner bridge is live.',
+      nextStep: hasLockCheck
+        ? 'Continue monitoring lock collisions during manual and scheduled runs.'
+        : 'Expose lock verification in the backend bridge checks.'
+    },
+    {
+      id: 'dependency-preflight',
+      label: 'Dependency preflight safety',
+      owner: 'operations',
+      status: controlsAvailable ? (hasPreflightCheck ? 'ok' : 'stale') : 'degraded',
+      evidence: controlsAvailable
+        ? hasPreflightCheck
+          ? 'Runner checks explicitly verify dependency preflight readiness.'
+          : 'Preflight is used by the UI, but backend verification is not explicitly surfaced yet.'
+        : 'Dependency-safe manual runs are blocked until the runner bridge is live.',
+      nextStep: hasPreflightCheck
+        ? 'Keep dependency enforcement aligned with the recommended run order.'
+        : 'Expose preflight verification in the backend bridge checks.'
+    }
+  ];
 }
 
 function StatusBadge({ status }) {
@@ -1106,6 +1461,11 @@ function OperationsIncidentCard({ systemHealth, sections, automationRuns, contro
                     <p className="mt-1 text-sm text-gray-600">
                       <span className="font-medium text-gray-800">Fix:</span> {incident.fix}
                     </p>
+                    {incident.impactedCapabilities.length > 0 ? (
+                      <p className="mt-1 text-sm text-gray-600">
+                        <span className="font-medium text-gray-800">Impacts:</span> {incident.impactedCapabilities.join(', ')}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="min-w-48 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                     <p className="text-xs uppercase tracking-wide text-slate-500">Owner</p>
@@ -1204,10 +1564,11 @@ function ServiceLevelCard({ automationRuns, controlStatus }) {
 }
 
 function LaunchReadinessCard({ sections, automationRuns, controlStatus }) {
-  const rows = useMemo(
+  const readiness = useMemo(
     () => buildLaunchReadinessRows(sections, automationRuns, controlStatus),
     [sections, automationRuns, controlStatus]
   );
+  const rows = readiness.rows;
   const readyCount = rows.filter((row) => row.status === 'ok').length;
   const readinessScore = Math.round((readyCount / Math.max(rows.length, 1)) * 100);
   const blockers = rows.filter((row) => row.status !== 'ok');
@@ -1231,11 +1592,145 @@ function LaunchReadinessCard({ sections, automationRuns, controlStatus }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
           <SummaryValue label="Readiness score" value={`${readinessScore}%`} />
           <SummaryValue label="Ready capabilities" value={`${readyCount}/${rows.length}`} />
           <SummaryValue label="Blockers" value={blockers.length} />
           <SummaryValue label="Next focus" value={blockers[0]?.label || 'Product polish'} />
+          <SummaryValue label="Launch risk" value={readiness.topRisk} />
+        </div>
+
+        {readiness.atRiskCapabilities.length > 0 ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+            <p className="font-semibold text-amber-900">Launch-critical capabilities at risk</p>
+            <p className="mt-2 text-sm text-amber-800">
+              {readiness.atRiskCapabilities.join(', ')} currently carry the highest launch risk based on active operations incidents.
+            </p>
+          </div>
+        ) : null}
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          {rows.map((row) => (
+            <div key={row.id} className="rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-900">{row.label}</p>
+                  <p className="mt-1 text-xs uppercase tracking-wide text-gray-500">Owner: {row.owner}</p>
+                </div>
+                <StatusBadge status={row.status} />
+              </div>
+              <p className="mt-3 text-sm text-gray-600">
+                <span className="font-medium text-gray-800">Evidence:</span> {row.evidence}
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                <span className="font-medium text-gray-800">Next step:</span> {row.nextStep}
+              </p>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SourceGovernanceCard({ sections }) {
+  const rows = useMemo(() => buildSourceGovernanceRows(sections), [sections]);
+  const localCount = rows.filter((row) => row.controlModel === 'Managed locally').length;
+  const remoteCount = rows.filter((row) => row.controlModel !== 'Managed locally' && row.status === 'ok').length;
+  const missingCount = rows.filter((row) => row.status !== 'ok').length;
+  const totalFeeds = rows.reduce((sum, row) => sum + row.feeds.length, 0);
+
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-slate-100 p-2.5">
+              <Database className="h-5 w-5 text-slate-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Source governance</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                The upstream feeds the business depends on before catalog, image, and readiness automations can do useful work.
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={missingCount > 0 ? 'missing' : 'ok'} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+          <SummaryValue label="Games covered" value={rows.length} />
+          <SummaryValue label="Managed local sources" value={localCount} />
+          <SummaryValue label="External sources" value={remoteCount} />
+          <SummaryValue label="Feed links powered" value={totalFeeds} />
+        </div>
+
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Game</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Source type</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Control model</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Upstream</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Feeds</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Coverage</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Operational risk</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {rows.map((row) => (
+                <tr key={row.game}>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900 align-top">{row.game}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top">{row.sourceType}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top">{row.controlModel}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top break-all max-w-xs">{row.upstream}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top">{row.feeds.join(', ')}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top">{row.cards} cards / {row.sets} sets</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top max-w-sm">{row.nextRisk}</td>
+                  <td className="px-4 py-3 text-sm align-top"><StatusBadge status={row.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ControlPlaneCard({ controlStatus }) {
+  const rows = useMemo(() => buildControlPlaneRows(controlStatus), [controlStatus]);
+  const healthy = rows.filter((row) => row.status === 'ok').length;
+  const watching = rows.filter((row) => row.status === 'stale').length;
+  const blocked = rows.filter((row) => row.status === 'degraded' || row.status === 'missing' || row.status === 'failed').length;
+
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-violet-50 p-2.5">
+              <Activity className="h-5 w-5 text-violet-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Operations control plane</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                The automation brain behind the business: reporting, manual execution, scheduler, locks, auditability, and dependency safety.
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={blocked > 0 ? 'degraded' : watching > 0 ? 'stale' : 'ok'} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+          <SummaryValue label="Control services" value={rows.length} />
+          <SummaryValue label="Healthy" value={healthy} />
+          <SummaryValue label="Watching" value={watching} />
+          <SummaryValue label="Blocked" value={blocked} />
         </div>
 
         <div className="grid gap-3 lg:grid-cols-2">
@@ -1248,6 +1743,169 @@ function LaunchReadinessCard({ sections, automationRuns, controlStatus }) {
                 </div>
                 <StatusBadge status={row.status} />
               </div>
+              <p className="mt-3 text-sm text-gray-600">
+                <span className="font-medium text-gray-800">Evidence:</span> {row.evidence}
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                <span className="font-medium text-gray-800">Next step:</span> {row.nextStep}
+              </p>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RunnerAuditTimelineCard({ controlStatus }) {
+  const summary = useMemo(() => buildRunnerAuditSummary(controlStatus), [controlStatus]);
+  const visibleEntries = summary.entries.slice(0, 10);
+
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-slate-100 p-2.5">
+              <Terminal className="h-5 w-5 text-slate-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Runner audit timeline</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                The proof trail for manual runs, scheduler actions, locks, blocked attempts, and failures on the automation control plane.
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={summary.status} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
+          <SummaryValue label="Active locks" value={summary.activeLocks} />
+          <SummaryValue label="Completed" value={summary.completedCount} />
+          <SummaryValue label="Blocked" value={summary.blockedCount} />
+          <SummaryValue label="Failures" value={summary.failureCount} />
+          <SummaryValue label="Actors seen" value={summary.uniqueActors.length} />
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <SummaryValue label="Latest status" value={summary.latestEntry?.status || 'none'} />
+            <SummaryValue label="Latest job" value={getJobDetails(summary.latestEntry?.jobId)?.label || summary.latestEntry?.jobId || 'none'} />
+            <SummaryValue label="Audit updated" value={formatDate(summary.generatedAt)} />
+          </div>
+        </div>
+
+        {visibleEntries.length === 0 ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+            <p className="font-semibold text-amber-900">No runner audit history captured yet.</p>
+            <p className="mt-2 text-sm text-amber-800">
+              The control plane is not yet producing a visible execution trail from the hosted admin perspective.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {visibleEntries.map((entry, index) => {
+              const status = String(entry?.status || 'missing').toLowerCase();
+              const jobLabel = getJobDetails(entry?.jobId)?.label || entry?.jobId || 'Unknown job';
+              const timestamp = entry?.finishedAt || entry?.startedAt || entry?.blockedAt || entry?.checkedAt || null;
+              const detail = entry?.error
+                || entry?.preflight?.message
+                || (entry?.exitCode != null ? `Exit code ${entry.exitCode}` : 'No extra diagnostics recorded.');
+
+              return (
+                <div key={`${entry?.runId || 'entry'}-${index}`} className="rounded-2xl border border-gray-200 bg-white p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-gray-900">{jobLabel}</p>
+                        <StatusBadge status={status} />
+                      </div>
+                      <p className="mt-2 text-sm text-gray-600">
+                        <span className="font-medium text-gray-800">Actor:</span> {entry?.actor || 'unknown'}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-600">
+                        <span className="font-medium text-gray-800">When:</span> {formatDate(timestamp)}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-600">
+                        <span className="font-medium text-gray-800">Details:</span> {detail}
+                      </p>
+                    </div>
+                    <div className="min-w-48 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Runner job</p>
+                      <p className="mt-1 break-all text-sm font-semibold text-slate-900">{entry?.runnerJob || 'unknown'}</p>
+                      {entry?.runId ? (
+                        <>
+                          <p className="mt-2 text-xs uppercase tracking-wide text-slate-500">Run ID</p>
+                          <p className="mt-1 break-all font-mono text-xs text-slate-700">{entry.runId}</p>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CapabilityConfidenceCard({ sections, automationRuns, controlStatus }) {
+  const rows = useMemo(
+    () => buildCapabilityConfidenceRows(sections, automationRuns, controlStatus),
+    [sections, automationRuns, controlStatus]
+  );
+  const trustedCount = rows.filter((row) => row.status === 'ok').length;
+  const watchingCount = rows.filter((row) => row.status === 'stale').length;
+  const unprovenCount = rows.filter((row) => row.status === 'missing' || row.status === 'failed').length;
+
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-sky-50 p-2.5">
+              <ShieldCheck className="h-5 w-5 text-sky-700" />
+            </div>
+            <div>
+              <CardTitle className="text-lg text-gray-900">Business capability confidence</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                The trust layer: which business capabilities are proven by fresh evidence, which are only being watched, and which are not yet trustworthy.
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={unprovenCount > 0 ? 'missing' : watchingCount > 0 ? 'stale' : 'ok'} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+          <SummaryValue label="Capabilities" value={rows.length} />
+          <SummaryValue label="Trusted" value={trustedCount} />
+          <SummaryValue label="Watching" value={watchingCount} />
+          <SummaryValue label="Unproven" value={unprovenCount} />
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          {rows.map((row) => (
+            <div key={row.id} className="rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-900">{row.label}</p>
+                  <p className="mt-1 text-xs uppercase tracking-wide text-gray-500">
+                    Confidence: {row.proofLabel}
+                  </p>
+                </div>
+                <StatusBadge status={row.status} />
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <SummaryValue label="Healthy jobs" value={`${row.jobsHealthy}/${row.totalJobs}`} />
+                <SummaryValue label="Source coverage" value={row.sourceCoverage} />
+                <SummaryValue label="Missing sources" value={row.missingSources} />
+              </div>
+
               <p className="mt-3 text-sm text-gray-600">
                 <span className="font-medium text-gray-800">Evidence:</span> {row.evidence}
               </p>
@@ -1353,11 +2011,31 @@ function RecoveryPlaybookCard({ systemHealth, sections, automationRuns, controlS
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-4">
           <SummaryValue label="Active incidents" value={playbook.incidentCount} />
           <SummaryValue label="Broken sections" value={playbook.brokenSections.length > 0 ? playbook.brokenSections.join(', ') : 'none'} />
           <SummaryValue label="First focus" value={playbook.nextIncident?.title || 'No active recovery needed'} />
+          <SummaryValue label="Restore first" value={playbook.restoreFirst} />
         </div>
+
+        {playbook.capabilityPriorities.length > 0 ? (
+          <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">
+            <p className="font-semibold text-indigo-900">Business capability restore priority</p>
+            <div className="mt-3 grid gap-3 lg:grid-cols-3">
+              {playbook.capabilityPriorities.map((capability) => (
+                <div key={capability.label} className="rounded-xl border border-indigo-100 bg-white p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-gray-900">{capability.label}</p>
+                    <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">
+                      {capability.count} hit
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-600">{capability.reason}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <p className="font-semibold text-gray-900">Recommended recovery order</p>
@@ -1742,6 +2420,8 @@ export default function AdminOperations() {
   const navigate = useNavigate();
   const [, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lastManualRefreshAt, setLastManualRefreshAt] = useState(null);
+  const [manualRefreshPending, setManualRefreshPending] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -1807,6 +2487,27 @@ export default function AdminOperations() {
       : 'Checking automation control backend...'
   };
   const startingJobId = runJobMutation.isPending ? runJobMutation.variables : null;
+  const serviceLevelRows = useMemo(
+    () => buildServiceLevelRows(automationRuns, controlStatus),
+    [automationRuns, controlStatus]
+  );
+  const launchReadiness = useMemo(
+    () => buildLaunchReadinessRows(sections, automationRuns, controlStatus),
+    [sections, automationRuns, controlStatus]
+  );
+  const sourceGovernanceRows = useMemo(() => buildSourceGovernanceRows(sections), [sections]);
+  const dataContractRows = useMemo(() => buildDataContractRows(automationRuns), [automationRuns]);
+  const capabilityConfidenceRows = useMemo(
+    () => buildCapabilityConfidenceRows(sections, automationRuns, controlStatus),
+    [sections, automationRuns, controlStatus]
+  );
+  const displayLastCheckedAt = useMemo(() => {
+    const timestamps = [healthQuery.dataUpdatedAt, controlQuery.dataUpdatedAt, lastManualRefreshAt]
+      .filter((value) => typeof value === 'number' && Number.isFinite(value));
+
+    if (timestamps.length === 0) return null;
+    return new Date(Math.max(...timestamps)).toISOString();
+  }, [controlQuery.dataUpdatedAt, healthQuery.dataUpdatedAt, lastManualRefreshAt]);
 
   const summary = useMemo(() => {
     const sectionStatuses = Object.values(sections).map((section) => String(section?.status || section?.overallStatus || 'missing').toLowerCase());
@@ -1817,16 +2518,74 @@ export default function AdminOperations() {
         : automationSummary.missing > 0
           ? 'missing'
           : 'ok';
-    const combinedStatuses = [...sectionStatuses, automationAreaStatus];
+    const combinedStatuses = [
+      ...sectionStatuses,
+      automationAreaStatus,
+      deriveAutomationHistoryStatus(automationSummary),
+      deriveServiceLevelStatus(serviceLevelRows),
+      deriveLaunchReadinessStatus(launchReadiness),
+      deriveSourceGovernanceStatus(sourceGovernanceRows),
+      deriveDataContractsStatus(dataContractRows),
+      capabilityConfidenceRows.some((row) => row.status === 'missing')
+        ? 'missing'
+        : capabilityConfidenceRows.some((row) => row.status === 'stale')
+          ? 'stale'
+          : 'ok',
+      deriveRunnerAuditStatus(controlStatus),
+      derivePipelineControlsStatus(controlStatus)
+    ];
     return {
       ok: combinedStatuses.filter((status) => status === 'ok').length,
-      degraded: combinedStatuses.filter((status) => status === 'degraded').length,
+      degraded: combinedStatuses.filter((status) => ['degraded', 'failed', 'running', 'blocked'].includes(status)).length,
       stale: combinedStatuses.filter((status) => status === 'stale').length,
       missing: combinedStatuses.filter((status) => status === 'missing').length,
-      topStatus: deriveAreaStatus(sectionStatuses, automationSummary),
+      topStatus: combinedStatuses.includes('missing')
+        ? 'missing'
+        : combinedStatuses.some((status) => ['degraded', 'failed', 'running', 'blocked'].includes(status))
+          ? 'degraded'
+          : combinedStatuses.includes('stale')
+            ? 'stale'
+            : 'ok',
       automationAreaStatus
     };
-  }, [sections, automationSummary]);
+  }, [sections, automationSummary, serviceLevelRows, launchReadiness, sourceGovernanceRows, dataContractRows, capabilityConfidenceRows, controlStatus]);
+
+  const handleRefresh = async () => {
+    const previousGeneratedAt = generatedAt;
+    setManualRefreshPending(true);
+    setLastManualRefreshAt(Date.now());
+
+    const [healthResult, controlResult] = await Promise.allSettled([
+      healthQuery.refetch({ cancelRefetch: true }),
+      controlQuery.refetch({ cancelRefetch: true })
+    ]);
+
+    setManualRefreshPending(false);
+
+    const healthFailed = healthResult.status === 'rejected';
+    const controlFailed = controlResult.status === 'rejected';
+
+    if (healthFailed && controlFailed) {
+      toast.error('Refresh failed. The dashboard could not reach either operations data source.');
+      return;
+    }
+
+    const refreshedGeneratedAt = healthResult.status === 'fulfilled'
+      ? (healthResult.value.data?.systemHealth?.generatedAt || null)
+      : previousGeneratedAt;
+
+    if (refreshedGeneratedAt && previousGeneratedAt && refreshedGeneratedAt === previousGeneratedAt) {
+      toast.success('Dashboard rechecked. The source snapshot has not regenerated since the last report.');
+      return;
+    }
+
+    if (controlFailed) {
+      toast.success('Health snapshot refreshed. Manual control status is still unavailable.');
+      return;
+    }
+
+    toast.success('Admin Operations refreshed successfully.');
+  };
 
   if (loading) {
     return (
@@ -1857,18 +2616,15 @@ export default function AdminOperations() {
                 Report generated: <span className="font-medium text-gray-800">{formatDate(generatedAt)}</span>
               </div>
               <div>
-                Last checked: <span className="font-medium text-gray-800">{formatDate(healthQuery.dataUpdatedAt)}</span>
+                Last checked: <span className="font-medium text-gray-800">{formatDate(displayLastCheckedAt)}</span>
               </div>
             </div>
             <Button
               type="button"
-              onClick={() => {
-                healthQuery.refetch({ cancelRefetch: false });
-                controlQuery.refetch({ cancelRefetch: false });
-              }}
+              onClick={handleRefresh}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${healthQuery.isFetching || controlQuery.isFetching ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`mr-2 h-4 w-4 ${manualRefreshPending || healthQuery.isFetching || controlQuery.isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
@@ -1946,6 +2702,12 @@ export default function AdminOperations() {
           automationRuns={automationRuns}
           controlStatus={controlStatus}
         />
+        <CapabilityConfidenceCard
+          sections={sections}
+          automationRuns={automationRuns}
+          controlStatus={controlStatus}
+        />
+        <SourceGovernanceCard sections={sections} />
         <DataContractsCard automationRuns={automationRuns} />
         <RecoveryPlaybookCard
           systemHealth={systemHealth}
@@ -1954,6 +2716,8 @@ export default function AdminOperations() {
           controlStatus={controlStatus}
         />
         <AutomationHistoryCard automationRuns={automationRuns} />
+        <ControlPlaneCard controlStatus={controlStatus} />
+        <RunnerAuditTimelineCard controlStatus={controlStatus} />
         <BridgeReadinessCard controlStatus={controlStatus} />
         <PipelineControlsCard
           automationRuns={automationRuns}

@@ -39,7 +39,9 @@ async function downloadFile(url, destinationPath) {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to download ${url}: ${response.status}`);
+    const error = new Error(`Failed to download ${url}: ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   const arrayBuffer = await response.arrayBuffer();
@@ -84,7 +86,10 @@ async function main() {
     downloaded: 0,
     skipped_existing: 0,
     missing_source_url: 0,
-    failed: 0
+    failed: 0,
+    upstream_404: 0,
+    upstream_403: 0,
+    unexpected_failures: 0
   };
 
   for (const card of Array.isArray(cards) ? cards : []) {
@@ -120,6 +125,13 @@ async function main() {
         }
       } catch (error) {
         stats.failed += 1;
+        if (error?.status === 404) {
+          stats.upstream_404 += 1;
+        } else if (error?.status === 403) {
+          stats.upstream_403 += 1;
+        } else {
+          stats.unexpected_failures += 1;
+        }
         console.error(`FAB image download failed for ${card?.name || cardId} [${cardId}]: ${error.message}`);
       }
     });

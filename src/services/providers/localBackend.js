@@ -162,6 +162,38 @@ function buildHostedAutomationControlUnavailable() {
         '/api/local/admin/automation/control-status',
         '/api/local/admin/automation/:jobId/run'
       ],
+      checks: [
+        {
+          id: 'manual-runner',
+          label: 'Manual runner bridge',
+          status: 'degraded',
+          detail: 'Hosted static mode can read reports, but cannot execute Node automation jobs directly.'
+        },
+        {
+          id: 'audit-log',
+          label: 'Audit trail',
+          status: 'degraded',
+          detail: 'Run audit history requires the operations backend bridge.'
+        },
+        {
+          id: 'single-run-locks',
+          label: 'Single-run locks',
+          status: 'degraded',
+          detail: 'Duplicate-run lock verification requires the operations backend bridge.'
+        },
+        {
+          id: 'dependency-preflight',
+          label: 'Dependency preflight',
+          status: 'degraded',
+          detail: 'Dependency-safe manual runs require the operations backend bridge.'
+        },
+        {
+          id: 'scheduler-map',
+          label: 'Scheduler map',
+          status: 'degraded',
+          detail: 'Autopilot scheduler visibility requires the operations backend bridge.'
+        }
+      ],
       nextSteps: [
         'Deploy the Node operations backend from render.yaml or another Node-capable host.',
         'Set VITE_API_ORIGIN on Cloudflare Pages to the backend origin.',

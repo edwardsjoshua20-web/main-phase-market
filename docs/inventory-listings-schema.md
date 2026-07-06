@@ -40,8 +40,8 @@ Computed behavior:
 
 Until the owned database migration is complete, inventory listings are stored in the old Base44 `Card` entity and adapted in:
 
-- [inventoryListings.js](/C:/Users/Admin/Desktop/main-phase-market/src/services/inventoryListings.js)
-- [cardInventorySnapshot.js](/C:/Users/Admin/Desktop/main-phase-market/src/components/admin/cardInventorySnapshot.js)
+- [inventoryListings.js](/D:/main-phase-market/src/services/inventoryListings.js)
+- [cardInventorySnapshot.js](/D:/main-phase-market/src/components/admin/cardInventorySnapshot.js)
 
 Legacy field mapping:
 

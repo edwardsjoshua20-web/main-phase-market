@@ -7,6 +7,7 @@ const IMAGE_ROOT = path.resolve(process.cwd(), 'public/data/mtg/images');
 const DEFAULT_SOURCE_PATH = resolveConfiguredSourcePath('magic', 'catalogSource');
 const DEFAULT_KINDS = ['small', 'normal', 'art_crop'];
 const CONCURRENCY = Number(process.env.MTG_IMAGE_CONCURRENCY || 8);
+const DEFAULT_MAX_DOWNLOADS = Number(process.env.MTG_IMAGE_MAX_DOWNLOADS || 5000);
 const KIND_MAP = ['small', 'normal', 'art_crop', 'png'];
 
 function ensureDir(dirPath) {
@@ -167,14 +168,49 @@ async function runPool(tasks, concurrency) {
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, () => worker()));
 }
 
+function parseArgs(argv) {
+  const options = {
+    kinds: null,
+    maxDownloads: DEFAULT_MAX_DOWNLOADS,
+    sourcePath: null,
+    help: false
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--help' || arg === '-h') {
+      options.help = true;
+      continue;
+    }
+
+    if (arg === '--max-downloads') {
+      options.maxDownloads = Number(argv[index + 1] || DEFAULT_MAX_DOWNLOADS);
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--source') {
+      options.sourcePath = argv[index + 1] || null;
+      index += 1;
+      continue;
+    }
+
+    if (!options.kinds && !String(arg).startsWith('--')) {
+      options.kinds = arg;
+    }
+  }
+
+  return options;
+}
+
 async function main() {
-  const firstArg = process.argv[2];
-  if (firstArg === '--help' || firstArg === '-h') {
-    console.log('Usage: node scripts/mirror-mtg-images.mjs [small,normal,art_crop,png]');
+  const options = parseArgs(process.argv.slice(2));
+  if (options.help) {
+    console.log('Usage: node scripts/mirror-mtg-images.mjs [small,normal,art_crop,png] [--max-downloads 5000] [--source path]');
     process.exit(0);
   }
 
-  const requestedKinds = (firstArg || process.env.MTG_IMAGE_KINDS || DEFAULT_KINDS.join(','))
+  const requestedKinds = (options.kinds || process.env.MTG_IMAGE_KINDS || DEFAULT_KINDS.join(','))
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
@@ -186,7 +222,8 @@ async function main() {
 
   ensureDir(IMAGE_ROOT);
 
-  const sourcePath = process.env.MTG_SOURCE_PATH || process.argv[3] || DEFAULT_SOURCE_PATH;
+  const sourcePath = process.env.MTG_SOURCE_PATH || options.sourcePath || DEFAULT_SOURCE_PATH;
+  const maxDownloads = Number.isFinite(options.maxDownloads) && options.maxDownloads > 0 ? options.maxDownloads : DEFAULT_MAX_DOWNLOADS;
   const uniqueById = new Map();
 
   await streamCards(sourcePath, async (card) => {
@@ -204,6 +241,7 @@ async function main() {
   });
 
   const tasks = [];
+  let queueClosed = false;
   const stats = {
     cardsSeen: uniqueById.size,
     downloadsQueued: 0,
@@ -214,6 +252,8 @@ async function main() {
   };
 
   for (const row of uniqueById.values()) {
+    if (queueClosed) break;
+
     for (const kind of validKinds) {
       const sourceUrl = row.images?.[kind];
 
@@ -248,10 +288,16 @@ async function main() {
           console.error(`Image download failed for ${row.name} [${row.id}] ${kind}: ${error.message}`);
         }
       });
+
+      if (stats.downloadsQueued >= maxDownloads) {
+        queueClosed = true;
+        break;
+      }
     }
   }
 
   console.log(`Found ${stats.cardsSeen} unique MTG cards.`);
+  console.log(`Capped queue at ${maxDownloads} downloads per run.`);
   console.log(`Queueing ${stats.downloadsQueued} image downloads for kinds: ${validKinds.join(', ')}.`);
 
   await runPool(tasks, CONCURRENCY);
@@ -259,12 +305,15 @@ async function main() {
   const manifest = {
     generated_at: new Date().toISOString(),
     kinds: validKinds,
+    mode: 'incremental-capped',
+    max_downloads_per_run: maxDownloads,
     cards_seen: stats.cardsSeen,
     downloads_queued: stats.downloadsQueued,
     downloaded: stats.downloaded,
     skipped_existing: stats.skippedExisting,
     missing_source_url: stats.missingSourceUrl,
-    failed: stats.failed
+    failed: stats.failed,
+    queue_completed: stats.downloadsQueued < maxDownloads
   };
 
   fs.writeFileSync(path.join(IMAGE_ROOT, 'mirror-manifest.json'), JSON.stringify(manifest, null, 2));

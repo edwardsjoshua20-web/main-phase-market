@@ -4,7 +4,7 @@
       "id": "mtg-images",
       "label": "Mirror MTG images",
       "command": "npm",
-      "args": ["run", "mtg:mirror:images", "--", "small,normal,art_crop"],
+      "args": ["run", "mtg:mirror:images", "--", "small,normal,art_crop", "--max-downloads", "5000"],
       "requires": [
         { "type": "source-exists", "game": "magic", "key": "catalogSource", "label": "MTG source export" }
       ],

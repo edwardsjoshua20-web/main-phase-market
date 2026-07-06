@@ -4,7 +4,7 @@ This rebuild uses one canonical MTG catalog plus a local-first search index.
 
 ## Source
 
-- Source file: `C:\Users\Admin\Desktop\Base44 MTG Import\source_copy\all_cards-latest.json`
+- Source file: `D:\main-phase-market\server\data\mtg\source\all_cards-latest.json`
 - Included:
   - Paper-playable cards, including non-English printings
   - Standard printings with images
