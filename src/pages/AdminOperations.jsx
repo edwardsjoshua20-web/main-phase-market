@@ -380,8 +380,39 @@ function deriveDataContractsStatus(rows) {
   return 'ok';
 }
 
+function getBridgeChecks(controlStatus) {
+  return Array.isArray(controlStatus?.bridge?.checks) ? controlStatus.bridge.checks : [];
+}
+
+function getBridgeCheck(controlStatus, checkId) {
+  return getBridgeChecks(controlStatus).find((check) => String(check?.id || '').toLowerCase() === String(checkId || '').toLowerCase()) || null;
+}
+
+function getBridgeCheckStatus(controlStatus, checkId, fallback = 'missing') {
+  return String(getBridgeCheck(controlStatus, checkId)?.status || fallback).toLowerCase();
+}
+
+function summarizeBridgeStatuses(statuses = []) {
+  const normalized = statuses.map((status) => String(status || 'missing').toLowerCase());
+  if (normalized.includes('missing')) return 'missing';
+  if (normalized.includes('degraded')) return 'degraded';
+  if (normalized.includes('stale')) return 'stale';
+  return 'ok';
+}
+
 function derivePipelineControlsStatus(controlStatus) {
-  return controlStatus?.available ? 'ok' : 'degraded';
+  const controlsAvailable = Boolean(controlStatus?.available);
+  if (!controlsAvailable) return 'degraded';
+
+  const bridgeStatus = summarizeBridgeStatuses([
+    getBridgeCheckStatus(controlStatus, 'allowed-job-map'),
+    getBridgeCheckStatus(controlStatus, 'dependency-preflight'),
+    getBridgeCheckStatus(controlStatus, 'single-run-locks'),
+    getBridgeCheckStatus(controlStatus, 'audit-log'),
+    getBridgeCheckStatus(controlStatus, 'run-history')
+  ]);
+
+  return bridgeStatus === 'ok' ? 'ok' : 'degraded';
 }
 
 function deriveRunnerAuditStatus(controlStatus) {
@@ -991,11 +1022,24 @@ function buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlS
 function buildControlPlaneRows(controlStatus) {
   const controlsAvailable = Boolean(controlStatus?.available);
   const scheduler = controlStatus?.scheduler || {};
-  const bridge = controlStatus?.bridge || {};
-  const checks = Array.isArray(bridge.checks) ? bridge.checks : [];
-  const hasAuditCheck = checks.some((check) => String(check.label || '').toLowerCase().includes('audit'));
-  const hasLockCheck = checks.some((check) => String(check.label || '').toLowerCase().includes('lock'));
-  const hasPreflightCheck = checks.some((check) => String(check.label || '').toLowerCase().includes('preflight'));
+  const remoteConnectionsStatus = getBridgeCheckStatus(controlStatus, 'remote-connections');
+  const allowedOriginsStatus = getBridgeCheckStatus(controlStatus, 'allowed-origins');
+  const supabaseUrlStatus = getBridgeCheckStatus(controlStatus, 'supabase-url');
+  const supabaseServiceRoleStatus = getBridgeCheckStatus(controlStatus, 'supabase-service-role');
+  const auditLogStatus = getBridgeCheckStatus(controlStatus, 'audit-log');
+  const runHistoryStatus = getBridgeCheckStatus(controlStatus, 'run-history');
+  const lockStatus = getBridgeCheckStatus(controlStatus, 'single-run-locks');
+  const preflightStatus = getBridgeCheckStatus(controlStatus, 'dependency-preflight');
+  const allowedJobMapStatus = getBridgeCheckStatus(controlStatus, 'allowed-job-map');
+  const schedulerMapStatus = getBridgeCheckStatus(controlStatus, 'scheduler-map');
+  const bridgeConnectionStatus = summarizeBridgeStatuses([
+    remoteConnectionsStatus,
+    allowedOriginsStatus,
+    supabaseUrlStatus,
+    supabaseServiceRoleStatus,
+    allowedJobMapStatus
+  ]);
+  const auditSurfaceStatus = summarizeBridgeStatuses([auditLogStatus, runHistoryStatus]);
 
   return [
     {
@@ -1010,19 +1054,29 @@ function buildControlPlaneRows(controlStatus) {
       id: 'manual-runner',
       label: 'Manual runner bridge',
       owner: 'operations',
-      status: controlsAvailable ? 'ok' : 'degraded',
+      status: controlsAvailable && bridgeConnectionStatus === 'ok' ? 'ok' : 'degraded',
       evidence: controlsAvailable
-        ? 'Hosted admin can reach the backend runner for manual job execution.'
+        ? bridgeConnectionStatus === 'ok'
+          ? 'Hosted admin can reach the backend runner for manual job execution.'
+          : 'Runner is reachable, but one or more bridge prerequisites are still not green.'
         : controlStatus?.reason || 'Hosted admin cannot currently reach the backend runner.',
       nextStep: controlsAvailable
-        ? 'Keep the backend origin and auth bridge healthy.'
+        ? bridgeConnectionStatus === 'ok'
+          ? 'Keep the backend origin and auth bridge healthy.'
+          : 'Clear the remaining bridge readiness checks before trusting manual execution.'
         : 'Host/connect the operations backend and wire VITE_API_ORIGIN.'
     },
     {
       id: 'scheduler',
       label: 'Autopilot scheduler',
       owner: 'operations',
-      status: scheduler.enabled ? 'ok' : scheduler.configured ? 'degraded' : 'missing',
+      status: scheduler.enabled
+        ? 'ok'
+        : scheduler.configured
+          ? schedulerMapStatus === 'ok'
+            ? 'degraded'
+            : 'missing'
+          : 'missing',
       evidence: scheduler.enabled
         ? `Scheduler is enabled and checking due jobs. Last checked ${formatDate(scheduler.lastCheckedAt)}.`
         : scheduler.configured
@@ -1036,43 +1090,43 @@ function buildControlPlaneRows(controlStatus) {
       id: 'audit-trail',
       label: 'Run audit trail',
       owner: 'operations',
-      status: controlsAvailable ? (hasAuditCheck ? 'ok' : 'stale') : 'degraded',
+      status: controlsAvailable ? auditSurfaceStatus : 'degraded',
       evidence: controlsAvailable
-        ? hasAuditCheck
-          ? 'Backend readiness checks include audit coverage verification.'
-          : 'Runner is connected, but audit-trail verification is not explicitly surfaced yet.'
+        ? auditSurfaceStatus === 'ok'
+          ? 'Backend readiness checks include audit coverage verification and writable run history.'
+          : 'Runner is connected, but audit storage or run-history verification is not yet green.'
         : 'Audit records cannot be trusted from the hosted surface until the runner bridge is live.',
-      nextStep: hasAuditCheck
+      nextStep: auditSurfaceStatus === 'ok'
         ? 'Keep audit output visible in the operations backend.'
-        : 'Expose audit verification in the backend bridge checks.'
+        : 'Repair audit-log and run-history bridge checks so the execution trail is trustworthy.'
     },
     {
       id: 'single-run-locks',
       label: 'Single-run locks',
       owner: 'operations',
-      status: controlsAvailable ? (hasLockCheck ? 'ok' : 'stale') : 'degraded',
+      status: controlsAvailable ? lockStatus : 'degraded',
       evidence: controlsAvailable
-        ? hasLockCheck
+        ? lockStatus === 'ok'
           ? 'Runner checks explicitly verify single-run lock protection.'
-          : 'Runner is connected, but lock verification is not explicitly surfaced yet.'
+          : 'Runner is connected, but lock verification is not yet green.'
         : 'Duplicate-run protection cannot be exercised from hosted admin until the runner bridge is live.',
-      nextStep: hasLockCheck
+      nextStep: lockStatus === 'ok'
         ? 'Continue monitoring lock collisions during manual and scheduled runs.'
-        : 'Expose lock verification in the backend bridge checks.'
+        : 'Repair the single-run lock bridge check before trusting concurrent manual or scheduled runs.'
     },
     {
       id: 'dependency-preflight',
       label: 'Dependency preflight safety',
       owner: 'operations',
-      status: controlsAvailable ? (hasPreflightCheck ? 'ok' : 'stale') : 'degraded',
+      status: controlsAvailable ? preflightStatus : 'degraded',
       evidence: controlsAvailable
-        ? hasPreflightCheck
+        ? preflightStatus === 'ok'
           ? 'Runner checks explicitly verify dependency preflight readiness.'
-          : 'Preflight is used by the UI, but backend verification is not explicitly surfaced yet.'
+          : 'Preflight is used by the UI, but backend verification is not yet green.'
         : 'Dependency-safe manual runs are blocked until the runner bridge is live.',
-      nextStep: hasPreflightCheck
+      nextStep: preflightStatus === 'ok'
         ? 'Keep dependency enforcement aligned with the recommended run order.'
-        : 'Expose preflight verification in the backend bridge checks.'
+        : 'Repair the dependency-preflight bridge check so the backend proves the same safety rules as the UI.'
     }
   ];
 }
