@@ -1119,6 +1119,24 @@ function BridgeReadinessCard({ controlStatus }) {
   const expectedEndpoints = Array.isArray(bridge.expectedEndpoints) ? bridge.expectedEndpoints : [];
   const nextSteps = Array.isArray(bridge.nextSteps) ? bridge.nextSteps : [];
   const checks = Array.isArray(bridge.checks) ? bridge.checks : [];
+  const activationContract = [
+    {
+      label: 'Backend host',
+      value: 'Render service running npm run ops:serve'
+    },
+    {
+      label: 'Cloudflare Pages',
+      value: 'VITE_API_ORIGIN=https://<render-service>.onrender.com'
+    },
+    {
+      label: 'Backend env',
+      value: 'ALLOW_REMOTE_CONNECTIONS=true, PUBLIC_APP_URL=https://mainphasemarket.net'
+    },
+    {
+      label: 'Proof command',
+      value: 'npm run ops:check -- --origin https://<render-service>.onrender.com --token <admin-token>'
+    }
+  ];
 
   return (
     <Card className={controlsAvailable ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'}>
@@ -1171,27 +1189,49 @@ function BridgeReadinessCard({ controlStatus }) {
         ) : null}
 
         {!controlsAvailable ? (
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-4">
             <div className="rounded-xl border border-blue-100 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Expected backend endpoints</p>
-              <div className="mt-3 space-y-2">
-                {(expectedEndpoints.length > 0 ? expectedEndpoints : ['/api/local/health', '/api/local/admin/automation/control-status']).map((endpoint) => (
-                  <p key={endpoint} className="break-all rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">
-                    {endpoint}
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Activation contract</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Static reporting is live. Manual runs, audit history, scheduler proof, and one-click refresh become live after this bridge contract is connected.
                   </p>
+                </div>
+                <StatusBadge status="degraded" />
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                {activationContract.map((item) => (
+                  <div key={item.label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
+                    <p className="mt-1 break-all font-mono text-xs text-slate-700">{item.value}</p>
+                  </div>
                 ))}
               </div>
             </div>
-            <div className="rounded-xl border border-blue-100 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Next bridge steps</p>
-              <ol className="mt-3 space-y-2 text-sm text-slate-700">
-                {(nextSteps.length > 0 ? nextSteps : ['Deploy the Node operations backend.', 'Set VITE_API_ORIGIN in Cloudflare Pages.', 'Redeploy the hosted frontend.']).map((step, index) => (
-                  <li key={step} className="flex gap-2">
-                    <span className="font-semibold text-slate-900">{index + 1}.</span>
-                    <span>{step}</span>
-                  </li>
-                ))}
-              </ol>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border border-blue-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Expected backend endpoints</p>
+                <div className="mt-3 space-y-2">
+                  {(expectedEndpoints.length > 0 ? expectedEndpoints : ['/api/local/health', '/api/local/admin/automation/control-status']).map((endpoint) => (
+                    <p key={endpoint} className="break-all rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">
+                      {endpoint}
+                    </p>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-xl border border-blue-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Next bridge steps</p>
+                <ol className="mt-3 space-y-2 text-sm text-slate-700">
+                  {(nextSteps.length > 0 ? nextSteps : ['Deploy the Node operations backend.', 'Set VITE_API_ORIGIN in Cloudflare Pages.', 'Redeploy the hosted frontend.']).map((step, index) => (
+                    <li key={step} className="flex gap-2">
+                      <span className="font-semibold text-slate-900">{index + 1}.</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             </div>
           </div>
         ) : (
@@ -2107,7 +2147,7 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
               </div>
               <div>
                 <p className={controlsAvailable ? 'font-semibold text-green-950' : 'font-semibold text-blue-950'}>
-                  {controlsAvailable ? 'Manual pipeline runner is connected.' : 'Manual runs require the local operations backend.'}
+                  {controlsAvailable ? 'Manual pipeline runner is connected.' : 'Manual runs require the operations backend bridge.'}
                 </p>
                 <p className={`mt-1 text-sm ${controlsAvailable ? 'text-green-800' : 'text-blue-800'}`}>
                   {controlsAvailable
