@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { backend } from '@/services/backend';
+import * as adminOperationsModel from '@/services/admin/adminOperationsModel';
 import {
   getAutomationDependencySummary,
   siteAutomationRegistry,
@@ -1384,7 +1385,10 @@ function DashboardAreaBoardCard({ areas }) {
 }
 
 function ActionCenterCard({ systemHealth, sections, automationRuns, controlStatus }) {
-  const items = useMemo(() => buildActionItems(systemHealth, sections, automationRuns), [systemHealth, sections, automationRuns]);
+  const items = useMemo(
+    () => adminOperationsModel.buildActionItems(systemHealth, sections, automationRuns),
+    [systemHealth, sections, automationRuns]
+  );
 
   return (
     <Card className="border-gray-200">
@@ -1508,7 +1512,7 @@ function ReadinessCard({ section }) {
 }
 
 function AutomationHistoryCard({ automationRuns }) {
-  const summary = useMemo(() => summarizeAutomationRuns(automationRuns), [automationRuns]);
+  const summary = useMemo(() => adminOperationsModel.summarizeAutomationRuns(automationRuns), [automationRuns]);
 
   return (
     <Card className="border-gray-200">
@@ -1576,7 +1580,7 @@ function AutomationHistoryCard({ automationRuns }) {
 
 function OperationsIncidentCard({ systemHealth, sections, automationRuns, controlStatus }) {
   const incidents = useMemo(
-    () => buildOperationIncidents(systemHealth, sections, automationRuns, controlStatus),
+    () => adminOperationsModel.buildOperationIncidents(systemHealth, sections, automationRuns, controlStatus),
     [systemHealth, sections, automationRuns, controlStatus]
   );
   const critical = incidents.filter((incident) => incident.severity === 'critical').length;
@@ -1665,7 +1669,7 @@ function OperationsIncidentCard({ systemHealth, sections, automationRuns, contro
 
 function ServiceLevelCard({ automationRuns, controlStatus }) {
   const rows = useMemo(
-    () => buildServiceLevelRows(automationRuns, controlStatus),
+    () => adminOperationsModel.buildServiceLevelRows(automationRuns, controlStatus),
     [automationRuns, controlStatus]
   );
   const okCount = rows.filter((row) => row.status === 'ok').length;
@@ -1744,7 +1748,7 @@ function ServiceLevelCard({ automationRuns, controlStatus }) {
 
 function LaunchReadinessCard({ sections, automationRuns, controlStatus }) {
   const readiness = useMemo(
-    () => buildLaunchReadinessRows(sections, automationRuns, controlStatus),
+    () => adminOperationsModel.buildLaunchReadinessRows(sections, automationRuns, controlStatus),
     [sections, automationRuns, controlStatus]
   );
   const rows = readiness.rows;
@@ -1813,7 +1817,7 @@ function LaunchReadinessCard({ sections, automationRuns, controlStatus }) {
 }
 
 function SourceGovernanceCard({ sections }) {
-  const rows = useMemo(() => buildSourceGovernanceRows(sections), [sections]);
+  const rows = useMemo(() => adminOperationsModel.buildSourceGovernanceRows(sections), [sections]);
   const localCount = rows.filter((row) => row.controlModel === 'Managed locally').length;
   const remoteCount = rows.filter((row) => row.controlModel !== 'Managed locally' && row.status === 'ok').length;
   const missingCount = rows.filter((row) => row.status !== 'ok').length;
@@ -1881,7 +1885,7 @@ function SourceGovernanceCard({ sections }) {
 }
 
 function ControlPlaneCard({ controlStatus }) {
-  const rows = useMemo(() => buildControlPlaneRows(controlStatus), [controlStatus]);
+  const rows = useMemo(() => adminOperationsModel.buildControlPlaneRows(controlStatus), [controlStatus]);
   const healthy = rows.filter((row) => row.status === 'ok').length;
   const watching = rows.filter((row) => row.status === 'stale').length;
   const blocked = rows.filter((row) => row.status === 'degraded' || row.status === 'missing' || row.status === 'failed').length;
@@ -1937,7 +1941,7 @@ function ControlPlaneCard({ controlStatus }) {
 }
 
 function RunnerAuditTimelineCard({ controlStatus }) {
-  const summary = useMemo(() => buildRunnerAuditSummary(controlStatus), [controlStatus]);
+  const summary = useMemo(() => adminOperationsModel.buildRunnerAuditSummary(controlStatus), [controlStatus]);
   const visibleEntries = summary.entries.slice(0, 10);
 
   return (
@@ -2033,7 +2037,7 @@ function RunnerAuditTimelineCard({ controlStatus }) {
 
 function CapabilityConfidenceCard({ sections, automationRuns, controlStatus }) {
   const rows = useMemo(
-    () => buildCapabilityConfidenceRows(sections, automationRuns, controlStatus),
+    () => adminOperationsModel.buildCapabilityConfidenceRows(sections, automationRuns, controlStatus),
     [sections, automationRuns, controlStatus]
   );
   const trustedCount = rows.filter((row) => row.status === 'ok').length;
@@ -2100,7 +2104,7 @@ function CapabilityConfidenceCard({ sections, automationRuns, controlStatus }) {
 }
 
 function DataContractsCard({ automationRuns }) {
-  const rows = useMemo(() => buildDataContractRows(automationRuns), [automationRuns]);
+  const rows = useMemo(() => adminOperationsModel.buildDataContractRows(automationRuns), [automationRuns]);
 
   return (
     <Card className="border-gray-200">
@@ -2167,7 +2171,7 @@ function DataContractsCard({ automationRuns }) {
 
 function RecoveryPlaybookCard({ systemHealth, sections, automationRuns, controlStatus }) {
   const playbook = useMemo(
-    () => buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlStatus),
+    () => adminOperationsModel.buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlStatus),
     [systemHealth, sections, automationRuns, controlStatus]
   );
 
@@ -2249,7 +2253,7 @@ function RecoveryPlaybookCard({ systemHealth, sections, automationRuns, controlS
 function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startingJobId }) {
   const controlsAvailable = Boolean(controlStatus?.available);
   const recommendedRunOrder = useMemo(
-    () => buildRecommendedRunOrder(automationRuns, controlStatus),
+    () => adminOperationsModel.buildRecommendedRunOrder(automationRuns, controlStatus),
     [automationRuns, controlStatus]
   );
 
@@ -2657,7 +2661,7 @@ export default function AdminOperations() {
   const sections = systemHealth?.sections || {};
   const generatedAt = systemHealth?.generatedAt || null;
   const automationRuns = systemHealth?.automationRuns || { generatedAt: null, jobs: {} };
-  const automationSummary = useMemo(() => summarizeAutomationRuns(automationRuns), [automationRuns]);
+  const automationSummary = useMemo(() => adminOperationsModel.summarizeAutomationRuns(automationRuns), [automationRuns]);
   const controlStatus = controlQuery.data || {
     available: false,
     mode: 'unknown',
@@ -2667,27 +2671,27 @@ export default function AdminOperations() {
   };
   const startingJobId = runJobMutation.isPending ? runJobMutation.variables : null;
   const serviceLevelRows = useMemo(
-    () => buildServiceLevelRows(automationRuns, controlStatus),
+    () => adminOperationsModel.buildServiceLevelRows(automationRuns, controlStatus),
     [automationRuns, controlStatus]
   );
   const launchReadiness = useMemo(
-    () => buildLaunchReadinessRows(sections, automationRuns, controlStatus),
+    () => adminOperationsModel.buildLaunchReadinessRows(sections, automationRuns, controlStatus),
     [sections, automationRuns, controlStatus]
   );
-  const sourceGovernanceRows = useMemo(() => buildSourceGovernanceRows(sections), [sections]);
-  const dataContractRows = useMemo(() => buildDataContractRows(automationRuns), [automationRuns]);
+  const sourceGovernanceRows = useMemo(() => adminOperationsModel.buildSourceGovernanceRows(sections), [sections]);
+  const dataContractRows = useMemo(() => adminOperationsModel.buildDataContractRows(automationRuns), [automationRuns]);
   const capabilityConfidenceRows = useMemo(
-    () => buildCapabilityConfidenceRows(sections, automationRuns, controlStatus),
+    () => adminOperationsModel.buildCapabilityConfidenceRows(sections, automationRuns, controlStatus),
     [sections, automationRuns, controlStatus]
   );
   const operationIncidents = useMemo(
-    () => buildOperationIncidents(systemHealth, sections, automationRuns, controlStatus),
+    () => adminOperationsModel.buildOperationIncidents(systemHealth, sections, automationRuns, controlStatus),
     [systemHealth, sections, automationRuns, controlStatus]
   );
-  const controlPlaneRows = useMemo(() => buildControlPlaneRows(controlStatus), [controlStatus]);
-  const runnerAuditSummary = useMemo(() => buildRunnerAuditSummary(controlStatus), [controlStatus]);
+  const controlPlaneRows = useMemo(() => adminOperationsModel.buildControlPlaneRows(controlStatus), [controlStatus]);
+  const runnerAuditSummary = useMemo(() => adminOperationsModel.buildRunnerAuditSummary(controlStatus), [controlStatus]);
   const recoveryPlaybook = useMemo(
-    () => buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlStatus),
+    () => adminOperationsModel.buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlStatus),
     [systemHealth, sections, automationRuns, controlStatus]
   );
   const displayLastCheckedAt = useMemo(() => {
@@ -2707,23 +2711,23 @@ export default function AdminOperations() {
         : automationSummary.missing > 0
           ? 'missing'
           : 'ok';
-    const incidentQueueStatus = deriveIncidentQueueStatus(operationIncidents);
-    const serviceLevelStatus = deriveServiceLevelStatus(serviceLevelRows);
-    const launchReadinessStatus = deriveLaunchReadinessStatus(launchReadiness);
-    const sourceGovernanceStatus = deriveSourceGovernanceStatus(sourceGovernanceRows);
-    const dataContractsStatus = deriveDataContractsStatus(dataContractRows);
-    const bridgeReadinessStatus = summarizeBridgeStatuses(getBridgeChecks(controlStatus).map((check) => check.status));
-    const controlPlaneStatus = deriveControlPlaneStatus(controlPlaneRows);
-    const capabilityConfidenceStatus = deriveCapabilityConfidenceStatus(capabilityConfidenceRows);
-    const recoveryPlaybookStatus = deriveRecoveryPlaybookStatus(recoveryPlaybook);
-    const pipelineControlsStatus = derivePipelineControlsStatus(controlStatus);
+    const incidentQueueStatus = adminOperationsModel.deriveIncidentQueueStatus(operationIncidents);
+    const serviceLevelStatus = adminOperationsModel.deriveServiceLevelStatus(serviceLevelRows);
+    const launchReadinessStatus = adminOperationsModel.deriveLaunchReadinessStatus(launchReadiness);
+    const sourceGovernanceStatus = adminOperationsModel.deriveSourceGovernanceStatus(sourceGovernanceRows);
+    const dataContractsStatus = adminOperationsModel.deriveDataContractsStatus(dataContractRows);
+    const bridgeReadinessStatus = adminOperationsModel.summarizeBridgeStatuses(adminOperationsModel.getBridgeChecks(controlStatus).map((check) => check.status));
+    const controlPlaneStatus = adminOperationsModel.deriveControlPlaneStatus(controlPlaneRows);
+    const capabilityConfidenceStatus = adminOperationsModel.deriveCapabilityConfidenceStatus(capabilityConfidenceRows);
+    const recoveryPlaybookStatus = adminOperationsModel.deriveRecoveryPlaybookStatus(recoveryPlaybook);
+    const pipelineControlsStatus = adminOperationsModel.derivePipelineControlsStatus(controlStatus);
 
     return [
       {
         id: 'automation-registry',
         label: 'Automation registry',
         owner: 'operations',
-        status: deriveAreaStatus(sectionStatuses, automationSummary),
+        status: adminOperationsModel.deriveAreaStatus(sectionStatuses, automationSummary),
         evidence: `${siteAutomationRegistry.length} declared automation jobs are registered in the system.`,
         nextStep: 'Keep registry ownership, cadence, and output contracts aligned with the real pipeline stack.'
       },
@@ -2731,7 +2735,7 @@ export default function AdminOperations() {
         id: 'pipeline-run-history',
         label: 'Pipeline run history',
         owner: 'operations',
-        status: deriveAutomationHistoryStatus(automationSummary),
+        status: adminOperationsModel.deriveAutomationHistoryStatus(automationSummary),
         evidence: `${automationSummary.ok} healthy, ${automationSummary.failed} failed, ${automationSummary.running} running, ${automationSummary.missing} with no recorded run yet.`,
         nextStep: 'Use fresh run history as the source of truth before trusting manual reruns or scheduler decisions.'
       },
@@ -2784,7 +2788,7 @@ export default function AdminOperations() {
         label: 'Operations bridge readiness',
         owner: 'operations',
         status: bridgeReadinessStatus,
-        evidence: `${getBridgeChecks(controlStatus).filter((check) => String(check.status || '').toLowerCase() === 'ok').length}/${getBridgeChecks(controlStatus).length} backend bridge readiness checks are green.`,
+        evidence: `${adminOperationsModel.getBridgeChecks(controlStatus).filter((check) => String(check.status || '').toLowerCase() === 'ok').length}/${adminOperationsModel.getBridgeChecks(controlStatus).length} backend bridge readiness checks are green.`,
         nextStep: controlStatus?.available
           ? 'Keep the hosted bridge reachable and its backend checks green.'
           : 'Host/connect the operations backend bridge and wire VITE_API_ORIGIN.'
