@@ -49,151 +49,6 @@ const sectionIcons = {
   readiness: CheckCircle2
 };
 
-const ADMIN_TIMEZONE = 'America/New_York';
-
-function formatDate(value) {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('en-US', {
-    timeZone: ADMIN_TIMEZONE,
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true,
-    timeZoneName: 'short'
-  });
-}
-
-function formatHours(value) {
-  if (value == null || Number.isNaN(Number(value))) return '—';
-  return `${Number(value).toFixed(1)}h ago`;
-}
-
-function formatDuration(value) {
-  if (value == null || Number.isNaN(Number(value))) return '—';
-  const ms = Number(value);
-  if (ms < 1000) return `${ms}ms`;
-  const totalSeconds = Math.round(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes === 0) return `${seconds}s`;
-  return `${minutes}m ${seconds}s`;
-}
-
-function getCadenceTargetHours(cadence) {
-  const normalized = String(cadence || '').toLowerCase();
-  if (normalized.includes('hourly')) return 1.5;
-  if (normalized.includes('every-2-days')) return 54;
-  if (normalized.includes('daily')) return 30;
-  return 30;
-}
-
-function getRunFreshnessHours(run) {
-  const lastRunAt = run?.lastSucceededAt || run?.lastFinishedAt || run?.lastStartedAt || null;
-  if (!lastRunAt) return null;
-  const time = new Date(lastRunAt).getTime();
-  if (Number.isNaN(time)) return null;
-  return Math.max(0, (Date.now() - time) / 36e5);
-}
-
-function getBusinessImpact(jobId) {
-  const impact = {
-    'card-backfill-refresh': 'Raw card data feeding catalog, images, pricing, search, and storefront accuracy.',
-    'catalog-refresh': 'Normalized card/search catalog used across storefront, deck tools, and admin inventory flows.',
-    'image-repair-sync': 'Card image coverage across shop, deck builder, commander hub, and inventory intake.',
-    'pricing-refresh': 'Storefront market price guidance and deck/card value calculations.',
-    'homepage-upcoming-releases': 'Public homepage hero/release feed staying current for upcoming products.',
-    'system-health-report': 'Admin visibility, incident detection, and freshness reporting.'
-  };
-  return impact[jobId] || 'Business automation health.';
-}
-
-function getJobDetails(jobId) {
-  return siteAutomationRegistry.find((job) => job.id === jobId) || null;
-}
-
-function getRunRecord(automationRuns, jobId) {
-  return automationRuns?.jobs?.[jobId] || null;
-}
-
-function summarizeTargets(entries) {
-  const names = entries
-    .map((entry) => entry.game || entry.source || entry.id)
-    .filter(Boolean);
-
-  if (names.length === 0) return 'No affected targets listed';
-  if (names.length <= 3) return names.join(', ');
-  return `${names.slice(0, 3).join(', ')} +${names.length - 3} more`;
-}
-
-function summarizeAutomationRuns(automationRuns) {
-  const runs = Object.values(automationRuns?.jobs || {});
-  return {
-    ok: runs.filter((run) => run?.lastStatus === 'ok').length,
-    failed: runs.filter((run) => run?.lastStatus === 'failed').length,
-    running: runs.filter((run) => run?.lastStatus === 'running').length,
-    missing: siteAutomationRegistry.filter((job) => !automationRuns?.jobs?.[job.id]?.lastStatus).length
-  };
-}
-
-function getControlReadiness(run) {
-  const status = String(run?.lastStatus || 'missing').toLowerCase();
-
-  if (status === 'ok') {
-    return {
-      label: 'Ready when runner is wired',
-      tone: 'text-green-700',
-      note: 'Latest recorded run completed successfully.'
-    };
-  }
-
-  if (status === 'running') {
-    return {
-      label: 'Run in progress',
-      tone: 'text-blue-700',
-      note: 'Wait for this job to finish before allowing another run.'
-    };
-  }
-
-  if (status === 'failed') {
-    return {
-      label: 'Needs review before rerun',
-      tone: 'text-red-700',
-      note: run?.lastError || 'The last run failed and should be reviewed before manual execution.'
-    };
-  }
-
-  return {
-    label: 'Needs first recorded run',
-    tone: 'text-amber-700',
-    note: 'No run history has been captured yet.'
-  };
-}
-
-function dependencyRunStatus(automationRuns, jobId) {
-  return String(getRunRecord(automationRuns, jobId)?.lastStatus || 'missing').toLowerCase();
-}
-
-function getDependencyDiagnostics(job, automationRuns) {
-  const dependencySummary = getAutomationDependencySummary(job.id);
-  const dependencies = dependencySummary.dependsOn.map((dependency) => ({
-    ...dependency,
-    runStatus: dependencyRunStatus(automationRuns, dependency.id)
-  }));
-  const blockers = dependencies.filter((dependency) => dependency.runStatus !== 'ok');
-
-  return {
-    dependencies,
-    blocks: dependencySummary.blocks,
-    blockers,
-    ready: blockers.length === 0
-  };
-}
-
 function DependencySummary({ job, automationRuns, controlStatus }) {
   const diagnostics = adminOperationsModel.getDependencyDiagnostics(job, automationRuns);
   const preflight = adminOperationsModel.getEffectivePreflight(job, automationRuns, controlStatus);
@@ -265,10 +120,10 @@ function JobRunSummary({ run }) {
     <div className="space-y-1 text-xs text-gray-600">
       <div className="flex items-center gap-2">
         <StatusBadge status={run.lastStatus || 'missing'} />
-        <span>Duration: {formatDuration(run.lastDurationMs)}</span>
+        <span>Duration: {adminOperationsModel.formatDuration(run.lastDurationMs)}</span>
       </div>
-      <p>Last success: {formatDate(run.lastSucceededAt)}</p>
-      <p>Last failure: {formatDate(run.lastFailedAt)}</p>
+      <p>Last success: {adminOperationsModel.formatDate(run.lastSucceededAt)}</p>
+      <p>Last failure: {adminOperationsModel.formatDate(run.lastFailedAt)}</p>
       {run.lastError ? <p className="text-red-600">Why: {run.lastError}</p> : null}
     </div>
   );
@@ -632,7 +487,7 @@ function AutomationHistoryCard({ automationRuns }) {
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {siteAutomationRegistry.map((job) => {
-                const run = getRunRecord(automationRuns, job.id);
+                const run = adminOperationsModel.getRunRecord(automationRuns, job.id);
                 return (
                   <tr key={job.id}>
                     <td className="px-4 py-3 align-top">
@@ -642,9 +497,9 @@ function AutomationHistoryCard({ automationRuns }) {
                     <td className="px-4 py-3 text-sm text-gray-700 align-top">{job.owner}</td>
                     <td className="px-4 py-3 text-sm text-gray-700 align-top">{job.cadence}</td>
                     <td className="px-4 py-3 text-sm align-top"><StatusBadge status={run?.lastStatus || 'missing'} /></td>
-                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDate(run?.lastSucceededAt)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDate(run?.lastFailedAt)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDuration(run?.lastDurationMs)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{adminOperationsModel.formatDate(run?.lastSucceededAt)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{adminOperationsModel.formatDate(run?.lastFailedAt)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{adminOperationsModel.formatDuration(run?.lastDurationMs)}</td>
                     <td className="px-4 py-3 text-sm text-gray-600 align-top max-w-sm">
                       {run?.lastError ? run.lastError : run ? 'Latest run completed without a recorded error.' : 'No run history has been captured for this job yet.'}
                     </td>
@@ -782,7 +637,7 @@ function ServiceLevelCard({ automationRuns, controlStatus }) {
           <SummaryValue label="Within SLA" value={okCount} />
           <SummaryValue label="Needs attention" value={attentionCount} />
           <SummaryValue label="Next due job" value={nextDue?.label || 'none'} />
-          <SummaryValue label="Next due at" value={formatDate(nextDue?.nextDueAt)} />
+          <SummaryValue label="Next due at" value={adminOperationsModel.formatDate(nextDue?.nextDueAt)} />
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-gray-200">
@@ -806,12 +661,12 @@ function ServiceLevelCard({ automationRuns, controlStatus }) {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 align-top">{row.cadence} / {row.targetHours}h</td>
                   <td className="px-4 py-3 text-sm text-gray-700 align-top">
-                    {row.freshnessHours == null ? 'No successful run yet' : formatHours(row.freshnessHours)}
+                    {row.freshnessHours == null ? 'No successful run yet' : adminOperationsModel.formatHours(row.freshnessHours)}
                     {row.overdueHours > 0 ? (
-                      <p className="mt-1 text-xs font-medium text-orange-700">Over by {formatHours(row.overdueHours)}</p>
+                      <p className="mt-1 text-xs font-medium text-orange-700">Over by {adminOperationsModel.formatHours(row.overdueHours)}</p>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDate(row.nextDueAt)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 align-top">{adminOperationsModel.formatDate(row.nextDueAt)}</td>
                   <td className="px-4 py-3 text-sm align-top">
                     <StatusBadge status={row.status} />
                     {row.isDue ? <p className="mt-1 text-xs text-orange-700">Scheduler says due</p> : null}
@@ -1055,8 +910,8 @@ function RunnerAuditTimelineCard({ controlStatus }) {
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="grid gap-3 md:grid-cols-3">
             <SummaryValue label="Latest status" value={summary.latestEntry?.status || 'none'} />
-            <SummaryValue label="Latest job" value={getJobDetails(summary.latestEntry?.jobId)?.label || summary.latestEntry?.jobId || 'none'} />
-            <SummaryValue label="Audit updated" value={formatDate(summary.generatedAt)} />
+            <SummaryValue label="Latest job" value={adminOperationsModel.getJobDetails(summary.latestEntry?.jobId)?.label || summary.latestEntry?.jobId || 'none'} />
+            <SummaryValue label="Audit updated" value={adminOperationsModel.formatDate(summary.generatedAt)} />
           </div>
         </div>
 
@@ -1071,7 +926,7 @@ function RunnerAuditTimelineCard({ controlStatus }) {
           <div className="space-y-3">
             {visibleEntries.map((entry, index) => {
               const status = String(entry?.status || 'missing').toLowerCase();
-              const jobLabel = getJobDetails(entry?.jobId)?.label || entry?.jobId || 'Unknown job';
+              const jobLabel = adminOperationsModel.getJobDetails(entry?.jobId)?.label || entry?.jobId || 'Unknown job';
               const timestamp = entry?.finishedAt || entry?.startedAt || entry?.blockedAt || entry?.checkedAt || null;
               const detail = entry?.error
                 || entry?.preflight?.message
@@ -1089,7 +944,7 @@ function RunnerAuditTimelineCard({ controlStatus }) {
                         <span className="font-medium text-gray-800">Actor:</span> {entry?.actor || 'unknown'}
                       </p>
                       <p className="mt-1 text-sm text-gray-600">
-                        <span className="font-medium text-gray-800">When:</span> {formatDate(timestamp)}
+                        <span className="font-medium text-gray-800">When:</span> {adminOperationsModel.formatDate(timestamp)}
                       </p>
                       <p className="mt-1 text-sm text-gray-600">
                         <span className="font-medium text-gray-800">Details:</span> {detail}
@@ -1397,7 +1252,7 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <SummaryValue label="State" value={controlStatus?.scheduler?.enabled ? 'enabled' : 'disabled'} />
             <SummaryValue label="Configured" value={controlStatus?.scheduler?.configured ? 'yes' : 'no'} />
-            <SummaryValue label="Last checked" value={formatDate(controlStatus?.scheduler?.lastCheckedAt)} />
+            <SummaryValue label="Last checked" value={adminOperationsModel.formatDate(controlStatus?.scheduler?.lastCheckedAt)} />
             <SummaryValue label="Due jobs" value={(controlStatus?.scheduler?.dueJobs || []).length} />
           </div>
           <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200">
@@ -1415,12 +1270,12 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
                 {(controlStatus?.scheduler?.jobs || []).map((job) => (
                   <tr key={job.jobId}>
                     <td className="px-4 py-3 align-top">
-                      <p className="text-sm font-medium text-gray-900">{getJobDetails(job.jobId)?.label || job.jobId}</p>
+                      <p className="text-sm font-medium text-gray-900">{adminOperationsModel.getJobDetails(job.jobId)?.label || job.jobId}</p>
                       <p className="mt-1 text-xs text-gray-500">{job.reason}</p>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 align-top">{job.cadence}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDate(job.lastRunAt)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{formatDate(job.nextRunAt)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{adminOperationsModel.formatDate(job.lastRunAt)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 align-top">{adminOperationsModel.formatDate(job.nextRunAt)}</td>
                     <td className="px-4 py-3 text-sm align-top">
                       <StatusBadge status={job.lock ? 'running' : job.due ? 'degraded' : 'ok'} />
                     </td>
@@ -1462,8 +1317,8 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
 
         <div className="grid gap-4 lg:grid-cols-2">
           {siteAutomationRegistry.map((job) => {
-            const run = getRunRecord(automationRuns, job.id);
-            const readiness = getControlReadiness(run);
+            const run = adminOperationsModel.getRunRecord(automationRuns, job.id);
+            const readiness = adminOperationsModel.getControlReadiness(run);
             const controlEntry = adminOperationsModel.getControlEntry(controlStatus, job.id);
             const lock = controlEntry?.lock || null;
             const preflight = adminOperationsModel.getEffectivePreflight(job, automationRuns, controlStatus);
@@ -1485,8 +1340,8 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
 
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   <SummaryValue label="Owner" value={job.owner} />
-                  <SummaryValue label="Last success" value={formatDate(run?.lastSucceededAt)} />
-                  <SummaryValue label="Duration" value={formatDuration(run?.lastDurationMs)} />
+                  <SummaryValue label="Last success" value={adminOperationsModel.formatDate(run?.lastSucceededAt)} />
+                  <SummaryValue label="Duration" value={adminOperationsModel.formatDuration(run?.lastDurationMs)} />
                 </div>
 
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -1506,7 +1361,7 @@ function PipelineControlsCard({ automationRuns, controlStatus, onRunJob, startin
                     <p className={`text-sm font-semibold ${readiness.tone}`}>{readiness.label}</p>
                     <p className="mt-1 text-sm text-gray-500">
                       {lock
-                        ? `Locked by run ${lock.runId || 'unknown'} started ${formatDate(lock.startedAt)}.`
+                        ? `Locked by run ${lock.runId || 'unknown'} started ${adminOperationsModel.formatDate(lock.startedAt)}.`
                         : !preflight.ready
                           ? preflight.message
                         : readiness.note}
@@ -1542,11 +1397,11 @@ function SectionCard({ title, sectionKey, section, automationRuns }) {
   const topLevelStatus = section?.status || section?.overallStatus || 'missing';
   const jobs = (adminOperationsModel.sectionJobMap[sectionKey] || [])
     .map((jobId) => {
-      const job = getJobDetails(jobId);
+      const job = adminOperationsModel.getJobDetails(jobId);
       if (!job) return null;
       return {
         ...job,
-        run: getRunRecord(automationRuns, jobId)
+        run: adminOperationsModel.getRunRecord(automationRuns, jobId)
       };
     })
     .filter(Boolean);
@@ -1570,8 +1425,8 @@ function SectionCard({ title, sectionKey, section, automationRuns }) {
       <CardContent className="space-y-4">
         {section?.file && (
           <div className="grid gap-3 md:grid-cols-3">
-            <SummaryValue label="Updated" value={formatDate(section.file.modifiedAt)} />
-            <SummaryValue label="Freshness" value={formatHours(section.modifiedHoursAgo)} />
+            <SummaryValue label="Updated" value={adminOperationsModel.formatDate(section.file.modifiedAt)} />
+            <SummaryValue label="Freshness" value={adminOperationsModel.formatHours(section.modifiedHoursAgo)} />
             {'releaseCount' in section ? (
               <SummaryValue label="Items" value={section.releaseCount} />
             ) : null}
@@ -1581,8 +1436,8 @@ function SectionCard({ title, sectionKey, section, automationRuns }) {
         {section?.snapshot && (
           <div className="grid gap-3 md:grid-cols-4">
             <SummaryValue label="Snapshot status" value={section.snapshot.status || '—'} />
-            <SummaryValue label="Updated" value={formatDate(section.snapshot.file?.modifiedAt)} />
-            <SummaryValue label="Freshness" value={formatHours(section.snapshot.modifiedHoursAgo)} />
+            <SummaryValue label="Updated" value={adminOperationsModel.formatDate(section.snapshot.file?.modifiedAt)} />
+            <SummaryValue label="Freshness" value={adminOperationsModel.formatHours(section.snapshot.modifiedHoursAgo)} />
             <SummaryValue label="Preview rows" value={section.snapshot.previewCount ?? 0} />
           </div>
         )}
@@ -1619,9 +1474,9 @@ function SectionCard({ title, sectionKey, section, automationRuns }) {
                   <StatusBadge status={job.run?.lastStatus || 'missing'} />
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
-                  <SummaryValue label="Last success" value={formatDate(job.run?.lastSucceededAt)} />
-                  <SummaryValue label="Last failure" value={formatDate(job.run?.lastFailedAt)} />
-                  <SummaryValue label="Duration" value={formatDuration(job.run?.lastDurationMs)} />
+                  <SummaryValue label="Last success" value={adminOperationsModel.formatDate(job.run?.lastSucceededAt)} />
+                  <SummaryValue label="Last failure" value={adminOperationsModel.formatDate(job.run?.lastFailedAt)} />
+                  <SummaryValue label="Duration" value={adminOperationsModel.formatDuration(job.run?.lastDurationMs)} />
                 </div>
                 {job.run?.lastError ? (
                   <p className="mt-3 text-sm text-red-600">Why: {job.run.lastError}</p>
@@ -1662,8 +1517,8 @@ function SectionCard({ title, sectionKey, section, automationRuns }) {
                         : 'No extra diagnostics recorded.'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 break-all max-w-xs">{adminOperationsModel.formatSourceSummary(entry.source)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{formatDate(entry.file?.modifiedAt || entry.cards?.file?.modifiedAt || entry.sets?.file?.modifiedAt)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{formatHours(entry.modifiedHoursAgo)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{adminOperationsModel.formatDate(entry.file?.modifiedAt || entry.cards?.file?.modifiedAt || entry.sets?.file?.modifiedAt)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{adminOperationsModel.formatHours(entry.modifiedHoursAgo)}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {entry.rows != null ? `${entry.rows} rows` : null}
                       {entry.cards?.count != null ? `${entry.cards.count} cards / ${entry.sets?.count ?? 0} sets` : null}
@@ -1723,7 +1578,7 @@ export default function AdminOperations() {
   const runJobMutation = useMutation({
     mutationFn: (jobId) => backend.app.runAutomationJob(jobId),
     onSuccess: (payload, jobId) => {
-      const job = getJobDetails(jobId);
+      const job = adminOperationsModel.getJobDetails(jobId);
       toast.success(`${job?.label || 'Pipeline'} started`);
       controlQuery.refetch();
       healthQuery.refetch({ cancelRefetch: false });
@@ -1878,10 +1733,10 @@ export default function AdminOperations() {
           <div className="flex items-center gap-3">
             <div className="text-sm text-gray-500 text-right space-y-1">
               <div>
-                Report generated: <span className="font-medium text-gray-800">{formatDate(generatedAt)}</span>
+                Report generated: <span className="font-medium text-gray-800">{adminOperationsModel.formatDate(generatedAt)}</span>
               </div>
               <div>
-                Last checked: <span className="font-medium text-gray-800">{formatDate(displayLastCheckedAt)}</span>
+                Last checked: <span className="font-medium text-gray-800">{adminOperationsModel.formatDate(displayLastCheckedAt)}</span>
               </div>
             </div>
             <Button
