@@ -1,13 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { getGameDataAliases, sourceRequirementStatus } from './lib/source-registry.mjs';
 import { siteAutomationSections } from '../src/services/automation/siteAutomationRegistry.js';
+import { resolveRuntimeSiteDataRoot, getRuntimeAutomationRunsPath } from './lib/runtime-site-data-paths.mjs';
 
 const ROOT = process.cwd();
 const PUBLIC_DATA_ROOT = path.join(ROOT, 'public', 'data');
-const SITE_DATA_ROOT = path.join(PUBLIC_DATA_ROOT, 'site');
+const PUBLIC_SITE_DATA_ROOT = path.join(PUBLIC_DATA_ROOT, 'site');
+const SITE_DATA_ROOT = resolveRuntimeSiteDataRoot(ROOT);
 const OUTPUT_PATH = path.join(SITE_DATA_ROOT, 'system-health.json');
-const RUN_HISTORY_PATH = path.join(SITE_DATA_ROOT, 'automation-runs.json');
+const RUN_HISTORY_PATH = getRuntimeAutomationRunsPath(ROOT);
 
 const GAMES = ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
 const IMAGE_MIRROR_GAMES = ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
@@ -24,6 +28,92 @@ const AGE_LIMITS_HOURS = {
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
+}
+
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function escapePowerShellLiteral(value) {
+  return String(value).replace(/'/g, "''");
+}
+
+function writeJsonViaPowerShell(filePath, serialized) {
+  const tempPath = path.join(os.tmpdir(), `mpm-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+  fs.writeFileSync(tempPath, serialized);
+  const scriptPath = path.join(os.tmpdir(), `mpm-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.ps1`);
+
+  try {
+    const script = [
+      `$target = '${escapePowerShellLiteral(filePath)}'`,
+      `$source = '${escapePowerShellLiteral(tempPath)}'`,
+      `$content = [System.IO.File]::ReadAllText($source)`,
+      `[System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($target)) | Out-Null`,
+      `[System.IO.File]::WriteAllText($target, $content, [System.Text.UTF8Encoding]::new($false))`
+    ].join('\r\n');
+    fs.writeFileSync(scriptPath, script);
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath], {
+      stdio: 'pipe',
+      windowsHide: true
+    });
+
+    if (result.status !== 0) {
+      const stderr = result.stderr?.toString?.().trim();
+      throw new Error(stderr || `PowerShell fallback write failed for ${filePath}`);
+    }
+    const persisted = fs.readFileSync(filePath, 'utf8');
+    if (persisted !== serialized) {
+      throw new Error(`PowerShell fallback wrote unexpected content for ${filePath}`);
+    }
+  } finally {
+    try {
+      fs.rmSync(tempPath, { force: true });
+    } catch {
+      // Best-effort temp cleanup only.
+    }
+    try {
+      fs.rmSync(scriptPath, { force: true });
+    } catch {
+      // Best-effort temp cleanup only.
+    }
+  }
+}
+
+function safeWriteJsonFile(filePath, payload, { retries = 4, delayMs = 75 } = {}) {
+  ensureDir(path.dirname(filePath));
+  const serialized = JSON.stringify(payload, null, 2);
+  if (process.platform === 'win32') {
+    writeJsonViaPowerShell(filePath, serialized);
+    return;
+  }
+  const tempPath = path.join(os.tmpdir(), `mpm-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.tmp`);
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      fs.writeFileSync(tempPath, serialized);
+      fs.renameSync(tempPath, filePath);
+      return;
+    } catch (error) {
+      try {
+        if (fs.existsSync(tempPath)) {
+          fs.rmSync(tempPath, { force: true });
+        }
+      } catch {
+        // Best-effort temp cleanup only.
+      }
+
+      const code = String(error?.code || '').toUpperCase();
+      const retryable = ['EPERM', 'EBUSY', 'EACCES'].includes(code);
+      if (process.platform === 'win32' && ['EPERM', 'EBUSY', 'EACCES', 'EXDEV'].includes(code)) {
+        writeJsonViaPowerShell(filePath, serialized);
+        return;
+      }
+      if (!retryable || attempt === retries) {
+        throw error;
+      }
+      sleep(delayMs * (attempt + 1));
+    }
+  }
 }
 
 function readJsonIfExists(filePath, fallback = null) {
@@ -131,7 +221,7 @@ function buildAutomationSummary(jobIds, automationRuns) {
 }
 
 function buildHomepageHealth() {
-  const filePath = path.join(SITE_DATA_ROOT, 'upcoming-releases.json');
+  const filePath = path.join(PUBLIC_SITE_DATA_ROOT, 'upcoming-releases.json');
   const payload = readJsonIfExists(filePath, { releases: [] });
   const stats = getFileStats(filePath);
   const modifiedHoursAgo = hoursSince(stats?.modifiedAt);
@@ -275,14 +365,15 @@ function buildImagesHealth() {
 }
 
 function buildPricingHealth() {
-  const snapshotPath = path.join(SITE_DATA_ROOT, 'pricing-snapshot.json');
+  const snapshotPath = path.join(PUBLIC_SITE_DATA_ROOT, 'pricing-snapshot.json');
   const snapshot = readJsonIfExists(snapshotPath, null);
   const snapshotStats = getFileStats(snapshotPath);
   const snapshotHoursAgo = hoursSince(snapshotStats?.modifiedAt);
   const snapshotStale = snapshotHoursAgo != null && snapshotHoursAgo > AGE_LIMITS_HOURS.pricingSnapshot;
 
   const sourceEntries = PRICING_SOURCES.map((source) => {
-    const filePath = path.join(SITE_DATA_ROOT, 'pricing-sources', `${source}.json`);
+    const filePath = path.join(PUBLIC_SITE_DATA_ROOT, 'pricing-sources', `${source}.json`);
+
     const rows = readJsonIfExists(filePath, []);
     const stats = getFileStats(filePath);
     const modifiedHoursAgo = hoursSince(stats?.modifiedAt);
@@ -472,8 +563,7 @@ function main() {
     sections
   };
 
-  ensureDir(SITE_DATA_ROOT);
-  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(payload, null, 2));
+  safeWriteJsonFile(OUTPUT_PATH, payload);
   console.log(`Built system health report at ${OUTPUT_PATH}`);
   console.log(JSON.stringify({
     overallStatus: payload.overallStatus,

@@ -183,9 +183,7 @@ async function main() {
     }
 
     const finalCards = sortCards(existingCards);
-    if (!fs.existsSync(OUTPUT_CARDS_PATH)) {
-      fs.writeFileSync(OUTPUT_CARDS_PATH, JSON.stringify(finalCards, null, 2));
-    }
+    fs.writeFileSync(OUTPUT_CARDS_PATH, JSON.stringify(finalCards, null, 2));
 
     const manifest = {
       generated_at: new Date().toISOString(),

@@ -3,8 +3,9 @@ import cors from 'cors';
 import { URL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import crypto from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import Stripe from 'stripe';
 import {
   createEntity,
@@ -57,6 +58,7 @@ import { ensureOnePieceSearchIndex, searchOnePieceAdvancedIndex, searchOnePieceI
 import { ensurePokemonSearchIndex, searchPokemonAdvancedIndex, searchPokemonIndex } from './pokemonSearchIndex.mjs';
 import { ensureStarWarsSearchIndex, searchStarWarsAdvancedIndex, searchStarWarsIndex } from './starwarsSearchIndex.mjs';
 import { ensureYugiohSearchIndex, searchYugiohAdvancedIndex, searchYugiohIndex } from './yugiohSearchIndex.mjs';
+import { resolveRuntimeSiteDataRoot } from '../scripts/lib/runtime-site-data-paths.mjs';
 
 const envFileValues = (() => {
   const parseEnvFile = (filePath) => {
@@ -931,6 +933,10 @@ function allowRemoteConnections() {
   return String(getEnvValue('ALLOW_REMOTE_CONNECTIONS') || '').trim().toLowerCase() === 'true';
 }
 
+function eagerWarmupEnabled() {
+  return String(getEnvValue('MPM_EAGER_WARMUP_ENABLED') || '').trim().toLowerCase() === 'true';
+}
+
 function isAllowedOrigin(origin) {
   if (!origin) {
     return true;
@@ -974,25 +980,32 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '25mb' }));
 
-ensureMtgSearchIndex().catch((error) => {
-  console.error('Failed to initialize MTG search index:', error);
-});
+function startOptionalWarmups() {
+  if (!eagerWarmupEnabled()) {
+    console.log('Skipping eager search-index warmup; on-demand loading remains enabled.');
+    return;
+  }
 
-ensureMtgCommanderEngine().catch((error) => {
-  console.error('Failed to initialize MTG commander engine:', error);
-});
+  ensureMtgSearchIndex().catch((error) => {
+    console.error('Failed to initialize MTG search index:', error);
+  });
 
-ensurePokemonSearchIndex().catch((error) => {
-  console.error('Failed to initialize Pokemon search index:', error);
-});
+  ensureMtgCommanderEngine().catch((error) => {
+    console.error('Failed to initialize MTG commander engine:', error);
+  });
 
-ensureFabSearchIndex().catch((error) => {
-  console.error('Failed to initialize FAB search index:', error);
-});
+  ensurePokemonSearchIndex().catch((error) => {
+    console.error('Failed to initialize Pokemon search index:', error);
+  });
 
-ensureStarWarsSearchIndex().catch((error) => {
-  console.error('Failed to initialize Star Wars search index:', error);
-});
+  ensureFabSearchIndex().catch((error) => {
+    console.error('Failed to initialize FAB search index:', error);
+  });
+
+  ensureStarWarsSearchIndex().catch((error) => {
+    console.error('Failed to initialize Star Wars search index:', error);
+  });
+}
 
 const localAdminUser = {
   id: 'local-admin',
@@ -1001,7 +1014,8 @@ const localAdminUser = {
   role: 'admin'
 };
 
-const SITE_DATA_ROOT = path.join(process.cwd(), 'public', 'data', 'site');
+const PUBLIC_SITE_DATA_ROOT = path.join(process.cwd(), 'public', 'data', 'site');
+const SITE_DATA_ROOT = resolveRuntimeSiteDataRoot(process.cwd());
 const AUTOMATION_CONTROL_LOG_PATH = path.join(SITE_DATA_ROOT, 'automation-control-log.json');
 const AUTOMATION_LOCK_ROOT = path.join(SITE_DATA_ROOT, 'automation-locks');
 const AUTOMATION_RUN_HISTORY_PATH = path.join(SITE_DATA_ROOT, 'automation-runs.json');
@@ -1064,7 +1078,104 @@ function readJsonFile(filePath, fallback) {
 
 function writeJsonFile(filePath, payload) {
   ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
+  const serialized = JSON.stringify(payload, null, 2);
+  if (process.platform === 'win32') {
+    const psTempPath = path.join(os.tmpdir(), `mpm-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+    const psScriptPath = path.join(os.tmpdir(), `mpm-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.ps1`);
+    fs.writeFileSync(psTempPath, serialized);
+    try {
+      const script = [
+        `$target = '${String(filePath).replace(/'/g, "''")}'`,
+        `$source = '${String(psTempPath).replace(/'/g, "''")}'`,
+        `$content = [System.IO.File]::ReadAllText($source)`,
+        `[System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($target)) | Out-Null`,
+        `[System.IO.File]::WriteAllText($target, $content, [System.Text.UTF8Encoding]::new($false))`
+      ].join('\r\n');
+      fs.writeFileSync(psScriptPath, script);
+      const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psScriptPath], {
+        stdio: 'pipe',
+        windowsHide: true
+      });
+      if (result.status !== 0) {
+        const stderr = result.stderr?.toString?.().trim();
+        throw new Error(stderr || `PowerShell write failed for ${filePath}`);
+      }
+      const persisted = fs.readFileSync(filePath, 'utf8');
+      if (persisted !== serialized) {
+        throw new Error(`PowerShell write produced unexpected content for ${filePath}`);
+      }
+      return;
+    } finally {
+      try {
+        fs.rmSync(psTempPath, { force: true });
+      } catch {}
+      try {
+        fs.rmSync(psScriptPath, { force: true });
+      } catch {}
+    }
+  }
+  const tempPath = path.join(os.tmpdir(), `mpm-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.tmp`);
+
+  for (let attempt = 0; attempt <= 4; attempt += 1) {
+    try {
+      fs.writeFileSync(tempPath, serialized);
+      fs.renameSync(tempPath, filePath);
+      return;
+    } catch (error) {
+      try {
+        if (fs.existsSync(tempPath)) {
+          fs.rmSync(tempPath, { force: true });
+        }
+      } catch {
+        // Best-effort temp cleanup only.
+      }
+
+      const code = String(error?.code || '').toUpperCase();
+      const retryable = ['EPERM', 'EBUSY', 'EACCES'].includes(code);
+      if (process.platform === 'win32' && ['EPERM', 'EBUSY', 'EACCES', 'EXDEV'].includes(code)) {
+        const psTempPath = path.join(os.tmpdir(), `mpm-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+        const psScriptPath = path.join(os.tmpdir(), `mpm-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.ps1`);
+        fs.writeFileSync(psTempPath, serialized);
+        try {
+          const backupPath = `${filePath}.bak-${process.pid}-${Date.now()}`;
+          const script = [
+            `$target = '${String(filePath).replace(/'/g, "''")}'`,
+            `$source = '${String(psTempPath).replace(/'/g, "''")}'`,
+            `$backup = '${String(backupPath).replace(/'/g, "''")}'`,
+            `if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Force }`,
+            `if (Test-Path -LiteralPath $target) { Rename-Item -LiteralPath $target -NewName ([System.IO.Path]::GetFileName($backup)) -Force }`,
+            `Move-Item -LiteralPath $source -Destination $target -Force`,
+            `if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Force }`
+          ].join('\r\n');
+          fs.writeFileSync(psScriptPath, script);
+          const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psScriptPath], {
+            stdio: 'pipe',
+            windowsHide: true
+          });
+          if (result.status !== 0) {
+            const stderr = result.stderr?.toString?.().trim();
+            throw new Error(stderr || `PowerShell fallback write failed for ${filePath}`);
+          }
+          return;
+        } finally {
+          try {
+            fs.rmSync(psTempPath, { force: true });
+          } catch {
+            // Best-effort temp cleanup only.
+          }
+          try {
+            fs.rmSync(psScriptPath, { force: true });
+          } catch {
+            // Best-effort temp cleanup only.
+          }
+        }
+      }
+      if (!retryable || attempt === 4) {
+        throw error;
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 75 * (attempt + 1));
+    }
+  }
 }
 
 function canWriteAutomationPath(targetPath, { directory = false } = {}) {
@@ -1268,6 +1379,7 @@ function buildOpsBridgeActivationContract() {
 
 function buildOpsBridgeReadiness() {
   const systemHealthPath = path.join(SITE_DATA_ROOT, 'system-health.json');
+  const fallbackSystemHealthPath = path.join(PUBLIC_SITE_DATA_ROOT, 'system-health.json');
   const allowedHosts = [...allowedOriginHosts].sort();
   const requiredPublicHosts = ['mainphasemarket.net', 'www.mainphasemarket.net'];
   const missingPublicHosts = requiredPublicHosts.filter((hostname) => !allowedOriginHosts.has(hostname));
@@ -1275,7 +1387,7 @@ function buildOpsBridgeReadiness() {
   const supabaseUrlConfigured = Boolean(getEnvValue('SUPABASE_URL') || getEnvValue('VITE_SUPABASE_URL'));
   const serviceRoleConfigured = Boolean(getEnvValue('SUPABASE_SERVICE_ROLE_KEY'));
   const publicAppUrl = getEnvValue('PUBLIC_APP_URL') || '';
-  const systemHealthAvailable = fs.existsSync(systemHealthPath);
+  const systemHealthAvailable = fs.existsSync(systemHealthPath) || fs.existsSync(fallbackSystemHealthPath);
   const auditLogWritable = canWriteAutomationPath(AUTOMATION_CONTROL_LOG_PATH);
   const lockStorageWritable = canWriteAutomationPath(AUTOMATION_LOCK_ROOT, { directory: true });
   const runHistoryWritable = canWriteAutomationPath(AUTOMATION_RUN_HISTORY_PATH);
@@ -1323,7 +1435,7 @@ function buildOpsBridgeReadiness() {
       status: systemHealthAvailable ? 'ok' : 'missing',
       detail: systemHealthAvailable
         ? 'System health report exists for Admin Operations.'
-        : 'Run npm run automation:health to create public/data/site/system-health.json.'
+        : 'Run npm run automation:health to create the runtime system-health.json artifact.'
     },
     {
       id: 'audit-log',
@@ -1418,7 +1530,8 @@ function buildOpsBridgeReadiness() {
       scheduledJobsWithoutRunner,
       lockTtlHours: AUTOMATION_LOCK_TTL_MS / (60 * 60 * 1000),
       scheduler: buildAutomationScheduleStatus(),
-      siteDataRoot: SITE_DATA_ROOT
+      siteDataRoot: SITE_DATA_ROOT,
+      publicSnapshotRoot: PUBLIC_SITE_DATA_ROOT
     },
     checks,
     counts
@@ -1635,16 +1748,23 @@ function startAutomationScheduler() {
 startAutomationScheduler();
 
 app.get('/api/local/health', (_req, res) => {
-  const systemHealthPath = path.join(process.cwd(), 'public', 'data', 'site', 'system-health.json');
-  const systemHealth = fs.existsSync(systemHealthPath)
-    ? parseJsonSafely(fs.readFileSync(systemHealthPath, 'utf8'), null)
+  const runtimeSystemHealthPath = path.join(SITE_DATA_ROOT, 'system-health.json');
+  const publicSystemHealthPath = path.join(PUBLIC_SITE_DATA_ROOT, 'system-health.json');
+  const resolvedSystemHealthPath = fs.existsSync(runtimeSystemHealthPath)
+    ? runtimeSystemHealthPath
+    : publicSystemHealthPath;
+  const systemHealth = fs.existsSync(resolvedSystemHealthPath)
+    ? parseJsonSafely(fs.readFileSync(resolvedSystemHealthPath, 'utf8'), null)
     : null;
 
   res.json({
     ok: true,
     mode: 'local',
     dbPath: getDbPath(),
-    systemHealth
+    systemHealth,
+    runtimeSiteDataRoot: SITE_DATA_ROOT,
+    publicSiteDataRoot: PUBLIC_SITE_DATA_ROOT,
+    resolvedSystemHealthPath
   });
 });
 
@@ -2604,4 +2724,7 @@ app.delete('/api/local/entities/:entity/:id', (req, res) => {
 
 app.listen(port, host, () => {
   console.log(`Local API listening on http://${host}:${port}`);
+  setTimeout(() => {
+    startOptionalWarmups();
+  }, 0);
 });

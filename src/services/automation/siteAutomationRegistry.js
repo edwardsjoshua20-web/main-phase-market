@@ -88,6 +88,7 @@ export const siteAutomationRegistry = [
     runnerJob: 'health',
     script: 'npm run automation:health',
     commands: [
+      ['node', 'scripts/verify-admin-ops-architecture.mjs'],
       ['node', 'scripts/build-site-health-report.mjs']
     ],
     dependsOn: [],

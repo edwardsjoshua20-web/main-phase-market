@@ -16,6 +16,12 @@ services:
         value: local
       - key: ALLOW_REMOTE_CONNECTIONS
         value: "true"
+      - key: MPM_RUNTIME_SITE_DATA_ROOT
+        value: /tmp/main-phase-market/site-data
+      - key: MPM_AUTOMATION_SCHEDULER_ENABLED
+        value: "true"
+      - key: MPM_EAGER_WARMUP_ENABLED
+        value: "false"
       - key: ALLOWED_ORIGIN_HOSTS
         sync: false
       - key: PUBLIC_APP_URL

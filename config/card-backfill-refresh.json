@@ -1,6 +1,20 @@
 {
   "jobs": [
     {
+      "id": "fab-backfill",
+      "label": "Backfill FAB cards",
+      "command": "npm",
+      "args": ["run", "fab:backfill:cards"],
+      "enabled": true
+    },
+    {
+      "id": "lorcana-backfill",
+      "label": "Backfill Lorcana cards",
+      "command": "npm",
+      "args": ["run", "lorcana:backfill:cards"],
+      "enabled": true
+    },
+    {
       "id": "pokemon-backfill",
       "label": "Backfill Pokemon cards",
       "command": "npm",

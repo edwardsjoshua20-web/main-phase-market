@@ -12,6 +12,7 @@ It is separate from Cloudflare Pages because Cloudflare Pages serves the website
 - Single-run locks so the same job does not stampede itself.
 - Automation control audit log.
 - Admin-only protection for hosted remote use.
+- Runtime-owned automation artifacts under `MPM_RUNTIME_SITE_DATA_ROOT`.
 
 ## Local startup
 
@@ -39,6 +40,9 @@ Required environment:
 ALLOW_REMOTE_CONNECTIONS=true
 LOCAL_API_HOST=0.0.0.0
 PORT=<provided by host>
+MPM_RUNTIME_SITE_DATA_ROOT=/tmp/main-phase-market/site-data
+MPM_AUTOMATION_SCHEDULER_ENABLED=true
+MPM_EAGER_WARMUP_ENABLED=false
 SUPABASE_URL=<project url>
 SUPABASE_SERVICE_ROLE_KEY=<service role key>
 SUPABASE_PUBLIC_BUCKET=<public bucket name>
@@ -104,6 +108,9 @@ healthCheckPath: /api/local/health
 NODE_VERSION=22
 LOCAL_API_HOST=0.0.0.0
 ALLOW_REMOTE_CONNECTIONS=true
+MPM_RUNTIME_SITE_DATA_ROOT=/tmp/main-phase-market/site-data
+MPM_AUTOMATION_SCHEDULER_ENABLED=true
+MPM_EAGER_WARMUP_ENABLED=false
 ```
 
 After Render reports the service healthy, copy the Render service URL into Cloudflare Pages:
@@ -122,7 +129,7 @@ npm.cmd run ops:check -- --origin https://<render-service>.onrender.com --token 
 
 When the bridge is connected, `/AdminOperations` should show:
 
-- pipeline health from `public/data/site/system-health.json`
+- pipeline health from the runtime `system-health.json` artifact
 - pipeline run history
 - pipeline controls as connected
 - automation jobs with last success, duration, command, and run state
@@ -133,8 +140,9 @@ If the bridge is not connected, the controls should stay disabled instead of pre
 
 - Only allowlisted jobs can run.
 - Remote automation control requires an authenticated Supabase admin user.
-- Jobs write locks under `public/data/site/automation-locks`.
-- Manual run attempts write audit entries to `public/data/site/automation-control-log.json`.
+- Jobs write locks under `<MPM_RUNTIME_SITE_DATA_ROOT>/automation-locks`.
+- Manual run attempts write audit entries to `<MPM_RUNTIME_SITE_DATA_ROOT>/automation-control-log.json`.
+- Run history and runtime health live under `<MPM_RUNTIME_SITE_DATA_ROOT>`.
 - Do not put service-role secrets into Cloudflare Pages frontend variables.
 
 ## Current allowlisted jobs
@@ -155,4 +163,4 @@ If the bridge is not connected, the controls should stay disabled instead of pre
 | `Health check failed: HTTP 403` | Remote bridge does not allow remote connections or origin is blocked. | Set `ALLOW_REMOTE_CONNECTIONS=true` and confirm `ALLOWED_ORIGIN_HOSTS`. |
 | `Automation controls: unavailable (HTTP 401/403)` | Missing or non-admin Supabase bearer token. | Log in as admin, use an admin token, and confirm profile role is `admin`. |
 | Admin Operations says runner unavailable | Cloudflare Pages does not have `VITE_API_ORIGIN`, or the bridge is offline. | Set `VITE_API_ORIGIN`, redeploy Pages, and run `npm run ops:check`. |
-| A job is stuck running | Lock exists for a live PID or stale lock cleanup has not run yet. | Check `public/data/site/automation-locks`; stale locks older than the TTL are cleaned automatically. |
+| A job is stuck running | Lock exists for a live PID or stale lock cleanup has not run yet. | Check `<MPM_RUNTIME_SITE_DATA_ROOT>/automation-locks`; stale locks older than the TTL are cleaned automatically. |
