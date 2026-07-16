@@ -1,4 +1,4 @@
-import React from 'react';
+ï»¿import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import * as adminOperationsModel from '@/services/admin/adminOperationsModel';
 import { useAdminOperationsDashboard } from '@/hooks/useAdminOperationsDashboard';
@@ -20,6 +20,37 @@ function getHoursSince(timestamp) {
   const parsed = new Date(timestamp).getTime();
   if (!Number.isFinite(parsed)) return null;
   return Math.max(0, (Date.now() - parsed) / (1000 * 60 * 60));
+}
+
+function normalizeStatus(value) {
+  return String(value || 'missing').toLowerCase();
+}
+
+function getBusinessCoreSummary(sections = {}) {
+  const systems = [
+    { key: 'homepage', label: 'Homepage feed', status: normalizeStatus(sections.homepage?.status) },
+    { key: 'catalogs', label: 'Card catalogs', status: normalizeStatus(sections.catalogs?.overallStatus) },
+    { key: 'images', label: 'Image pipelines', status: normalizeStatus(sections.images?.overallStatus) },
+    { key: 'pricing', label: 'Pricing', status: normalizeStatus(sections.pricing?.status) },
+    { key: 'readiness', label: 'Launch readiness', status: normalizeStatus(sections.readiness?.overallStatus) }
+  ];
+  const healthy = systems.filter((system) => system.status === 'ok').length;
+  const statuses = systems.map((system) => system.status);
+  const needsAttention = systems.filter((system) => system.status !== 'ok');
+  const topStatus = statuses.includes('missing')
+    ? 'missing'
+    : statuses.some((status) => ['degraded', 'failed', 'running', 'blocked'].includes(status))
+      ? 'degraded'
+      : statuses.includes('stale')
+        ? 'stale'
+        : 'ok';
+  return {
+    systems,
+    healthy,
+    total: systems.length,
+    topStatus,
+    needsAttention
+  };
 }
 
 function getSelfMaintainingSummary({ reportFreshnessStatus, controlStatus, schedulerEnabled, overallStatus }) {
@@ -130,22 +161,9 @@ export default function AdminOperations() {
     : schedulerEnabled
       ? 'Autopilot active'
       : 'Runner connected';
+  const businessCoreSummary = getBusinessCoreSummary(sections);
 
   const attentionItems = [
-    reportFreshnessStatus !== 'ok'
-      ? {
-          title: 'Hosted report is out of date',
-          detail: generatedAt
-            ? `The latest published health snapshot is ${reportAgeHours.toFixed(1)} hours old, so this page is not currently proving that the site is staying healthy on its own.`
-            : 'No hosted health snapshot has been published yet.'
-        }
-      : null,
-    summary.topStatus !== 'ok'
-      ? {
-          title: 'Overall site operations are not fully healthy yet',
-          detail: `Current overall status is ${summary.topStatus}.`
-        }
-      : null,
     sections.homepage?.status !== 'ok'
       ? {
           title: 'Homepage feed needs attention',
@@ -168,6 +186,14 @@ export default function AdminOperations() {
       ? {
           title: 'Pricing pipeline needs attention',
           detail: sections.pricing?.diagnostics?.[0] || 'Pricing data is not current yet.'
+        }
+      : null,
+    reportFreshnessStatus !== 'ok'
+      ? {
+          title: 'Hosted report is out of date',
+          detail: generatedAt
+            ? `The latest published health snapshot is ${reportAgeHours.toFixed(1)} hours old, so this page is not currently proving that the site is staying healthy on its own.`
+            : 'No hosted health snapshot has been published yet.'
         }
       : null,
     !controlStatus?.available
@@ -212,14 +238,14 @@ export default function AdminOperations() {
       title: 'Card Catalogs',
       status: sections.catalogs?.overallStatus || 'missing',
       primary: `${sections.catalogs?.counts?.ok ?? 0}/${sections.catalogs?.entries?.length || 0} games healthy`,
-      secondary: `Missing: ${sections.catalogs?.counts?.missing ?? 0} • Stale: ${sections.catalogs?.counts?.stale ?? 0}`,
+      secondary: `Missing: ${sections.catalogs?.counts?.missing ?? 0} â€¢ Stale: ${sections.catalogs?.counts?.stale ?? 0}`,
       tertiary: sections.catalogs?.overallStatus === 'ok' ? 'Catalogs are current.' : 'One or more catalogs need work.'
     },
     {
       title: 'Images',
       status: sections.images?.overallStatus || 'missing',
       primary: `${sections.images?.counts?.ok ?? 0}/${sections.images?.entries?.length || 0} image pipelines healthy`,
-      secondary: `Missing: ${sections.images?.counts?.missing ?? 0} • Stale: ${sections.images?.counts?.stale ?? 0}`,
+      secondary: `Missing: ${sections.images?.counts?.missing ?? 0} â€¢ Stale: ${sections.images?.counts?.stale ?? 0}`,
       tertiary: sections.images?.overallStatus === 'ok' ? 'Image mirrors are current.' : 'Image mirrors need attention.'
     },
     {
@@ -291,13 +317,21 @@ export default function AdminOperations() {
               <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-semibold text-gray-900">Overall answer</p>
-                  <StatusBadge status={summary.topStatus} />
+                  <StatusBadge status={businessCoreSummary.topStatus} />
                 </div>
-                <p className="text-lg font-semibold text-gray-900 capitalize">{summary.topStatus}</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {businessCoreSummary.topStatus === 'ok'
+                    ? 'Business systems are healthy'
+                    : businessCoreSummary.topStatus === 'stale'
+                      ? 'Business systems need a freshness pass'
+                      : businessCoreSummary.topStatus === 'missing'
+                        ? 'Business systems are missing proof'
+                        : 'Business systems need attention'}
+                </p>
                 <p className="text-sm text-gray-600">
-                  {summary.topStatus === 'ok'
-                    ? 'The major business systems are currently healthy.'
-                    : 'The business backbone still has real issues showing on the board.'}
+                  {businessCoreSummary.topStatus === 'ok'
+                    ? `All ${businessCoreSummary.total} core business systems are green.`
+                    : `${businessCoreSummary.healthy}/${businessCoreSummary.total} core business systems are green right now.`}
                 </p>
               </div>
 
@@ -323,7 +357,7 @@ export default function AdminOperations() {
         </Card>
 
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <StatsCard title="Overall" value={summary.topStatus} icon={summary.topStatus === 'ok' ? CheckCircle2 : summary.topStatus === 'missing' ? ServerCrash : AlertTriangle} color={summary.topStatus === 'ok' ? 'green' : summary.topStatus === 'missing' ? 'red' : 'amber'} />
+          <StatsCard title="Business Core" value={businessCoreSummary.topStatus} icon={businessCoreSummary.topStatus === 'ok' ? CheckCircle2 : businessCoreSummary.topStatus === 'missing' ? ServerCrash : AlertTriangle} color={businessCoreSummary.topStatus === 'ok' ? 'green' : businessCoreSummary.topStatus === 'missing' ? 'red' : 'amber'} />
           <StatsCard title="Healthy Areas" value={summary.ok} icon={CheckCircle2} color="green" />
           <StatsCard title="Degraded Areas" value={summary.degraded} icon={AlertTriangle} color="amber" />
           <StatsCard title="Stale Areas" value={summary.stale} icon={Clock3} color="purple" />
@@ -338,7 +372,7 @@ export default function AdminOperations() {
                 <StatusBadge status={topBlocker ? 'degraded' : 'ok'} />
               </div>
               <p className="text-lg font-semibold text-gray-900">{topBlocker?.title || 'No blocker flagged'}</p>
-              <p className="text-sm text-gray-500">{topBlocker?.detail || 'Nothing major is blocking the operations backbone right now.'}</p>
+              <p className="text-sm text-gray-500">{topBlocker?.detail || 'Nothing major is blocking the business backbone right now.'}</p>
             </CardContent>
           </Card>
 
@@ -575,3 +609,5 @@ export default function AdminOperations() {
     </div>
   );
 }
+
+
