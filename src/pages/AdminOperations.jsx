@@ -15,6 +15,13 @@ import { CapabilityConfidenceCard, ControlPlaneCard, DataContractsCard, LaunchRe
 import { StatusBadge } from '@/components/admin/AdminOperationsShared';
 import { AlertTriangle, ArrowLeft, CheckCircle2, Clock3, RefreshCw, ServerCrash } from 'lucide-react';
 
+function getHoursSince(timestamp) {
+  if (!timestamp) return null;
+  const parsed = new Date(timestamp).getTime();
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, (Date.now() - parsed) / (1000 * 60 * 60));
+}
+
 export default function AdminOperations() {
   const navigate = useNavigate();
   const {
@@ -43,7 +50,22 @@ export default function AdminOperations() {
 
   const schedulerEnabled = Boolean(controlStatus?.scheduler?.enabled);
   const schedulerChecks = Number(controlStatus?.scheduler?.checks || 0);
+  const reportAgeHours = getHoursSince(generatedAt);
+  const reportFreshnessStatus = reportAgeHours == null ? 'missing' : reportAgeHours > 2 ? 'stale' : 'ok';
+  const operatingMode = !controlStatus?.available
+    ? 'Snapshot mode'
+    : schedulerEnabled
+      ? 'Autopilot active'
+      : 'Runner connected';
   const attentionItems = [
+    reportFreshnessStatus !== 'ok'
+      ? {
+          title: 'Hosted report is out of date',
+          detail: generatedAt
+            ? `The latest published health snapshot is ${reportAgeHours.toFixed(1)} hours old, so this page is not currently proving that the site is staying healthy on its own.`
+            : 'No hosted health snapshot has been published yet.'
+        }
+      : null,
     summary.topStatus !== 'ok'
       ? {
           title: 'Overall site operations are not fully healthy yet',
@@ -194,6 +216,26 @@ export default function AdminOperations() {
           </CardHeader>
         </Card>
 
+        {(reportFreshnessStatus !== 'ok' || !controlStatus?.available || !schedulerEnabled) ? (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="p-5 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">How to read this right now</p>
+                  <p className="text-sm text-amber-800 mt-1">
+                    {reportFreshnessStatus !== 'ok'
+                      ? 'The hosted report is stale, so treat this page as a warning surface right now instead of proof that the business systems are fully self-maintaining.'
+                      : !controlStatus?.available
+                        ? 'The business data is visible, but the hosted admin is still in snapshot/read-only mode until the runner bridge is reachable.'
+                        : 'The runner is reachable, but autopilot is not yet proving unattended freshness end to end.'}
+                  </p>
+                </div>
+                <StatusBadge status={reportFreshnessStatus !== 'ok' ? 'stale' : !controlStatus?.available ? 'degraded' : 'ok'} />
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card className="border-gray-200">
             <CardContent className="p-5 space-y-2">
@@ -216,12 +258,31 @@ export default function AdminOperations() {
 
           <Card className="border-gray-200">
             <CardContent className="p-5 space-y-2">
-              <p className="text-sm text-gray-500">Autopilot Scheduler</p>
+              <p className="text-sm text-gray-500">Operating Mode</p>
               <div className="flex items-center justify-between gap-3">
-                <p className="text-2xl font-semibold text-gray-900">{schedulerEnabled ? 'Running' : 'Not active'}</p>
-                <StatusBadge status={schedulerEnabled ? 'ok' : 'degraded'} />
+                <p className="text-2xl font-semibold text-gray-900">{operatingMode}</p>
+                <StatusBadge status={!controlStatus?.available ? 'degraded' : schedulerEnabled ? 'ok' : 'stale'} />
               </div>
-              <p className="text-sm text-gray-500">Scheduler checks recorded: {schedulerChecks}</p>
+              <p className="text-sm text-gray-500">
+                {!controlStatus?.available
+                  ? 'Hosted admin can read reports, but cannot yet prove live runner access.'
+                  : schedulerEnabled
+                    ? `Scheduler checks recorded: ${schedulerChecks}`
+                    : 'Runner is reachable, but autopilot is not fully active yet.'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-gray-200">
+            <CardContent className="p-5 space-y-2">
+              <p className="text-sm text-gray-500">Hosted Report Freshness</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-2xl font-semibold text-gray-900">
+                  {reportAgeHours == null ? 'Missing' : reportAgeHours <= 2 ? 'Current' : `${reportAgeHours.toFixed(1)}h old`}
+                </p>
+                <StatusBadge status={reportFreshnessStatus} />
+              </div>
+              <p className="text-sm text-gray-500">This is the proof line for whether hosted reporting is staying fresh on its own.</p>
             </CardContent>
           </Card>
 

@@ -5,6 +5,20 @@ import {
   summarizeBridgeStatuses
 } from './adminOperationsControlPlaneService.js';
 
+function getHoursSince(timestamp) {
+  if (!timestamp) return null;
+  const parsed = new Date(timestamp).getTime();
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, (Date.now() - parsed) / (1000 * 60 * 60));
+}
+
+export function deriveHostedReportingSurfaceStatus(generatedAt) {
+  const hoursSinceGenerated = getHoursSince(generatedAt);
+  if (hoursSinceGenerated == null) return 'missing';
+  if (hoursSinceGenerated > 2) return 'stale';
+  return 'ok';
+}
+
 export function deriveAreaStatus(sectionStatuses, automationSummary) {
   if (sectionStatuses.includes('missing') || automationSummary.missing > 0) return 'missing';
   if (sectionStatuses.includes('degraded') || automationSummary.failed > 0 || automationSummary.running > 0) return 'degraded';
@@ -69,6 +83,7 @@ export function deriveRecoveryPlaybookStatus(playbook) {
 }
 
 export function buildDashboardAreas({
+  generatedAt,
   sections,
   automationSummary,
   operationIncidents,
@@ -94,8 +109,22 @@ export function buildDashboardAreas({
   const capabilityConfidenceStatus = deriveCapabilityConfidenceStatus(capabilityConfidenceRows);
   const recoveryPlaybookStatus = deriveRecoveryPlaybookStatus(recoveryPlaybook);
   const pipelineControlsStatus = derivePipelineControlsStatus(controlStatus);
+  const hostedReportingSurfaceStatus = deriveHostedReportingSurfaceStatus(generatedAt);
+  const hoursSinceGenerated = getHoursSince(generatedAt);
 
   return [
+    {
+      id: 'hosted-reporting-surface',
+      label: 'Hosted reporting surface',
+      owner: 'operations',
+      status: hostedReportingSurfaceStatus,
+      evidence: generatedAt
+        ? `Latest hosted health snapshot was generated ${hoursSinceGenerated != null ? `${hoursSinceGenerated.toFixed(1)} hour${hoursSinceGenerated >= 1.5 ? 's' : ''}` : 'recently'} ago.`
+        : 'No hosted health snapshot has been generated yet.',
+      nextStep: hostedReportingSurfaceStatus === 'ok'
+        ? 'Keep the health report regenerating on schedule so the dashboard stays trustworthy.'
+        : 'Refresh the system-health-report pipeline and confirm the hosted snapshot is publishing on schedule.'
+    },
     {
       id: 'automation-registry',
       label: 'Automation registry',

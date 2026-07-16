@@ -28,6 +28,7 @@ export function buildAdminOperationsDashboardState({
   const recoveryPlaybook = adminOperationsModel.buildRecoveryPlaybooks(systemHealth, sections, automationRuns, controlStatus);
 
   const dashboardAreas = buildDashboardAreas({
+    generatedAt,
     sections,
     automationSummary,
     operationIncidents,
