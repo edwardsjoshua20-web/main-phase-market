@@ -7,7 +7,7 @@ import {
 } from '@/services/automation/siteAutomationRegistry';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StatsCard from '@/components/admin/StatsCard';
 import { AutomationHistoryCard, PipelineControlsCard } from '@/components/admin/AdminOperationsRuntimeCards';
 import { ActionCenterCard, BridgeReadinessCard, DashboardAreaBoardCard, ReadinessCard, SectionCard } from '@/components/admin/AdminOperationsOverviewCards';
@@ -20,6 +20,78 @@ function getHoursSince(timestamp) {
   const parsed = new Date(timestamp).getTime();
   if (!Number.isFinite(parsed)) return null;
   return Math.max(0, (Date.now() - parsed) / (1000 * 60 * 60));
+}
+
+function getSelfMaintainingSummary({ reportFreshnessStatus, controlStatus, schedulerEnabled, overallStatus }) {
+  if (reportFreshnessStatus !== 'ok') {
+    return {
+      status: 'stale',
+      title: 'Not proven yet',
+      detail: 'The hosted report is stale, so the site is not currently proving unattended health on its own.'
+    };
+  }
+
+  if (!controlStatus?.available) {
+    return {
+      status: 'degraded',
+      title: 'Read-only proof mode',
+      detail: 'The page can read business reports, but the live runner bridge is not available from the hosted admin yet.'
+    };
+  }
+
+  if (!schedulerEnabled) {
+    return {
+      status: 'stale',
+      title: 'Runner connected, autopilot not fully active',
+      detail: 'The control bridge is reachable, but unattended scheduling is not fully proving itself yet.'
+    };
+  }
+
+  if (overallStatus !== 'ok') {
+    return {
+      status: 'degraded',
+      title: 'Autopilot active, but issues remain',
+      detail: 'The self-maintaining backbone is live, but one or more business systems still need attention.'
+    };
+  }
+
+  return {
+    status: 'ok',
+    title: 'Self-maintaining mode is proven',
+    detail: 'Hosted reporting is fresh, the runner bridge is live, autopilot is active, and the major business systems are healthy.'
+  };
+}
+
+function getProductWorkSummary({ attentionItems, reportFreshnessStatus, controlStatus, schedulerEnabled }) {
+  if (reportFreshnessStatus !== 'ok') {
+    return {
+      status: 'stale',
+      title: 'Only with caution',
+      detail: 'You can keep building, but trust the admin page as a warning surface instead of hard proof until freshness is restored.'
+    };
+  }
+
+  if (!controlStatus?.available || !schedulerEnabled) {
+    return {
+      status: 'stale',
+      title: 'Yes, but ops is still maturing',
+      detail: 'Product work can continue, but the operations backbone is not fully unattended yet.'
+    };
+  }
+
+  if (attentionItems.length > 0) {
+    return {
+      status: 'degraded',
+      title: 'Mostly yes',
+      detail: 'You can move product forward, but there are still flagged operations items to close out.'
+    };
+  }
+
+  return {
+    status: 'ok',
+    title: 'Yes',
+    detail: 'Nothing major is blocking product work right now.'
+  };
 }
 
 export default function AdminOperations() {
@@ -37,7 +109,8 @@ export default function AdminOperations() {
     targetSummary,
     dashboardAreas,
     controlStatus,
-    startingJobId,    displayLastCheckedAt,
+    startingJobId,
+    displayLastCheckedAt,
     handleRefresh,
     runJob
   } = useAdminOperationsDashboard();
@@ -57,6 +130,7 @@ export default function AdminOperations() {
     : schedulerEnabled
       ? 'Autopilot active'
       : 'Runner connected';
+
   const attentionItems = [
     reportFreshnessStatus !== 'ok'
       ? {
@@ -110,6 +184,22 @@ export default function AdminOperations() {
       : null
   ].filter(Boolean);
 
+  const selfMaintainingSummary = getSelfMaintainingSummary({
+    reportFreshnessStatus,
+    controlStatus,
+    schedulerEnabled,
+    overallStatus: summary.topStatus
+  });
+
+  const productWorkSummary = getProductWorkSummary({
+    attentionItems,
+    reportFreshnessStatus,
+    controlStatus,
+    schedulerEnabled
+  });
+
+  const topBlocker = attentionItems[0] || null;
+
   const systemCards = [
     {
       title: 'Homepage Feed',
@@ -121,15 +211,15 @@ export default function AdminOperations() {
     {
       title: 'Card Catalogs',
       status: sections.catalogs?.overallStatus || 'missing',
-      primary: `${sections.catalogs?.counts?.ok ?? 0}/${Object.keys(sections.catalogs?.counts || {}).length ? (sections.catalogs?.entries?.length || 0) : (sections.readiness?.entries?.length || 0)} games healthy`,
-      secondary: `Missing: ${sections.catalogs?.counts?.missing ?? 0} â€¢ Stale: ${sections.catalogs?.counts?.stale ?? 0}`,
+      primary: `${sections.catalogs?.counts?.ok ?? 0}/${sections.catalogs?.entries?.length || 0} games healthy`,
+      secondary: `Missing: ${sections.catalogs?.counts?.missing ?? 0} • Stale: ${sections.catalogs?.counts?.stale ?? 0}`,
       tertiary: sections.catalogs?.overallStatus === 'ok' ? 'Catalogs are current.' : 'One or more catalogs need work.'
     },
     {
       title: 'Images',
       status: sections.images?.overallStatus || 'missing',
       primary: `${sections.images?.counts?.ok ?? 0}/${sections.images?.entries?.length || 0} image pipelines healthy`,
-      secondary: `Missing: ${sections.images?.counts?.missing ?? 0} â€¢ Stale: ${sections.images?.counts?.stale ?? 0}`,
+      secondary: `Missing: ${sections.images?.counts?.missing ?? 0} • Stale: ${sections.images?.counts?.stale ?? 0}`,
       tertiary: sections.images?.overallStatus === 'ok' ? 'Image mirrors are current.' : 'Image mirrors need attention.'
     },
     {
@@ -169,7 +259,7 @@ export default function AdminOperations() {
               <Link to="/" className="text-sm text-gray-500 hover:text-gray-800">Site</Link>
             </div>
             <h1 className="text-3xl font-bold text-gray-900">Admin Operations</h1>
-            <p className="text-gray-500 mt-1">A visual pulse for the pipelines, downloads, catalog feeds, image sync, pricing, and system health.</p>
+            <p className="text-gray-500 mt-1">The business control room for catalogs, images, pricing, homepage feeds, and the automations that keep them alive.</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-sm text-gray-500 text-right space-y-1">
@@ -191,6 +281,47 @@ export default function AdminOperations() {
           </div>
         </div>
 
+        <Card className="border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-xl text-gray-900">Plain-English status</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">This is the fast version: what matters right now, whether the site is maintaining itself, and whether we can safely focus on product work.</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold text-gray-900">Overall answer</p>
+                  <StatusBadge status={summary.topStatus} />
+                </div>
+                <p className="text-lg font-semibold text-gray-900 capitalize">{summary.topStatus}</p>
+                <p className="text-sm text-gray-600">
+                  {summary.topStatus === 'ok'
+                    ? 'The major business systems are currently healthy.'
+                    : 'The business backbone still has real issues showing on the board.'}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold text-gray-900">Self-maintaining beast mode</p>
+                  <StatusBadge status={selfMaintainingSummary.status} />
+                </div>
+                <p className="text-lg font-semibold text-gray-900">{selfMaintainingSummary.title}</p>
+                <p className="text-sm text-gray-600">{selfMaintainingSummary.detail}</p>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold text-gray-900">Can we focus on product work?</p>
+                  <StatusBadge status={productWorkSummary.status} />
+                </div>
+                <p className="text-lg font-semibold text-gray-900">{productWorkSummary.title}</p>
+                <p className="text-sm text-gray-600">{productWorkSummary.detail}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <StatsCard title="Overall" value={summary.topStatus} icon={summary.topStatus === 'ok' ? CheckCircle2 : summary.topStatus === 'missing' ? ServerCrash : AlertTriangle} color={summary.topStatus === 'ok' ? 'green' : summary.topStatus === 'missing' ? 'red' : 'amber'} />
           <StatsCard title="Healthy Areas" value={summary.ok} icon={CheckCircle2} color="green" />
@@ -199,19 +330,62 @@ export default function AdminOperations() {
           <StatsCard title="Missing Areas" value={summary.missing} icon={ServerCrash} color="red" />
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard title="Healthy Targets" value={targetSummary.ok} icon={CheckCircle2} color="green" />
-          <StatsCard title="Degraded Targets" value={targetSummary.degraded} icon={AlertTriangle} color="amber" />
-          <StatsCard title="Stale Targets" value={targetSummary.stale} icon={Clock3} color="purple" />
-          <StatsCard title="Missing Targets" value={targetSummary.missing} icon={ServerCrash} color="red" />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <Card className="border-gray-200 xl:col-span-2">
+            <CardContent className="p-5 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-gray-500">Top blocker right now</p>
+                <StatusBadge status={topBlocker ? 'degraded' : 'ok'} />
+              </div>
+              <p className="text-lg font-semibold text-gray-900">{topBlocker?.title || 'No blocker flagged'}</p>
+              <p className="text-sm text-gray-500">{topBlocker?.detail || 'Nothing major is blocking the operations backbone right now.'}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-gray-200">
+            <CardContent className="p-5 space-y-2">
+              <p className="text-sm text-gray-500">Last Successful Automation</p>
+              <p className="text-xl font-semibold text-gray-900">{adminOperationsModel.formatDate(latestSuccessfulAutomationRun)}</p>
+              <p className="text-sm text-gray-500">Most recent pipeline success recorded by the system.</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-gray-200">
+            <CardContent className="p-5 space-y-2">
+              <p className="text-sm text-gray-500">Operating Mode</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xl font-semibold text-gray-900">{operatingMode}</p>
+                <StatusBadge status={!controlStatus?.available ? 'degraded' : schedulerEnabled ? 'ok' : 'stale'} />
+              </div>
+              <p className="text-sm text-gray-500">
+                {!controlStatus?.available
+                  ? 'Hosted admin can read reports, but cannot yet prove live runner access.'
+                  : schedulerEnabled
+                    ? `Scheduler checks recorded: ${schedulerChecks}`
+                    : 'Runner is reachable, but autopilot is not fully active yet.'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-gray-200">
+            <CardContent className="p-5 space-y-2">
+              <p className="text-sm text-gray-500">Hosted Report Freshness</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xl font-semibold text-gray-900">
+                  {reportAgeHours == null ? 'Missing' : reportAgeHours <= 2 ? 'Current' : `${reportAgeHours.toFixed(1)}h old`}
+                </p>
+                <StatusBadge status={reportFreshnessStatus} />
+              </div>
+              <p className="text-sm text-gray-500">This is the proof line for whether hosted reporting is staying fresh on its own.</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Card className="border-gray-200">
           <CardHeader>
-            <CardTitle className="text-xl text-gray-900">What this page is telling you</CardTitle>
+            <CardTitle className="text-xl text-gray-900">How to use this page</CardTitle>
             <p className="text-sm text-gray-500 mt-1">
-              This is the business dashboard for the siteâ€™s self-maintaining systems. It answers four simple questions:
-              is the site healthy, what ran last, what needs attention, and are the automations keeping up on their own.
+              Start at the plain-English cards above. If those look good, glance at Business systems. Only open Technical details when you want the engineering proof.
             </p>
           </CardHeader>
         </Card>
@@ -235,65 +409,6 @@ export default function AdminOperations() {
             </CardContent>
           </Card>
         ) : null}
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card className="border-gray-200">
-            <CardContent className="p-5 space-y-2">
-              <p className="text-sm text-gray-500">Overall Site Health</p>
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-2xl font-semibold text-gray-900 capitalize">{summary.topStatus}</p>
-                <StatusBadge status={summary.topStatus} />
-              </div>
-              <p className="text-sm text-gray-500">Healthy areas: {summary.ok} / {dashboardAreas.length}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-gray-200">
-            <CardContent className="p-5 space-y-2">
-              <p className="text-sm text-gray-500">Last Successful Automation</p>
-              <p className="text-xl font-semibold text-gray-900">{adminOperationsModel.formatDate(latestSuccessfulAutomationRun)}</p>
-              <p className="text-sm text-gray-500">Most recent pipeline success recorded by the system.</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-gray-200">
-            <CardContent className="p-5 space-y-2">
-              <p className="text-sm text-gray-500">Operating Mode</p>
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-2xl font-semibold text-gray-900">{operatingMode}</p>
-                <StatusBadge status={!controlStatus?.available ? 'degraded' : schedulerEnabled ? 'ok' : 'stale'} />
-              </div>
-              <p className="text-sm text-gray-500">
-                {!controlStatus?.available
-                  ? 'Hosted admin can read reports, but cannot yet prove live runner access.'
-                  : schedulerEnabled
-                    ? `Scheduler checks recorded: ${schedulerChecks}`
-                    : 'Runner is reachable, but autopilot is not fully active yet.'}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-gray-200">
-            <CardContent className="p-5 space-y-2">
-              <p className="text-sm text-gray-500">Hosted Report Freshness</p>
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-2xl font-semibold text-gray-900">
-                  {reportAgeHours == null ? 'Missing' : reportAgeHours <= 2 ? 'Current' : `${reportAgeHours.toFixed(1)}h old`}
-                </p>
-                <StatusBadge status={reportFreshnessStatus} />
-              </div>
-              <p className="text-sm text-gray-500">This is the proof line for whether hosted reporting is staying fresh on its own.</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-gray-200">
-            <CardContent className="p-5 space-y-2">
-              <p className="text-sm text-gray-500">Problems Needing Attention</p>
-              <p className="text-2xl font-semibold text-gray-900">{attentionItems.length}</p>
-              <p className="text-sm text-gray-500">{attentionItems.length === 0 ? 'Nothing urgent is flagged right now.' : 'These are the things still blocking full unattended beast mode.'}</p>
-            </CardContent>
-          </Card>
-        </div>
 
         <Card className="border-gray-200">
           <CardHeader>
@@ -366,7 +481,7 @@ export default function AdminOperations() {
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">Technical details</h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  Open this only when you want the deeper engineering proof: pipeline internals, bridge readiness, run history, and recovery detail.
+                  Open this when you want the deeper engineering proof: pipeline internals, bridge readiness, run history, and recovery detail.
                 </p>
               </div>
               <Badge variant="outline" className="border-slate-200 text-slate-700 bg-slate-50 group-open:bg-slate-100">
@@ -460,4 +575,3 @@ export default function AdminOperations() {
     </div>
   );
 }
-
