@@ -162,6 +162,17 @@ function getBeastModeChecklist({ businessCoreSummary, reportFreshnessStatus, con
   ];
 }
 
+function getChecklistProgress(items = []) {
+  const total = items.length;
+  const complete = items.filter((item) => item.status === 'ok').length;
+  const ratio = total > 0 ? complete / total : 0;
+  return {
+    total,
+    complete,
+    percent: Math.round(ratio * 100)
+  };
+}
+
 export default function AdminOperations() {
   const navigate = useNavigate();
   const {
@@ -266,6 +277,10 @@ export default function AdminOperations() {
     controlStatus,
     schedulerEnabled
   });
+  const beastModeProgress = getChecklistProgress(beastModeChecklist);
+  const bridgeActivationContract = Array.isArray(controlStatus?.bridge?.activationContract)
+    ? controlStatus.bridge.activationContract
+    : [];
 
   const topBlocker = attentionItems[0] || null;
   const operatorControlStatus = !controlStatus?.available
@@ -489,12 +504,20 @@ export default function AdminOperations() {
 
         <Card className="border-gray-200">
           <CardHeader>
-            <CardTitle className="text-xl text-gray-900">Finish self-maintaining beast mode</CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-xl text-gray-900">Finish self-maintaining beast mode</CardTitle>
+              <StatusBadge status={beastModeProgress.complete === beastModeProgress.total ? 'ok' : beastModeProgress.complete >= 2 ? 'stale' : 'degraded'} />
+            </div>
             <p className="text-sm text-gray-500 mt-1">
               This is the actual finish line. When all four steps are green, the site is business-healthy and the hosted admin page is truly proving unattended operations.
             </p>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-900">Progress</p>
+              <p className="mt-1 text-2xl font-bold text-slate-900">{beastModeProgress.complete}/{beastModeProgress.total} complete</p>
+              <p className="text-sm text-slate-600">{beastModeProgress.percent}% of the full self-maintaining finish line is currently proven.</p>
+            </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {beastModeChecklist.map((item) => (
                 <div key={item.id} className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
@@ -506,6 +529,53 @@ export default function AdminOperations() {
                 </div>
               ))}
             </div>
+
+            {!controlStatus?.available ? (
+              <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                <p className="font-semibold text-blue-950">What still needs outside-the-repo wiring</p>
+                <p className="mt-1 text-sm text-blue-800">
+                  The codebase side is in much better shape. The main thing still preventing full beast mode is the hosted runner bridge.
+                </p>
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  {(bridgeActivationContract.length > 0 ? bridgeActivationContract : [
+                    {
+                      id: 'backend-host',
+                      label: 'Backend host',
+                      value: 'Render service running npm run ops:serve',
+                      proof: '/api/local/health returns ok'
+                    },
+                    {
+                      id: 'cloudflare-origin',
+                      label: 'Cloudflare Pages',
+                      value: 'VITE_API_ORIGIN=https://<render-service>.onrender.com',
+                      proof: 'Hosted Admin Operations can reach /api/local/admin/automation/control-status'
+                    },
+                    {
+                      id: 'backend-env',
+                      label: 'Backend env',
+                      value: 'ALLOW_REMOTE_CONNECTIONS=true, PUBLIC_APP_URL=https://mainphasemarket.net',
+                      proof: 'Remote bridge readiness check reports remote connections ok'
+                    },
+                    {
+                      id: 'admin-proof',
+                      label: 'Proof command',
+                      value: 'npm run ops:check -- --origin https://<render-service>.onrender.com --token <admin-token>',
+                      proof: 'health ok and automation controls available'
+                    }
+                  ]).map((item) => (
+                    <div key={item.id || item.label} className="rounded-xl border border-blue-100 bg-white p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{item.label}</p>
+                      <p className="mt-1 break-all font-mono text-xs text-slate-700">{item.value}</p>
+                      {item.proof ? (
+                        <p className="mt-2 text-xs text-slate-500">
+                          <span className="font-semibold text-slate-600">Proof:</span> {item.proof}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
