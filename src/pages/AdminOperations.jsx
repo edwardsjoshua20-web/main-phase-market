@@ -125,6 +125,43 @@ function getProductWorkSummary({ attentionItems, reportFreshnessStatus, controlS
   };
 }
 
+function getBeastModeChecklist({ businessCoreSummary, reportFreshnessStatus, controlStatus, schedulerEnabled }) {
+  return [
+    {
+      id: 'business-core',
+      label: 'Business core systems are healthy',
+      status: businessCoreSummary.topStatus === 'ok' ? 'ok' : businessCoreSummary.topStatus,
+      detail: businessCoreSummary.topStatus === 'ok'
+        ? `All ${businessCoreSummary.total} core systems are green.`
+        : `${businessCoreSummary.healthy}/${businessCoreSummary.total} core systems are currently green.`
+    },
+    {
+      id: 'hosted-proof',
+      label: 'Hosted reporting is fresh',
+      status: reportFreshnessStatus,
+      detail: reportFreshnessStatus === 'ok'
+        ? 'The public admin page is reading a current proof snapshot.'
+        : 'The public admin page is not yet proving fresh health on schedule.'
+    },
+    {
+      id: 'runner-bridge',
+      label: 'Runner bridge is connected',
+      status: controlStatus?.available ? 'ok' : 'degraded',
+      detail: controlStatus?.available
+        ? 'Hosted admin can reach the automation runner bridge.'
+        : (controlStatus?.reason || 'Hosted admin cannot yet reach the automation runner bridge.')
+    },
+    {
+      id: 'autopilot',
+      label: 'Autopilot scheduler is active',
+      status: schedulerEnabled ? 'ok' : 'stale',
+      detail: schedulerEnabled
+        ? 'Scheduled automation checks are active.'
+        : 'The runner bridge is not yet proving unattended scheduling.'
+    }
+  ];
+}
+
 export default function AdminOperations() {
   const navigate = useNavigate();
   const {
@@ -219,6 +256,12 @@ export default function AdminOperations() {
 
   const productWorkSummary = getProductWorkSummary({
     attentionItems,
+    reportFreshnessStatus,
+    controlStatus,
+    schedulerEnabled
+  });
+  const beastModeChecklist = getBeastModeChecklist({
+    businessCoreSummary,
     reportFreshnessStatus,
     controlStatus,
     schedulerEnabled
@@ -442,6 +485,28 @@ export default function AdminOperations() {
               Start at the plain-English cards above. If those look good, glance at Business systems. Only open Technical details when you want the engineering proof.
             </p>
           </CardHeader>
+        </Card>
+
+        <Card className="border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-xl text-gray-900">Finish self-maintaining beast mode</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              This is the actual finish line. When all four steps are green, the site is business-healthy and the hosted admin page is truly proving unattended operations.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {beastModeChecklist.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-gray-900">{item.label}</p>
+                    <StatusBadge status={item.status} />
+                  </div>
+                  <p className="text-sm text-gray-600">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
         </Card>
 
         {(reportFreshnessStatus !== 'ok' || !controlStatus?.available || !schedulerEnabled) ? (
