@@ -173,6 +173,80 @@ function getChecklistProgress(items = []) {
   };
 }
 
+function getBeastLayers({ businessCoreSummary, reportFreshnessStatus, controlStatus, schedulerEnabled }) {
+  return [
+    {
+      id: 'engine-layer',
+      title: '1. Business engine layer',
+      status: businessCoreSummary.topStatus,
+      headline: businessCoreSummary.topStatus === 'ok' ? 'Running' : 'Needs work',
+      detail: businessCoreSummary.topStatus === 'ok'
+        ? 'Catalogs, images, pricing, homepage, and launch readiness are healthy.'
+        : `${businessCoreSummary.healthy}/${businessCoreSummary.total} core business systems are currently green.`
+    },
+    {
+      id: 'proof-layer',
+      title: '2. Proof and reporting layer',
+      status: reportFreshnessStatus,
+      headline: reportFreshnessStatus === 'ok' ? 'Fresh proof' : reportFreshnessStatus === 'stale' ? 'Proof is old' : 'Proof missing',
+      detail: reportFreshnessStatus === 'ok'
+        ? 'The hosted admin page is reading a current proof snapshot.'
+        : 'The hosted admin page is not yet proving freshness on its own.'
+    },
+    {
+      id: 'autopilot-layer',
+      title: '3. Autopilot and controls layer',
+      status: !controlStatus?.available ? 'degraded' : schedulerEnabled ? 'ok' : 'stale',
+      headline: !controlStatus?.available ? 'Bridge not wired' : schedulerEnabled ? 'Autopilot active' : 'Runner only',
+      detail: !controlStatus?.available
+        ? (controlStatus?.reason || 'Hosted admin cannot reach the live runner bridge yet.')
+        : schedulerEnabled
+          ? 'The runner bridge is connected and scheduled automation is active.'
+          : 'The runner is reachable, but unattended scheduling is not fully proving itself yet.'
+    }
+  ];
+}
+
+function getNextMilestone({ businessCoreSummary, reportFreshnessStatus, controlStatus, schedulerEnabled, attentionItems }) {
+  if (businessCoreSummary.topStatus !== 'ok') {
+    return {
+      status: businessCoreSummary.topStatus,
+      title: 'Stabilize the business engines first',
+      detail: attentionItems[0]?.detail || 'One or more core systems still need attention before we call this business-grade.'
+    };
+  }
+
+  if (reportFreshnessStatus !== 'ok') {
+    return {
+      status: reportFreshnessStatus,
+      title: 'Restore hosted proof freshness',
+      detail: 'The business engines are healthy, but the hosted report is not fresh enough to prove the site is maintaining itself.'
+    };
+  }
+
+  if (!controlStatus?.available) {
+    return {
+      status: 'degraded',
+      title: 'Wire the hosted runner bridge',
+      detail: 'This is the main remaining outside-the-repo step before manual controls and true self-maintaining proof are real.'
+    };
+  }
+
+  if (!schedulerEnabled) {
+    return {
+      status: 'stale',
+      title: 'Turn on or prove the autopilot scheduler',
+      detail: 'The runner bridge is there, but unattended scheduling still is not fully proven from the hosted admin perspective.'
+    };
+  }
+
+  return {
+    status: 'ok',
+    title: 'Shift back to storefront and product work',
+    detail: 'The business backbone is healthy, the proof is current, and the control layer is live.'
+  };
+}
+
 export default function AdminOperations() {
   const navigate = useNavigate();
   const {
@@ -277,7 +351,20 @@ export default function AdminOperations() {
     controlStatus,
     schedulerEnabled
   });
+  const beastLayers = getBeastLayers({
+    businessCoreSummary,
+    reportFreshnessStatus,
+    controlStatus,
+    schedulerEnabled
+  });
   const beastModeProgress = getChecklistProgress(beastModeChecklist);
+  const nextMilestone = getNextMilestone({
+    businessCoreSummary,
+    reportFreshnessStatus,
+    controlStatus,
+    schedulerEnabled,
+    attentionItems
+  });
   const bridgeActivationContract = Array.isArray(controlStatus?.bridge?.activationContract)
     ? controlStatus.bridge.activationContract
     : [];
@@ -500,6 +587,48 @@ export default function AdminOperations() {
               Start at the plain-English cards above. If those look good, glance at Business systems. Only open Technical details when you want the engineering proof.
             </p>
           </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-3">
+              {beastLayers.map((layer) => (
+                <div key={layer.id} className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-gray-900">{layer.title}</p>
+                    <StatusBadge status={layer.status} />
+                  </div>
+                  <p className="text-lg font-semibold text-gray-900">{layer.headline}</p>
+                  <p className="text-sm text-gray-600">{layer.detail}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-900">Recommended next move</p>
+                  <p className="mt-1 text-sm text-slate-600">{nextMilestone.detail}</p>
+                </div>
+                <StatusBadge status={nextMilestone.status} />
+              </div>
+              <p className="mt-3 text-lg font-semibold text-slate-900">{nextMilestone.title}</p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                { label: 'ok', meaning: 'Working and currently proven.' },
+                { label: 'stale', meaning: 'Probably working, but proof is too old.' },
+                { label: 'degraded', meaning: 'Partly working or missing a live dependency.' },
+                { label: 'missing', meaning: 'No proof or no live connection exists yet.' }
+              ].map((item) => (
+                <div key={item.label} className="rounded-2xl border border-gray-200 bg-white p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold capitalize text-gray-900">{item.label}</p>
+                    <StatusBadge status={item.label} />
+                  </div>
+                  <p className="mt-2 text-sm text-gray-600">{item.meaning}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
         </Card>
 
         <Card className="border-gray-200">
