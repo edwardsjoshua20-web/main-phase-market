@@ -225,6 +225,11 @@ export default function AdminOperations() {
   });
 
   const topBlocker = attentionItems[0] || null;
+  const operatorControlStatus = !controlStatus?.available
+    ? 'degraded'
+    : schedulerEnabled
+      ? 'ok'
+      : 'stale';
 
   const systemCards = [
     {
@@ -358,11 +363,26 @@ export default function AdminOperations() {
 
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <StatsCard title="Business Core" value={businessCoreSummary.topStatus} icon={businessCoreSummary.topStatus === 'ok' ? CheckCircle2 : businessCoreSummary.topStatus === 'missing' ? ServerCrash : AlertTriangle} color={businessCoreSummary.topStatus === 'ok' ? 'green' : businessCoreSummary.topStatus === 'missing' ? 'red' : 'amber'} />
-          <StatsCard title="Healthy Areas" value={summary.ok} icon={CheckCircle2} color="green" />
-          <StatsCard title="Degraded Areas" value={summary.degraded} icon={AlertTriangle} color="amber" />
-          <StatsCard title="Stale Areas" value={summary.stale} icon={Clock3} color="purple" />
-          <StatsCard title="Missing Areas" value={summary.missing} icon={ServerCrash} color="red" />
+          <StatsCard title="Core Systems Green" value={`${businessCoreSummary.healthy}/${businessCoreSummary.total}`} icon={CheckCircle2} color={businessCoreSummary.healthy === businessCoreSummary.total ? 'green' : 'amber'} />
+          <StatsCard title="Self-Maintaining Proof" value={selfMaintainingSummary.status} icon={selfMaintainingSummary.status === 'ok' ? CheckCircle2 : selfMaintainingSummary.status === 'stale' ? Clock3 : AlertTriangle} color={selfMaintainingSummary.status === 'ok' ? 'green' : selfMaintainingSummary.status === 'stale' ? 'purple' : 'amber'} />
+          <StatsCard title="Operator Controls" value={!controlStatus?.available ? 'offline' : schedulerEnabled ? 'live' : 'partial'} icon={!controlStatus?.available ? ServerCrash : schedulerEnabled ? CheckCircle2 : Clock3} color={operatorControlStatus === 'ok' ? 'green' : operatorControlStatus === 'stale' ? 'purple' : 'amber'} />
+          <StatsCard title="Hosted Report" value={reportAgeHours == null ? 'missing' : reportAgeHours <= 2 ? 'current' : `${reportAgeHours.toFixed(1)}h`} icon={reportFreshnessStatus === 'ok' ? CheckCircle2 : reportFreshnessStatus === 'stale' ? Clock3 : ServerCrash} color={reportFreshnessStatus === 'ok' ? 'green' : reportFreshnessStatus === 'stale' ? 'purple' : 'red'} />
         </div>
+
+        <Card className="border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-xl text-gray-900">Operations counters</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">These are the deeper ops counts. Useful for engineering, but not the first thing you should need to read.</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatsCard title="Healthy Areas" value={summary.ok} icon={CheckCircle2} color="green" />
+              <StatsCard title="Degraded Areas" value={summary.degraded} icon={AlertTriangle} color="amber" />
+              <StatsCard title="Stale Areas" value={summary.stale} icon={Clock3} color="purple" />
+              <StatsCard title="Missing Areas" value={summary.missing} icon={ServerCrash} color="red" />
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <Card className="border-gray-200 xl:col-span-2">
