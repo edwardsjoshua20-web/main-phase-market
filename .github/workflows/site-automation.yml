@@ -71,7 +71,9 @@ jobs:
         shell: bash
         run: |
           started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          started_epoch_ms="$(date +%s%3N)"
           echo "started_at=$started_at" >> "$GITHUB_OUTPUT"
+          echo "started_epoch_ms=$started_epoch_ms" >> "$GITHUB_OUTPUT"
           npm run "automation:${{ inputs.pipeline }}"
 
       - name: Record successful run
@@ -79,16 +81,24 @@ jobs:
         shell: bash
         run: |
           finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          finished_epoch_ms="$(date +%s%3N)"
+          duration_ms=$((finished_epoch_ms - ${{ steps.automation.outputs.started_epoch_ms }}))
           curl --fail-with-body --request POST "$MPM_AUTOMATION_DISPATCH_URL" \
             --header 'Content-Type: application/json' \
             --header "x-mpm-automation-secret: $MPM_AUTOMATION_SHARED_SECRET" \
-            --data "{\"action\":\"complete\",\"jobId\":\"${{ inputs.job_id }}\",\"runId\":\"${{ inputs.run_id }}\",\"status\":\"ok\",\"startedAt\":\"${{ steps.automation.outputs.started_at }}\",\"diagnostics\":{\"runner\":\"github-actions\",\"pipeline\":\"${{ inputs.pipeline }}\"}}"
+            --data "{\"action\":\"complete\",\"jobId\":\"${{ inputs.job_id }}\",\"runId\":\"${{ inputs.run_id }}\",\"status\":\"ok\",\"startedAt\":\"${{ steps.automation.outputs.started_at }}\",\"durationMs\":$duration_ms,\"diagnostics\":{\"runner\":\"github-actions\",\"pipeline\":\"${{ inputs.pipeline }}\"}}"
 
       - name: Record failed run
         if: failure()
         shell: bash
         run: |
+          finished_epoch_ms="$(date +%s%3N)"
+          started_epoch_ms="${{ steps.automation.outputs.started_epoch_ms }}"
+          duration_ms=0
+          if [ -n "$started_epoch_ms" ]; then
+            duration_ms=$((finished_epoch_ms - started_epoch_ms))
+          fi
           curl --fail-with-body --request POST "$MPM_AUTOMATION_DISPATCH_URL" \
             --header 'Content-Type: application/json' \
             --header "x-mpm-automation-secret: $MPM_AUTOMATION_SHARED_SECRET" \
-            --data "{\"action\":\"complete\",\"jobId\":\"${{ inputs.job_id }}\",\"runId\":\"${{ inputs.run_id }}\",\"status\":\"failed\",\"startedAt\":\"${{ steps.automation.outputs.started_at }}\",\"error\":\"GitHub Actions workflow failed. See the workflow log for details.\",\"diagnostics\":{\"runner\":\"github-actions\",\"pipeline\":\"${{ inputs.pipeline }}\"}}"
+            --data "{\"action\":\"complete\",\"jobId\":\"${{ inputs.job_id }}\",\"runId\":\"${{ inputs.run_id }}\",\"status\":\"failed\",\"startedAt\":\"${{ steps.automation.outputs.started_at }}\",\"durationMs\":$duration_ms,\"error\":\"GitHub Actions workflow failed. See the workflow log for details.\",\"diagnostics\":{\"runner\":\"github-actions\",\"pipeline\":\"${{ inputs.pipeline }}\"}}"
