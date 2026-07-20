@@ -15,15 +15,20 @@ function getRequiredEnv(name: string) {
 }
 
 function configuredSecretKeys() {
-  const encoded = Deno.env.get('SUPABASE_SECRET_KEYS')?.trim();
-  if (!encoded) return [];
+  // Supabase's scheduled Edge Function request uses a project API key.  Accept
+  // either of the platform-provided key registries so the cron job can use the
+  // non-sensitive publishable key instead of a service-role credential.
+  return ['SUPABASE_SECRET_KEYS', 'SUPABASE_PUBLISHABLE_KEYS'].flatMap((name) => {
+    const encoded = Deno.env.get(name)?.trim();
+    if (!encoded) return [];
 
-  try {
-    const keys = JSON.parse(encoded);
-    return Object.values(keys).filter((value): value is string => typeof value === 'string' && value.length > 0);
-  } catch {
-    return [];
-  }
+    try {
+      const keys = JSON.parse(encoded);
+      return Object.values(keys).filter((value): value is string => typeof value === 'string' && value.length > 0);
+    } catch {
+      return [];
+    }
+  });
 }
 
 function isAuthorized(request: Request) {
