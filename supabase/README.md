@@ -1,5 +1,17 @@
 # Supabase
 
+## Live automation scheduling
+
+`automation-orchestrator` is the hourly Supabase Cron target. It evaluates the
+due pipeline windows, then sends each permitted job through `automation-dispatch`
+to the GitHub Actions runner. Supabase remains the scheduler and durable audit
+ledger; GitHub Actions runs the heavy Node processes.
+
+Create one hourly Cron job in the Supabase dashboard that invokes
+`automation-orchestrator` with `POST`. Supabase Cron supplies a secret API key
+for Edge Function calls, and the function also supports the local shared-secret
+path for controlled manual testing.
+
 This folder is the home for anything that belongs to the Supabase side of Main Phase Market.
 
 Use this folder for:
