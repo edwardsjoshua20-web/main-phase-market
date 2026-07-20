@@ -38,7 +38,13 @@ export function readEnvFile(filePath) {
 
 export function readSupabaseUploadConfig(projectRoot = process.cwd()) {
   const envPath = path.join(projectRoot, '.env.local');
-  const env = readEnvFile(envPath);
+  const fileEnv = fs.existsSync(envPath) ? readEnvFile(envPath) : {};
+  const env = {
+    ...fileEnv,
+    ...Object.fromEntries(
+      Object.entries(process.env).filter(([, value]) => typeof value === 'string' && value.length > 0)
+    )
+  };
   const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || '';
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
   const bucketName = env.SUPABASE_PUBLIC_BUCKET || 'main-phase-market-public';

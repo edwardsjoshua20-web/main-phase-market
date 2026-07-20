@@ -63,6 +63,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Hydrate current public data from Supabase Storage
+        run: npm run supabase:hydrate:public-data
+
       - name: Run allowlisted automation pipeline
         id: automation
         shell: bash

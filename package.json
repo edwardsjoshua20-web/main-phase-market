@@ -60,6 +60,7 @@
     "automation:homepage": "node scripts/run-site-automation.mjs homepage",
     "automation:catalog": "npm run automation:catalog:refresh",
     "automation:images": "npm run automation:images:refresh",
+    "supabase:hydrate:public-data": "node scripts/hydrate-supabase-public-data.mjs",
     "automation:pricing": "node scripts/run-site-automation.mjs pricing",
     "automation:health": "node scripts/run-site-automation.mjs health",
     "ops:check": "node scripts/check-ops-bridge.mjs",
