@@ -12,7 +12,11 @@ export function buildAdminOperationsDashboardState({
 }) {
   const sections = systemHealth?.sections || {};
   const generatedAt = systemHealth?.generatedAt || null;
-  const automationRuns = systemHealth?.automationRuns || { generatedAt: null, jobs: {} };
+  // The hosted health snapshot explains catalog/image/pricing coverage. The
+  // durable Supabase control plane is the source of truth for actual job runs.
+  const automationRuns = controlQuery?.data?.automationRuns
+    || systemHealth?.automationRuns
+    || { generatedAt: null, jobs: {} };
   const automationSummary = adminOperationsModel.summarizeAutomationRuns(automationRuns);
 
   const controlStatus = normalizeAdminOperationsControlStatus(controlQuery);

@@ -232,6 +232,28 @@ function buildHostedAutomationControlUnavailable() {
   };
 }
 
+async function fetchHostedAutomationControlStatus() {
+  const token = requireHostedSession();
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/automation-status`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`
+    },
+    body: '{}'
+  });
+
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
+  if (!response.ok) {
+    const error = new Error(payload?.error || `Automation status request failed: ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
 function getStoredSession() {
   if (typeof window === 'undefined') return null;
 
@@ -870,7 +892,7 @@ export const localBackend = {
     },
     getAutomationControlStatus() {
       if (hostedStaticDataMode) {
-        return Promise.resolve(buildHostedAutomationControlUnavailable());
+        return fetchHostedAutomationControlStatus();
       }
       return apiRequest('/admin/automation/control-status');
     },
