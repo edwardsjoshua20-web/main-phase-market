@@ -1,0 +1,91 @@
+name: Main Phase Market automation runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: Supabase automation job identifier
+        required: true
+        type: choice
+        options:
+          - card-backfill-refresh
+          - homepage-upcoming-releases
+          - catalog-refresh
+          - image-repair-sync
+          - pricing-refresh
+          - system-health-report
+      pipeline:
+        description: Allowlisted Node automation pipeline
+        required: true
+        type: choice
+        options:
+          - cards
+          - homepage
+          - catalog
+          - images
+          - pricing
+          - health
+      run_id:
+        description: Supabase run ledger identifier
+        required: true
+        type: string
+      trigger_source:
+        description: Origin recorded in the run ledger
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-phase-market-automation-${{ inputs.job_id }}
+  cancel-in-progress: false
+
+jobs:
+  run-automation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_PUBLIC_BUCKET: ${{ secrets.SUPABASE_PUBLIC_BUCKET }}
+      MPM_RUNTIME_SITE_DATA_ROOT: ${{ runner.temp }}/main-phase-market-runtime
+      MPM_AUTOMATION_SHARED_SECRET: ${{ secrets.MPM_AUTOMATION_SHARED_SECRET }}
+      MPM_AUTOMATION_DISPATCH_URL: ${{ secrets.MPM_AUTOMATION_DISPATCH_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run allowlisted automation pipeline
+        id: automation
+        shell: bash
+        run: |
+          started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "started_at=$started_at" >> "$GITHUB_OUTPUT"
+          npm run "automation:${{ inputs.pipeline }}"
+
+      - name: Record successful run
+        if: success()
+        shell: bash
+        run: |
+          finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          curl --fail-with-body --request POST "$MPM_AUTOMATION_DISPATCH_URL" \
+            --header 'Content-Type: application/json' \
+            --header "x-mpm-automation-secret: $MPM_AUTOMATION_SHARED_SECRET" \
+            --data "{\"action\":\"complete\",\"jobId\":\"${{ inputs.job_id }}\",\"runId\":\"${{ inputs.run_id }}\",\"status\":\"ok\",\"startedAt\":\"${{ steps.automation.outputs.started_at }}\",\"diagnostics\":{\"runner\":\"github-actions\",\"pipeline\":\"${{ inputs.pipeline }}\"}}"
+
+      - name: Record failed run
+        if: failure()
+        shell: bash
+        run: |
+          curl --fail-with-body --request POST "$MPM_AUTOMATION_DISPATCH_URL" \
+            --header 'Content-Type: application/json' \
+            --header "x-mpm-automation-secret: $MPM_AUTOMATION_SHARED_SECRET" \
+            --data "{\"action\":\"complete\",\"jobId\":\"${{ inputs.job_id }}\",\"runId\":\"${{ inputs.run_id }}\",\"status\":\"failed\",\"startedAt\":\"${{ steps.automation.outputs.started_at }}\",\"error\":\"GitHub Actions workflow failed. See the workflow log for details.\",\"diagnostics\":{\"runner\":\"github-actions\",\"pipeline\":\"${{ inputs.pipeline }}\"}}"

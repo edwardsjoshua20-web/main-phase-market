@@ -23,10 +23,35 @@ Recommended next files to add here:
 - `storage-buckets.md`
 - `edge-functions/`
 
-What should not live here:
-- Archidekt ingest bots
-- MTG catalog builders
-- commander simulation engine
-- long-running workers
+## Automation control plane
 
-Those stay in the custom backend until we deliberately migrate them.
+Supabase is the permanent operational control plane for Main Phase Market:
+
+- `automation_jobs` is the allowlisted job registry.
+- `automation_runs` is the durable history, queue, and single-run lock record.
+- `automation-dispatch` is the secure Edge Function that records a run and
+  dispatches an allowlisted pipeline to the runner workflow.
+
+The catalog/image engines remain Node scripts because they process large card
+feeds and image batches. Supabase Cron schedules them and records their state;
+the GitHub Actions runner executes the heavy work and publishes its outputs back
+to Supabase Storage. This avoids an always-on third-party server while keeping
+the source of truth, audit history, and published data inside Supabase.
+
+Before activating the dispatcher, configure these Supabase Edge Function secrets:
+
+- `MPM_AUTOMATION_SHARED_SECRET`
+- `GITHUB_AUTOMATION_REPOSITORY`
+- `GITHUB_AUTOMATION_TOKEN`
+- optional `GITHUB_AUTOMATION_WORKFLOW` (`site-automation.yml` by default)
+
+Configure matching GitHub Actions secrets:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_PUBLIC_BUCKET`
+- `MPM_AUTOMATION_SHARED_SECRET`
+- `MPM_AUTOMATION_DISPATCH_URL` (the `automation-dispatch` Edge Function URL)
+
+Do not expose any service-role key, GitHub token, or shared secret in Cloudflare
+Pages frontend variables.
