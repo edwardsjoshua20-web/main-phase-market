@@ -31,12 +31,14 @@ async function downloadIfPresent({ storageBaseUrl, serviceRoleKey, relativePath,
     }
   });
 
-  if (response.status === 404) {
-    return { relativePath, status: 'missing' };
-  }
-
   if (!response.ok) {
-    throw new Error(`Storage download failed for ${relativePath}: ${response.status} ${await response.text()}`);
+    const detail = await response.text();
+    const missingObject = response.status === 404
+      || (response.status === 400 && /object not found|not_found/i.test(detail));
+    if (missingObject) {
+      return { relativePath, status: 'missing' };
+    }
+    throw new Error(`Storage download failed for ${relativePath}: ${response.status} ${detail}`);
   }
 
   const content = Buffer.from(await response.arrayBuffer());
