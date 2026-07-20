@@ -49,7 +49,7 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       SUPABASE_PUBLIC_BUCKET: ${{ secrets.SUPABASE_PUBLIC_BUCKET }}
-      MPM_RUNTIME_SITE_DATA_ROOT: ${{ runner.temp }}/main-phase-market-runtime
+      MPM_RUNTIME_SITE_DATA_ROOT: ${{ github.workspace }}/.runtime
       MPM_AUTOMATION_SHARED_SECRET: ${{ secrets.MPM_AUTOMATION_SHARED_SECRET }}
       MPM_AUTOMATION_DISPATCH_URL: ${{ secrets.MPM_AUTOMATION_DISPATCH_URL }}
     steps:

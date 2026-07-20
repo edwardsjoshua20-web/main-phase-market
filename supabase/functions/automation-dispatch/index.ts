@@ -10,6 +10,12 @@ const ALLOWED_JOBS = new Set([
   'pricing-refresh',
   'system-health-report'
 ]);
+const ALLOWED_TRIGGER_SOURCES = new Set([
+  'supabase-cron',
+  'admin',
+  'github-actions',
+  'recovery'
+]);
 
 function getRequiredEnv(name: string) {
   const value = Deno.env.get(name)?.trim();
@@ -86,6 +92,10 @@ Deno.serve(async (request) => {
 
     if (action !== 'dispatch') {
       return errorResponse('Unsupported automation action.', 400);
+    }
+
+    if (!ALLOWED_TRIGGER_SOURCES.has(source)) {
+      return errorResponse('Unsupported automation trigger source.', 400);
     }
 
     const { data: job, error: jobError } = await supabase
