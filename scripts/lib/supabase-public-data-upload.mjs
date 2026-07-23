@@ -107,6 +107,11 @@ export function shouldSkipFile(relativePath, { includeImages = false } = {}) {
   return false;
 }
 
+function fileModifiedBeforeThreshold(stats, options = {}) {
+  const threshold = Number(options.modifiedSinceMs || 0);
+  return Number.isFinite(threshold) && threshold > 0 && stats.mtimeMs < threshold;
+}
+
 export function toObjectKey(relativePath) {
   return String(relativePath || '')
     .split('/')
@@ -123,6 +128,11 @@ function collectFilesFromDirectory(currentDir, publicRoot, accumulator, options 
       continue;
     }
 
+    const stats = fs.statSync(fullPath);
+    if (fileModifiedBeforeThreshold(stats, options)) {
+      continue;
+    }
+
     const relativePath = path.relative(publicRoot, fullPath).split(path.sep).join('/');
     if (shouldSkipFile(relativePath, options)) {
       continue;
@@ -131,7 +141,7 @@ function collectFilesFromDirectory(currentDir, publicRoot, accumulator, options 
     accumulator.set(relativePath, {
       fullPath,
       relativePath,
-      size: fs.statSync(fullPath).size
+      size: stats.size
     });
   }
 }
@@ -155,6 +165,10 @@ export function collectPublicFilesByRelativePaths(relativePaths = [], options = 
     const stats = fs.statSync(fullPath);
     if (stats.isDirectory()) {
       collectFilesFromDirectory(fullPath, publicRoot, collected, options);
+      continue;
+    }
+
+    if (fileModifiedBeforeThreshold(stats, options)) {
       continue;
     }
 

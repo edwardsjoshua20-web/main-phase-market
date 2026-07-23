@@ -93,6 +93,9 @@ export async function publishAutomationPipeline(pipelineId, options = {}) {
   const projectRoot = options.projectRoot || process.cwd();
   const quietProgress = Boolean(options.quietProgress);
   const selection = buildPublishSelection(pipelineId);
+  const modifiedSinceMs = pipelineId === 'images'
+    ? Number(options.modifiedSinceMs || 0)
+    : 0;
   const mirroredArtifacts = pipelineId === 'health' ? mirrorRuntimeArtifacts(projectRoot) : [];
   const effectiveSelection = {
     ...selection,
@@ -121,6 +124,7 @@ export async function publishAutomationPipeline(pipelineId, options = {}) {
   const uploadResult = await uploadPublicDataSelection(effectiveSelection, {
     projectRoot,
     includeImages: Boolean(effectiveSelection.includeImages),
+    modifiedSinceMs,
     quietProgress
   });
 
@@ -130,6 +134,7 @@ export async function publishAutomationPipeline(pipelineId, options = {}) {
     mirroredArtifacts,
     relativePaths: effectiveSelection.relativePaths,
     includeImages: Boolean(effectiveSelection.includeImages),
+    modifiedSinceMs: modifiedSinceMs || null,
     ...uploadResult
   };
 }

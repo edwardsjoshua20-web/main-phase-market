@@ -9,6 +9,7 @@ import { resolveRuntimeSiteDataRoot, getRuntimeAutomationRunsPath } from './lib/
 const ROOT = process.cwd();
 const SITE_DATA_ROOT = resolveRuntimeSiteDataRoot(ROOT);
 const RUN_HISTORY_PATH = getRuntimeAutomationRunsPath(ROOT);
+const automationStartedMs = Date.now();
 
 const job = String(process.argv[2] || '').trim().toLowerCase();
 
@@ -278,6 +279,7 @@ const publishResults = [];
 for (const pipelineId of publishPipelineIds) {
   publishResults.push(await publishAutomationPipeline(pipelineId, {
     projectRoot: ROOT,
+    modifiedSinceMs: pipelineId === 'images' ? Math.max(0, automationStartedMs - 5000) : 0,
     quietProgress: true
   }));
 }
