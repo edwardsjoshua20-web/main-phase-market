@@ -21,6 +21,7 @@ cf-dist-upload
 *.zip
 .codex-temp
 tmp
+.runtime/
 CON
 Data Exports
 Pokemon Symbols

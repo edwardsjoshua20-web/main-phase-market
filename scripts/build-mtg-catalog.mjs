@@ -293,9 +293,15 @@ async function main() {
 
   let totalCards = 0;
   let importedCards = 0;
+  let lastProgressAt = Date.now();
 
   await streamCards(sourcePath, async (card) => {
     totalCards += 1;
+
+    if (totalCards % 25000 === 0 || Date.now() - lastProgressAt > 30000) {
+      lastProgressAt = Date.now();
+      console.log(`MTG catalog progress: scanned ${totalCards} rows, imported ${importedCards} cards.`);
+    }
 
     const exclusionReason = shouldExclude(card);
     if (exclusionReason) {

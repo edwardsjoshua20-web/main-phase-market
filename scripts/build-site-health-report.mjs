@@ -149,6 +149,12 @@ function hoursSince(isoString) {
   return Math.round((((Date.now() - time) / (1000 * 60 * 60)) + Number.EPSILON) * 100) / 100;
 }
 
+function freshestIso(...isoStrings) {
+  return isoStrings
+    .filter(Boolean)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
+}
+
 function statusFromChecks({ exists = true, stale = false, degraded = false }) {
   if (!exists) return 'missing';
   if (stale) return 'stale';
@@ -257,7 +263,7 @@ function buildCatalogHealth() {
     const effectiveCardsCount = game === 'magic'
       ? Number(mtgManifest?.imported_cards || (Array.isArray(cards) ? cards.length : 0))
       : (Array.isArray(cards) ? cards.length : 0);
-    const freshestModifiedAt = effectiveCardsStats?.modifiedAt || setsStats?.modifiedAt || null;
+    const freshestModifiedAt = freshestIso(effectiveCardsStats?.modifiedAt, setsStats?.modifiedAt);
     const modifiedHoursAgo = hoursSince(freshestModifiedAt);
     const stale = modifiedHoursAgo != null && modifiedHoursAgo > AGE_LIMITS_HOURS.catalog;
     const exists = Boolean(effectiveCardsStats || setsStats);
