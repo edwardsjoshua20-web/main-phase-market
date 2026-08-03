@@ -54,6 +54,7 @@
     "pricing:import:starcitygames": "node scripts/import-starcitygames-source.mjs",
     "pricing:refresh:sources": "node scripts/run-pricing-source-refresh.mjs",
     "automation:cards:refresh": "node scripts/run-site-automation.mjs cards",
+    "automation:cards": "npm run automation:cards:refresh",
     "automation:catalog:refresh": "node scripts/run-site-automation.mjs catalog",
     "automation:images:refresh": "node scripts/run-site-automation.mjs images",
     "supabase:sync:entities": "node scripts/sync-entity-store-to-supabase.mjs",

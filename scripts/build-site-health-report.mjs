@@ -251,6 +251,23 @@ function normalizeLedgerStatus(status) {
   return 'missing';
 }
 
+function isIsoAtOrAfter(candidate, reference) {
+  if (!candidate || !reference) return false;
+  const candidateMs = new Date(candidate).getTime();
+  const referenceMs = new Date(reference).getTime();
+  if (Number.isNaN(candidateMs) || Number.isNaN(referenceMs)) return false;
+  return candidateMs >= referenceMs;
+}
+
+function reconcileLedgerStatus(status, current = {}, startedAt = null, finishedAt = null) {
+  if (status !== 'running') return status;
+  if (finishedAt) return current.lastFailedAt && isIsoAtOrAfter(current.lastFailedAt, finishedAt) ? 'failed' : 'ok';
+  if (current.lastFinishedAt && isIsoAtOrAfter(current.lastFinishedAt, startedAt)) {
+    return current.lastStatus && current.lastStatus !== 'running' ? current.lastStatus : 'ok';
+  }
+  return status;
+}
+
 function mergeSupabaseAutomationLedger(automationRuns, ledgerRows = []) {
   if (!Array.isArray(ledgerRows) || ledgerRows.length === 0) {
     return automationRuns;
@@ -269,18 +286,19 @@ function mergeSupabaseAutomationLedger(automationRuns, ledgerRows = []) {
 
     const jobDefinition = getAutomationJobById(jobId);
     const current = next.jobs[jobId] || {};
-    const status = normalizeLedgerStatus(row.status);
-    const startedAt = row.started_at || row.created_at || null;
-    const finishedAt = row.finished_at || null;
+    const ledgerStatus = normalizeLedgerStatus(row.last_status || row.status);
+    const startedAt = row.last_started_at || row.started_at || row.created_at || null;
+    const finishedAt = row.last_finished_at || row.finished_at || null;
+    const status = reconcileLedgerStatus(ledgerStatus, current, startedAt, finishedAt);
     const existingRecentRuns = Array.isArray(current.recentRuns) ? current.recentRuns : [];
     const ledgerRecentRun = {
       pipeline: jobDefinition?.runnerJob || row.runner_reference || 'supabase-ledger',
       status,
       startedAt,
       finishedAt,
-      durationMs: Number(row.duration_ms || 0) || null,
+      durationMs: Number(row.last_duration_ms || row.duration_ms || 0) || null,
       exitCode: status === 'ok' ? 0 : status === 'failed' ? 1 : null,
-      error: row.error_message || null,
+      error: row.last_error || row.error_message || null,
       triggerSource: row.trigger_source || null,
       runnerReference: row.runner_reference || null,
       runId: row.run_id || null,
@@ -305,9 +323,9 @@ function mergeSupabaseAutomationLedger(automationRuns, ledgerRows = []) {
       lastFailedAt: status === 'failed'
         ? (finishedAt || startedAt || current.lastFailedAt || null)
         : (current.lastFailedAt || null),
-      lastDurationMs: Number(row.duration_ms || 0) || current.lastDurationMs || null,
+      lastDurationMs: Number(row.last_duration_ms || row.duration_ms || 0) || current.lastDurationMs || null,
       lastExitCode: status === 'ok' ? 0 : status === 'failed' ? 1 : (current.lastExitCode ?? null),
-      lastError: status === 'failed' ? (row.error_message || 'Automation run failed.') : null,
+      lastError: status === 'failed' ? (row.last_error || row.error_message || 'Automation run failed.') : null,
       recentRuns,
       ledger: {
         source: 'supabase',
