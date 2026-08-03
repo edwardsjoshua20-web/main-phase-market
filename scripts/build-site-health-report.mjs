@@ -3,8 +3,9 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { getGameDataAliases, sourceRequirementStatus } from './lib/source-registry.mjs';
-import { siteAutomationSections } from '../src/services/automation/siteAutomationRegistry.js';
+import { getAutomationJobById, siteAutomationSections } from '../src/services/automation/siteAutomationRegistry.js';
 import { resolveRuntimeSiteDataRoot, getRuntimeAutomationRunsPath } from './lib/runtime-site-data-paths.mjs';
+import { readSupabaseUploadConfig } from './lib/supabase-public-data-upload.mjs';
 
 const ROOT = process.cwd();
 const PUBLIC_DATA_ROOT = path.join(ROOT, 'public', 'data');
@@ -195,6 +196,130 @@ function readAutomationRuns() {
     generatedAt: payload?.generatedAt || null,
     jobs: payload?.jobs && typeof payload.jobs === 'object' ? payload.jobs : {}
   };
+}
+
+async function readSupabaseAutomationLedger() {
+  let config;
+  try {
+    config = readSupabaseUploadConfig(ROOT);
+  } catch {
+    return {
+      status: 'skipped',
+      reason: 'supabase-config-unavailable',
+      rows: []
+    };
+  }
+
+  if (!config.supabaseUrl || !config.serviceRoleKey) {
+    return {
+      status: 'skipped',
+      reason: 'supabase-config-incomplete',
+      rows: []
+    };
+  }
+
+  const url = `${String(config.supabaseUrl).replace(/\/+$/, '')}/rest/v1/automation_latest_runs?select=*&order=job_id.asc`;
+  const response = await fetch(url, {
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      Accept: 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    return {
+      status: 'failed',
+      reason: `supabase-ledger-read-failed:${response.status}`,
+      detail: detail.slice(0, 300),
+      rows: []
+    };
+  }
+
+  const rows = await response.json().catch(() => []);
+  return {
+    status: 'ok',
+    rows: Array.isArray(rows) ? rows : []
+  };
+}
+
+function normalizeLedgerStatus(status) {
+  const normalized = String(status || 'missing').toLowerCase();
+  if (normalized === 'queued' || normalized === 'dispatching') return 'running';
+  if (['ok', 'failed', 'cancelled', 'running'].includes(normalized)) return normalized;
+  return 'missing';
+}
+
+function mergeSupabaseAutomationLedger(automationRuns, ledgerRows = []) {
+  if (!Array.isArray(ledgerRows) || ledgerRows.length === 0) {
+    return automationRuns;
+  }
+
+  const next = {
+    generatedAt: new Date().toISOString(),
+    jobs: {
+      ...(automationRuns?.jobs || {})
+    }
+  };
+
+  for (const row of ledgerRows) {
+    const jobId = String(row?.job_id || '').trim();
+    if (!jobId) continue;
+
+    const jobDefinition = getAutomationJobById(jobId);
+    const current = next.jobs[jobId] || {};
+    const status = normalizeLedgerStatus(row.status);
+    const startedAt = row.started_at || row.created_at || null;
+    const finishedAt = row.finished_at || null;
+    const existingRecentRuns = Array.isArray(current.recentRuns) ? current.recentRuns : [];
+    const ledgerRecentRun = {
+      pipeline: jobDefinition?.runnerJob || row.runner_reference || 'supabase-ledger',
+      status,
+      startedAt,
+      finishedAt,
+      durationMs: Number(row.duration_ms || 0) || null,
+      exitCode: status === 'ok' ? 0 : status === 'failed' ? 1 : null,
+      error: row.error_message || null,
+      triggerSource: row.trigger_source || null,
+      runnerReference: row.runner_reference || null,
+      runId: row.run_id || null,
+      source: 'supabase-ledger'
+    };
+
+    const existingRunIds = new Set(existingRecentRuns.map((run) => run?.runId).filter(Boolean));
+    const recentRuns = row.run_id && existingRunIds.has(row.run_id)
+      ? existingRecentRuns
+      : [ledgerRecentRun, ...existingRecentRuns].slice(0, 10);
+
+    next.jobs[jobId] = {
+      jobId,
+      label: jobDefinition?.label || current.label || jobId,
+      ...current,
+      lastStatus: status,
+      lastStartedAt: startedAt || current.lastStartedAt || null,
+      lastFinishedAt: finishedAt || current.lastFinishedAt || null,
+      lastSucceededAt: status === 'ok'
+        ? (finishedAt || startedAt || current.lastSucceededAt || null)
+        : (current.lastSucceededAt || null),
+      lastFailedAt: status === 'failed'
+        ? (finishedAt || startedAt || current.lastFailedAt || null)
+        : (current.lastFailedAt || null),
+      lastDurationMs: Number(row.duration_ms || 0) || current.lastDurationMs || null,
+      lastExitCode: status === 'ok' ? 0 : status === 'failed' ? 1 : (current.lastExitCode ?? null),
+      lastError: status === 'failed' ? (row.error_message || 'Automation run failed.') : null,
+      recentRuns,
+      ledger: {
+        source: 'supabase',
+        runId: row.run_id || null,
+        triggerSource: row.trigger_source || null,
+        runnerReference: row.runner_reference || null,
+        updatedAt: row.updated_at || null
+      }
+    };
+  }
+
+  return next;
 }
 
 function buildAutomationSummary(jobIds, automationRuns) {
@@ -544,8 +669,12 @@ function attachAutomationSummaries(sections, automationRuns) {
   }
 }
 
-function main() {
-  const automationRuns = readAutomationRuns();
+async function main() {
+  const ledger = await readSupabaseAutomationLedger();
+  const automationRuns = mergeSupabaseAutomationLedger(readAutomationRuns(), ledger.rows);
+  if (ledger.status === 'ok') {
+    safeWriteJsonFile(RUN_HISTORY_PATH, automationRuns);
+  }
   const homepage = buildHomepageHealth();
   const catalogs = buildCatalogHealth();
   const images = buildImagesHealth();
@@ -565,6 +694,11 @@ function main() {
   const payload = {
     generatedAt: new Date().toISOString(),
     overallStatus: buildSummary([homepage, catalogs, images, pricing, readiness]),
+    automationLedger: {
+      status: ledger.status,
+      reason: ledger.reason || null,
+      rows: ledger.rows.length
+    },
     automationRuns,
     sections
   };
