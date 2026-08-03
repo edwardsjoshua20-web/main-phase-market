@@ -19,6 +19,46 @@ export function getRunFreshnessHours(run) {
   return Math.max(0, (Date.now() - time) / 36e5);
 }
 
+export function getRunningLimitHours(jobId) {
+  const limits = {
+    'system-health-report': 0.25,
+    'homepage-upcoming-releases': 0.25,
+    'pricing-refresh': 0.75,
+    'card-backfill-refresh': 2,
+    'catalog-refresh': 2,
+    'image-repair-sync': 6
+  };
+  return limits[jobId] || 1;
+}
+
+export function getRunningAgeHours(run) {
+  if (String(run?.lastStatus || '').toLowerCase() !== 'running' || !run?.lastStartedAt) return null;
+  const startedMs = new Date(run.lastStartedAt).getTime();
+  if (Number.isNaN(startedMs)) return null;
+  return Math.max(0, (Date.now() - startedMs) / 36e5);
+}
+
+export function isRunStaleActive(run, jobId = run?.jobId) {
+  const runningAgeHours = getRunningAgeHours(run);
+  if (runningAgeHours == null) return false;
+  return runningAgeHours > getRunningLimitHours(jobId);
+}
+
+export function describeRunDiagnostics(run, jobId = run?.jobId) {
+  const status = String(run?.lastStatus || 'missing').toLowerCase();
+  if (!run) return 'No run history has been captured for this job yet.';
+  if (run.lastError) return run.lastError;
+  if (status === 'running') {
+    const runningAgeHours = getRunningAgeHours(run);
+    const limitHours = getRunningLimitHours(jobId);
+    if (runningAgeHours != null && runningAgeHours > limitHours) {
+      return `Run has been active for ${runningAgeHours.toFixed(1)}h, past the ${limitHours.toFixed(1)}h recovery window. The dispatcher will retire this stale lock before the next run.`;
+    }
+    return `Run is active for ${runningAgeHours == null ? 'an unknown time' : `${runningAgeHours.toFixed(1)}h`}. Wait for completion before starting another copy.`;
+  }
+  return 'Latest run completed without a recorded error.';
+}
+
 export function getBusinessImpact(jobId) {
   const impact = {
     'card-backfill-refresh': 'Raw card data feeding catalog, images, pricing, search, and storefront accuracy.',
@@ -71,10 +111,12 @@ export function getControlReadiness(run) {
   }
 
   if (status === 'running') {
+    const jobId = run?.jobId;
+    const staleActive = isRunStaleActive(run, jobId);
     return {
-      label: 'Run in progress',
-      tone: 'text-blue-700',
-      note: 'Wait for this job to finish before allowing another run.'
+      label: staleActive ? 'Stale run waiting for recovery' : 'Run in progress',
+      tone: staleActive ? 'text-amber-700' : 'text-blue-700',
+      note: describeRunDiagnostics(run, jobId)
     };
   }
 

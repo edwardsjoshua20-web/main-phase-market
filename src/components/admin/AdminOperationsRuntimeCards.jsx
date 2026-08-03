@@ -48,6 +48,7 @@ export function AutomationHistoryCard({ automationRuns }) {
             <tbody className="divide-y divide-gray-200 bg-white">
               {siteAutomationRegistry.map((job) => {
                 const run = adminOperationsModel.getRunRecord(automationRuns, job.id);
+                const displayStatus = adminOperationsModel.isRunStaleActive(run, job.id) ? 'stale' : (run?.lastStatus || 'missing');
                 return (
                   <tr key={job.id}>
                     <td className="px-4 py-3 align-top">
@@ -56,12 +57,12 @@ export function AutomationHistoryCard({ automationRuns }) {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 align-top">{job.owner}</td>
                     <td className="px-4 py-3 text-sm text-gray-700 align-top">{job.cadence}</td>
-                    <td className="px-4 py-3 text-sm align-top"><StatusBadge status={run?.lastStatus || 'missing'} /></td>
+                    <td className="px-4 py-3 text-sm align-top"><StatusBadge status={displayStatus} /></td>
                     <td className="px-4 py-3 text-sm text-gray-600 align-top">{adminOperationsModel.formatDate(run?.lastSucceededAt)}</td>
                     <td className="px-4 py-3 text-sm text-gray-600 align-top">{adminOperationsModel.formatDate(run?.lastFailedAt)}</td>
                     <td className="px-4 py-3 text-sm text-gray-600 align-top">{adminOperationsModel.formatDuration(run?.lastDurationMs)}</td>
                     <td className="px-4 py-3 text-sm text-gray-600 align-top max-w-sm">
-                      {run?.lastError ? run.lastError : run ? 'Latest run completed without a recorded error.' : 'No run history has been captured for this job yet.'}
+                      {adminOperationsModel.describeRunDiagnostics(run, job.id)}
                     </td>
                   </tr>
                 );

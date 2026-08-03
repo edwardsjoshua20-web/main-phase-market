@@ -49,7 +49,9 @@ import {
   getDependencyDiagnostics as getDependencyDiagnosticsFromService,
   getJobDetails as getJobDetailsFromService,
   getRunFreshnessHours as getRunFreshnessHoursFromService,
+  describeRunDiagnostics as describeRunDiagnosticsFromService,
   getRunRecord as getRunRecordFromService,
+  isRunStaleActive as isRunStaleActiveFromService,
   summarizeAutomationRuns as summarizeAutomationRunsFromService,
   summarizeTargets as summarizeTargetsFromService
 } from './adminOperationsPipelineService.js';
@@ -141,6 +143,14 @@ export function getCadenceTargetHours(cadence) {
 
 export function getRunFreshnessHours(run) {
   return getRunFreshnessHoursFromService(run);
+}
+
+export function isRunStaleActive(run, jobId) {
+  return isRunStaleActiveFromService(run, jobId);
+}
+
+export function describeRunDiagnostics(run, jobId) {
+  return describeRunDiagnosticsFromService(run, jobId);
 }
 
 export function getBusinessImpact(jobId) {
