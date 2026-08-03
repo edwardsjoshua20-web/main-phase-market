@@ -155,6 +155,13 @@ function commandToString([command, ...args]) {
   return [command, ...args].join(' ');
 }
 
+function commandForPlatform(command) {
+  if (process.platform !== 'win32') return command;
+  if (command === 'npm') return 'npm.cmd';
+  if (command === 'npx') return 'npx.cmd';
+  return command;
+}
+
 function updateJobRun(jobId, label, patch, recentRun = null) {
   const history = readRunHistory();
   const current = history.jobs[jobId] || {
@@ -187,9 +194,9 @@ function updateJobRun(jobId, label, patch, recentRun = null) {
 
 function executeCommand(commandSpec) {
   const commandStartedAt = Date.now();
-  const result = spawnSync(commandSpec[0], commandSpec.slice(1), {
+  const result = spawnSync(commandForPlatform(commandSpec[0]), commandSpec.slice(1), {
     stdio: 'inherit',
-    shell: process.platform === 'win32'
+    shell: false
   });
 
   return {
@@ -204,6 +211,9 @@ if (!JOBS[job]) {
   console.error(`Unknown automation job "${job}". Expected one of: ${Object.keys(JOBS).join(', ')}`);
   process.exit(1);
 }
+
+let pipelineExitCode = 0;
+let pipelineError = null;
 
 for (const step of JOBS[job].steps) {
   const startedAt = new Date().toISOString();
@@ -259,14 +269,16 @@ for (const step of JOBS[job].steps) {
   );
 
   if (!succeeded) {
-    process.exit(stepExitCode || 1);
+    pipelineExitCode = pipelineExitCode || stepExitCode || 1;
+    pipelineError = pipelineError || stepError;
   }
 }
 
 if (JOBS[job].steps.some((step) => step.jobId === 'system-health-report')) {
   const finalHealthBuild = executeCommand(['node', 'scripts/build-site-health-report.mjs']);
   if (finalHealthBuild.exitCode !== 0 || finalHealthBuild.error) {
-    process.exit(finalHealthBuild.exitCode || 1);
+    pipelineExitCode = pipelineExitCode || finalHealthBuild.exitCode || 1;
+    pipelineError = pipelineError || finalHealthBuild.error || `Command failed: ${finalHealthBuild.command}`;
   }
 }
 
@@ -301,3 +313,9 @@ for (const step of JOBS[job].steps) {
   });
 }
 
+if (pipelineExitCode !== 0) {
+  if (pipelineError) {
+    console.error(`[automation:pipeline-failed] ${job} ${pipelineError}`);
+  }
+  process.exit(pipelineExitCode);
+}
