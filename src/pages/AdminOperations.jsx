@@ -247,6 +247,70 @@ function getNextMilestone({ businessCoreSummary, reportFreshnessStatus, controlS
   };
 }
 
+function getOwnerInvestorSnapshot({
+  summary,
+  businessCoreSummary,
+  selfMaintainingSummary,
+  productWorkSummary,
+  beastModeProgress,
+  topBlocker,
+  latestSuccessfulAutomationRun,
+  nextMilestone,
+  reportFreshnessStatus,
+  reportAgeHours,
+  controlStatus,
+  schedulerEnabled
+}) {
+  const activeIssueCount = Number(summary?.degraded || 0) + Number(summary?.stale || 0) + Number(summary?.missing || 0);
+  const provenAutomation = selfMaintainingSummary.status === 'ok';
+  const investorStatus = businessCoreSummary.topStatus === 'ok' && provenAutomation
+    ? {
+        status: 'ok',
+        label: 'Green',
+        detail: 'The business systems and self-maintaining proof are both green.'
+      }
+    : businessCoreSummary.topStatus === 'ok'
+      ? {
+          status: selfMaintainingSummary.status,
+          label: 'Stabilizing',
+          detail: 'The core business systems look healthy, but the unattended proof layer still needs to finish proving itself.'
+        }
+      : {
+          status: businessCoreSummary.topStatus,
+          label: 'Needs attention',
+          detail: 'One or more core business systems still need work before this is investor-safe.'
+        };
+
+  const currentBlocker = topBlocker
+    ? `${topBlocker.title}: ${topBlocker.detail}`
+    : !controlStatus?.available
+      ? 'The hosted admin can read reports, but the live runner bridge is not fully available.'
+      : !schedulerEnabled
+        ? 'The runner is reachable, but autopilot scheduling is not fully proven yet.'
+        : 'No blocking operations item is currently flagged.';
+
+  const proofLabel = reportFreshnessStatus === 'ok'
+    ? 'Fresh hosted proof'
+    : reportFreshnessStatus === 'stale'
+      ? `Hosted proof is ${reportAgeHours == null ? 'stale' : `${reportAgeHours.toFixed(1)}h old`}`
+      : 'Hosted proof missing';
+
+  return {
+    investorStatus,
+    activeIssueCount,
+    currentBlocker,
+    proofLabel,
+    readinessPercent: beastModeProgress.percent,
+    automationLabel: provenAutomation
+      ? 'Autopilot proof is green'
+      : `${beastModeProgress.complete}/${beastModeProgress.total} self-maintaining checks proven`,
+    lastSuccessfulAutomationLabel: adminOperationsModel.formatDate(latestSuccessfulAutomationRun),
+    nextAction: nextMilestone?.title || 'Keep stabilizing the operations backbone.',
+    productWorkLabel: productWorkSummary.title,
+    productWorkStatus: productWorkSummary.status
+  };
+}
+
 export default function AdminOperations() {
   const navigate = useNavigate();
   const {
@@ -365,6 +429,20 @@ export default function AdminOperations() {
     schedulerEnabled,
     attentionItems
   });
+  const ownerInvestorSnapshot = getOwnerInvestorSnapshot({
+    summary,
+    businessCoreSummary,
+    selfMaintainingSummary,
+    productWorkSummary,
+    beastModeProgress,
+    topBlocker,
+    latestSuccessfulAutomationRun,
+    nextMilestone,
+    reportFreshnessStatus,
+    reportAgeHours,
+    controlStatus,
+    schedulerEnabled
+  });
   const bridgeActivationContract = Array.isArray(controlStatus?.bridge?.activationContract)
     ? controlStatus.bridge.activationContract
     : [];
@@ -456,6 +534,60 @@ export default function AdminOperations() {
             </Button>
           </div>
         </div>
+
+        <Card className="border-blue-200 bg-blue-50/60">
+          <CardHeader>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <CardTitle className="text-xl text-gray-900">Owner / Investor snapshot</CardTitle>
+                <p className="text-sm text-blue-900/70 mt-1">
+                  The no-BS version: business health, automation proof, current blocker, and the next thing that moves us closer to launch confidence.
+                </p>
+              </div>
+              <StatusBadge status={ownerInvestorSnapshot.investorStatus.status} />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="rounded-2xl border border-blue-200 bg-white p-5">
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr]">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Executive answer</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-950">{ownerInvestorSnapshot.investorStatus.label}</p>
+                  <p className="mt-2 text-sm text-slate-600">{ownerInvestorSnapshot.investorStatus.detail}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Self-maintaining proof</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-950">{ownerInvestorSnapshot.readinessPercent}%</p>
+                  <p className="mt-2 text-sm text-slate-600">{ownerInvestorSnapshot.automationLabel}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Can we build product?</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <p className="text-2xl font-bold text-slate-950">{ownerInvestorSnapshot.productWorkLabel}</p>
+                    <StatusBadge status={ownerInvestorSnapshot.productWorkStatus} />
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600">Active ops issues: {ownerInvestorSnapshot.activeIssueCount}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="rounded-2xl border border-blue-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current blocker</p>
+                <p className="mt-2 text-sm font-medium text-slate-900">{ownerInvestorSnapshot.currentBlocker}</p>
+              </div>
+              <div className="rounded-2xl border border-blue-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest proof</p>
+                <p className="mt-2 text-sm font-medium text-slate-900">{ownerInvestorSnapshot.proofLabel}</p>
+                <p className="mt-1 text-xs text-slate-500">Last successful automation: {ownerInvestorSnapshot.lastSuccessfulAutomationLabel}</p>
+              </div>
+              <div className="rounded-2xl border border-blue-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Next action</p>
+                <p className="mt-2 text-sm font-medium text-slate-900">{ownerInvestorSnapshot.nextAction}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="border-gray-200">
           <CardHeader>
