@@ -16,6 +16,15 @@ const ALLOWED_TRIGGER_SOURCES = new Set([
   'github-actions',
   'recovery'
 ]);
+const ACTIVE_STATUSES = ['dispatching', 'queued', 'running'];
+const STALE_ACTIVE_LIMITS_MS: Record<string, number> = {
+  'system-health-report': 15 * 60 * 1000,
+  'homepage-upcoming-releases': 15 * 60 * 1000,
+  'pricing-refresh': 45 * 60 * 1000,
+  'card-backfill-refresh': 2 * 60 * 60 * 1000,
+  'catalog-refresh': 2 * 60 * 60 * 1000,
+  'image-repair-sync': 6 * 60 * 60 * 1000
+};
 
 function getRequiredEnv(name: string) {
   const value = Deno.env.get(name)?.trim();
@@ -31,6 +40,34 @@ function isSharedSecretValid(request: Request) {
 
 function isTerminalStatus(status: string) {
   return ['ok', 'failed', 'cancelled'].includes(status);
+}
+
+function activeStaleCutoff(jobId: string) {
+  const limitMs = STALE_ACTIVE_LIMITS_MS[jobId] || 60 * 60 * 1000;
+  return new Date(Date.now() - limitMs).toISOString();
+}
+
+async function retireStaleActiveRuns(supabase: ReturnType<typeof createClient>, jobId: string) {
+  const cutoff = activeStaleCutoff(jobId);
+  const { data, error } = await supabase
+    .from('automation_runs')
+    .update({
+      status: 'failed',
+      finished_at: new Date().toISOString(),
+      error_message: `Automation run was automatically marked failed because it stayed active past the stale-lock cutoff (${cutoff}).`,
+      diagnostics: {
+        recovery: 'stale-active-run-retired',
+        cutoff,
+        jobId
+      }
+    })
+    .eq('job_id', jobId)
+    .in('status', ACTIVE_STATUSES)
+    .lt('created_at', cutoff)
+    .select('id');
+
+  if (error) throw error;
+  return Array.isArray(data) ? data.length : 0;
 }
 
 Deno.serve(async (request) => {
@@ -106,6 +143,8 @@ Deno.serve(async (request) => {
     if (jobError) throw jobError;
     if (!job?.enabled) return errorResponse('This automation job is disabled.', 409);
 
+    const retiredStaleRuns = await retireStaleActiveRuns(supabase, jobId);
+
     const { data: run, error: runError } = await supabase
       .from('automation_runs')
       .insert({ job_id: jobId, trigger_source: source, status: 'dispatching' })
@@ -156,7 +195,7 @@ Deno.serve(async (request) => {
       .eq('id', run.id);
     if (updateError) throw updateError;
 
-    return jsonResponse({ ok: true, runId: run.id, jobId, pipeline: job.runner_pipeline }, 202);
+    return jsonResponse({ ok: true, runId: run.id, jobId, pipeline: job.runner_pipeline, retiredStaleRuns }, 202);
   } catch (error) {
     console.error('automation-dispatch error:', error);
     return errorResponse(error);
