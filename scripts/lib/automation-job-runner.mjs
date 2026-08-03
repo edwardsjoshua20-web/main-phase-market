@@ -65,6 +65,7 @@ function commandForPlatform(command) {
 
 export function runAutomationJobs(jobList = [], options = {}) {
   const failFast = options.failFast !== false;
+  const defaultTimeoutMs = Number(options.defaultTimeoutMs || 0) || null;
   const results = [];
   let hasFailure = false;
 
@@ -92,20 +93,30 @@ export function runAutomationJobs(jobList = [], options = {}) {
 
     logJob('started', job, { command: job.command });
     const command = commandForPlatform(job.command);
+    const timeoutMs = Number(job.timeoutMs || defaultTimeoutMs || 0) || undefined;
     const result = spawnSync(command, job.args || [], {
       stdio: 'inherit',
-      shell: false
+      shell: false,
+      timeout: timeoutMs
     });
 
-    if (result.status !== 0) {
+    const timedOut = result.error?.code === 'ETIMEDOUT' || result.signal === 'SIGTERM';
+    if (result.status !== 0 || result.error) {
       hasFailure = true;
       const finishedAt = nowIso();
-      logJob('failed', job, { exitCode: result.status ?? 1, durationMs: elapsedMs(startedAtMs) });
+      logJob('failed', job, {
+        exitCode: result.status ?? 1,
+        durationMs: elapsedMs(startedAtMs),
+        reason: timedOut ? 'timeout' : result.error?.code
+      });
       results.push({
         id: job.id,
         label: job.label,
         status: 'failed',
+        reason: timedOut ? 'timeout' : (result.error?.code || null),
+        error: result.error?.message || null,
         exitCode: result.status ?? 1,
+        timeoutMs: timeoutMs || null,
         startedAt,
         finishedAt,
         durationMs: elapsedMs(startedAtMs)

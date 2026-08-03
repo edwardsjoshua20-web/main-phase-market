@@ -6,6 +6,7 @@
       "label": "Backfill FAB cards",
       "command": "npm",
       "args": ["run", "fab:backfill:cards"],
+      "timeoutMs": 900000,
       "enabled": true
     },
     {
@@ -13,6 +14,7 @@
       "label": "Backfill Lorcana cards",
       "command": "npm",
       "args": ["run", "lorcana:backfill:cards"],
+      "timeoutMs": 900000,
       "enabled": true
     },
     {
@@ -20,6 +22,7 @@
       "label": "Backfill Pokemon cards",
       "command": "npm",
       "args": ["run", "pokemon:backfill:cards"],
+      "timeoutMs": 1200000,
       "requires": [
         { "type": "source-exists", "game": "pokemon", "key": "catalogSource", "label": "Pokemon source export" }
       ],
@@ -30,6 +33,7 @@
       "label": "Backfill One Piece cards",
       "command": "npm",
       "args": ["run", "onepiece:backfill:cards"],
+      "timeoutMs": 900000,
       "enabled": true
     },
     {
@@ -37,6 +41,7 @@
       "label": "Backfill Yu-Gi-Oh cards",
       "command": "npm",
       "args": ["run", "yugioh:backfill:cards"],
+      "timeoutMs": 900000,
       "enabled": true
     },
     {
@@ -44,6 +49,7 @@
       "label": "Backfill Star Wars cards",
       "command": "npm",
       "args": ["run", "starwars:backfill:cards"],
+      "timeoutMs": 900000,
       "enabled": true
     }
   ]

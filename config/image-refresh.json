@@ -6,6 +6,7 @@
       "label": "Mirror MTG images",
       "command": "npm",
       "args": ["run", "mtg:mirror:images", "--", "small,normal,art_crop", "--max-downloads", "5000"],
+      "timeoutMs": 2700000,
       "requires": [
         { "type": "source-exists", "game": "magic", "key": "catalogSource", "label": "MTG source export" }
       ],
@@ -16,6 +17,7 @@
       "label": "Mirror FAB images",
       "command": "npm",
       "args": ["run", "fab:mirror:images"],
+      "timeoutMs": 1800000,
       "requires": [
         { "type": "file-exists", "path": "public/data/fab/cards.json", "label": "FAB cards catalog" }
       ],
@@ -26,6 +28,7 @@
       "label": "Mirror Lorcana images",
       "command": "npm",
       "args": ["run", "lorcana:mirror:images"],
+      "timeoutMs": 1800000,
       "requires": [
         { "type": "file-exists", "path": "public/data/lorcana/cards.json", "label": "Lorcana cards catalog" }
       ],
@@ -36,6 +39,7 @@
       "label": "Mirror Pokemon images",
       "command": "npm",
       "args": ["run", "pokemon:mirror:images"],
+      "timeoutMs": 1800000,
       "requires": [
         { "type": "source-exists", "game": "pokemon", "key": "catalogSource", "label": "Pokemon source export" }
       ],
@@ -46,6 +50,7 @@
       "label": "Mirror One Piece images",
       "command": "npm",
       "args": ["run", "onepiece:mirror:images"],
+      "timeoutMs": 1800000,
       "requires": [
         { "type": "file-exists", "path": "public/data/onepiece/cards.json", "label": "One Piece cards catalog" }
       ],
@@ -56,6 +61,7 @@
       "label": "Mirror Yu-Gi-Oh images",
       "command": "npm",
       "args": ["run", "yugioh:mirror:images"],
+      "timeoutMs": 1800000,
       "requires": [
         { "type": "file-exists", "path": "public/data/yugioh/cards.json", "label": "Yu-Gi-Oh cards catalog" }
       ],
@@ -66,6 +72,7 @@
       "label": "Mirror Star Wars images",
       "command": "npm",
       "args": ["run", "starwars:mirror:images"],
+      "timeoutMs": 1800000,
       "requires": [
         { "type": "file-exists", "path": "public/data/starwars/cards.json", "label": "Star Wars cards catalog" }
       ],
