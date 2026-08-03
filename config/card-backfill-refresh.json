@@ -1,4 +1,5 @@
 {
+  "failFast": false,
   "jobs": [
     {
       "id": "fab-backfill",

@@ -17,7 +17,9 @@ const jobs = Array.isArray(manifest.payload?.jobs)
   ? manifest.payload.jobs.filter((job) => job?.enabled !== false)
   : [];
 
-const outcome = runAutomationJobs(jobs);
+const outcome = runAutomationJobs(jobs, {
+  failFast: manifest.payload?.failFast !== false
+});
 console.log(JSON.stringify({
   manifest: manifest.manifestPath,
   results: outcome.results

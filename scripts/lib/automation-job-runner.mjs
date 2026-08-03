@@ -40,51 +40,99 @@ function requirementSatisfied(requirement = {}) {
   };
 }
 
-export function runAutomationJobs(jobList = []) {
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function elapsedMs(startedAt) {
+  return Date.now() - startedAt;
+}
+
+function logJob(event, job, extra = {}) {
+  const details = Object.entries(extra)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(' ');
+  console.log(`[automation:${event}] ${job?.id || 'unknown'} ${job?.label || ''}${details ? ` ${details}` : ''}`.trim());
+}
+
+function commandForPlatform(command) {
+  if (process.platform !== 'win32') return command;
+  if (command === 'npm') return 'npm.cmd';
+  if (command === 'npx') return 'npx.cmd';
+  return command;
+}
+
+export function runAutomationJobs(jobList = [], options = {}) {
+  const failFast = options.failFast !== false;
   const results = [];
+  let hasFailure = false;
 
   for (const job of jobList) {
+    const startedAtMs = Date.now();
+    const startedAt = nowIso();
     const requirements = Array.isArray(job?.requires) ? job.requires.map(requirementSatisfied) : [];
     const missingRequirements = requirements.filter((entry) => !entry.ok);
 
     if (missingRequirements.length > 0) {
+      const finishedAt = nowIso();
+      logJob('skipped', job, { reason: 'missing-requirements', missing: missingRequirements.length });
       results.push({
         id: job.id,
         label: job.label,
         status: 'skipped',
         reason: 'missing-requirements',
+        startedAt,
+        finishedAt,
+        durationMs: elapsedMs(startedAtMs),
         missingRequirements
       });
       continue;
     }
 
-    const result = spawnSync(job.command, job.args || [], {
+    logJob('started', job, { command: job.command });
+    const command = commandForPlatform(job.command);
+    const result = spawnSync(command, job.args || [], {
       stdio: 'inherit',
-      shell: process.platform === 'win32'
+      shell: false
     });
 
     if (result.status !== 0) {
+      hasFailure = true;
+      const finishedAt = nowIso();
+      logJob('failed', job, { exitCode: result.status ?? 1, durationMs: elapsedMs(startedAtMs) });
       results.push({
         id: job.id,
         label: job.label,
         status: 'failed',
-        exitCode: result.status ?? 1
+        exitCode: result.status ?? 1,
+        startedAt,
+        finishedAt,
+        durationMs: elapsedMs(startedAtMs)
       });
-      return {
-        ok: false,
-        results
-      };
+      if (failFast) {
+        return {
+          ok: false,
+          results
+        };
+      }
+      continue;
     }
 
+    const finishedAt = nowIso();
+    logJob('completed', job, { durationMs: elapsedMs(startedAtMs) });
     results.push({
       id: job.id,
       label: job.label,
-      status: 'completed'
+      status: 'completed',
+      startedAt,
+      finishedAt,
+      durationMs: elapsedMs(startedAtMs)
     });
   }
 
   return {
-    ok: true,
+    ok: !hasFailure,
     results
   };
 }
