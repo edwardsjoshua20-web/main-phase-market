@@ -14,6 +14,7 @@ const GAME_FILES = GAMES.flatMap((game) => [
   `data/${game}/cards-manifest.json`,
   `data/${game}/manifest.json`,
   `data/${game}/sets.json`,
+  `data/${game}/images/mirror-manifest.json`,
   `data/${game}/mirror-manifest.json`
 ]);
 

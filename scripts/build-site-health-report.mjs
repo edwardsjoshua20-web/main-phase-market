@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { getGameDataAliases, sourceRequirementStatus } from './lib/source-registry.mjs';
 import { getAutomationJobById, siteAutomationSections } from '../src/services/automation/siteAutomationRegistry.js';
 import { resolveRuntimeSiteDataRoot, getRuntimeAutomationRunsPath } from './lib/runtime-site-data-paths.mjs';
-import { readSupabaseUploadConfig } from './lib/supabase-public-data-upload.mjs';
+import { readSupabaseUploadConfig, toObjectKey, toStorageBaseUrl } from './lib/supabase-public-data-upload.mjs';
 
 const ROOT = process.cwd();
 const PUBLIC_DATA_ROOT = path.join(ROOT, 'public', 'data');
@@ -143,6 +143,23 @@ function resolveDataFile(game, relativePath) {
   return path.join(PUBLIC_DATA_ROOT, aliases[0], relativePath);
 }
 
+function getDataObjectCandidates(game, relativePath) {
+  return getGameDataAliases(game).map((alias) => `data/${alias}/${relativePath.replace(/\\/g, '/')}`);
+}
+
+async function firstPublishedObject(checkPublishedObject, candidates) {
+  if (typeof checkPublishedObject !== 'function') return null;
+
+  for (const relativePath of candidates) {
+    const published = await checkPublishedObject(relativePath);
+    if (published?.exists) {
+      return published;
+    }
+  }
+
+  return null;
+}
+
 function hoursSince(isoString) {
   if (!isoString) return null;
   const time = new Date(isoString).getTime();
@@ -161,6 +178,55 @@ function statusFromChecks({ exists = true, stale = false, degraded = false }) {
   if (stale) return 'stale';
   if (degraded) return 'degraded';
   return 'ok';
+}
+
+async function createPublishedObjectChecker() {
+  let config;
+  try {
+    config = readSupabaseUploadConfig(ROOT);
+  } catch {
+    return async () => null;
+  }
+
+  if (!config.supabaseUrl || !config.serviceRoleKey || !config.bucketName) {
+    return async () => null;
+  }
+
+  const storageBaseUrl = toStorageBaseUrl(config.supabaseUrl, config.bucketName);
+  const cache = new Map();
+
+  return async (relativePath) => {
+    const normalizedPath = String(relativePath || '').replace(/\\/g, '/');
+    if (!normalizedPath) return null;
+    if (cache.has(normalizedPath)) return cache.get(normalizedPath);
+
+    const response = await fetch(`${storageBaseUrl}/${toObjectKey(normalizedPath)}`, {
+      headers: {
+        Authorization: `Bearer ${config.serviceRoleKey}`,
+        apikey: config.serviceRoleKey,
+        Range: 'bytes=0-0'
+      }
+    }).catch((error) => ({
+      ok: false,
+      status: 0,
+      headers: new Headers(),
+      text: async () => error?.message || 'network-error'
+    }));
+
+    const lastModified = response.headers?.get?.('last-modified') || null;
+    const contentLength = response.headers?.get?.('content-length') || null;
+    const contentRange = response.headers?.get?.('content-range') || null;
+    const published = {
+      path: normalizedPath,
+      exists: response.ok || response.status === 206,
+      statusCode: response.status,
+      size: Number(contentLength || contentRange?.match(/\/(\d+)$/)?.[1] || 0) || null,
+      modifiedAt: lastModified ? new Date(lastModified).toISOString() : null
+    };
+
+    cache.set(normalizedPath, published);
+    return published;
+  };
 }
 
 function summarizeSection(entries = []) {
@@ -391,8 +457,8 @@ function buildHomepageHealth() {
   };
 }
 
-function buildCatalogHealth() {
-  const entries = GAMES.map((game) => {
+async function buildCatalogHealth(checkPublishedObject) {
+  const entries = await Promise.all(GAMES.map(async (game) => {
     const cardsPath = resolveDataFile(game, 'cards.json');
     const setsPath = resolveDataFile(game, 'sets.json');
     const cards = readJsonIfExists(cardsPath, []);
@@ -403,16 +469,28 @@ function buildCatalogHealth() {
     const mtgManifest = mtgManifestPath ? readJsonIfExists(mtgManifestPath, null) : null;
     const mtgManifestStats = mtgManifestPath ? getFileStats(mtgManifestPath) : null;
     const effectiveCardsStats = cardsStats || mtgManifestStats;
+    const publishedCards = await firstPublishedObject(checkPublishedObject, [
+      ...getDataObjectCandidates(game, 'cards.json'),
+      ...(game === 'magic' ? getDataObjectCandidates(game, 'manifest.json') : [])
+    ]);
+    const publishedSets = await firstPublishedObject(checkPublishedObject, getDataObjectCandidates(game, 'sets.json'));
     const effectiveCardsCount = game === 'magic'
       ? Number(mtgManifest?.imported_cards || (Array.isArray(cards) ? cards.length : 0))
       : (Array.isArray(cards) ? cards.length : 0);
-    const freshestModifiedAt = freshestIso(effectiveCardsStats?.modifiedAt, setsStats?.modifiedAt);
+    const freshestModifiedAt = freshestIso(
+      effectiveCardsStats?.modifiedAt,
+      setsStats?.modifiedAt,
+      publishedCards?.modifiedAt,
+      publishedSets?.modifiedAt
+    );
     const modifiedHoursAgo = hoursSince(freshestModifiedAt);
     const stale = modifiedHoursAgo != null && modifiedHoursAgo > AGE_LIMITS_HOURS.catalog;
-    const exists = Boolean(effectiveCardsStats || setsStats);
+    const cardsAvailable = Boolean(effectiveCardsStats || publishedCards?.exists);
+    const setsAvailable = Boolean(setsStats || publishedSets?.exists);
+    const exists = cardsAvailable || setsAvailable;
     const degraded = game === 'magic'
-      ? (!effectiveCardsStats || !setsStats || effectiveCardsCount === 0)
-      : (!cardsStats || !setsStats || (Array.isArray(cards) && cards.length === 0));
+      ? (!cardsAvailable || !setsAvailable || (!publishedCards?.exists && effectiveCardsCount === 0))
+      : (!cardsAvailable || !setsAvailable || (!publishedCards?.exists && Array.isArray(cards) && cards.length === 0));
     const source = sourceRequirementStatus(game, 'catalogSource');
 
     const diagnostics = [];
@@ -422,11 +500,15 @@ function buildCatalogHealth() {
     if (source?.type === 'file' && source.exists === false) {
       diagnostics.push('Expected local source file is missing.');
     }
-    if (!effectiveCardsStats) {
+    if (!cardsAvailable) {
       diagnostics.push('cards.json or manifest output is missing.');
+    } else if (!effectiveCardsStats && publishedCards?.exists) {
+      diagnostics.push('Published Supabase catalog object exists; local runner artifact is not present.');
     }
-    if (!setsStats) {
+    if (!setsAvailable) {
       diagnostics.push('sets.json output is missing.');
+    } else if (!setsStats && publishedSets?.exists) {
+      diagnostics.push('Published Supabase sets object exists; local runner artifact is not present.');
     }
     if (stale) {
       diagnostics.push('Catalog output is stale and needs a refresh run.');
@@ -441,16 +523,18 @@ function buildCatalogHealth() {
       source,
       cards: {
         file: effectiveCardsStats,
+        published: publishedCards,
         count: effectiveCardsCount
       },
       sets: {
         file: setsStats,
+        published: publishedSets,
         count: Array.isArray(sets) ? sets.length : 0
       },
       modifiedHoursAgo,
       diagnostics
     };
-  });
+  }));
 
   return {
     area: 'catalogs',
@@ -459,21 +543,27 @@ function buildCatalogHealth() {
   };
 }
 
-function buildImagesHealth() {
-  const entries = IMAGE_MIRROR_GAMES.map((game) => {
+async function buildImagesHealth(checkPublishedObject) {
+  const entries = await Promise.all(IMAGE_MIRROR_GAMES.map(async (game) => {
     const manifestPath = resolveDataFile(game, path.join('images', 'mirror-manifest.json'));
     const manifest = readJsonIfExists(manifestPath, null);
     const stats = getFileStats(manifestPath);
-    const modifiedHoursAgo = hoursSince(stats?.modifiedAt);
+    const publishedManifest = await firstPublishedObject(checkPublishedObject, [
+      ...getDataObjectCandidates(game, 'images/mirror-manifest.json'),
+      ...getDataObjectCandidates(game, 'mirror-manifest.json')
+    ]);
+    const modifiedHoursAgo = hoursSince(freshestIso(stats?.modifiedAt, publishedManifest?.modifiedAt));
     const stale = modifiedHoursAgo != null && modifiedHoursAgo > AGE_LIMITS_HOURS.imageManifest;
-    const exists = Boolean(stats);
+    const exists = Boolean(stats || publishedManifest?.exists);
     const unexpectedFailures = Number(manifest?.unexpected_failures || manifest?.unexpectedFailures || 0);
     const degraded = Boolean(manifest) && unexpectedFailures > 0;
     const source = sourceRequirementStatus(game, 'catalogSource');
 
     const diagnostics = [];
-    if (!stats) {
+    if (!exists) {
       diagnostics.push('Image mirror manifest is missing.');
+    } else if (!stats && publishedManifest?.exists) {
+      diagnostics.push('Published Supabase image manifest exists; local runner artifact is not present.');
     }
     if (stale) {
       diagnostics.push('Image mirror manifest is stale and should be rebuilt.');
@@ -493,6 +583,7 @@ function buildImagesHealth() {
       status: statusFromChecks({ exists, stale, degraded }),
       source,
       file: stats,
+      published: publishedManifest,
       modifiedHoursAgo,
       cardsSeen: Number(manifest?.cards_seen || manifest?.cardsSeen || 0),
       downloaded: Number(manifest?.downloaded || 0),
@@ -504,7 +595,7 @@ function buildImagesHealth() {
       unexpectedFailures,
       diagnostics
     };
-  });
+  }));
 
   return {
     area: 'images',
@@ -607,6 +698,9 @@ function buildGameReadiness(catalogs, images) {
     const cardsCount = Number(catalogEntry?.cards?.count || 0);
     const setsCount = Number(catalogEntry?.sets?.count || 0);
     const imageCardsSeen = Number(imageEntry?.cardsSeen || 0);
+    const cardsAvailable = cardsCount > 0 || Boolean(catalogEntry?.cards?.published?.exists);
+    const setsAvailable = setsCount > 0 || Boolean(catalogEntry?.sets?.published?.exists);
+    const imagesAvailable = imageCardsSeen > 0 || Boolean(imageEntry?.published?.exists);
 
     let stage = 'source-missing';
     let score = 0;
@@ -619,19 +713,19 @@ function buildGameReadiness(catalogs, images) {
       nextAction = 'Run card backfill to generate cards.json.';
     }
 
-    if (cardsCount > 0) {
+    if (cardsAvailable) {
       stage = 'sets-needed';
       score = 45;
       nextAction = 'Run set extraction to generate sets.json.';
     }
 
-    if (cardsCount > 0 && setsCount > 0) {
+    if (cardsAvailable && setsAvailable) {
       stage = 'images-needed';
       score = 70;
       nextAction = 'Run image mirror to generate image manifests and hosted card art.';
     }
 
-    if (cardsCount > 0 && setsCount > 0 && imageCardsSeen > 0) {
+    if (cardsAvailable && setsAvailable && imagesAvailable) {
       stage = 'storefront-ready';
       score = 100;
       nextAction = 'Operational. Keep the scheduled refresh jobs healthy.';
@@ -652,6 +746,9 @@ function buildGameReadiness(catalogs, images) {
       cardsCount,
       setsCount,
       imageCardsSeen,
+      cardsAvailable,
+      setsAvailable,
+      imagesAvailable,
       catalogStatus: catalogEntry?.status || 'missing',
       imageStatus: imageEntry?.status || 'missing'
     };
@@ -693,9 +790,10 @@ async function main() {
   if (ledger.status === 'ok') {
     safeWriteJsonFile(RUN_HISTORY_PATH, automationRuns);
   }
+  const checkPublishedObject = await createPublishedObjectChecker();
   const homepage = buildHomepageHealth();
-  const catalogs = buildCatalogHealth();
-  const images = buildImagesHealth();
+  const catalogs = await buildCatalogHealth(checkPublishedObject);
+  const images = await buildImagesHealth(checkPublishedObject);
   const pricing = buildPricingHealth();
   const readiness = buildGameReadiness(catalogs, images);
 
