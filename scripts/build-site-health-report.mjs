@@ -26,6 +26,14 @@ const AGE_LIMITS_HOURS = {
   catalog: 72,
   imageManifest: 48
 };
+const STALE_ACTIVE_LIMITS_MS = {
+  'system-health-report': 15 * 60 * 1000,
+  'homepage-upcoming-releases': 15 * 60 * 1000,
+  'pricing-refresh': 45 * 60 * 1000,
+  'card-backfill-refresh': 2 * 60 * 60 * 1000,
+  'catalog-refresh': 2 * 60 * 60 * 1000,
+  'image-repair-sync': 6 * 60 * 60 * 1000
+};
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -334,6 +342,17 @@ function reconcileLedgerStatus(status, current = {}, startedAt = null, finishedA
   return status;
 }
 
+function getStaleActiveCutoffMs(jobId) {
+  return STALE_ACTIVE_LIMITS_MS[jobId] || 60 * 60 * 1000;
+}
+
+function isStaleActiveRun(jobId, status, startedAt) {
+  if (status !== 'running' || !startedAt) return false;
+  const startedMs = new Date(startedAt).getTime();
+  if (Number.isNaN(startedMs)) return false;
+  return Date.now() - startedMs > getStaleActiveCutoffMs(jobId);
+}
+
 function mergeSupabaseAutomationLedger(automationRuns, ledgerRows = []) {
   if (!Array.isArray(ledgerRows) || ledgerRows.length === 0) {
     return automationRuns;
@@ -355,20 +374,28 @@ function mergeSupabaseAutomationLedger(automationRuns, ledgerRows = []) {
     const ledgerStatus = normalizeLedgerStatus(row.last_status || row.status);
     const startedAt = row.last_started_at || row.started_at || row.created_at || null;
     const finishedAt = row.last_finished_at || row.finished_at || null;
-    const status = reconcileLedgerStatus(ledgerStatus, current, startedAt, finishedAt);
+    let status = reconcileLedgerStatus(ledgerStatus, current, startedAt, finishedAt);
+    const staleActive = isStaleActiveRun(jobId, status, startedAt);
+    if (staleActive) {
+      status = 'failed';
+    }
     const existingRecentRuns = Array.isArray(current.recentRuns) ? current.recentRuns : [];
     const ledgerRecentRun = {
       pipeline: jobDefinition?.runnerJob || row.runner_reference || 'supabase-ledger',
       status,
       startedAt,
-      finishedAt,
+      finishedAt: staleActive ? new Date().toISOString() : finishedAt,
       durationMs: Number(row.last_duration_ms || row.duration_ms || 0) || null,
       exitCode: status === 'ok' ? 0 : status === 'failed' ? 1 : null,
-      error: row.last_error || row.error_message || null,
+      error: staleActive
+        ? `Automation run stayed active past the stale-lock cutoff (${Math.round(getStaleActiveCutoffMs(jobId) / 60000)} minutes).`
+        : row.last_error || row.error_message || null,
       triggerSource: row.trigger_source || null,
       runnerReference: row.runner_reference || null,
       runId: row.run_id || null,
-      source: 'supabase-ledger'
+      source: 'supabase-ledger',
+      diagnostics: row.diagnostics && typeof row.diagnostics === 'object' ? row.diagnostics : {},
+      recovered: staleActive ? 'stale-active-run-treated-as-failed' : null
     };
 
     const existingRunIds = new Set(existingRecentRuns.map((run) => run?.runId).filter(Boolean));
@@ -382,22 +409,27 @@ function mergeSupabaseAutomationLedger(automationRuns, ledgerRows = []) {
       ...current,
       lastStatus: status,
       lastStartedAt: startedAt || current.lastStartedAt || null,
-      lastFinishedAt: finishedAt || current.lastFinishedAt || null,
+      lastFinishedAt: (staleActive ? new Date().toISOString() : finishedAt) || current.lastFinishedAt || null,
       lastSucceededAt: status === 'ok'
         ? (finishedAt || startedAt || current.lastSucceededAt || null)
         : (current.lastSucceededAt || null),
       lastFailedAt: status === 'failed'
-        ? (finishedAt || startedAt || current.lastFailedAt || null)
+        ? ((staleActive ? new Date().toISOString() : finishedAt) || startedAt || current.lastFailedAt || null)
         : (current.lastFailedAt || null),
       lastDurationMs: Number(row.last_duration_ms || row.duration_ms || 0) || current.lastDurationMs || null,
       lastExitCode: status === 'ok' ? 0 : status === 'failed' ? 1 : (current.lastExitCode ?? null),
-      lastError: status === 'failed' ? (row.last_error || row.error_message || 'Automation run failed.') : null,
+      lastError: status === 'failed'
+        ? (staleActive
+          ? `Automation run stayed active past the stale-lock cutoff (${Math.round(getStaleActiveCutoffMs(jobId) / 60000)} minutes).`
+          : row.last_error || row.error_message || 'Automation run failed.')
+        : null,
       recentRuns,
       ledger: {
         source: 'supabase',
         runId: row.run_id || null,
         triggerSource: row.trigger_source || null,
         runnerReference: row.runner_reference || null,
+        diagnostics: row.diagnostics && typeof row.diagnostics === 'object' ? row.diagnostics : {},
         updatedAt: row.updated_at || null
       }
     };

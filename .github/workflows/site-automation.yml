@@ -86,7 +86,7 @@ jobs:
           curl --fail-with-body --request POST "$MPM_AUTOMATION_DISPATCH_URL" \
             --header 'Content-Type: application/json' \
             --header "x-mpm-automation-secret: $MPM_AUTOMATION_SHARED_SECRET" \
-            --data "{\"action\":\"complete\",\"jobId\":\"${{ inputs.job_id }}\",\"runId\":\"${{ inputs.run_id }}\",\"status\":\"ok\",\"startedAt\":\"${{ steps.automation.outputs.started_at }}\",\"durationMs\":$duration_ms,\"diagnostics\":{\"runner\":\"github-actions\",\"pipeline\":\"${{ inputs.pipeline }}\"}}"
+            --data "{\"action\":\"complete\",\"jobId\":\"${{ inputs.job_id }}\",\"runId\":\"${{ inputs.run_id }}\",\"status\":\"ok\",\"startedAt\":\"${{ steps.automation.outputs.started_at }}\",\"durationMs\":$duration_ms,\"diagnostics\":{\"runner\":\"github-actions\",\"pipeline\":\"${{ inputs.pipeline }}\",\"githubRunId\":\"${{ github.run_id }}\",\"githubRunAttempt\":\"${{ github.run_attempt }}\",\"githubRunUrl\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"sha\":\"${{ github.sha }}\"}}"
 
       - name: Record failed run
         if: failure()
@@ -101,4 +101,4 @@ jobs:
           curl --fail-with-body --request POST "$MPM_AUTOMATION_DISPATCH_URL" \
             --header 'Content-Type: application/json' \
             --header "x-mpm-automation-secret: $MPM_AUTOMATION_SHARED_SECRET" \
-            --data "{\"action\":\"complete\",\"jobId\":\"${{ inputs.job_id }}\",\"runId\":\"${{ inputs.run_id }}\",\"status\":\"failed\",\"startedAt\":\"${{ steps.automation.outputs.started_at }}\",\"durationMs\":$duration_ms,\"error\":\"GitHub Actions workflow failed. See the workflow log for details.\",\"diagnostics\":{\"runner\":\"github-actions\",\"pipeline\":\"${{ inputs.pipeline }}\"}}"
+            --data "{\"action\":\"complete\",\"jobId\":\"${{ inputs.job_id }}\",\"runId\":\"${{ inputs.run_id }}\",\"status\":\"failed\",\"startedAt\":\"${{ steps.automation.outputs.started_at }}\",\"durationMs\":$duration_ms,\"error\":\"GitHub Actions workflow failed. See the workflow log for details.\",\"diagnostics\":{\"runner\":\"github-actions\",\"pipeline\":\"${{ inputs.pipeline }}\",\"githubRunId\":\"${{ github.run_id }}\",\"githubRunAttempt\":\"${{ github.run_attempt }}\",\"githubRunUrl\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"sha\":\"${{ github.sha }}\"}}"

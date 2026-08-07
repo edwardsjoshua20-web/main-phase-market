@@ -18,6 +18,7 @@ type LatestRun = {
   finished_at: string | null;
   duration_ms: number | null;
   error_message: string | null;
+  diagnostics: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -113,7 +114,12 @@ function toAutomationRuns(jobs: AutomationJob[], latestRuns: LatestRun[]) {
       lastSucceededAt: run?.status === 'ok' ? (run.finished_at || run.created_at) : null,
       lastFailedAt: run?.status === 'failed' ? (run.finished_at || run.created_at) : null,
       durationMs: run?.duration_ms ?? null,
-      diagnostics: run?.error_message ? [run.error_message] : [],
+      diagnostics: [
+        ...(run?.error_message ? [run.error_message] : []),
+        ...(run?.diagnostics && typeof run.diagnostics === 'object'
+          ? Object.entries(run.diagnostics).map(([key, value]) => `${key}: ${String(value)}`)
+          : [])
+      ],
       triggerSource: run?.trigger_source || null
     }];
   }));
@@ -140,8 +146,8 @@ Deno.serve(async (request) => {
     );
 
     const [latestRuns, recentRuns] = await Promise.all([
-      fetchJson<LatestRun[]>('/rest/v1/automation_latest_runs?select=job_id,run_id,status,trigger_source,started_at,finished_at,duration_ms,error_message,created_at'),
-      fetchJson<LatestRun[]>('/rest/v1/automation_runs?select=job_id,run_id:id,status,trigger_source,started_at,finished_at,duration_ms,error_message,created_at&order=created_at.desc&limit=20')
+      fetchJson<LatestRun[]>('/rest/v1/automation_latest_runs?select=job_id,run_id,status,trigger_source,started_at,finished_at,duration_ms,error_message,diagnostics,created_at'),
+      fetchJson<LatestRun[]>('/rest/v1/automation_runs?select=job_id,run_id:id,status,trigger_source,started_at,finished_at,duration_ms,error_message,diagnostics,created_at&order=created_at.desc&limit=20')
     ]);
 
     const cronRuns = recentRuns.filter((run) => run.trigger_source === 'supabase-cron');
@@ -182,7 +188,8 @@ Deno.serve(async (request) => {
           createdAt: run.created_at,
           finishedAt: run.finished_at,
           durationMs: run.duration_ms,
-          detail: run.error_message || null
+          detail: run.error_message || null,
+          diagnostics: run.diagnostics || {}
         }))
       },
       allowedJobs: jobs.map((job) => ({
