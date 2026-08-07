@@ -23,6 +23,15 @@ type LatestRun = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')?.replace(/\/+$/, '') || '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const ACTIVE_STATUSES = ['dispatching', 'queued', 'running'];
+const STALE_ACTIVE_LIMITS_MS: Record<string, number> = {
+  'system-health-report': 15 * 60 * 1000,
+  'homepage-upcoming-releases': 15 * 60 * 1000,
+  'pricing-refresh': 45 * 60 * 1000,
+  'card-backfill-refresh': 2 * 60 * 60 * 1000,
+  'catalog-refresh': 2 * 60 * 60 * 1000,
+  'image-repair-sync': 6 * 60 * 60 * 1000
+};
 
 function serviceHeaders() {
   return {
@@ -35,6 +44,45 @@ async function fetchJson<T>(path: string) {
   const response = await fetch(`${SUPABASE_URL}${path}`, { headers: serviceHeaders() });
   if (!response.ok) throw new Error(`Automation status query failed (${response.status}).`);
   return response.json() as Promise<T>;
+}
+
+function activeStaleCutoff(jobId: string) {
+  const limitMs = STALE_ACTIVE_LIMITS_MS[jobId] || 60 * 60 * 1000;
+  return new Date(Date.now() - limitMs).toISOString();
+}
+
+async function retireStaleActiveRuns(jobId: string) {
+  const cutoff = activeStaleCutoff(jobId);
+  const params = new URLSearchParams({
+    job_id: `eq.${jobId}`,
+    status: `in.(${ACTIVE_STATUSES.join(',')})`,
+    created_at: `lt.${cutoff}`
+  });
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/automation_runs?${params.toString()}`, {
+    method: 'PATCH',
+    headers: {
+      ...serviceHeaders(),
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation'
+    },
+    body: JSON.stringify({
+      status: 'failed',
+      finished_at: new Date().toISOString(),
+      error_message: `Automation run was automatically marked failed because it stayed active past the stale-lock cutoff (${cutoff}).`,
+      diagnostics: {
+        recovery: 'stale-active-run-retired-by-status-check',
+        cutoff,
+        jobId
+      }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Stale active run cleanup failed for ${jobId} (${response.status}).`);
+  }
+
+  const rows = await response.json().catch(() => []);
+  return Array.isArray(rows) ? rows.length : 0;
 }
 
 async function requireAdmin(request: Request) {
@@ -81,14 +129,23 @@ Deno.serve(async (request) => {
 
   try {
     await requireAdmin(request);
-    const [jobs, latestRuns, recentRuns] = await Promise.all([
-      fetchJson<AutomationJob[]>('/rest/v1/automation_jobs?select=job_id,label,cadence,owner,enabled&order=job_id.asc'),
+    const jobs = await fetchJson<AutomationJob[]>('/rest/v1/automation_jobs?select=job_id,label,cadence,owner,enabled&order=job_id.asc');
+    const staleCleanup = await Promise.all(
+      jobs
+        .filter((job) => job.enabled)
+        .map(async (job) => ({
+          jobId: job.job_id,
+          retired: await retireStaleActiveRuns(job.job_id)
+        }))
+    );
+
+    const [latestRuns, recentRuns] = await Promise.all([
       fetchJson<LatestRun[]>('/rest/v1/automation_latest_runs?select=job_id,run_id,status,trigger_source,started_at,finished_at,duration_ms,error_message,created_at'),
       fetchJson<LatestRun[]>('/rest/v1/automation_runs?select=job_id,run_id:id,status,trigger_source,started_at,finished_at,duration_ms,error_message,created_at&order=created_at.desc&limit=20')
     ]);
 
     const cronRuns = recentRuns.filter((run) => run.trigger_source === 'supabase-cron');
-    const activeRuns = latestRuns.filter((run) => ['queued', 'dispatching', 'running'].includes(run.status));
+    const activeRuns = latestRuns.filter((run) => ACTIVE_STATUSES.includes(run.status));
     const latestCronRunAt = cronRuns[0]?.created_at || null;
     const automationRuns = toAutomationRuns(jobs.filter((job) => job.enabled), latestRuns);
 
@@ -102,7 +159,8 @@ Deno.serve(async (request) => {
         status: latestCronRunAt ? 'proven' : 'awaiting-first-cron-run',
         lastCheckedAt: latestCronRunAt,
         checks: cronRuns.length,
-        dueJobs: activeRuns.map((run) => run.job_id)
+        dueJobs: activeRuns.map((run) => run.job_id),
+        staleRunsRetired: staleCleanup.reduce((total, item) => total + item.retired, 0)
       },
       bridge: {
         checks: [
