@@ -333,7 +333,38 @@ function isIsoAtOrAfter(candidate, reference) {
   return candidateMs >= referenceMs;
 }
 
+function getRunObservedAt(run = {}) {
+  return run.finishedAt || run.startedAt || null;
+}
+
+function getRecentTerminalRuns(current = {}, status = null) {
+  return (Array.isArray(current.recentRuns) ? current.recentRuns : [])
+    .filter((run) => ['ok', 'failed', 'cancelled'].includes(run?.status))
+    .filter((run) => !status || run.status === status)
+    .filter((run) => getRunObservedAt(run))
+    .sort((a, b) => new Date(getRunObservedAt(b)).getTime() - new Date(getRunObservedAt(a)).getTime());
+}
+
+function getNewestRecentTerminalRun(current = {}) {
+  return getRecentTerminalRuns(current)[0] || null;
+}
+
+function getFreshestRecentTerminalAt(current = {}, status) {
+  return getRunObservedAt(getRecentTerminalRuns(current, status)[0] || {});
+}
+
 function reconcileLedgerStatus(status, current = {}, startedAt = null, finishedAt = null) {
+  const ledgerObservedAt = finishedAt || startedAt;
+  const newestRecentRun = getNewestRecentTerminalRun(current);
+  if (newestRecentRun && isIsoAtOrAfter(getRunObservedAt(newestRecentRun), ledgerObservedAt)) {
+    return newestRecentRun.status === 'cancelled' ? 'failed' : newestRecentRun.status;
+  }
+  if (current.lastSucceededAt && isIsoAtOrAfter(current.lastSucceededAt, ledgerObservedAt)) {
+    return 'ok';
+  }
+  if (current.lastFailedAt && isIsoAtOrAfter(current.lastFailedAt, ledgerObservedAt)) {
+    return 'failed';
+  }
   if (status !== 'running') return status;
   if (finishedAt) return current.lastFailedAt && isIsoAtOrAfter(current.lastFailedAt, finishedAt) ? 'failed' : 'ok';
   if (current.lastFinishedAt && isIsoAtOrAfter(current.lastFinishedAt, startedAt)) {
@@ -379,6 +410,11 @@ function mergeSupabaseAutomationLedger(automationRuns, ledgerRows = []) {
     if (staleActive) {
       status = 'failed';
     }
+    const recentSucceededAt = getFreshestRecentTerminalAt(current, 'ok');
+    const recentFailedAt = freshestIso(
+      getFreshestRecentTerminalAt(current, 'failed'),
+      getFreshestRecentTerminalAt(current, 'cancelled')
+    );
     const existingRecentRuns = Array.isArray(current.recentRuns) ? current.recentRuns : [];
     const ledgerRecentRun = {
       pipeline: jobDefinition?.runnerJob || row.runner_reference || 'supabase-ledger',
@@ -409,12 +445,12 @@ function mergeSupabaseAutomationLedger(automationRuns, ledgerRows = []) {
       ...current,
       lastStatus: status,
       lastStartedAt: startedAt || current.lastStartedAt || null,
-      lastFinishedAt: (staleActive ? new Date().toISOString() : finishedAt) || current.lastFinishedAt || null,
+      lastFinishedAt: freshestIso(staleActive ? new Date().toISOString() : finishedAt, current.lastFinishedAt),
       lastSucceededAt: status === 'ok'
-        ? (finishedAt || startedAt || current.lastSucceededAt || null)
+        ? freshestIso(recentSucceededAt, current.lastSucceededAt, finishedAt, startedAt)
         : (current.lastSucceededAt || null),
       lastFailedAt: status === 'failed'
-        ? ((staleActive ? new Date().toISOString() : finishedAt) || startedAt || current.lastFailedAt || null)
+        ? freshestIso(recentFailedAt, current.lastFailedAt, staleActive ? new Date().toISOString() : finishedAt, startedAt)
         : (current.lastFailedAt || null),
       lastDurationMs: Number(row.last_duration_ms || row.duration_ms || 0) || current.lastDurationMs || null,
       lastExitCode: status === 'ok' ? 0 : status === 'failed' ? 1 : (current.lastExitCode ?? null),

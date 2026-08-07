@@ -63,6 +63,21 @@ function commandForPlatform(command) {
   return command;
 }
 
+function spawnSpecForPlatform(command, args = []) {
+  const platformCommand = commandForPlatform(command);
+  if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(platformCommand)) {
+    return {
+      command: process.env.ComSpec || 'cmd.exe',
+      args: ['/d', '/s', '/c', platformCommand, ...args]
+    };
+  }
+
+  return {
+    command: platformCommand,
+    args
+  };
+}
+
 export function runAutomationJobs(jobList = [], options = {}) {
   const failFast = options.failFast !== false;
   const defaultTimeoutMs = Number(options.defaultTimeoutMs || 0) || null;
@@ -92,13 +107,20 @@ export function runAutomationJobs(jobList = [], options = {}) {
     }
 
     logJob('started', job, { command: job.command });
-    const command = commandForPlatform(job.command);
+    const spawnSpec = spawnSpecForPlatform(job.command, job.args || []);
     const timeoutMs = Number(job.timeoutMs || defaultTimeoutMs || 0) || undefined;
-    const result = spawnSync(command, job.args || [], {
-      stdio: 'inherit',
+    const pipeOutput = process.platform === 'win32';
+    const result = spawnSync(spawnSpec.command, spawnSpec.args, {
+      stdio: pipeOutput ? ['ignore', 'pipe', 'pipe'] : 'inherit',
       shell: false,
-      timeout: timeoutMs
+      timeout: timeoutMs,
+      encoding: pipeOutput ? 'utf8' : undefined,
+      maxBuffer: pipeOutput ? 25 * 1024 * 1024 : undefined
     });
+    if (pipeOutput) {
+      if (result.stdout) process.stdout.write(result.stdout);
+      if (result.stderr) process.stderr.write(result.stderr);
+    }
 
     const timedOut = result.error?.code === 'ETIMEDOUT' || result.signal === 'SIGTERM';
     if (result.status !== 0 || result.error) {
