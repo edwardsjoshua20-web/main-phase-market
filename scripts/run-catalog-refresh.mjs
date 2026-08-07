@@ -1,4 +1,5 @@
 import { readAutomationManifest, runAutomationJobs } from './lib/automation-job-runner.mjs';
+import { writeAutomationResultIfRequested } from './lib/automation-result-output.mjs';
 
 const DEFAULT_MANIFEST = 'config/catalog-refresh.json';
 const manifest = readAutomationManifest(DEFAULT_MANIFEST, process.argv[2]);
@@ -18,8 +19,10 @@ const jobs = Array.isArray(manifest.payload?.jobs)
   : [];
 
 const outcome = runAutomationJobs(jobs);
-console.log(JSON.stringify({
+const payload = {
   manifest: manifest.manifestPath,
   results: outcome.results
-}, null, 2));
+};
+writeAutomationResultIfRequested(payload);
+console.log(JSON.stringify(payload, null, 2));
 if (!outcome.ok) process.exit(1);

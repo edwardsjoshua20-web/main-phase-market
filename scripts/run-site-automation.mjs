@@ -162,6 +162,11 @@ function commandForPlatform(command) {
   return command;
 }
 
+function readJsonIfExists(filePath, fallback = null) {
+  if (!filePath || !fs.existsSync(filePath)) return fallback;
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
 function updateJobRun(jobId, label, patch, recentRun = null) {
   const history = readRunHistory();
   const current = history.jobs[jobId] || {
@@ -194,17 +199,46 @@ function updateJobRun(jobId, label, patch, recentRun = null) {
 
 function executeCommand(commandSpec) {
   const commandStartedAt = Date.now();
+  const resultPath = path.join(os.tmpdir(), `mpm-automation-result-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
   const result = spawnSync(commandForPlatform(commandSpec[0]), commandSpec.slice(1), {
     stdio: 'inherit',
-    shell: false
+    shell: false,
+    env: {
+      ...process.env,
+      MPM_AUTOMATION_RESULT_PATH: resultPath
+    }
   });
+  const resultSummary = readJsonIfExists(resultPath, null);
+  try {
+    fs.rmSync(resultPath, { force: true });
+  } catch {
+    // Best-effort temp cleanup only.
+  }
 
   return {
     command: commandToString(commandSpec),
     exitCode: result.status ?? 1,
     durationMs: Date.now() - commandStartedAt,
-    error: result.error?.message || null
+    error: result.error?.message || null,
+    resultSummary
   };
+}
+
+function summarizeStructuredFailure(commandResult) {
+  const results = Array.isArray(commandResult?.resultSummary?.results)
+    ? commandResult.resultSummary.results
+    : [];
+  const failed = results.filter((entry) => entry?.status === 'failed');
+  if (failed.length === 0) return null;
+
+  return failed
+    .map((entry) => [
+      entry.id || entry.label || 'unknown-job',
+      entry.reason ? `reason=${entry.reason}` : null,
+      entry.exitCode != null ? `exitCode=${entry.exitCode}` : null,
+      entry.timeoutMs ? `timeoutMs=${entry.timeoutMs}` : null
+    ].filter(Boolean).join(' '))
+    .join('; ');
 }
 
 if (!JOBS[job]) {
@@ -235,7 +269,7 @@ for (const step of JOBS[job].steps) {
 
     if (commandResult.exitCode !== 0 || commandResult.error) {
       stepExitCode = commandResult.exitCode || 1;
-      stepError = commandResult.error || `Command failed: ${commandResult.command}`;
+      stepError = commandResult.error || summarizeStructuredFailure(commandResult) || `Command failed: ${commandResult.command}`;
       break;
     }
   }

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { importPricingSourceSnapshot, VALID_PRICING_SOURCES } from './lib/pricing-source-pipeline.mjs';
+import { writeAutomationResultIfRequested } from './lib/automation-result-output.mjs';
 
 const manifestPathArg = process.argv[2] || 'config/pricing-source-refresh.json';
 const manifestPath = path.resolve(process.cwd(), manifestPathArg);
@@ -46,12 +47,14 @@ function main() {
     });
   }
 
-  console.log(JSON.stringify({
+  const payload = {
     status: 'completed',
     manifest: manifestPath,
     processed: results.length,
     results
-  }, null, 2));
+  };
+  writeAutomationResultIfRequested(payload);
+  console.log(JSON.stringify(payload, null, 2));
 }
 
 main();
