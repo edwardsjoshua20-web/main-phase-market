@@ -254,6 +254,8 @@ function getOwnerInvestorSnapshot({
   productWorkSummary,
   beastModeProgress,
   topBlocker,
+  automationJobs,
+  automationRunSummary,
   latestSuccessfulAutomationRun,
   nextMilestone,
   reportFreshnessStatus,
@@ -262,6 +264,9 @@ function getOwnerInvestorSnapshot({
   schedulerEnabled
 }) {
   const activeIssueCount = Number(summary?.degraded || 0) + Number(summary?.stale || 0) + Number(summary?.missing || 0);
+  const failedJobs = automationJobs.filter((job) => String(job?.lastStatus || '').toLowerCase() === 'failed');
+  const runningJobs = automationJobs.filter((job) => String(job?.lastStatus || '').toLowerCase() === 'running');
+  const missingRunJobs = siteAutomationRegistry.filter((job) => !automationRunsHasJob(automationJobs, job.id));
   const provenAutomation = selfMaintainingSummary.status === 'ok';
   const investorStatus = businessCoreSummary.topStatus === 'ok' && provenAutomation
     ? {
@@ -281,9 +286,13 @@ function getOwnerInvestorSnapshot({
           detail: 'One or more core business systems still need work before this is investor-safe.'
         };
 
-  const currentBlocker = topBlocker
-    ? `${topBlocker.title}: ${topBlocker.detail}`
-    : !controlStatus?.available
+  const currentBlocker = failedJobs.length > 0
+    ? `Failed automation job${failedJobs.length === 1 ? '' : 's'}: ${failedJobs.map((job) => job.label || job.jobId).join(', ')}.`
+    : runningJobs.length > 0
+      ? `Automation currently running: ${runningJobs.map((job) => job.label || job.jobId).join(', ')}. Wait for completion before trusting final output status.`
+      : topBlocker
+        ? `${topBlocker.title}: ${topBlocker.detail}`
+        : !controlStatus?.available
       ? 'The hosted admin can read reports, but the live runner bridge is not fully available.'
       : !schedulerEnabled
         ? 'The runner is reachable, but autopilot scheduling is not fully proven yet.'
@@ -301,6 +310,15 @@ function getOwnerInvestorSnapshot({
     currentBlocker,
     proofLabel,
     readinessPercent: beastModeProgress.percent,
+    outputHealthLabel: `${businessCoreSummary.healthy}/${businessCoreSummary.total} core outputs green`,
+    automationRunHealthLabel: `${automationRunSummary.ok}/${siteAutomationRegistry.length} automation jobs latest-green`,
+    automationRunProblemLabel: failedJobs.length > 0
+      ? `${failedJobs.length} failed`
+      : runningJobs.length > 0
+        ? `${runningJobs.length} running`
+        : missingRunJobs.length > 0
+          ? `${missingRunJobs.length} without history`
+          : 'No failed/running jobs',
     automationLabel: provenAutomation
       ? 'Autopilot proof is green'
       : `${beastModeProgress.complete}/${beastModeProgress.total} self-maintaining checks proven`,
@@ -309,6 +327,10 @@ function getOwnerInvestorSnapshot({
     productWorkLabel: productWorkSummary.title,
     productWorkStatus: productWorkSummary.status
   };
+}
+
+function automationRunsHasJob(automationJobs = [], jobId) {
+  return automationJobs.some((job) => job?.jobId === jobId || job?.id === jobId);
 }
 
 export default function AdminOperations() {
@@ -333,6 +355,7 @@ export default function AdminOperations() {
   } = useAdminOperationsDashboard();
 
   const automationJobs = Object.values(automationRuns?.jobs || {});
+  const automationRunSummary = adminOperationsModel.summarizeAutomationRuns(automationRuns);
   const latestSuccessfulAutomationRun = automationJobs
     .map((job) => job?.lastSucceededAt || null)
     .filter(Boolean)
@@ -436,6 +459,8 @@ export default function AdminOperations() {
     productWorkSummary,
     beastModeProgress,
     topBlocker,
+    automationJobs,
+    automationRunSummary,
     latestSuccessfulAutomationRun,
     nextMilestone,
     reportFreshnessStatus,
@@ -586,53 +611,22 @@ export default function AdminOperations() {
                 <p className="mt-2 text-sm font-medium text-slate-900">{ownerInvestorSnapshot.nextAction}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-gray-200">
-          <CardHeader>
-            <CardTitle className="text-xl text-gray-900">Plain-English status</CardTitle>
-            <p className="text-sm text-gray-500 mt-1">This is the fast version: what matters right now, whether the site is maintaining itself, and whether we can safely focus on product work.</p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 lg:grid-cols-3">
-              <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold text-gray-900">Overall answer</p>
-                  <StatusBadge status={businessCoreSummary.topStatus} />
-                </div>
-                <p className="text-lg font-semibold text-gray-900">
-                  {businessCoreSummary.topStatus === 'ok'
-                    ? 'Business systems are healthy'
-                    : businessCoreSummary.topStatus === 'stale'
-                      ? 'Business systems need a freshness pass'
-                      : businessCoreSummary.topStatus === 'missing'
-                        ? 'Business systems are missing proof'
-                        : 'Business systems need attention'}
-                </p>
-                <p className="text-sm text-gray-600">
-                  {businessCoreSummary.topStatus === 'ok'
-                    ? `All ${businessCoreSummary.total} core business systems are green.`
-                    : `${businessCoreSummary.healthy}/${businessCoreSummary.total} core business systems are green right now.`}
-                </p>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-blue-100 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">1. Report freshness</p>
+                <p className="mt-2 font-semibold text-slate-900">{ownerInvestorSnapshot.proofLabel}</p>
+                <p className="mt-1 text-xs text-slate-500">This only says the dashboard report regenerated.</p>
               </div>
-
-              <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold text-gray-900">Self-maintaining beast mode</p>
-                  <StatusBadge status={selfMaintainingSummary.status} />
-                </div>
-                <p className="text-lg font-semibold text-gray-900">{selfMaintainingSummary.title}</p>
-                <p className="text-sm text-gray-600">{selfMaintainingSummary.detail}</p>
+              <div className="rounded-2xl border border-blue-100 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">2. Automation runs</p>
+                <p className="mt-2 font-semibold text-slate-900">{ownerInvestorSnapshot.automationRunHealthLabel}</p>
+                <p className="mt-1 text-xs text-slate-500">{ownerInvestorSnapshot.automationRunProblemLabel}</p>
               </div>
-
-              <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold text-gray-900">Can we focus on product work?</p>
-                  <StatusBadge status={productWorkSummary.status} />
-                </div>
-                <p className="text-lg font-semibold text-gray-900">{productWorkSummary.title}</p>
-                <p className="text-sm text-gray-600">{productWorkSummary.detail}</p>
+              <div className="rounded-2xl border border-blue-100 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">3. Business outputs</p>
+                <p className="mt-2 font-semibold text-slate-900">{ownerInvestorSnapshot.outputHealthLabel}</p>
+                <p className="mt-1 text-xs text-slate-500">This is what users actually feel on the storefront.</p>
               </div>
             </div>
           </CardContent>
