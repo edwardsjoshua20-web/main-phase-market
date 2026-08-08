@@ -2,13 +2,20 @@ import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 import { getLocalJsonIfAvailable, postLocalJsonIfAvailable } from '@/lib/catalogApi';
 
 const manifestUrl = getCatalogAssetUrl('mtg', 'manifest.json');
+const liteManifestUrl = getCatalogAssetUrl('mtg', 'search-lite-manifest.json');
 
 const manifestCache = {
   promise: null,
   value: null
 };
+const liteManifestCache = {
+  promise: null,
+  value: null,
+  failed: false
+};
 
 const bucketCache = new Map();
+const liteBucketCache = new Map();
 const allBucketsCache = {
   promise: null,
   value: null
@@ -108,6 +115,34 @@ async function loadManifest() {
   return manifestCache.promise;
 }
 
+async function loadLiteManifest() {
+  if (liteManifestCache.value) {
+    return liteManifestCache.value;
+  }
+
+  if (liteManifestCache.failed) {
+    return null;
+  }
+
+  if (!liteManifestCache.promise) {
+    liteManifestCache.promise = fetch(liteManifestUrl).then(async (response) => {
+      if (!response.ok) {
+        liteManifestCache.failed = true;
+        return null;
+      }
+
+      const manifest = await response.json();
+      liteManifestCache.value = manifest;
+      return manifest;
+    }).catch(() => {
+      liteManifestCache.failed = true;
+      return null;
+    });
+  }
+
+  return liteManifestCache.promise;
+}
+
 async function loadBucket(bucket) {
   if (bucketCache.has(bucket)) {
     return bucketCache.get(bucket);
@@ -140,6 +175,30 @@ async function loadBucket(bucket) {
   });
 
   bucketCache.set(bucket, promise);
+  return promise;
+}
+
+async function loadLiteBucket(bucket) {
+  if (liteBucketCache.has(bucket)) {
+    return liteBucketCache.get(bucket);
+  }
+
+  const promise = loadLiteManifest().then(async (manifest) => {
+    const bucketInfo = manifest?.buckets?.[bucket];
+    const bucketFile = bucketInfo?.file;
+    if (!bucketFile) {
+      return loadBucket(bucket);
+    }
+
+    const response = await fetch(getCatalogAssetUrl('mtg', bucketFile));
+    if (!response.ok) {
+      return loadBucket(bucket);
+    }
+
+    return response.json();
+  });
+
+  liteBucketCache.set(bucket, promise);
   return promise;
 }
 
@@ -730,7 +789,7 @@ export async function searchMtgCatalogSuggestions(query, limit = 10) {
   }
 
   const bucket = bucketForQuery(normalizedQuery);
-  const rows = await loadBucket(bucket);
+  const rows = await loadLiteBucket(bucket);
   const englishImageIndexes = buildEnglishImageIndexes(rows);
 
   return dedupeByName(

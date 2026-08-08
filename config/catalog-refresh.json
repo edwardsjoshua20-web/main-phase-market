@@ -11,6 +11,17 @@
       "enabled": true
     },
     {
+      "id": "mtg-search-lite",
+      "label": "Build MTG lightweight search index",
+      "command": "npm",
+      "args": ["run", "mtg:build:search-lite"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/mtg/manifest.json", "label": "MTG catalog manifest" },
+        { "type": "file-exists", "path": "public/data/mtg/search", "label": "MTG search buckets" }
+      ],
+      "enabled": true
+    },
+    {
       "id": "fab-sets",
       "label": "Extract FAB sets",
       "command": "npm",
