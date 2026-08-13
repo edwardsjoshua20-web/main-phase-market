@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import readline from 'node:readline';
 import { Readable } from 'node:stream';
+import zlib from 'node:zlib';
 import { getGameSourceConfig, resolveConfiguredSourcePath } from './lib/source-registry.mjs';
 
 const BULK_API_URL = getGameSourceConfig('magic', 'bulkApi')?.url || 'https://api.scryfall.com/bulk-data';
@@ -61,6 +63,56 @@ async function downloadFile(url, outputPath) {
   fs.renameSync(tempPath, outputPath);
 }
 
+async function downloadJsonlGzipAsJsonArray(url, outputPath) {
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Main Phase Market MTG Source Refresh',
+      Accept: 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed for ${url}: ${response.status} ${response.statusText}`);
+  }
+
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  const tempPath = `${outputPath}.tmp`;
+  const output = fs.createWriteStream(tempPath);
+  const gunzip = zlib.createGunzip();
+  const input = Readable.fromWeb(response.body).pipe(gunzip);
+  const lines = readline.createInterface({
+    input,
+    crlfDelay: Infinity
+  });
+
+  let count = 0;
+  output.write('[\n');
+
+  for await (const line of lines) {
+    const trimmed = String(line || '').trim();
+    if (!trimmed) continue;
+    if (count > 0) output.write(',\n');
+    output.write(trimmed);
+    count += 1;
+  }
+
+  output.write('\n]\n');
+
+  await new Promise((resolve, reject) => {
+    output.end(resolve);
+    output.on('error', reject);
+    gunzip.on('error', reject);
+  });
+
+  if (count === 0) {
+    fs.rmSync(tempPath, { force: true });
+    throw new Error(`Scryfall JSONL feed was empty: ${url}`);
+  }
+
+  fs.renameSync(tempPath, outputPath);
+  return count;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const payload = await fetchJson(BULK_API_URL);
@@ -68,19 +120,27 @@ async function main() {
     ? payload.data.find((entry) => entry.type === args.type)
     : null;
 
-  if (!bulkEntry?.download_uri) {
+  const downloadUri = bulkEntry?.download_uri || bulkEntry?.jsonl_download_uri || null;
+  if (!downloadUri) {
     throw new Error(`Could not find Scryfall bulk type: ${args.type}`);
   }
 
-  await downloadFile(bulkEntry.download_uri, OUTPUT_PATH);
+  const convertedRows = bulkEntry.jsonl_download_uri && !bulkEntry.download_uri
+    ? await downloadJsonlGzipAsJsonArray(downloadUri, OUTPUT_PATH)
+    : null;
+
+  if (convertedRows == null) {
+    await downloadFile(downloadUri, OUTPUT_PATH);
+  }
 
   const stats = fs.statSync(OUTPUT_PATH);
   console.log(JSON.stringify({
     type: args.type,
     updated_at: bulkEntry.updated_at || null,
-    download_uri: bulkEntry.download_uri,
+    download_uri: downloadUri,
     output_path: OUTPUT_PATH,
-    bytes: stats.size
+    bytes: stats.size,
+    converted_rows: convertedRows
   }, null, 2));
 }
 
