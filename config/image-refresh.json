@@ -2,10 +2,18 @@
   "failFast": false,
   "jobs": [
     {
+      "id": "mtg-source",
+      "label": "Refresh MTG source before image repair",
+      "command": "npm",
+      "args": ["run", "mtg:refresh:source"],
+      "timeoutMs": 900000,
+      "enabled": true
+    },
+    {
       "id": "mtg-images",
       "label": "Mirror MTG images",
       "command": "npm",
-      "args": ["run", "mtg:mirror:images", "--", "small,normal,art_crop", "--max-downloads", "5000"],
+      "args": ["run", "mtg:mirror:images", "--", "small,normal,art_crop", "--max-downloads", "1000"],
       "timeoutMs": 2700000,
       "requires": [
         { "type": "source-exists", "game": "magic", "key": "catalogSource", "label": "MTG source export" }
