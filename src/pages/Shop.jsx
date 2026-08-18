@@ -47,6 +47,12 @@ function resolveListingSellPrice(listing = {}) {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
+function resolveResultSellPrice(result = {}) {
+  const value = Number(result?.listingSellPrice ?? result?.customerPrice ?? 0);
+  if (Number.isFinite(value) && value > 0) return value;
+  return resolveListingSellPrice(result?.stockCard);
+}
+
 function resolveMarketPrice(result = {}) {
   const value = Number(result.marketPrice ?? result.market_price ?? result.price ?? 0);
   return Number.isFinite(value) && value > 0 ? value : null;
@@ -1186,8 +1192,31 @@ export default function Shop() {
             {pagedResults.map((result, idx) => {
               const gridImageUrl = getResultGridImageUrl(result);
               const previewImageUrl = getResultPreviewImageUrl(result);
-              const listingSellPrice = resolveListingSellPrice(result.stockCard);
+              const listingSellPrice = resolveResultSellPrice(result);
               const marketPrice = resolveMarketPrice(result);
+              const hasActiveListingPrice = result.inStock && listingSellPrice != null;
+
+              if (
+                idx === 0 &&
+                typeof window !== 'undefined' &&
+                new URLSearchParams(window.location.search).get('traceSearch') === '1'
+              ) {
+                console.info('[MPM search render trace:first-result]', {
+                  name: result.name,
+                  inStock: result.inStock,
+                  stockCard: result.stockCard,
+                  stockCardPrice: result.stockCard?.price,
+                  stockCardSellPrice: result.stockCard?.sell_price,
+                  stockCardDisplayPrice: result.stockCard?.display_price,
+                  listing: result.listing,
+                  listingSellPrice: result.listingSellPrice,
+                  resolvedListingSellPrice: listingSellPrice,
+                  customerPrice: result.customerPrice,
+                  price: result.price,
+                  market_price: result.market_price,
+                  marketPrice: result.marketPrice
+                });
+              }
 
               return (
           <div
@@ -1266,11 +1295,12 @@ export default function Shop() {
                   }
                   {result.rarity && <p className="text-xs text-gray-400 mt-0.5">{result.rarity}</p>}
                   <div className="mt-3">
-                    {result.stockCard ?
+                    {result.stockCard || hasActiveListingPrice ?
                 <>
                         {listingSellPrice != null &&
                     <p className="text-lg font-bold text-blue-600">${listingSellPrice.toFixed(2)}</p>
                     }
+                        {result.stockCard &&
                         <Button
                     onClick={(event) => handleAddCardToCart(result.stockCard, event)}
                     size="sm"
@@ -1279,6 +1309,7 @@ export default function Shop() {
                           <ShoppingCart className="w-3 h-3 mr-1" />
                           Add to Cart
                         </Button>
+                    }
                       </> :
 
                 <>
