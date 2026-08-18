@@ -41,6 +41,15 @@ import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 import { createPageUrl } from '@/utils';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
+function resolveListingSellPrice(listing = {}) {
+  const value = Number(listing.sell_price ?? listing.price ?? listing.display_price ?? 0);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function resolveMarketPrice(result = {}) {
+  const value = Number(result.marketPrice ?? result.market_price ?? result.price ?? 0);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
 
 export default function Shop() {
   const HOVER_OPEN_DELAY_MS = 180;
@@ -341,11 +350,14 @@ export default function Shop() {
 
   const addToCartMutation = useMutation({
     mutationFn: async (/** @type {any} */ card) => {
+      const sellPrice = resolveListingSellPrice(card);
       await cart.addItem({
         card_id: card.id,
         card_name: card.name,
         card_image: card.image_url,
-        price: card.price,
+        price: sellPrice,
+        sell_price: sellPrice,
+        market_price: card.market_price ?? null,
         game: card.game,
         set_code: card.set_code,
         set_name: card.set_name,
@@ -1173,6 +1185,8 @@ export default function Shop() {
             {pagedResults.map((result, idx) => {
               const gridImageUrl = getResultGridImageUrl(result);
               const previewImageUrl = getResultPreviewImageUrl(result);
+              const listingSellPrice = resolveListingSellPrice(result.stockCard);
+              const marketPrice = resolveMarketPrice(result);
 
               return (
           <div
@@ -1253,7 +1267,9 @@ export default function Shop() {
                   <div className="mt-3">
                     {result.stockCard ?
                 <>
-                        <p className="text-lg font-bold text-blue-600">${result.stockCard.price?.toFixed(2)}</p>
+                        {listingSellPrice != null &&
+                    <p className="text-lg font-bold text-blue-600">${listingSellPrice.toFixed(2)}</p>
+                    }
                         <Button
                     onClick={(event) => handleAddCardToCart(result.stockCard, event)}
                     size="sm"
@@ -1265,8 +1281,8 @@ export default function Shop() {
                       </> :
 
                 <>
-                        {result.price != null &&
-                  <p className="text-sm text-gray-500 mb-1">Market: <span className="font-semibold text-gray-700">${result.price.toFixed(2)}</span></p>
+                        {marketPrice != null &&
+                  <p className="text-sm text-gray-500 mb-1">Market: <span className="font-semibold text-gray-700">${marketPrice.toFixed(2)}</span></p>
                   }
                       </>
                 }
