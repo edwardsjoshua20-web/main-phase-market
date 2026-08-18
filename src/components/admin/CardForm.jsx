@@ -20,6 +20,22 @@ const scanStyle = `
   .scan-line { position: absolute; left: 0; right: 0; height: 2px; background: #60a5fa; animation: scan 2s ease-in-out infinite; }
 `;
 
+const SELL_PRICE_FLOOR = 1;
+
+function normalizeMoney(value, fallback = 0) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.round(parsed * 100) / 100;
+}
+
+function normalizeSellPrice(value) {
+  return Math.max(SELL_PRICE_FLOOR, normalizeMoney(value, SELL_PRICE_FLOOR));
+}
+
+function getCatalogMarketPrice(card = {}) {
+  return normalizeMoney(card.market_price ?? card.basePrice ?? card.target_price ?? null, null);
+}
+
 export default function CardForm({ card, onSubmit, onCancel, isLoading, existingLocations = [] }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -31,7 +47,7 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
   const [selectedCondition, setSelectedCondition] = useState(card?.condition || 'near_mint');
   
   // Edit mode fields
-  const [editPrice, setEditPrice] = useState(card?.price || 0);
+  const [editPrice, setEditPrice] = useState(normalizeSellPrice(card?.price || card?.sell_price || 1));
   const [editCost, setEditCost] = useState(card?.cost || 0);
   const [editQuantity, setEditQuantity] = useState(card?.quantity || 1);
   
@@ -66,6 +82,17 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
   const searchTimeoutRef = useRef(null);
   
   const isEditMode = !!card;
+
+  useEffect(() => {
+    if (!card) return;
+    setSelectedCard(card);
+    setSelectedGame(card.game || 'magic');
+    setSelectedCondition(card.condition || 'near_mint');
+    setEditPrice(normalizeSellPrice(card.price || card.sell_price || 1));
+    setEditCost(card.cost || 0);
+    setEditQuantity(card.quantity || 1);
+    setFormData({ location: card.location || '' });
+  }, [card]);
   
   // Remove unused refs since we're not using live camera anymore
   // (keeping videoRef and streamRef removal to clean up)
@@ -454,8 +481,10 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
       // Edit mode - only update editable fields
       if (!selectedCard) return;
       const submitData = {
-        price: parseFloat(editPrice) || 0,
-        cost: parseFloat(editCost) || 0,
+        price: normalizeSellPrice(editPrice),
+        sell_price: normalizeSellPrice(editPrice),
+        market_price: getCatalogMarketPrice(selectedCard),
+        cost: normalizeMoney(editCost, 0),
         quantity: parseInt(editQuantity) || 0,
         condition: selectedCondition,
         location: formData.location || ''
@@ -520,10 +549,20 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">Market Price ($):</label>
+              <label className="text-sm font-medium text-gray-700 block mb-2">Catalog Market Price:</label>
+              <div className="h-10 rounded-md border border-gray-200 bg-gray-50 px-3 flex items-center text-sm text-gray-700">
+                {getCatalogMarketPrice(selectedCard) != null
+                  ? `$${getCatalogMarketPrice(selectedCard).toFixed(2)}`
+                  : 'No market price available'}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-2">Your Cost ($):</label>
               <Input
                 type="number"
                 step="0.01"
+                min="0"
                 value={editCost}
                 onChange={(e) => setEditCost(e.target.value)}
                 className="bg-white border-gray-300"
@@ -535,11 +574,12 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
               <Input
                 type="number"
                 step="0.01"
+                min="1"
                 value={editPrice}
                 onChange={(e) => {
-                  const val = parseFloat(e.target.value) || 0;
-                  setEditPrice(val < 1 ? 1.00 : val);
+                  setEditPrice(e.target.value);
                 }}
+                onBlur={(e) => setEditPrice(normalizeSellPrice(e.target.value))}
                 className="bg-white border-gray-300"
               />
             </div>
@@ -906,15 +946,15 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-2">Price ($):</label>
+                    <label className="text-sm font-medium text-gray-700 block mb-2">Sell Price ($) <span className="text-xs text-gray-400 font-normal">— min $1.00</span></label>
                     <Input
                       type="number"
                       step="0.01"
-                      min="0.01"
+                      min="1"
                       value={selectedCard.price || 1.00}
                       onChange={(e) => {
-                        const newPrice = parseFloat(e.target.value) || 1.00;
-                        setSelectedCard({...selectedCard, price: newPrice < 1 ? 1.00 : newPrice});
+                        const newPrice = normalizeSellPrice(e.target.value);
+                        setSelectedCard({...selectedCard, price: newPrice, sell_price: newPrice});
                       }}
                       className="bg-white border-gray-300"
                     />
@@ -989,6 +1029,15 @@ export default function CardForm({ card, onSubmit, onCancel, isLoading, existing
               disabled={isLoading}
             >
               {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Adding...</> : `Add All ${batchCards.length} Cards`}
+            </Button>
+          )}
+          {isEditMode && (
+            <Button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isLoading}
+            >
+              {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Save Card'}
             </Button>
           )}
         </div>

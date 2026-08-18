@@ -74,6 +74,7 @@ export function buildInventoryCardPayload({
     rarity: selectedCard.rarity,
     condition: selectedCondition,
     price: finalPrice,
+    sell_price: finalPrice,
     market_price: pricing.marketPrice,
     target_price: pricing.targetPrice,
     cost: Number(fallbackCost) || 0,

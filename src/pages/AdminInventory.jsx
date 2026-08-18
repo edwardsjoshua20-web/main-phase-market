@@ -285,8 +285,8 @@ export default function AdminInventory() {
     p.sku?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalValue = cards.reduce((sum, c) => sum + (c.price * c.quantity), 0);
-  const totalCost = cards.reduce((sum, c) => sum + ((c.cost || 0) * c.quantity), 0);
+  const totalValue = cards.reduce((sum, c) => sum + ((Number(c.price) || 0) * (Number(c.quantity) || 0)), 0);
+  const totalCost = cards.reduce((sum, c) => sum + ((Number(c.cost) || 0) * (Number(c.quantity) || 0)), 0);
   const potentialProfit = totalValue - totalCost;
   const activeCards = cards.filter(c => c.status === 'active').length;
   const lowStock = cards.filter(c => getInventoryStockState(c).inStock && getInventoryStockState(c).availableQuantity <= 3).length;
@@ -428,7 +428,8 @@ export default function AdminInventory() {
                   <TableHead className="text-gray-600">Game</TableHead>
                   <TableHead className="text-gray-600">Finish</TableHead>
                   <TableHead className="text-gray-600">Condition</TableHead>
-                  <TableHead className="text-gray-600">Market Price</TableHead>
+                  <TableHead className="text-gray-600">Catalog Market</TableHead>
+                  <TableHead className="text-gray-600">Your Cost</TableHead>
                   <TableHead className="text-gray-600 cursor-pointer select-none" onClick={() => handleSort('price')}>
                     <span className="flex items-center">Sell Price <SortIcon field="price" /></span>
                   </TableHead>
@@ -477,8 +478,11 @@ export default function AdminInventory() {
                        {card.condition?.replace('_', ' ')}
                      </Badge>
                     </TableCell>
-                    <TableCell className="text-gray-500">${(card.cost || 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-blue-600 font-medium">${card.price?.toFixed(2)}</TableCell>
+                    <TableCell className="text-gray-500">
+                      {card.market_price != null ? `$${(Number(card.market_price) || 0).toFixed(2)}` : '—'}
+                    </TableCell>
+                    <TableCell className="text-gray-500">${(Number(card.cost) || 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-blue-600 font-medium">${(Number(card.price) || 0).toFixed(2)}</TableCell>
                     <TableCell>
                       <span className={getInventoryStockState(card).inStock && getInventoryStockState(card).availableQuantity <= 3 ? 'text-amber-600 font-medium' : 'text-gray-900'}>
                         {card.quantity}
@@ -576,7 +580,7 @@ export default function AdminInventory() {
                 <TableRow className="border-gray-200 bg-gray-50">
                   <TableHead className="text-gray-600">Product</TableHead>
                   <TableHead className="text-gray-600">Type</TableHead>
-                  <TableHead className="text-gray-600">Market Price</TableHead>
+                  <TableHead className="text-gray-600">Your Cost</TableHead>
                   <TableHead className="text-gray-600">Sell Price</TableHead>
                   <TableHead className="text-gray-600">Qty</TableHead>
                   <TableHead className="text-gray-600">Status</TableHead>
@@ -604,8 +608,8 @@ export default function AdminInventory() {
                         {product.product_type?.replace('_', ' ')}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-gray-500">${(product.cost || 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-blue-600 font-medium">${product.price?.toFixed(2)}</TableCell>
+                    <TableCell className="text-gray-500">${(Number(product.cost) || 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-blue-600 font-medium">${(Number(product.price) || 0).toFixed(2)}</TableCell>
                     <TableCell>
                       <span className={getInventoryStockState(product).inStock && getInventoryStockState(product).availableQuantity <= 3 ? 'text-amber-600 font-medium' : 'text-gray-900'}>
                         {product.quantity}

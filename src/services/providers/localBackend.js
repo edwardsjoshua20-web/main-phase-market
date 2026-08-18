@@ -577,19 +577,31 @@ function matchesHostedFilter(row, filter = {}) {
   return Object.entries(filter || {}).every(([key, value]) => matchesHostedFilterValue(row?.[key], value));
 }
 
+const PUBLIC_HOSTED_ENTITY_READS = new Set(['Card', 'Product']);
+
+function requiresHostedSessionForEntityRead(entityName) {
+  return !PUBLIC_HOSTED_ENTITY_READS.has(entityName);
+}
+
 function createHostedEntityClient(entityName) {
   return {
     async list(sort = '-created_date', limit, skip) {
       return this.filter({}, sort, limit, skip);
     },
     async filter(filter = {}, sort = '-created_date', limit, skip = 0) {
-      requireHostedSession();
+      if (requiresHostedSessionForEntityRead(entityName)) {
+        requireHostedSession();
+      }
       const params = new URLSearchParams();
       params.set('select', '*');
       params.set('entity_name', `eq.${encodeHostedFilterValue(entityName)}`);
       params.set('order', 'created_date.desc');
 
-      const rows = await supabaseRequest(`/rest/v1/app_entities?${params.toString()}`);
+      const rows = await supabaseRequest(`/rest/v1/app_entities?${params.toString()}`, {
+        auth: !requiresHostedSessionForEntityRead(entityName)
+          ? Boolean(getSessionToken())
+          : undefined
+      });
       const filteredRows = (rows || [])
         .map(normalizeHostedEntityRow)
         .filter((row) => matchesHostedFilter(row, filter));
