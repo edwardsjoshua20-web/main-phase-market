@@ -175,9 +175,16 @@ function listingMatchesCard(card = {}, listing = {}) {
   const cardName = normalizeSearchText(card.name || card.product_name);
   if (!listingName || !cardName || listingName !== cardName) return false;
 
-  const listingSet = normalizeSearchText(listing.set_code || listing.set_name || '');
-  const cardSet = normalizeSearchText(card.set_code || card.set_id || card.set_name || '');
-  if (listingSet && cardSet && listingSet !== cardSet) return false;
+  const listingSetCode = normalizeSearchText(listing.set_code || listing.set_id || '');
+  const cardSetCode = normalizeSearchText(card.set_code || card.set_id || '');
+  const listingSetName = normalizeSearchText(listing.set_name || '');
+  const cardSetName = normalizeSearchText(card.set_name || '');
+  const setComparisons = [
+    [listingSetCode, cardSetCode],
+    [listingSetName, cardSetName]
+  ].filter(([left, right]) => left && right);
+
+  if (setComparisons.length > 0 && !setComparisons.some(([left, right]) => left === right)) return false;
 
   const listingNumber = normalizeSearchText(listing.collector_number || listing.card_number || listing.number || '');
   const cardNumber = normalizeSearchText(card.collector_number || card.card_number || card.number || '');

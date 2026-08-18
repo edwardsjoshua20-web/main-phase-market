@@ -66,6 +66,30 @@ const fixtureInventory = [
 
 const enriched = enrichCatalogResultsWithInventory(fixtureCatalog, fixtureInventory);
 const ranked = rankCatalogResults(enriched, 'Fog');
+const setNameOnlyListingEnriched = enrichCatalogResultsWithInventory(
+  [
+    {
+      id: 'spg-jace-beleren',
+      game: 'magic',
+      name: 'Jace Beleren',
+      set_code: 'SPG',
+      set_name: 'Spotlight Series',
+      card_number: '13'
+    }
+  ],
+  [
+    {
+      id: 'listing-jace-beleren',
+      game: 'magic',
+      name: 'Jace Beleren',
+      set_code: '',
+      set_name: 'Spotlight Series',
+      card_number: '13',
+      quantity: 1,
+      sell_price: 999
+    }
+  ]
+)[0];
 
 assert(normalizeSearchText('  Fóg--Bank ') === 'fog bank', 'query normalization should lowercase, trim, and normalize punctuation/diacritics');
 assert(ranked.some((card) => card.id === 'fog-empty'), 'out-of-stock exact catalog card must remain searchable');
@@ -74,6 +98,8 @@ assert(ranked[0].id === 'fog-stocked', 'in-stock exact match should rank before 
 assert(ranked.findIndex((card) => card.id === 'fog-empty') < ranked.findIndex((card) => card.id === 'fog-bank'), 'exact out-of-stock match should rank before less relevant partial in-stock match');
 assert(ranked.length === fixtureCatalog.length, 'inventory enrichment must not remove catalog matches');
 assert(new Set(ranked.map((card) => `${card.game}:${card.id}`)).size === ranked.length, 'distinct printings should remain distinct');
+assert(setNameOnlyListingEnriched.inStock === true, 'inventory enrichment should match an active listing by set name when the listing lacks set code');
+assert(setNameOnlyListingEnriched.listingSellPrice === 999, 'inventory enrichment should preserve active listing sell price when market price is unavailable');
 
 const pageOne = paginateSearchResults(ranked, 0, 2);
 const pageTwo = paginateSearchResults(ranked, 1, 2);
