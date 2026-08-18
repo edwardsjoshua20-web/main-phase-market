@@ -13,6 +13,10 @@ export default function SearchResultCard({ result, user, onQuickView, onHoverIma
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
   const wishlist = useWishlistOwner(user);
+  const listingSellPrice = Number(result.stockCard?.sell_price ?? result.stockCard?.price ?? result.listingSellPrice ?? result.customerPrice ?? 0);
+  const marketPrice = Number(result.marketPrice ?? result.market_price ?? (!result.stockCard ? result.price : 0));
+  const hasListingSellPrice = Number.isFinite(listingSellPrice) && listingSellPrice > 0;
+  const hasMarketPrice = Number.isFinite(marketPrice) && marketPrice > 0;
 
   const { data: userLists = [] } = useQuery({
     queryKey: ['cardlists', user?.email],
@@ -125,12 +129,16 @@ export default function SearchResultCard({ result, user, onQuickView, onHoverIma
           <span className="text-gray-500 line-clamp-1">{result.set_name}</span>
         </div>
         {result.rarity && <p className="text-xs text-gray-500 mt-1 capitalize">{result.rarity}</p>}
-        {result.price && <p className="text-sm font-bold text-gray-900 mt-2">${result.price.toFixed(2)}</p>}
+        {result.inStock && hasListingSellPrice ? (
+          <p className="text-sm font-bold text-gray-900 mt-2">${listingSellPrice.toFixed(2)}</p>
+        ) : hasMarketPrice ? (
+          <p className="text-sm text-gray-500 mt-2">Market: <span className="font-semibold text-gray-700">${marketPrice.toFixed(2)}</span></p>
+        ) : null}
         <div className="mt-3 space-y-2">
           {result.inStock ? (
             <>
               <Badge className="bg-green-600 text-white text-xs w-fit">In Stock</Badge>
-              <p className="text-xs text-gray-600">${result.stockCard.price.toFixed(2)} • {result.stockCard.quantity} available</p>
+              <p className="text-xs text-gray-600">{hasListingSellPrice ? `$${listingSellPrice.toFixed(2)} • ` : ''}{result.stockCard.quantity} available</p>
               <Button size="sm" onClick={() => onQuickView(result.stockCard)} className="w-full bg-gray-800 hover:bg-gray-700 text-xs h-8">
                 <ShoppingCart className="w-3 h-3 mr-1" /> Add to Cart
               </Button>

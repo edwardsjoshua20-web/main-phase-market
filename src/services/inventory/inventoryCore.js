@@ -147,14 +147,23 @@ function hasSameKnownValue(left, right, fields) {
   });
 }
 
+function hasExplicitInventoryValue(record = {}, fields = []) {
+  return fields.some((field) => normalizeInventoryText(record[field]));
+}
+
 export function findInventoryMatch(catalogItem = {}, inventoryRows = [], game = catalogItem.game) {
   const target = normalizeInventoryIdentity({ ...catalogItem, game });
+  const fieldsToMatch = ['collectorNumber', 'setCode', 'setName', 'language', 'finish'];
+  if (hasExplicitInventoryValue(catalogItem, ['condition'])) {
+    fieldsToMatch.push('condition');
+  }
+
   return (Array.isArray(inventoryRows) ? inventoryRows : []).find((inventoryRow) => {
     const row = normalizeInventoryIdentity(inventoryRow);
     if (target.game && row.game && target.game !== row.game) return false;
     if (target.name && row.name && target.name !== row.name) return false;
     if (target.canonicalCardId && row.canonicalCardId && target.canonicalCardId !== row.canonicalCardId) return false;
-    if (!hasSameKnownValue(row, target, ['collectorNumber', 'setCode', 'setName', 'language', 'finish', 'condition'])) return false;
+    if (!hasSameKnownValue(row, target, fieldsToMatch)) return false;
     return getInventoryStockState(inventoryRow).inStock;
   }) || null;
 }

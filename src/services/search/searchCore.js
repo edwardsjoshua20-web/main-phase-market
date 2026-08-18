@@ -71,6 +71,11 @@ function stockQuantity(listing = {}) {
   return Number.isFinite(inventory) && inventory > 0 ? inventory : 0;
 }
 
+function sellPrice(listing = {}) {
+  const value = Number(listing.sell_price ?? listing.price ?? listing.display_price ?? 0);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 function textFields(card = {}) {
   return [
     card.name,
@@ -185,11 +190,21 @@ export function enrichCatalogResultsWithInventory(catalogResults = [], inventory
   return catalogResults.map((card) => {
     const listing = inventoryListings.find((candidate) => listingMatchesCard(card, candidate));
     const quantity = listing ? stockQuantity(listing) : 0;
+    const activeSellPrice = quantity > 0 ? sellPrice(listing) : null;
     return {
       ...card,
       inStock: quantity > 0,
-      stockCard: quantity > 0 ? listing : null,
+      stockCard: quantity > 0 ? {
+        ...listing,
+        price: activeSellPrice ?? listing.price,
+        sell_price: activeSellPrice ?? listing.sell_price,
+        display_price: activeSellPrice ?? listing.display_price,
+        market_price: listing.market_price ?? card.market_price ?? card.price ?? null
+      } : null,
       inventoryQuantity: quantity,
+      listingSellPrice: activeSellPrice,
+      customerPrice: activeSellPrice ?? null,
+      marketPrice: card.market_price ?? card.price ?? null,
       searchIdentity: getSearchIdentity(card)
     };
   });

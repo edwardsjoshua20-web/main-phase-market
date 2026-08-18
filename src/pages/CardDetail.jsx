@@ -126,6 +126,27 @@ function OutOfStockNotice() {
     </div>
   );
 }
+function getListingSellPrice(listing = {}) {
+  const value = Number(listing.sell_price ?? listing.price ?? listing.display_price ?? 0);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function StorefrontAvailabilityNotice({ stockListing }) {
+  if (!stockListing) return <OutOfStockNotice />;
+
+  const sellPrice = getListingSellPrice(stockListing);
+  return (
+    <div className="mt-4 w-full rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
+      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">In Stock</p>
+      {sellPrice != null && (
+        <p className="mt-1 text-2xl font-bold text-gray-900">${sellPrice.toFixed(2)}</p>
+      )}
+      <p className="mt-1 text-xs text-emerald-700">
+        {Number(stockListing.quantity || stockListing.inventoryQuantity || 0) || 1} available
+      </p>
+    </div>
+  );
+}
 
 export default function CardDetail() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -337,7 +358,9 @@ export default function CardDetail() {
         card_id: card.id,
         card_name: card.name,
         card_image: getCardImageUrl(card),
-        price: card.price,
+        price: getListingSellPrice(card),
+        sell_price: getListingSellPrice(card),
+        market_price: card.market_price ?? null,
         game: card.game,
         set_code: card.set_code,
         set_name: card.set_name,
@@ -439,7 +462,7 @@ export default function CardDetail() {
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
               )}
-              {!canAddToCart && <OutOfStockNotice />}
+              <StorefrontAvailabilityNotice stockListing={stockListing} />
             </div>
 
             <div className="space-y-6">
@@ -671,7 +694,7 @@ export default function CardDetail() {
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
               )}
-              {!canAddToCart && <OutOfStockNotice />}
+              <StorefrontAvailabilityNotice stockListing={stockListing} />
             </div>
 
             <div className="space-y-6">
@@ -838,7 +861,7 @@ export default function CardDetail() {
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
               )}
-              {!canAddToCart && <OutOfStockNotice />}
+              <StorefrontAvailabilityNotice stockListing={stockListing} />
             </div>
 
             <div className="space-y-6">
@@ -988,7 +1011,7 @@ export default function CardDetail() {
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
               )}
-              {!canAddToCart && <OutOfStockNotice />}
+              <StorefrontAvailabilityNotice stockListing={stockListing} />
             </div>
 
             <div className="space-y-6">
@@ -1117,7 +1140,7 @@ export default function CardDetail() {
               ) : (
                 <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
               )}
-              {!canAddToCart && <OutOfStockNotice />}
+              <StorefrontAvailabilityNotice stockListing={stockListing} />
             </div>
 
             <div className="space-y-6">
@@ -1305,7 +1328,7 @@ export default function CardDetail() {
                 ) : (
                   <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
                 )}
-                {!canAddToCart && <OutOfStockNotice />}
+                <StorefrontAvailabilityNotice stockListing={stockListing} />
               </div>
 
               {starWarsCard.image_back_url && (
@@ -1565,7 +1588,7 @@ export default function CardDetail() {
             ) : (
               <div className="aspect-[3/4] flex items-center justify-center text-gray-400">No Image</div>
             )}
-            {!canAddToCart && <OutOfStockNotice />}
+            <StorefrontAvailabilityNotice stockListing={stockListing} />
           </div>
 
           <div className="space-y-6">
@@ -1717,5 +1740,4 @@ export default function CardDetail() {
     </div>
   );
 }
-
 
