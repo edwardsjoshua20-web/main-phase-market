@@ -15,7 +15,8 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { getGuestCart, getGuestWishlist } from '@/components/utils/guestStorage';
+import { useCartOwner } from '@/hooks/useCartOwner';
+import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 import { Plus, Search, Loader2, MessageSquare, BookOpen, CheckCircle, Flame } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -64,10 +65,10 @@ export default function MobileForum() {
     });
   }, []);
 
-  const { data: cartItems = [] } = useQuery({ queryKey: ['cart', user?.email], queryFn: () => backend.data.CartItem.filter({ user_email: user.email }), enabled: !!user?.email });
-  const { data: wishlistItems = [] } = useQuery({ queryKey: ['wishlist', user?.email], queryFn: () => backend.data.Wishlist.filter({ user_email: user.email }), enabled: !!user?.email });
-  const guestCart = getGuestCart();
-  const guestWishlist = getGuestWishlist();
+  const cart = useCartOwner(user);
+  const cartItems = cart.items;
+  const wishlist = useWishlistOwner(user);
+  const wishlistItems = wishlist.items;
 
   const { data: posts = [], isLoading } = useQuery({
     queryKey: ['forum-posts', game, category],
@@ -274,9 +275,9 @@ export default function MobileForum() {
         </div>
       )}
 
-      <MobileBottomNav cartCount={(user ? cartItems : guestCart).reduce((sum, item) => sum + item.quantity, 0)} wishlistCount={(user ? wishlistItems : guestWishlist).length} onCartClick={() => setCartOpen(true)} onWishlistClick={() => setWishlistOpen(true)} currentPage="Forum" />
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} items={user ? cartItems : guestCart} onUpdateQuantity={() => {}} onRemove={() => {}} />
-      <WishlistDrawer open={wishlistOpen} onClose={() => setWishlistOpen(false)} items={user ? wishlistItems : guestWishlist} onAddToCart={() => {}} onRemove={() => {}} user={user} />
+      <MobileBottomNav cartCount={cart.itemCount} wishlistCount={wishlist.count} onCartClick={() => setCartOpen(true)} onWishlistClick={() => setWishlistOpen(true)} currentPage="Forum" />
+      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} items={cartItems} onUpdateQuantity={(id, quantity) => cart.setQuantity(id, quantity)} onRemove={(id) => cart.removeItem(id)} />
+      <WishlistDrawer open={wishlistOpen} onClose={() => setWishlistOpen(false)} items={wishlistItems} onAddToCart={() => {}} onRemove={(id) => wishlist.removeItem(id)} user={user} />
     </div>
   );
 }

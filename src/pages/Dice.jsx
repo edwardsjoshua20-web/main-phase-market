@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { backend } from '@/services/backend';
+import { listingOwner } from '@/services/listing/listingOwner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +34,7 @@ export default function Dice() {
 
   const { data: diceProducts = [], isLoading } = useQuery({
     queryKey: ['dice-products'],
-    queryFn: () => backend.data.Product.filter({ product_type: 'dice' }, '-created_date'),
+    queryFn: () => listingOwner.filterProductListings({ product_type: 'dice' }, '-created_date'),
   });
 
   const handleContactRequest = (product) => {

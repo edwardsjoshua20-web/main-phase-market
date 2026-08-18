@@ -1,5 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { backend } from '@/services/backend';
+import { listingOwner } from '@/services/listing/listingOwner';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,12 @@ import DeckStackView from '@/components/deckbuilder/DeckStackView';
 import AISimulationResults from '@/components/deckbuilder/AISimulationResults';
 import CardImage from '@/components/cards/CardImage';
 import { simulateMtgCommanderDeck } from '@/lib/mtgCommanderCatalog';
-import { getMtgPrintingsByOracleId, searchMtgCatalog } from '@/lib/mtgLocalCatalog';
 import { groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
 import { getCardImageUrl } from '@/lib/cardImages';
 import { buildPackedColumns } from '@/lib/deckColumnLayout';
 import { toast } from 'sonner';
 import { calculateDeckValue } from '@/services/pricing/pricingPipeline';
+import { searchOwner } from '@/services/search/searchOwner';
 
 const DECK_FORMATS_BY_GAME = {
   magic: {
@@ -257,7 +258,7 @@ export default function AdvancedDeckBuilder() {
             let resolved = null;
 
             if (i.oracle_id) {
-              const printings = await getMtgPrintingsByOracleId(i.oracle_id);
+              const printings = await searchOwner.getMagicPrintingsByOracleId(i.oracle_id);
               resolved = printings.find((printing) => printing.id === i.product_id)
                 || printings.find((printing) => String(printing.set_code || '').toUpperCase() === String(i.set_code || '').toUpperCase())
                 || printings[0]
@@ -265,30 +266,12 @@ export default function AdvancedDeckBuilder() {
             }
 
             if (!resolved && i.product_name) {
-              const matches = await searchMtgCatalog(i.product_name, 20);
+              const matches = await searchOwner.searchByGame(i.product_name, 'magic', 20, { includeInventory: false });
               resolved = matches.find((card) => card.id === i.product_id)
                 || matches.find((card) => card.oracle_id && card.oracle_id === i.oracle_id)
                 || matches.find((card) => String(card.set_code || '').toUpperCase() === String(i.set_code || '').toUpperCase())
                 || matches[0]
                 || null;
-            }
-
-            if (!resolved && i.product_id) {
-              try {
-                const response = await fetch(`https://api.scryfall.com/cards/${i.product_id}`);
-                if (response.ok) {
-                  const data = await response.json();
-                  const normalImage = data.image_uris?.normal || data.card_faces?.[0]?.image_uris?.normal || null;
-                  resolved = {
-                    type: data.card_faces?.[0]?.type_line || data.type_line || '',
-                    image_url: normalImage,
-                    oracle_id: data.oracle_id || i.oracle_id || null,
-                    set_code: String(data.set || i.set_code || '').toUpperCase(),
-                  };
-                }
-              } catch {
-                // Keep the existing item data when Scryfall is unavailable.
-              }
             }
 
             return {
@@ -339,22 +322,12 @@ export default function AdvancedDeckBuilder() {
     enabled: !!user?.email
   });
 
-  const { data: storeProductsRaw = [] } = useQuery({
-    queryKey: ['storeProducts'],
-    queryFn: () => backend.data.Product.filter({ status: 'active' }),
+  const { data: storeProducts = [] } = useQuery({
+    queryKey: ['storefront-inventory'],
+    queryFn: () => listingOwner.listStorefrontListings({ includeProducts: true }),
     staleTime: 0,
     refetchInterval: 30 * 1000
   });
-
-  const { data: storeCardsRaw = [] } = useQuery({
-    queryKey: ['storeCards'],
-    queryFn: () => backend.data.Card.filter({ status: 'active' }),
-    staleTime: 0,
-    refetchInterval: 30 * 1000
-  });
-
-  // Combine both Card and Product entities for stock lookup
-  const storeProducts = [...storeProductsRaw, ...storeCardsRaw];
 
   const decks = lists;
 
@@ -502,28 +475,15 @@ export default function AdvancedDeckBuilder() {
   const fetchCardVariants = async (cardName) => {
     setLoadingVariants(true);
     try {
-      let variants = [];
-      if (selectedGame === 'magic') {
-        const res = await fetch(`https://api.scryfall.com/cards/search?q=!"${encodeURIComponent(cardName)}"&unique=prints&order=released&sort=set`);
-        const data = await res.json();
-        variants = (data.data || []).map(c => ({
+      const variants = (await searchOwner.searchByGame(cardName, selectedGame, 100, { includeInventory: false }))
+        .map(c => ({
           id: c.id,
           name: c.name,
-          set_name: c.set_name,
-          set_code: c.set.toUpperCase(),
-          image_url: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal,
-          price: c.prices?.usd ? parseFloat(c.prices.usd) : null
+          set_name: c.set_name || c.set || c.set_code || 'Unknown',
+          set_code: String(c.set_code || c.set || '').toUpperCase(),
+          image_url: c.image_url || c.image || c.product_image,
+          market_price: c.market_price || c.price || null
         }));
-      } else if (selectedGame === 'pokemon') {
-        const res = await backend.actions.invoke('searchPokemonCards', { query: cardName });
-        const pokemonCards = res.data?.data || [];
-        variants = pokemonCards.map(c => ({
-          id: c.id,
-          name: c.name,
-          set_name: c.set?.name || 'Unknown',
-          image_url: c.images?.large || c.images?.small
-        }));
-      }
       setSetVariants(variants);
     } catch {
       toast.error('Could not load variants');
@@ -535,7 +495,7 @@ export default function AdvancedDeckBuilder() {
   const updateCardVariant = async (item, newVariant) => {
     const updatedItems = activeDeck.items.map(i =>
       i.product_id === item.product_id 
-        ? { ...i, product_id: newVariant.id, product_image: newVariant.image_url, price: newVariant.price || i.price }
+        ? { ...i, product_id: newVariant.id, product_image: newVariant.image_url, market_price: newVariant.market_price || i.market_price }
         : i
     );
     const newCost = calculateDeckValue(updatedItems);
@@ -1682,5 +1642,6 @@ export default function AdvancedDeckBuilder() {
     </div>
   );
 }
+
 
 

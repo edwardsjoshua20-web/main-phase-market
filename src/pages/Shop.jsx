@@ -24,7 +24,6 @@ import {
 import { Search, X, Package, Loader2, ChevronDown, ChevronRight, Mail, Layers, Box, Dice1, Heart, ShoppingCart } from 'lucide-react';
 import QuickViewDialog from '@/components/store/QuickViewDialog';
 import AdvancedSearch from '@/components/store/AdvancedSearch';
-import { searchYugiohSets } from '@/lib/yugiohLocalCatalog';
 import { toast } from 'sonner';
 import {
   GAME_OPTIONS,
@@ -33,9 +32,12 @@ import {
   hasActiveFilters,
   isValidEmail
 } from '@/pages/shop/shopUtils';
-import { inventoryListings } from '@/services/inventoryListings';
+import { inventoryOwner } from '@/services/inventory/inventoryOwner';
+import { listingOwner } from '@/services/listing/listingOwner';
+import { searchOwner } from '@/services/search/searchOwner';
 import { performShopCardSearch } from '@/services/search/shopSearch';
-import { addToGuestCart } from '@/components/utils/guestStorage';
+import { useCartOwner } from '@/hooks/useCartOwner';
+import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 import { createPageUrl } from '@/utils';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
@@ -63,6 +65,8 @@ export default function Shop() {
 
   const [quickViewItem, setQuickViewItem] = useState(null);
   const queryClient = useQueryClient();
+  const cart = useCartOwner(user);
+  const wishlist = useWishlistOwner(user);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -314,7 +318,7 @@ export default function Shop() {
   const { data: cards = [], isLoading: cardsLoading } = useQuery({
     queryKey: ['shop-cards', filters.game],
     queryFn: async () => {
-      const allCards = await inventoryListings.list('-created_date', 500);
+      const allCards = await listingOwner.listCardListings('-created_date', 500);
       return allCards.filter((c) => c.status === 'active' && (filters.game === 'all' || c.game === filters.game));
     }
   });
@@ -330,32 +334,26 @@ export default function Shop() {
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ['shop-products', filters.game],
     queryFn: async () => {
-      const allProducts = await backend.data.Product.list('-created_date', 100);
-      return allProducts.filter((p) => p.status === 'active' && p.quantity > 0 && (filters.game === 'all' || p.game === filters.game));
+      const allProducts = await listingOwner.listProductListings('-created_date', 100);
+      return allProducts.filter((p) => p.status === 'active' && inventoryOwner.getStockState(p).inStock && (filters.game === 'all' || p.game === filters.game));
     }
   });
 
   const addToCartMutation = useMutation({
     mutationFn: async (/** @type {any} */ card) => {
-      if (user?.email) {
-        await backend.data.CartItem.create({
-          card_id: card.id,
-          card_name: card.name,
-          card_image: card.image_url,
-          price: card.price,
-          quantity: 1,
-          user_email: user.email
-        });
-        return;
-      }
-
-      addToGuestCart({
+      await cart.addItem({
         card_id: card.id,
         card_name: card.name,
         card_image: card.image_url,
         price: card.price,
-        quantity: 1
-      });
+        game: card.game,
+        set_code: card.set_code,
+        set_name: card.set_name,
+        collector_number: card.collector_number || card.number,
+        finish: card.finish,
+        condition: card.condition,
+        language: card.language || card.lang,
+      }, 1);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cart'] });
@@ -371,13 +369,19 @@ export default function Shop() {
   };
 
   const addToWishlistMutation = useMutation({
-    mutationFn: (/** @type {any} */ card) => backend.data.Wishlist.create({
-      user_email: user.email,
+    mutationFn: (/** @type {any} */ card) => wishlist.addItem({
       product_id: card.id,
       product_name: card.name,
       product_image: card.image_url,
       price: card.price,
-      product_type: 'card'
+      product_type: 'card',
+      game: card.game,
+      set_code: card.set_code,
+      set_name: card.set_name,
+      collector_number: card.collector_number || card.number,
+      finish: card.finish,
+      condition: card.condition,
+      language: card.language || card.lang,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wishlist'] });
@@ -450,13 +454,19 @@ export default function Shop() {
 
       if (user) {
         try {
-          await backend.data.Wishlist.create({
-            user_email: user.email,
+          await wishlist.addItem({
             product_id: item.id,
             product_name: item.name,
             product_image: item.image_url,
             price: wishlistPrice ?? item.price ?? 0,
-            product_type: wishlistProductType
+            product_type: wishlistProductType,
+            game: item.game,
+            set_code: item.set_code,
+            set_name: item.set_name || setName,
+            collector_number: item.collector_number || item.number || cardNumber,
+            finish: item.finish,
+            condition: item.condition,
+            language: item.language || item.lang,
           });
           queryClient.invalidateQueries({ queryKey: ['wishlist'] });
         } catch (wishlistError) {
@@ -488,62 +498,12 @@ export default function Shop() {
       let formattedResults = [];
       const gameFilter = filters.game === 'all' ? 'pokemon' : filters.game;
 
-      if (gameFilter === 'magic') {
-        formattedResults = [];
-      } else if (gameFilter === 'pokemon') {
-        // Search Pokémon TCG API for Pokemon sets/booster boxes
-        const response = await fetch(`https://api.pokemontcg.io/v2/sets?q=name:${encodeURIComponent(query)}`);
-        const data = await response.json();
-
-        if (data.data) {
-          // Group unique sets
-          const setMap = new Map();
-          data.data.forEach((set) => {
-            const setKey = set.name || 'Unknown';
-            if (!setMap.has(setKey)) {
-              const inStock = products.find((p) =>
-              p.product_type === 'booster_box' &&
-              p.set_name === set.name &&
-              p.quantity > 0
-              );
-
-              setMap.set(setKey, {
-                id: set.id,
-                name: set.name || 'Unknown Set',
-                set_code: set.id ? set.id.substring(0, 3).toUpperCase() : 'UNK',
-                image_url: set.images?.logo,
-                release_date: set.releaseDate || null,
-                game: 'pokemon',
-                inStock: !!inStock,
-                stockProduct: inStock
-              });
-            }
-          });
-          formattedResults = Array.from(setMap.values());
-        }
-      } else if (gameFilter === 'yugioh') {
-        const data = await searchYugiohSets(query, 200);
-        if (data) {
-          formattedResults = data.map((set) => {
-            const inStock = products.find((p) =>
-            p.product_type === 'booster_box' &&
-            p.set_name === set.name &&
-            p.quantity > 0
-            );
-
-            return {
-              id: set.set_code,
-              name: set.name,
-              set_code: set.set_code,
-              image_url: null,
-              release_date: set.release_date || null,
-              game: 'yugioh',
-              inStock: !!inStock,
-              stockProduct: inStock
-            };
-          });
-        }
-      }
+      formattedResults = await searchOwner.searchSets({
+        query,
+        game: gameFilter,
+        products,
+        limit: 200
+      });
 
       setBoxSearchResults(formattedResults);
     } catch (error) {
@@ -786,39 +746,13 @@ export default function Shop() {
 
       const fetchSets = async () => {
         try {
-          const setsResponse = await fetch('https://api.scryfall.com/sets');
-          const setsData = await setsResponse.json();
+          const setsWithStock = await searchOwner.listSets({
+            game: 'magic',
+            products,
+            limit: 50
+          });
 
-          if (setsData.data) {
-            // Filter for sets that would have booster boxes
-            const boostedSets = setsData.data.
-            filter((set) => set.set_type === 'expansion' || set.set_type === 'core' || set.set_type === 'draft_innovation').
-            sort((a, b) => new Date(b.released_at).getTime() - new Date(a.released_at).getTime()).
-            slice(0, 50); // Get top 50 most recent sets
-
-            const setsWithStock = boostedSets.map((set) => {
-              const listedProduct = products.find((p) =>
-              p.product_type === 'booster_box' &&
-              p.set_name === set.name
-              );
-
-              // Construct TCGPlayer-style product image URL
-              const boxImageUrl = `https://product-images.tcgplayer.com/fit-in/437x437/${set.code.toLowerCase()}-booster-box.jpg`;
-
-              return {
-                id: set.id,
-                name: set.name,
-                set_code: set.code.toUpperCase(),
-                image_url: boxImageUrl,
-                release_date: set.released_at,
-                game: 'magic',
-                inStock: Boolean(listedProduct && listedProduct.quantity > 0),
-                stockProduct: listedProduct || null
-              };
-            });
-
-            setAllMTGSets(setsWithStock);
-          }
+          setAllMTGSets(setsWithStock);
         } catch (error) {
           console.error('Failed to fetch MTG sets:', error);
         } finally {
@@ -912,7 +846,7 @@ export default function Shop() {
   [...new Set(cards.map((c) => c.rarity))].filter(Boolean).sort();
   const filteredCards = useMemo(() => {
     return cards.filter((c) => {
-      if (filters.inStock && c.quantity === 0) return false;
+      if (filters.inStock && !inventoryOwner.getStockState(c).inStock) return false;
       if (filters.rarity !== 'all' && c.rarity !== filters.rarity) return false;
       if (filters.set !== 'all' && c.set_name !== filters.set) return false;
       if (filters.search && !c.name?.toLowerCase().includes(filters.search.toLowerCase())) return false;
@@ -934,7 +868,7 @@ export default function Shop() {
   const gameBrowseCards = useMemo(() => {
     if (filters.game === 'all') return [];
     return cards.
-    filter((c) => c.status === 'active' && c.quantity > 0 && (
+    filter((c) => c.status === 'active' && inventoryOwner.getStockState(c).inStock && (
     !gameBrowseSearch || c.name?.toLowerCase().includes(gameBrowseSearch.toLowerCase()))).
     sort((a, b) => (b.price || 0) - (a.price || 0));
   }, [cards, filters.game, gameBrowseSearch]);
@@ -1741,7 +1675,7 @@ export default function Shop() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                  {/* Show in-stock singles instead of turning the shop into a price flex. */}
                  {cards.
-             filter((c) => c.status === 'active' && c.quantity > 0 && (filters.game === 'all' || c.game === filters.game)).
+             filter((c) => c.status === 'active' && inventoryOwner.getStockState(c).inStock && (filters.game === 'all' || c.game === filters.game)).
             slice(0, 20).
             map((card) =>
             <div
@@ -1785,7 +1719,7 @@ export default function Shop() {
                       e.preventDefault();
                       addToCartMutation.mutate(card);
                     }}
-                    disabled={card.quantity === 0}
+                    disabled={!inventoryOwner.getStockState(card).inStock}
                     size="sm"
                     className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs h-8">
 
@@ -1848,7 +1782,7 @@ export default function Shop() {
                       <div className="flex gap-1">
                           <Button
                     onClick={(event) => handleAddCardToCart(card, event)}
-                    disabled={card.quantity === 0}
+                    disabled={!inventoryOwner.getStockState(card).inStock}
                     size="sm"
                     className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs h-8">
 
@@ -2019,6 +1953,7 @@ export default function Shop() {
     </div>);
 
 }
+
 
 
 

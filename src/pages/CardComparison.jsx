@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { GitCompare, Search, Plus, X, Loader2, LogIn } from 'lucide-react';
 import { toast } from 'sonner';
 import { ManaCost, MtgSymbolText, PlaneswalkerLoyaltyBadge } from '@/components/lib/MtgSymbolText';
+import { searchOwner } from '@/services/search/searchOwner';
 
 const GAMES = [
   { value: 'magic', label: 'Magic: The Gathering' },
@@ -44,79 +45,18 @@ export default function CardComparison() {
     setSearchPage(0);
 
     try {
-      if (selectedGame === 'magic') {
-        let allCards = [];
-        let url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=released`;
-
-        while (url) {
-          const res = await fetch(url);
-          const data = await res.json();
-          if (!data.data) break;
-          allCards = allCards.concat(data.data);
-          url = data.has_more ? data.next_page : null;
-          if (allCards.length >= 500) break;
-        }
-
-        setSearchResults(allCards.map((c) => ({
-          name: c.name,
-          set_name: c.set_name,
-          rarity: c.rarity,
-          type_line: c.type_line,
-          mana_cost: c.mana_cost,
-          oracle_text: c.oracle_text,
-          power: c.power,
-          toughness: c.toughness,
-          loyalty: c.loyalty,
-          image_url: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal,
-          market_price: c.prices?.usd ? parseFloat(c.prices.usd) : null,
-          game: 'magic'
-        })));
-      } else if (selectedGame === 'yugioh') {
-        const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        setSearchResults((data.data || []).map((c) => ({
-          name: c.name,
-          set_name: c.card_sets?.[0]?.set_name || '',
-          rarity: c.card_sets?.[0]?.set_rarity || '',
-          type_line: c.type,
-          oracle_text: c.desc,
-          atk: c.atk,
-          def: c.def,
-          level: c.level,
-          attribute: c.attribute,
-          image_url: c.card_images?.[0]?.image_url,
-          market_price: c.card_prices?.[0]?.tcgplayer_price ? parseFloat(c.card_prices[0].tcgplayer_price) : null,
-          game: 'yugioh'
-        })));
-      } else if (selectedGame === 'pokemon') {
-        const res = await fetch(`https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(q)}*&pageSize=250&orderBy=-set.releaseDate`);
-        const data = await res.json();
-        setSearchResults((data.data || []).map((c) => ({
-          name: c.name,
-          set_name: c.set?.name || '',
-          rarity: c.rarity,
-          type_line: c.supertype,
-          image_url: c.images?.small,
-          market_price: null,
-          game: 'pokemon'
-        })));
-      } else if (selectedGame === 'lorcana') {
-        const cards = await backend.data.LorcanaCard.filter({ name_lower: { $regex: q.toLowerCase(), $options: 'i' } }, '-created_date', 500);
-        setSearchResults(cards.map((c) => ({
-          name: c.name,
-          set_name: c.set_name,
-          rarity: c.rarity,
-          type_line: (c.types || []).join(', '),
-          oracle_text: c.text,
-          image_url: c.image_url,
-          market_price: null,
-          game: 'lorcana',
-          cost: c.cost,
-          lore: c.lore,
-          strength: c.strength,
-          willpower: c.willpower
-        })));
-      }
+      const cards = await searchOwner.searchByGame(q, selectedGame, 500);
+      setSearchResults(cards.map((c) => ({
+        ...c,
+        name: c.name,
+        set_name: c.set_name || c.set || '',
+        rarity: c.rarity || '',
+        type_line: c.type_line || c.type || c.supertype || (c.types || []).join(', '),
+        oracle_text: c.oracle_text || c.text || c.desc || '',
+        image_url: c.image_url || c.image || c.product_image,
+        market_price: c.market_price || c.price || null,
+        game: selectedGame
+      })));
     } catch {
       setSearchResults([]);
     }

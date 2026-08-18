@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { backend } from '@/services/backend';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
-import { clearGuestStorage, getGuestCart } from '@/components/utils/guestStorage';
+import { useCartOwner } from '@/hooks/useCartOwner';
 import { 
   ChevronLeft, 
   Truck, 
@@ -35,8 +35,8 @@ export default function Checkout() {
     zip: '',
     country: 'US'
   });
-  const [guestCart, setGuestCart] = useState([]);
   const [touched, setTouched] = useState({});
+  const cart = useCartOwner(user);
 
   const validateEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 
@@ -88,7 +88,7 @@ export default function Checkout() {
           email: userData.email || ''
         }));
       } else {
-        setGuestCart(getGuestCart());
+        setUser(null);
       }
       setLoading(false);
     };
@@ -181,15 +181,9 @@ export default function Checkout() {
     }
   };
 
-  const { data: dbCartItems = [] } = useQuery({
-    queryKey: ['cart', user?.email],
-    queryFn: () => backend.data.CartItem.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
+  const cartItems = cart.items;
 
-  const cartItems = user ? dbCartItems : guestCart;
-
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = cart.subtotal;
   const total = subtotal + (shipping?.price || 0);
 
   const checkoutMutation = useMutation({
@@ -199,13 +193,7 @@ export default function Checkout() {
       }
 
       const response = await backend.actions.invoke('createCheckout', {
-        cartItems: cartItems.map(item => ({
-          card_id: item.card_id,
-          card_name: item.card_name,
-          card_image: item.card_image,
-          price: item.price,
-          quantity: item.quantity
-        })),
+        cartItems: cart.buildCheckoutPayload(),
         shippingInfo: {
           name: formData.name,
           email: formData.email,
@@ -222,10 +210,6 @@ export default function Checkout() {
       return response.data.url;
     },
     onSuccess: (checkoutUrl) => {
-      // Clear guest cart on successful checkout
-      if (!user) {
-        clearGuestStorage();
-      }
       window.location.href = checkoutUrl;
     },
     onError: (error) => {

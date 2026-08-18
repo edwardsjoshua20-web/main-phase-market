@@ -802,6 +802,22 @@ export async function searchMtgCatalogSuggestions(query, limit = 10) {
     .map(({ row }) => formatResult(row, englishImageIndexes));
 }
 
+export async function browseMtgCatalog(limit = 100) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 100, 500));
+
+  try {
+    const rows = await loadAllBuckets();
+    const englishImageIndexes = buildEnglishImageIndexes(rows);
+    return rows
+      .filter((row) => hasDisplayableImage(row, englishImageIndexes))
+      .sort(compareExactPrintings)
+      .slice(0, safeLimit)
+      .map((row) => formatResult(row, englishImageIndexes));
+  } catch {
+    return [];
+  }
+}
+
 export async function getMtgPrintingsByOracleId(oracleId) {
   if (!oracleId) {
     return [];

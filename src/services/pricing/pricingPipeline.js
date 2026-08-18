@@ -1,42 +1,22 @@
-import { buildPriceSource, normalizePriceNumber, summarizePricing } from '@/services/pricing/pricePolicy';
+import { normalizePriceNumber } from '@/services/pricing/pricePolicy';
+import { resolvePricingState } from '@/services/pricing/pricingCore';
 
 export function resolveCardPricing(raw = {}, options = {}) {
-  const fallbackPrice = normalizePriceNumber(
-    raw.sell_price
-    ?? raw.price
-    ?? raw.market_price
-    ?? raw.basePrice
-    ?? raw.prices?.usd
-    ?? null
-  );
-
-  const explicitSources = [
-    buildPriceSource('cardkingdom', raw.cardkingdom_price),
-    buildPriceSource('tcgplayer', raw.tcgplayer_price),
-    buildPriceSource('starcitygames', raw.starcitygames_price),
-    buildPriceSource('catalog_market', raw.market_price),
-    buildPriceSource('catalog_usd', raw.prices?.usd),
-    buildPriceSource('catalog_usd_foil', raw.finish === 'foil' ? raw.prices?.usd_foil : null),
-    buildPriceSource('catalog_usd_etched', raw.finish === 'etched' ? raw.prices?.usd_etched : null)
-  ].filter(Boolean);
-
-  const summary = summarizePricing(explicitSources, {
-    floor: options.floor ?? 1,
-    strategy: options.strategy ?? 'median',
-    fallbackPrice
-  });
-
-  const sellPrice = normalizePriceNumber(raw.sell_price ?? raw.price ?? summary.targetPrice ?? summary.marketPrice ?? fallbackPrice);
+  const pricing = resolvePricingState(raw, options);
   const costBasis = normalizePriceNumber(raw.cost_basis ?? raw.cost ?? null);
 
   return {
-    marketPrice: summary.marketPrice,
-    targetPrice: summary.targetPrice,
-    sellPrice,
-    displayPrice: sellPrice ?? summary.marketPrice ?? summary.targetPrice ?? 0,
+    marketPrice: pricing.market_price,
+    targetPrice: pricing.target_price,
+    sellPrice: pricing.sell_price,
+    displayPrice: pricing.display_price ?? 0,
     costBasis,
-    sourceCount: summary.sourceCount,
-    sources: summary.sources
+    sourceCount: pricing.source_count,
+    sources: pricing.sources,
+    identityKey: pricing.identity_key,
+    status: pricing.status,
+    stale: pricing.stale,
+    fallbackReason: pricing.fallback_reason
   };
 }
 

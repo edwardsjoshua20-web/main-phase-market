@@ -1,5 +1,5 @@
 import { getSiteAssetUrl } from '@/config/publicAssetUrls';
-import { backend } from '@/services/backend';
+import { listingOwner } from '@/services/listing/listingOwner';
 import { fetchJsonWithEmbeddedFallback, getEmbeddedUpcomingReleasesManifest } from '@/services/siteStaticSnapshots';
 import {
   fallbackHomepageReleases,
@@ -24,7 +24,7 @@ async function fetchStaticUpcomingReleaseManifest() {
 
 async function fetchUpcomingProductsFromBackend() {
   try {
-    const products = await backend.data.Product.filter({ is_preorder: true }, 'release_date', 20);
+    const products = await listingOwner.filterProductListings({ is_preorder: true }, 'release_date', 20);
     return sortUpcomingReleases(
       filterUpcomingReleases(
         (products || []).map((product) => normalizeHomepageRelease(product, 'product'))

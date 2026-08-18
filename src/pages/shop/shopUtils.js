@@ -1,4 +1,4 @@
-import { getInventoryCardLanguage } from '@/components/admin/cardInventorySnapshot';
+import { findInventoryMatch as findInventoryOwnerMatch, getInventoryStockState } from '@/services/inventory/inventoryCore';
 
 export const GAME_OPTIONS = [
   { value: 'all', label: 'All Games' },
@@ -23,31 +23,20 @@ export function normalizeOnePieceImageUrl(url) {
 }
 
 export function findInventoryMatch(apiCard, cards, pokemonCards) {
-  const inventory = apiCard.game === 'pokemon' ? pokemonCards : cards;
-
-  return inventory.find((inventoryCard) => {
-    if (inventoryCard.name !== apiCard.name) return false;
-    if (apiCard.game && inventoryCard.game && inventoryCard.game !== apiCard.game) return false;
-
-    if (apiCard.game === 'magic') {
-      const inventoryLanguage = getInventoryCardLanguage(inventoryCard);
-      const apiLanguage = String(apiCard.lang || 'en').toLowerCase();
-      if (inventoryLanguage !== apiLanguage) return false;
-    }
-
-    if (inventoryCard.card_number && apiCard.card_number) {
-      return inventoryCard.card_number === apiCard.card_number;
-    }
-    return inventoryCard.set_name === apiCard.set_name;
-  });
+  const inventory = apiCard.game === 'pokemon' && Array.isArray(pokemonCards) && pokemonCards.length > 0 ? pokemonCards : cards;
+  return findInventoryOwnerMatch(apiCard, inventory, apiCard.game);
 }
 
 export function enrichSearchResultsWithInventory(searchResults, cards, pokemonCards) {
   if (!searchResults.length) return searchResults;
 
   return searchResults.map((apiCard) => {
+    if (apiCard.searchIdentity && Object.prototype.hasOwnProperty.call(apiCard, 'stockCard')) {
+      return apiCard;
+    }
+
     const inventoryCard = findInventoryMatch(apiCard, cards, pokemonCards);
-    const inStockCard = inventoryCard && inventoryCard.quantity > 0 ? inventoryCard : null;
+    const inStockCard = inventoryCard && getInventoryStockState(inventoryCard).inStock ? inventoryCard : null;
 
     return {
       ...apiCard,
@@ -93,3 +82,4 @@ export function hasActiveFilters(filters) {
 export function isValidEmail(value) {
   return Boolean(value && value.includes('@'));
 }
+

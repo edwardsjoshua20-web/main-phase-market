@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Search, Plus, Trash2, TrendingUp, TrendingDown, BookOpen, Loader2, LogIn } from 'lucide-react';
 import { toast } from 'sonner';
+import { searchOwner } from '@/services/search/searchOwner';
 
 const GAMES = [
   { value: 'magic', label: 'Magic: The Gathering' },
@@ -76,48 +77,15 @@ export default function CollectionTracker() {
     setSearching(true);
     setSearchPage(0);
     try {
-      if (selectedGame === 'magic') {
-        // Fetch all pages from Scryfall
-        let allCards = [];
-        let url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=released`;
-        while (url) {
-          const res = await fetch(url);
-          const data = await res.json();
-          if (!data.data) break;
-          allCards = allCards.concat(data.data);
-          url = data.has_more ? data.next_page : null;
-          if (allCards.length >= 500) break; // safety cap
-        }
-        setSearchResults(allCards.map(c => ({
-          name: c.name, set_name: c.set_name, card_number: c.collector_number,
-          rarity: c.rarity, image_url: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal,
-          market_price: c.prices?.usd ? parseFloat(c.prices.usd) : null,
-        })));
-      } else if (selectedGame === 'yugioh') {
-        const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        setSearchResults((data.data || []).map(c => ({
-          name: c.name, set_name: c.card_sets?.[0]?.set_name || '', card_number: c.id,
-          rarity: c.card_sets?.[0]?.set_rarity || '', image_url: c.card_images?.[0]?.image_url,
-          market_price: c.card_prices?.[0]?.tcgplayer_price ? parseFloat(c.card_prices[0].tcgplayer_price) : null,
-        })));
-      } else if (selectedGame === 'pokemon') {
-        const res = await fetch(`https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(q)}*&pageSize=250&orderBy=-set.releaseDate`);
-        const data = await res.json();
-        setSearchResults((data.data || []).map(c => {
-          const price = c.tcgplayer?.prices?.holofoil?.market || c.tcgplayer?.prices?.normal?.market || c.tcgplayer?.prices?.reverseHolofoil?.market || c.cardmarket?.prices?.averageSellPrice || null;
-          return { name: c.name, set_name: c.set?.name || '', card_number: c.number, rarity: c.rarity, image_url: c.images?.small, market_price: price ? parseFloat(price) : null };
-        }));
-      } else if (selectedGame === 'lorcana') {
-        const cards = await backend.data.LorcanaCard.filter({ name_lower: { $regex: q.toLowerCase(), $options: 'i' } }, '-created_date', 500);
-        setSearchResults(cards.map(c => ({ name: c.name, set_name: c.set_name, card_number: c.collector_number, rarity: c.rarity, image_url: c.image_url, market_price: null })));
-      } else if (selectedGame === 'onepiece') {
-        const cards = await backend.data.OnePieceCard.filter({ name_lower: { $regex: q.toLowerCase(), $options: 'i' } }, '-created_date', 500);
-        setSearchResults(cards.map(c => ({ name: c.name, set_name: c.pack_id || '', card_number: c.api_id, rarity: c.rarity, image_url: c.image_url, market_price: null })));
-      } else if (selectedGame === 'flesh_and_blood') {
-        const cards = await backend.data.FleshAndBloodCard.filter({ name_lower: { $regex: q.toLowerCase(), $options: 'i' } }, '-created_date', 500);
-        setSearchResults(cards.map(c => ({ name: c.name, set_name: c.set_id || '', card_number: c.unique_id, rarity: '', image_url: c.image_url, market_price: null })));
-      }
+      const cards = await searchOwner.searchByGame(q, selectedGame, 500);
+      setSearchResults(cards.map(c => ({
+        name: c.name,
+        set_name: c.set_name || c.set || c.set_code || '',
+        card_number: c.card_number || c.collector_number || c.number || c.api_id || c.unique_id || c.id,
+        rarity: c.rarity || '',
+        image_url: c.image_url || c.image || c.product_image,
+        market_price: c.market_price || c.price || null
+      })));
     } catch (e) { setSearchResults([]); }
     setSearching(false);
   };

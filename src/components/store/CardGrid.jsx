@@ -6,6 +6,7 @@ import { Heart } from 'lucide-react';
 import { backend } from '@/services/backend';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
 const conditionLabels = {
   mint: 'Mint',
@@ -27,12 +28,7 @@ export default function CardGrid({ cards, user }) {
   const [savePopup, setSavePopup] = useState(null); // card id
   const [saving, setSaving] = useState(null);
   const queryClient = useQueryClient();
-
-  const { data: wishlistItems = [] } = useQuery({
-    queryKey: ['wishlist', user?.email],
-    queryFn: () => backend.data.Wishlist.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
+  const wishlist = useWishlistOwner(user);
 
   const { data: userLists = [] } = useQuery({
     queryKey: ['cardlists', user?.email],
@@ -40,7 +36,7 @@ export default function CardGrid({ cards, user }) {
     enabled: !!user?.email
   });
 
-  const isWishlisted = (cardId) => wishlistItems.some(w => w.product_id === cardId);
+  const isWishlisted = (cardId) => wishlist.contains({ product_id: cardId });
 
   const addToWishlist = async (e, card) => {
     e.preventDefault();
@@ -48,15 +44,21 @@ export default function CardGrid({ cards, user }) {
     if (!user) { backend.auth.redirectToLogin(window.location.href); return; }
     if (isWishlisted(card.id)) { setSavePopup(null); return; }
     setSaving(card.id);
-    await backend.data.Wishlist.create({
-      user_email: user.email,
+    await wishlist.addItem({
       product_id: card.id,
       product_name: card.name,
       product_image: getCardImageUrl(card),
       price: card.price || 0,
-      product_type: 'card'
+      product_type: 'card',
+      game: card.game,
+      set_code: card.set_code,
+      set_name: card.set_name,
+      collector_number: card.collector_number || card.number,
+      finish: card.finish,
+      condition: card.condition,
+      language: card.language || card.lang,
     });
-    queryClient.invalidateQueries(['wishlist']);
+    queryClient.invalidateQueries({ queryKey: ['wishlist'] });
     setSaving(null);
     setSavePopup(null);
   };

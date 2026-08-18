@@ -9,9 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { createPageUrl } from '@/utils';
 import { backend } from '@/services/backend';
-import { inventoryListings } from '@/services/inventoryListings';
-import { addToGuestCart } from '@/components/utils/guestStorage';
-import { getInventoryCardLanguage } from '@/components/admin/cardInventorySnapshot';
+import { inventoryOwner } from '@/services/inventory/inventoryOwner';
+import { listingOwner } from '@/services/listing/listingOwner';
+import { useCartOwner } from '@/hooks/useCartOwner';
 import { getLorcanaCardById } from '@/lib/lorcanaLocalCatalog';
 import { getFabCardById } from '@/lib/fabLocalCatalog';
 import { getMtgPrintingsByOracleId } from '@/lib/mtgLocalCatalog';
@@ -127,36 +127,6 @@ function OutOfStockNotice() {
   );
 }
 
-function normalizeMatchValue(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function matchesCatalogInventoryCard(apiCard, inventoryCard, game) {
-  if (!apiCard || !inventoryCard || !game) return false;
-  if (normalizeMatchValue(inventoryCard.name) !== normalizeMatchValue(apiCard.name)) return false;
-  if (inventoryCard.game && normalizeMatchValue(inventoryCard.game) !== normalizeMatchValue(game)) return false;
-
-  if (game === 'magic') {
-    const inventoryLanguage = getInventoryCardLanguage(inventoryCard);
-    const apiLanguage = normalizeMatchValue(apiCard.lang || 'en');
-    if (inventoryLanguage !== apiLanguage) return false;
-  }
-
-  const inventoryNumber = normalizeMatchValue(inventoryCard.card_number);
-  const apiNumber = normalizeMatchValue(apiCard.card_number);
-  if (inventoryNumber && apiNumber) {
-    return inventoryNumber === apiNumber;
-  }
-
-  const inventorySet = normalizeMatchValue(inventoryCard.set_name || inventoryCard.set_code);
-  const apiSet = normalizeMatchValue(apiCard.set_name || apiCard.set_code);
-  if (inventorySet && apiSet) {
-    return inventorySet === apiSet;
-  }
-
-  return true;
-}
-
 export default function CardDetail() {
   const urlParams = new URLSearchParams(window.location.search);
   const cardId = urlParams.get('id');
@@ -186,13 +156,13 @@ export default function CardDetail() {
 
   const { data: inventoryCard, isLoading: inventoryLoading } = useQuery({
     queryKey: ['card', cardId],
-    queryFn: () => inventoryListings.getById(cardId),
+    queryFn: () => listingOwner.getCardListingById(cardId),
     enabled: !isMtgCatalogMode && !isPokemonCatalogMode && !isYugiohCatalogMode && !isLorcanaCatalogMode && !isOnePieceCatalogMode && !isFabCatalogMode && !!cardId
   });
 
   const { data: inventoryRows = [] } = useQuery({
     queryKey: ['detail-inventory-listings'],
-    queryFn: () => inventoryListings.list('-created_date', 5000),
+    queryFn: () => listingOwner.listCardListings('-created_date', 5000),
     enabled: isMtgCatalogMode || isPokemonCatalogMode || isYugiohCatalogMode || isLorcanaCatalogMode || isOnePieceCatalogMode || isFabCatalogMode || isStarWarsCatalogMode
   });
 
@@ -352,11 +322,10 @@ export default function CardDetail() {
                 : null;
   const stockListing = useMemo(() => {
     if (!requestItem || !requestGame) return null;
-
-    const match = inventoryRows.find((inventoryRow) => matchesCatalogInventoryCard(requestItem, inventoryRow, requestGame));
-    return match?.in_stock ? match : null;
+    return inventoryOwner.findInventoryMatch(requestItem, inventoryRows, requestGame);
   }, [inventoryRows, requestGame, requestItem]);
   const canAddToCart = Boolean(stockListing);
+  const cart = useCartOwner(user);
 
   const addToCartMutation = useMutation({
     mutationFn: async (card) => {
@@ -364,28 +333,22 @@ export default function CardDetail() {
         throw new Error('This card is not currently in stock');
       }
 
-      const cartItem = {
+      await cart.addItem({
         card_id: card.id,
         card_name: card.name,
         card_image: getCardImageUrl(card),
         price: card.price,
-        quantity: 1
-      };
-
-      if (user?.email) {
-        await backend.data.CartItem.create({
-          ...cartItem,
-          user_email: user.email
-        });
-        return;
-      }
-
-      addToGuestCart(cartItem);
+        game: card.game,
+        set_code: card.set_code,
+        set_name: card.set_name,
+        collector_number: card.collector_number || card.number,
+        finish: card.finish,
+        condition: card.condition,
+        language: card.language || card.lang,
+      }, 1);
     },
     onSuccess: () => {
-      if (user?.email) {
-        queryClient.invalidateQueries({ queryKey: ['cart'] });
-      }
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
       toast.success('Added to cart');
     },
     onError: (error) => {
@@ -1754,3 +1717,5 @@ export default function CardDetail() {
     </div>
   );
 }
+
+

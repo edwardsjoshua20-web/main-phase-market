@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { backend } from '@/services/backend';
 import { brandAssets } from '@/config/appAssets';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -46,7 +46,8 @@ import HeaderShell from '@/components/layout/HeaderShell';
 import FooterShell from '@/components/layout/FooterShell';
 import { useHeaderCardSearch } from '@/hooks/useHeaderCardSearch';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
-import { getGuestCart, getGuestWishlist, removeFromGuestCart, removeFromGuestWishlist } from '@/components/utils/guestStorage';
+import { useCartOwner } from '@/hooks/useCartOwner';
+import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
 const adminPages = ['AdminInventory', 'AdminOrders', 'AdminOperations'];
 
@@ -56,8 +57,6 @@ export default function Layout({ children, currentPageName }) {
   const [cartOpen, setCartOpen] = useState(false);
   const [wishlistOpen, setWishlistOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [guestCart, setGuestCart] = useState([]);
-  const [guestWishlist, setGuestWishlist] = useState([]);
   const [selectedGame, setSelectedGame] = useState('magic');
   const [isMobile, setIsMobile] = useState(false);
   const queryClient = useQueryClient();
@@ -112,9 +111,6 @@ export default function Layout({ children, currentPageName }) {
       if (isAuth) {
         const userData = await backend.auth.getCurrentUser();
         setUser(userData);
-      } else {
-        setGuestCart(getGuestCart());
-        setGuestWishlist(getGuestWishlist());
       }
     };
     loadUser();
@@ -134,123 +130,30 @@ export default function Layout({ children, currentPageName }) {
     resetSearch();
   }, [selectedGame]);
 
-  useEffect(() => {
-    const handleGuestUpdate = () => {
-      setGuestCart(getGuestCart());
-      setGuestWishlist(getGuestWishlist());
-    };
-    window.addEventListener('guestCartUpdated', handleGuestUpdate);
-    window.addEventListener('guestWishlistUpdated', handleGuestUpdate);
-    return () => {
-      window.removeEventListener('guestCartUpdated', handleGuestUpdate);
-      window.removeEventListener('guestWishlistUpdated', handleGuestUpdate);
-    };
-  }, []);
-
-  const { data: dbCartItems = [] } = useQuery({
-    queryKey: ['cart', user?.email],
-    queryFn: () => backend.data.CartItem.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
-
-  const cartItems = user ? dbCartItems : guestCart;
-
-  const { data: dbWishlistItems = [] } = useQuery({
-    queryKey: ['wishlist', user?.email],
-    queryFn: () => backend.data.Wishlist.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
-
-  const wishlistItems = user ? dbWishlistItems : guestWishlist;
-
-  const updateCartMutation = useMutation({
-    mutationFn: async ({ id, quantity }) => {
-      if (user) {
-        if (quantity <= 0) {
-          await backend.data.CartItem.delete(id);
-        } else {
-          await backend.data.CartItem.update(id, { quantity });
-        }
-      } else {
-        const cart = getGuestCart();
-        if (quantity <= 0) {
-          removeFromGuestCart(id);
-        } else {
-          const item = cart.find(c => c.id === id);
-          if (item) {
-            item.quantity = quantity;
-            setGuestCart(cart);
-          }
-        }
-      }
-    },
-    onSuccess: () => {
-      if (user) {
-        queryClient.invalidateQueries(['cart']);
-      }
-    }
-  });
-
-  const removeFromCartMutation = useMutation({
-    mutationFn: (id) => {
-      if (user) {
-        return backend.data.CartItem.delete(id);
-      } else {
-        removeFromGuestCart(id);
-        return Promise.resolve();
-      }
-    },
-    onSuccess: () => {
-      if (user) {
-        queryClient.invalidateQueries(['cart']);
-      }
-    }
-  });
+  const cart = useCartOwner(user);
+  const cartItems = cart.items;
+  const wishlist = useWishlistOwner(user);
+  const wishlistItems = wishlist.items;
 
   const removeFromWishlistMutation = useMutation({
-    mutationFn: async (id) => {
-      if (user) {
-        await backend.data.Wishlist.delete(id);
-      } else {
-        removeFromGuestWishlist(id);
-      }
-    },
-    onSuccess: () => { if (user) queryClient.invalidateQueries(['wishlist']); }
+    mutationFn: (id) => wishlist.removeItem(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wishlist'] })
   });
 
   const addToCartFromWishlistMutation = useMutation({
     mutationFn: async (wishlistItem) => {
-      if (user) {
-        await backend.data.CartItem.create({
-          card_id: wishlistItem.product_id,
-          card_name: wishlistItem.product_name,
-          card_image: wishlistItem.product_image,
-          price: wishlistItem.price,
-          quantity: 1,
-          user_email: user.email
-        });
-      } else {
-        const cart = getGuestCart();
-        const existing = cart.find(c => c.card_id === wishlistItem.product_id);
-        if (existing) {
-          existing.quantity += 1;
-        } else {
-          cart.push({
-            id: `guest-${wishlistItem.product_id}-${Date.now()}`,
-            card_id: wishlistItem.product_id,
-            card_name: wishlistItem.product_name,
-            card_image: wishlistItem.product_image,
-            price: wishlistItem.price,
-            quantity: 1
-          });
-        }
-        setGuestCart(cart);
-      }
+      await cart.addItem({
+        card_id: wishlistItem.product_id,
+        card_name: wishlistItem.product_name,
+        card_image: wishlistItem.product_image,
+        price: wishlistItem.price,
+        product_type: wishlistItem.product_type,
+      }, 1);
     },
-    onSuccess: () => { if (user) queryClient.invalidateQueries(['cart']); }
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cart'] })
   });
 
-  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const cartCount = cart.itemCount;
 
   const isAdminPage = adminPages.includes(currentPageName);
 
@@ -306,8 +209,8 @@ export default function Layout({ children, currentPageName }) {
           </div>
         </footer>
         <MobileBottomNav
-          cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-          wishlistCount={wishlistItems.length}
+          cartCount={cartCount}
+          wishlistCount={wishlist.count}
           onCartClick={() => setCartOpen(true)}
           onWishlistClick={() => setWishlistOpen(true)}
           currentPage={currentPageName}
@@ -316,8 +219,8 @@ export default function Layout({ children, currentPageName }) {
           open={cartOpen} 
           onClose={() => setCartOpen(false)}
           items={cartItems}
-          onUpdateQuantity={(id, qty) => updateCartMutation.mutate({ id, quantity: qty })}
-          onRemove={(id) => removeFromCartMutation.mutate(id)}
+          onUpdateQuantity={(id, qty) => cart.setQuantity(id, qty)}
+          onRemove={(id) => cart.removeItem(id)}
         />
         <WishlistDrawer 
           open={wishlistOpen} 
@@ -353,7 +256,7 @@ export default function Layout({ children, currentPageName }) {
                 {!isAdminPage && (
                   <Button variant="ghost" size="icon" className="relative text-white hover:bg-gray-700 hover:text-white h-12 w-12" onClick={() => setWishlistOpen(true)}>
                     <Heart className="w-5 h-5" />
-                    {wishlistItems.length > 0 && <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-red-400 text-white text-xs font-bold">{wishlistItems.length}</Badge>}
+                    {wishlist.count > 0 && <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-red-400 text-white text-xs font-bold">{wishlist.count}</Badge>}
                   </Button>
                 )}
                 {!isAdminPage && (
@@ -527,7 +430,7 @@ export default function Layout({ children, currentPageName }) {
               {!isAdminPage && (
                 <Button variant="ghost" size="icon" className="relative text-white hover:bg-gray-700 hover:text-white" onClick={() => setWishlistOpen(true)}>
                 <Heart className="w-5 h-5" />
-                {wishlistItems.length > 0 && <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-red-400 text-white text-xs font-bold">{wishlistItems.length}</Badge>}
+                {wishlist.count > 0 && <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-red-400 text-white text-xs font-bold">{wishlist.count}</Badge>}
               </Button>
               )}
               {!isAdminPage && (
@@ -605,8 +508,8 @@ export default function Layout({ children, currentPageName }) {
         open={cartOpen} 
         onClose={() => setCartOpen(false)}
         items={cartItems}
-        onUpdateQuantity={(id, qty) => updateCartMutation.mutate({ id, quantity: qty })}
-        onRemove={(id) => removeFromCartMutation.mutate(id)}
+        onUpdateQuantity={(id, qty) => cart.setQuantity(id, qty)}
+        onRemove={(id) => cart.removeItem(id)}
       />
 
       {/* Wishlist Drawer */}

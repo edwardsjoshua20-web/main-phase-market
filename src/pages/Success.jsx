@@ -4,7 +4,7 @@ import { createPageUrl } from '@/utils';
 import { backend } from '@/services/backend';
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Package, Home, Loader2, AlertCircle } from 'lucide-react';
-import { clearGuestStorage } from '@/components/utils/guestStorage';
+import { cartOwner } from '@/services/cart/cartOwner';
 
 export default function Success() {
     const [loading, setLoading] = useState(true);
@@ -28,12 +28,9 @@ export default function Success() {
                 const isAuth = await backend.auth.isAuthenticated();
                 if (isAuth) {
                     const user = await backend.auth.getCurrentUser();
-                    const cartItems = await backend.data.CartItem.filter({ user_email: user.email });
-                    for (const item of cartItems) {
-                        await backend.data.CartItem.delete(item.id);
-                    }
+                    await cartOwner.clearCart({ user });
                 } else {
-                    clearGuestStorage();
+                    await cartOwner.clearCart({ user: null });
                 }
             } catch (error) {
                 console.error('Error finalizing checkout:', error);

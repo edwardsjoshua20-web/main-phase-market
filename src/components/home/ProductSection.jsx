@@ -9,7 +9,8 @@ import { ChevronRight, ShoppingCart, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 import HomepageContentShell from '@/components/layout/HomepageContentShell';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
-import { addToGuestCart } from '@/components/utils/guestStorage';
+import { useCartOwner } from '@/hooks/useCartOwner';
+import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
 const conditionLabels = {
   mint: 'Mint',
@@ -26,6 +27,8 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
   const [hoveredProduct, setHoveredProduct] = useState(null);
   const [user, setUser] = useState(null);
   const queryClient = useQueryClient();
+  const cart = useCartOwner(user);
+  const wishlist = useWishlistOwner(user);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -40,50 +43,46 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
 
   const addToCartMutation = useMutation({
     mutationFn: async (product) => {
-      if (user) {
-        await backend.data.CartItem.create({
-          card_id: product.id,
-          card_name: product.name,
-          card_image: getCardImageUrl(product),
-          price: product.price,
-          quantity: 1,
-          user_email: user.email
-        });
-      } else {
-        addToGuestCart({
-          card_id: product.id,
-          card_name: product.name,
-          card_image: getCardImageUrl(product),
-          price: product.price,
-          quantity: 1
-        });
-      }
+      await cart.addItem({
+        card_id: product.id,
+        card_name: product.name,
+        card_image: getCardImageUrl(product),
+        price: product.price,
+        product_type: product.product_type,
+        game: product.game,
+        set_code: product.set_code,
+        set_name: product.set_name,
+        collector_number: product.collector_number || product.number,
+        finish: product.finish,
+        condition: product.condition,
+        language: product.language || product.lang,
+      }, 1);
     },
     onSuccess: () => {
-      if (user) {
-        queryClient.invalidateQueries(['cart']);
-      }
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
       toast.success('Added to cart');
     }
   });
 
   const addToWishlistMutation = useMutation({
     mutationFn: async (product) => {
-      if (!user) {
-        backend.auth.redirectToLogin(window.location.href);
-        return;
-      }
-      await backend.data.Wishlist.create({
-        user_email: user.email,
+      await wishlist.addItem({
         product_id: product.id,
         product_name: product.name,
         product_image: getCardImageUrl(product),
         price: product.price,
-        product_type: product.product_type || 'card'
+        product_type: product.product_type || product.game || 'card',
+        game: product.game,
+        set_code: product.set_code,
+        set_name: product.set_name,
+        collector_number: product.collector_number || product.number,
+        finish: product.finish,
+        condition: product.condition,
+        language: product.language || product.lang,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['wishlist']);
+      queryClient.invalidateQueries({ queryKey: ['wishlist'] });
       toast.success('Added to wishlist');
     }
   });

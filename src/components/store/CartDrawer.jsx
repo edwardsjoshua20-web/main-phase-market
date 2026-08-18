@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { getCartSubtotal } from '@/services/cart/cartCore';
 
 export default function CartDrawer({ open, onClose, items = [], onUpdateQuantity, onRemove }) {
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = getCartSubtotal(items);
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
@@ -47,7 +48,7 @@ export default function CartDrawer({ open, onClose, items = [], onUpdateQuantity
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-gray-900 text-sm line-clamp-2">{item.card_name}</h4>
-                    <p className="text-blue-600 font-bold mt-1">${item.price.toFixed(2)}</p>
+                      <p className="text-blue-600 font-bold mt-1">${Number(item.price || 0).toFixed(2)}</p>
                     <div className="flex items-center gap-2 mt-2">
                       <Button
                         variant="outline"

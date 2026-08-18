@@ -6,17 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Heart, ShoppingCart } from 'lucide-react';
 import CardImage from '@/components/cards/CardImage';
 import { getCardImageUrl } from '@/lib/cardImages';
+import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
 export default function SearchResultCard({ result, user, onQuickView, onHoverImage }) {
   const [popupOpen, setPopupOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
-
-  const { data: wishlistItems = [] } = useQuery({
-    queryKey: ['wishlist', user?.email],
-    queryFn: () => backend.data.Wishlist.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
+  const wishlist = useWishlistOwner(user);
 
   const { data: userLists = [] } = useQuery({
     queryKey: ['cardlists', user?.email],
@@ -24,21 +20,27 @@ export default function SearchResultCard({ result, user, onQuickView, onHoverIma
     enabled: !!user?.email
   });
 
-  const isWishlisted = wishlistItems.some(w => w.product_id === result.id);
+  const isWishlisted = wishlist.contains({ product_id: result.id });
 
   const addToWishlist = async () => {
     if (!user) { backend.auth.redirectToLogin(window.location.href); return; }
     if (isWishlisted) { setPopupOpen(false); return; }
     setSaving(true);
-    await backend.data.Wishlist.create({
-      user_email: user.email,
+    await wishlist.addItem({
       product_id: result.id,
       product_name: result.name,
       product_image: getCardImageUrl(result),
       price: result.price || 0,
-      product_type: 'card'
+      product_type: 'card',
+      game: result.game,
+      set_code: result.set_code,
+      set_name: result.set_name,
+      collector_number: result.collector_number || result.number,
+      finish: result.finish,
+      condition: result.condition,
+      language: result.language || result.lang,
     });
-    queryClient.invalidateQueries(['wishlist']);
+    queryClient.invalidateQueries({ queryKey: ['wishlist'] });
     setSaving(false);
     setPopupOpen(false);
   };

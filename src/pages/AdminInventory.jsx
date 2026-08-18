@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { backend } from '@/services/backend';
+import { getInventoryStockState } from '@/services/inventory/inventoryCore';
+import { listingOwner } from '@/services/listing/listingOwner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -48,9 +50,8 @@ import CardForm from '@/components/admin/CardForm';
 import ProductForm from '@/components/admin/ProductForm';
 import StatsCard from '@/components/admin/StatsCard';
 import DollarCardStatsCard from '@/components/admin/DollarCardStatsCard';
-import { getInventoryCardFinish, getInventoryCardMergeKey } from '@/components/admin/cardInventorySnapshot';
+import { getInventoryCardFinish } from '@/components/admin/cardInventorySnapshot';
 import { upsertInventoryCards } from '@/services/inventory/inventoryMutationPipeline';
-import { inventoryListings } from '@/services/inventoryListings';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 const gameLabels = {
@@ -95,13 +96,13 @@ export default function AdminInventory() {
 
   const { data: cards = [] } = useQuery({
     queryKey: ['admin-cards'],
-    queryFn: () => inventoryListings.list('-created_date'),
+    queryFn: () => listingOwner.listCardListings('-created_date'),
     enabled: !loading
   });
 
   const { data: products = [] } = useQuery({
     queryKey: ['admin-products'],
-    queryFn: () => backend.data.Product.list('-created_date'),
+    queryFn: () => listingOwner.listProductListings('-created_date'),
     enabled: !loading
   });
 
@@ -119,7 +120,7 @@ export default function AdminInventory() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => inventoryListings.update(id, data),
+    mutationFn: ({ id, data }) => listingOwner.updateListing(id, data, { persistenceType: listingOwner.persistenceTypes.CARD }),
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-cards']);
       setShowForm(false);
@@ -133,7 +134,7 @@ export default function AdminInventory() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => inventoryListings.delete(id),
+    mutationFn: (id) => listingOwner.deleteListing(id, { persistenceType: listingOwner.persistenceTypes.CARD }),
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-cards']);
       toast.success('Card deleted');
@@ -145,7 +146,7 @@ export default function AdminInventory() {
   });
 
   const createProductMutation = useMutation({
-    mutationFn: (data) => backend.data.Product.create(data),
+    mutationFn: (data) => listingOwner.createListing(data, { persistenceType: listingOwner.persistenceTypes.PRODUCT }),
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-products']);
       setShowForm(false);
@@ -158,7 +159,7 @@ export default function AdminInventory() {
   });
 
   const updateProductMutation = useMutation({
-    mutationFn: ({ id, data }) => backend.data.Product.update(id, data),
+    mutationFn: ({ id, data }) => listingOwner.updateListing(id, data, { persistenceType: listingOwner.persistenceTypes.PRODUCT }),
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-products']);
       setShowForm(false);
@@ -172,7 +173,7 @@ export default function AdminInventory() {
   });
 
   const deleteProductMutation = useMutation({
-    mutationFn: (id) => backend.data.Product.delete(id),
+    mutationFn: (id) => listingOwner.deleteListing(id, { persistenceType: listingOwner.persistenceTypes.PRODUCT }),
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-products']);
       toast.success('Product deleted');
@@ -288,7 +289,7 @@ export default function AdminInventory() {
   const totalCost = cards.reduce((sum, c) => sum + ((c.cost || 0) * c.quantity), 0);
   const potentialProfit = totalValue - totalCost;
   const activeCards = cards.filter(c => c.status === 'active').length;
-  const lowStock = cards.filter(c => c.quantity > 0 && c.quantity <= 3).length;
+  const lowStock = cards.filter(c => getInventoryStockState(c).inStock && getInventoryStockState(c).availableQuantity <= 3).length;
   const handleLeaveInventory = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -479,7 +480,7 @@ export default function AdminInventory() {
                     <TableCell className="text-gray-500">${(card.cost || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-blue-600 font-medium">${card.price?.toFixed(2)}</TableCell>
                     <TableCell>
-                      <span className={card.quantity <= 3 && card.quantity > 0 ? 'text-amber-600 font-medium' : 'text-gray-900'}>
+                      <span className={getInventoryStockState(card).inStock && getInventoryStockState(card).availableQuantity <= 3 ? 'text-amber-600 font-medium' : 'text-gray-900'}>
                         {card.quantity}
                       </span>
                     </TableCell>
@@ -606,7 +607,7 @@ export default function AdminInventory() {
                     <TableCell className="text-gray-500">${(product.cost || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-blue-600 font-medium">${product.price?.toFixed(2)}</TableCell>
                     <TableCell>
-                      <span className={product.quantity <= 3 && product.quantity > 0 ? 'text-amber-600 font-medium' : 'text-gray-900'}>
+                      <span className={getInventoryStockState(product).inStock && getInventoryStockState(product).availableQuantity <= 3 ? 'text-amber-600 font-medium' : 'text-gray-900'}>
                         {product.quantity}
                       </span>
                     </TableCell>
@@ -770,5 +771,7 @@ export default function AdminInventory() {
     </div>
   );
 }
+
+
 
 

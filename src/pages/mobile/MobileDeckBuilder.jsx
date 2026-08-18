@@ -39,7 +39,8 @@ import { getYugiohCardById } from '@/lib/yugiohLocalCatalog';
 import { ManaCost, MtgSymbolText } from '@/components/lib/MtgSymbolText';
 import { PokemonSymbol, PokemonSymbolRow } from '@/components/lib/PokemonSymbol';
 import { groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
-import { getGuestCart, getGuestWishlist } from '@/components/utils/guestStorage';
+import { useCartOwner } from '@/hooks/useCartOwner';
+import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 import { toast } from 'sonner';
 
 const GAME_OPTIONS = [
@@ -401,20 +402,10 @@ export default function MobileDeckBuilder() {
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
   }, []);
 
-  const { data: dbCartItems = [] } = useQuery({
-    queryKey: ['cart', user?.email],
-    queryFn: () => backend.data.CartItem.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
-  const [guestCart] = useState(getGuestCart());
-  const [guestWishlist] = useState(getGuestWishlist());
-  const cartItems = user ? dbCartItems : guestCart;
-  const { data: dbWishlistItems = [] } = useQuery({
-    queryKey: ['wishlist', user?.email],
-    queryFn: () => backend.data.Wishlist.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
-  const wishlistItems = user ? dbWishlistItems : guestWishlist;
+  const cart = useCartOwner(user);
+  const wishlist = useWishlistOwner(user);
+  const cartItems = cart.items;
+  const wishlistItems = wishlist.items;
 
   const { data: decks = [], refetch: refetchDecks } = useQuery({
     queryKey: ['mobile-decks', user?.email],
@@ -1001,14 +992,14 @@ export default function MobileDeckBuilder() {
       )}
 
       <MobileBottomNav
-        cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-        wishlistCount={wishlistItems.length}
+        cartCount={cart.itemCount}
+        wishlistCount={wishlist.count}
         onCartClick={() => setCartOpen(true)}
         onWishlistClick={() => setWishlistOpen(true)}
         currentPage="DeckBuilder"
       />
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} items={cartItems} onUpdateQuantity={() => {}} onRemove={() => {}} />
-      <WishlistDrawer open={wishlistOpen} onClose={() => setWishlistOpen(false)} items={wishlistItems} onAddToCart={() => {}} onRemove={() => {}} user={user} />
+      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} items={cartItems} onUpdateQuantity={(id, quantity) => cart.setQuantity(id, quantity)} onRemove={(id) => cart.removeItem(id)} />
+      <WishlistDrawer open={wishlistOpen} onClose={() => setWishlistOpen(false)} items={wishlistItems} onAddToCart={() => {}} onRemove={(id) => wishlist.removeItem(id)} user={user} />
     </div>
   );
 }

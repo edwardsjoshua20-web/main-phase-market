@@ -7,34 +7,32 @@ import { backend } from '@/services/backend';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
-import { addToGuestCart, addToGuestWishlist } from '@/components/utils/guestStorage';
+import { useCartOwner } from '@/hooks/useCartOwner';
+import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
 export default function QuickViewDialog({ item, open, onClose, user }) {
   const queryClient = useQueryClient();
+  const cart = useCartOwner(user);
+  const wishlist = useWishlistOwner(user);
 
   const addToCartMutation = useMutation({
     mutationFn: async () => {
-      if (user) {
-        await backend.data.CartItem.create({
-          card_id: item.id,
-          card_name: item.name,
-          card_image: getCardImageUrl(item),
-          price: item.price,
-          quantity: 1,
-          user_email: user.email
-        });
-      } else {
-        addToGuestCart({
-          card_id: item.id,
-          card_name: item.name,
-          card_image: getCardImageUrl(item),
-          price: item.price,
-          quantity: 1
-        });
-      }
+      await cart.addItem({
+        card_id: item.id,
+        card_name: item.name,
+        card_image: getCardImageUrl(item),
+        price: item.price,
+        game: item.game,
+        set_code: item.set_code,
+        set_name: item.set_name,
+        collector_number: item.collector_number || item.number,
+        finish: item.finish,
+        condition: item.condition,
+        language: item.language || item.lang,
+      }, 1);
     },
     onSuccess: () => {
-      if (user) queryClient.invalidateQueries(['cart']);
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
       toast.success('Added to cart');
       onClose();
     }
@@ -42,27 +40,23 @@ export default function QuickViewDialog({ item, open, onClose, user }) {
 
   const addToWishlistMutation = useMutation({
     mutationFn: async () => {
-      if (user) {
-        await backend.data.Wishlist.create({
-          user_email: user.email,
-          product_id: item.id,
-          product_name: item.name,
-          product_image: getCardImageUrl(item),
-          price: item.price,
-          product_type: item.game ? 'card' : 'product'
-        });
-      } else {
-        addToGuestWishlist({
-          product_id: item.id,
-          product_name: item.name,
-          product_image: getCardImageUrl(item),
-          price: item.price,
-          product_type: item.game ? 'card' : 'product'
-        });
-      }
+      await wishlist.addItem({
+        product_id: item.id,
+        product_name: item.name,
+        product_image: getCardImageUrl(item),
+        price: item.price,
+        product_type: item.game ? 'card' : 'product',
+        game: item.game,
+        set_code: item.set_code,
+        set_name: item.set_name,
+        collector_number: item.collector_number || item.number,
+        finish: item.finish,
+        condition: item.condition,
+        language: item.language || item.lang,
+      });
     },
     onSuccess: () => {
-      if (user) queryClient.invalidateQueries(['wishlist']);
+      queryClient.invalidateQueries({ queryKey: ['wishlist'] });
       toast.success('Added to wishlist');
       onClose();
     }

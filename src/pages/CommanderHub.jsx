@@ -81,7 +81,8 @@ export default function CommanderHub() {
     featuredLoading,
     rankedFeatured,
     search,
-    setSearch
+    setSearch,
+    submitSearch
   } = useCommanderHubData();
 
   const openCommander = (oracleId) => {
@@ -98,7 +99,13 @@ export default function CommanderHub() {
             </h1>
           </div>
 
-          <div className="mt-8">
+          <form
+            className="mt-8"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitSearch();
+            }}
+          >
             <div className="relative max-w-4xl">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <Input
@@ -108,7 +115,7 @@ export default function CommanderHub() {
                 className="h-12 rounded-xl border-white/10 bg-white/5 pl-11 text-white placeholder:text-slate-500 focus-visible:ring-orange-500/40"
               />
             </div>
-          </div>
+          </form>
         </div>
       </div>
 

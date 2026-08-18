@@ -1,4 +1,4 @@
-import { backend } from '@/services/backend';
+import { listingOwner } from '@/services/listing/listingOwner';
 
 const AUDIT_PAGE_SIZE = 5000;
 const DELETE_CONCURRENCY = 5;
@@ -18,13 +18,13 @@ async function loadCardInventoryRows({ onProgress } = {}) {
     status: 'loading'
   });
 
-  return backend.data.Card.list('-created_date', AUDIT_PAGE_SIZE);
+  return listingOwner.listCardListings('-created_date', AUDIT_PAGE_SIZE);
 }
 
-async function deleteBatch(api, rows) {
+async function deleteBatch(rows) {
   for (let index = 0; index < rows.length; index += DELETE_CONCURRENCY) {
     const chunk = rows.slice(index, index + DELETE_CONCURRENCY);
-    await Promise.all(chunk.map((row) => api.delete(row.id)));
+    await Promise.all(chunk.map((row) => listingOwner.deleteListing(row.id, { persistenceType: listingOwner.persistenceTypes.CARD })));
   }
 }
 
@@ -92,7 +92,7 @@ export async function purgeVisibleMagicInventoryRows({ onProgress } = {}) {
       break;
     }
 
-    await deleteBatch(backend.data.Card, magicRows);
+    await deleteBatch(magicRows);
     totalDeleted += magicRows.length;
     rounds += 1;
 
@@ -120,7 +120,7 @@ export async function purgeVisibleMagicInventoryRows({ onProgress } = {}) {
 }
 
 export async function diagnoseVisibleMagicInventoryDelete() {
-  const rows = await backend.data.Card.list('-created_date', AUDIT_PAGE_SIZE);
+  const rows = await listingOwner.listCardListings('-created_date', AUDIT_PAGE_SIZE);
   const target = rows.find((row) => row?.game === 'magic');
 
   if (!target) {
@@ -134,12 +134,12 @@ export async function diagnoseVisibleMagicInventoryDelete() {
   let deleteError = null;
 
   try {
-    deleteResult = await backend.data.Card.delete(target.id);
+    deleteResult = await listingOwner.deleteListing(target.id, { persistenceType: listingOwner.persistenceTypes.CARD });
   } catch (error) {
     deleteError = error instanceof Error ? error.message : String(error);
   }
 
-  const afterRows = await backend.data.Card.list('-created_date', AUDIT_PAGE_SIZE);
+  const afterRows = await listingOwner.listCardListings('-created_date', AUDIT_PAGE_SIZE);
   const stillExists = afterRows.some((row) => row.id === target.id);
 
   return {

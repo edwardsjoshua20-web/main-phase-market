@@ -9,8 +9,10 @@ import MobileQuickActions from '@/components/mobile/MobileQuickActions';
 import CartDrawer from '@/components/store/CartDrawer';
 import WishlistDrawer from '@/components/store/WishlistDrawer';
 import { searchAllGamesLocal } from '@/lib/localSearch';
-import { getGuestCart, getGuestWishlist, removeFromGuestCart, removeFromGuestWishlist } from '@/components/utils/guestStorage';
-import { inventoryListings } from '@/services/inventoryListings';
+import { inventoryOwner } from '@/services/inventory/inventoryOwner';
+import { listingOwner } from '@/services/listing/listingOwner';
+import { useCartOwner } from '@/hooks/useCartOwner';
+import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
 const GAME_LINKS = [
   { game: 'magic', label: 'MTG' },
@@ -33,6 +35,8 @@ export default function MobileHome() {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const searchTimeoutRef = React.useRef(null);
+  const cart = useCartOwner(user);
+  const wishlist = useWishlistOwner(user);
 
   React.useEffect(() => {
     backend.auth.isAuthenticated().then(async (auth) => {
@@ -40,28 +44,14 @@ export default function MobileHome() {
     });
   }, []);
 
-  const { data: dbCartItems = [] } = useQuery({
-    queryKey: ['cart', user?.email],
-    queryFn: () => backend.data.CartItem.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
-
-  const { data: dbWishlistItems = [] } = useQuery({
-    queryKey: ['wishlist', user?.email],
-    queryFn: () => backend.data.Wishlist.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
-
-  const [guestCart] = useState(getGuestCart());
-  const [guestWishlist] = useState(getGuestWishlist());
-  const cartItems = user ? dbCartItems : guestCart;
-  const wishlistItems = user ? dbWishlistItems : guestWishlist;
+  const cartItems = cart.items;
+  const wishlistItems = wishlist.items;
 
   const { data: featuredCards = [] } = useQuery({
     queryKey: ['mobile-featured'],
     queryFn: async () => {
-      const cards = await inventoryListings.filter({ status: 'active' }, '-price', 12);
-      return cards.filter((card) => card.quantity > 0).slice(0, 6);
+      const cards = await listingOwner.filterCardListings({ status: 'active' }, '-price', 12);
+      return cards.filter((card) => inventoryOwner.getStockState(card).inStock).slice(0, 6);
     }
   });
 
@@ -81,53 +71,22 @@ export default function MobileHome() {
     }, 400);
   };
 
-  const updateCartMutation = useMutation({
-    mutationFn: async ({ id, quantity }) => {
-      if (user) {
-        if (quantity <= 0) await backend.data.CartItem.delete(id);
-        else await backend.data.CartItem.update(id, { quantity });
-      } else {
-        const cart = getGuestCart();
-        if (quantity <= 0) removeFromGuestCart(id);
-        else {
-          const item = cart.find((card) => card.id === id);
-          if (item) {
-            item.quantity = quantity;
-            localStorage.setItem('guestCart', JSON.stringify(cart));
-          }
-        }
-      }
-    },
-    onSuccess: () => user && queryClient.invalidateQueries(['cart'])
-  });
-
-  const removeFromCartMutation = useMutation({
-    mutationFn: (id) => user ? backend.data.CartItem.delete(id) : (removeFromGuestCart(id), Promise.resolve()),
-    onSuccess: () => user && queryClient.invalidateQueries(['cart'])
-  });
-
   const removeFromWishlistMutation = useMutation({
-    mutationFn: async (id) => {
-      if (user) await backend.data.Wishlist.delete(id);
-      else removeFromGuestWishlist(id);
-    },
-    onSuccess: () => user && queryClient.invalidateQueries(['wishlist'])
+    mutationFn: (id) => wishlist.removeItem(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wishlist'] })
   });
 
   const addToCartFromWishlistMutation = useMutation({
     mutationFn: async (item) => {
-      if (user) {
-        await backend.data.CartItem.create({
-          card_id: item.product_id,
-          card_name: item.product_name,
-          card_image: item.product_image,
-          price: item.price,
-          quantity: 1,
-          user_email: user.email
-        });
-      }
+      await cart.addItem({
+        card_id: item.product_id,
+        card_name: item.product_name,
+        card_image: item.product_image,
+        price: item.price,
+        product_type: item.product_type,
+      }, 1);
     },
-    onSuccess: () => user && queryClient.invalidateQueries(['cart'])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cart'] })
   });
 
   const featuredItems = featuredCards.slice(0, 6);
@@ -209,13 +168,13 @@ export default function MobileHome() {
       </footer>
 
       <MobileBottomNav
-        cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-        wishlistCount={wishlistItems.length}
+        cartCount={cart.itemCount}
+        wishlistCount={wishlist.count}
         onCartClick={() => setCartOpen(true)}
         onWishlistClick={() => setWishlistOpen(true)}
         currentPage="Home"
       />
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} items={cartItems} onUpdateQuantity={(id, qty) => updateCartMutation.mutate({ id, quantity: qty })} onRemove={(id) => removeFromCartMutation.mutate(id)} />
+      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} items={cartItems} onUpdateQuantity={(id, qty) => cart.setQuantity(id, qty)} onRemove={(id) => cart.removeItem(id)} />
       <WishlistDrawer open={wishlistOpen} onClose={() => setWishlistOpen(false)} items={wishlistItems} onAddToCart={(item) => addToCartFromWishlistMutation.mutate(item)} onRemove={(id) => removeFromWishlistMutation.mutate(id)} user={user} />
     </div>
   );

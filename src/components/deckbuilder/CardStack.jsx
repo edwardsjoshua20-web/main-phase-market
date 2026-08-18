@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { resolveCardPricing } from '@/services/pricing/pricingPipeline';
+import { findStoreStockMatch } from '@/services/inventory/inventoryCore';
 
 const CARD_WIDTH = 223;
 const CARD_HEIGHT = 311;
@@ -12,13 +13,7 @@ function PriceBar({ item, storeProducts }) {
   const marketPrice = pricing.marketPrice;
   const hasMarketPrice = marketPrice !== null && marketPrice !== undefined && marketPrice > 0;
 
-  // Look up actual store inventory by card name (case-insensitive, partial match)
-  const cardName = item.product_name?.toLowerCase().trim() || '';
-  const storeMatch = storeProducts?.find(p => {
-    const storeName = p.name?.toLowerCase().trim() || '';
-    if (!storeName || !cardName || p.quantity <= 0) return false;
-    return storeName === cardName || storeName.includes(cardName) || cardName.includes(storeName);
-  });
+  const storeMatch = findStoreStockMatch(item, storeProducts);
   const inStock = !!storeMatch;
   const storePrice = storeMatch?.price;
   const displayStorePrice = storePrice ?? pricing.sellPrice;
@@ -191,3 +186,4 @@ export default function CardStack({ type, cards, onChangeQty, onRemove, onChange
     </div>
   );
 }
+

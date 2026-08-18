@@ -34,18 +34,14 @@ import CartDrawer from '@/components/store/CartDrawer';
 import WishlistDrawer from '@/components/store/WishlistDrawer';
 import AdvancedSearch from '@/components/store/AdvancedSearch';
 import { searchAllGamesLocal, searchGameLocal } from '@/lib/localSearch';
-import { searchFabCatalogAdvanced } from '@/lib/fabLocalCatalog';
-import { searchLorcanaCatalogAdvanced } from '@/lib/lorcanaLocalCatalog';
-import { searchMtgCatalogAdvanced } from '@/lib/mtgLocalCatalog';
-import { searchOnePieceCatalogAdvanced } from '@/lib/onePieceLocalCatalog';
-import { searchPokemonCatalogAdvanced } from '@/lib/pokemonLocalCatalog';
-import { searchStarWarsCatalogAdvanced } from '@/lib/starwarsLocalCatalog';
-import { searchYugiohCatalogAdvanced } from '@/lib/yugiohLocalCatalog';
-import { addToGuestCart, getGuestCart, getGuestWishlist } from '@/components/utils/guestStorage';
 import { toast } from 'sonner';
-import { inventoryListings } from '@/services/inventoryListings';
+import { inventoryOwner } from '@/services/inventory/inventoryOwner';
+import { listingOwner } from '@/services/listing/listingOwner';
+import { searchOwner } from '@/services/search/searchOwner';
 import { enrichSearchResultsWithInventory, findInventoryMatch } from '@/pages/shop/shopUtils';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { useCartOwner } from '@/hooks/useCartOwner';
+import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
 const GAME_OPTIONS = [
   { value: 'all', label: 'All Games' },
@@ -63,25 +59,14 @@ const BROWSE_PAGE_SIZE = 24;
 async function runAdvancedCatalogSearch(game, apiQuery) {
   const page = 0;
   const limit = 36;
-
-  switch (game) {
-    case 'magic':
-      return (await searchMtgCatalogAdvanced(JSON.parse(apiQuery), { page, limit })).results || [];
-    case 'pokemon':
-      return (await searchPokemonCatalogAdvanced(JSON.parse(apiQuery), { page, limit })).results || [];
-    case 'yugioh':
-      return (await searchYugiohCatalogAdvanced(apiQuery, { page, limit })).results || [];
-    case 'onepiece':
-      return (await searchOnePieceCatalogAdvanced(JSON.parse(apiQuery), { page, limit })).results || [];
-    case 'lorcana':
-      return (await searchLorcanaCatalogAdvanced(JSON.parse(apiQuery), { page, limit })).results || [];
-    case 'flesh_and_blood':
-      return (await searchFabCatalogAdvanced(JSON.parse(apiQuery), { page, limit })).results || [];
-    case 'starwars':
-      return (await searchStarWarsCatalogAdvanced(JSON.parse(apiQuery), { page, limit })).results || [];
-    default:
-      return [];
-  }
+  const response = await searchOwner.searchShopCards({
+    query: 'Advanced Search',
+    game,
+    apiQuery,
+    page,
+    limit
+  });
+  return response.results || [];
 }
 
 export default function MobileShop() {
@@ -111,6 +96,8 @@ export default function MobileShop() {
   const [advancedSummary, setAdvancedSummary] = useState('');
   const searchTimeoutRef = useRef(null);
   const headerSearchRef = useRef(null);
+  const cart = useCartOwner(user);
+  const wishlist = useWishlistOwner(user);
 
   useEffect(() => {
     backend.auth.isAuthenticated().then(async (auth) => {
@@ -118,24 +105,12 @@ export default function MobileShop() {
     });
   }, []);
 
-  const { data: dbCartItems = [] } = useQuery({
-    queryKey: ['cart', user?.email],
-    queryFn: () => backend.data.CartItem.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
-  const { data: dbWishlistItems = [] } = useQuery({
-    queryKey: ['wishlist', user?.email],
-    queryFn: () => backend.data.Wishlist.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
-  const [guestCart] = useState(getGuestCart());
-  const [guestWishlist] = useState(getGuestWishlist());
-  const cartItems = user ? dbCartItems : guestCart;
-  const wishlistItems = user ? dbWishlistItems : guestWishlist;
+  const cartItems = cart.items;
+  const wishlistItems = wishlist.items;
 
   const { data: inventory = [] } = useQuery({
     queryKey: ['mobile-inventory'],
-    queryFn: () => inventoryListings.filter({ status: 'active' }, '-price', 500)
+    queryFn: () => listingOwner.filterCardListings({ status: 'active' }, '-price', 500)
   });
 
   const { data: pokemonInventory = [] } = useQuery({
@@ -182,19 +157,25 @@ export default function MobileShop() {
 
     try {
       let results = [];
+      const trimmedQuery = String(query || '').trim();
 
-      if (query.trim().length >= 2) {
+      if (trimmedQuery.length >= 2) {
         results = game === 'all'
-          ? await searchAllGamesLocal(query, 40)
-          : await searchGameLocal(query, game, 40);
+          ? await searchAllGamesLocal(trimmedQuery, 40)
+          : await searchGameLocal(trimmedQuery, game, 40);
+      } else if (game !== 'all') {
+        results = await searchOwner.browseByGame(game, 200);
       }
 
       let enriched = results.map((card) => {
+        if (card.searchIdentity && Object.prototype.hasOwnProperty.call(card, 'stockCard')) {
+          return card;
+        }
         const inv = findInventoryMatch(card, inventory, pokemonInventory);
         return {
           ...card,
-          inStock: !!(inv && inv.quantity > 0),
-          stockCard: inv && inv.quantity > 0 ? inv : null
+          inStock: !!(inv && inventoryOwner.getStockState(inv).inStock),
+          stockCard: inv && inventoryOwner.getStockState(inv).inStock ? inv : null
         };
       });
 
@@ -285,29 +266,20 @@ export default function MobileShop() {
     setFiltersOpen(false);
   };
 
-  const updateCartMutation = useMutation({
-    mutationFn: async ({ id, quantity }) => {
-      if (user) {
-        if (quantity <= 0) await backend.data.CartItem.delete(id);
-        else await backend.data.CartItem.update(id, { quantity });
-      }
-    },
-    onSuccess: () => user && queryClient.invalidateQueries(['cart'])
-  });
-
-  const removeFromCartMutation = useMutation({
-    mutationFn: (id) => user ? backend.data.CartItem.delete(id) : Promise.resolve(),
-    onSuccess: () => user && queryClient.invalidateQueries(['cart'])
-  });
-
   const removeFromWishlistMutation = useMutation({
-    mutationFn: (id) => user ? backend.data.Wishlist.delete(id) : Promise.resolve(),
-    onSuccess: () => user && queryClient.invalidateQueries(['wishlist'])
+    mutationFn: (id) => wishlist.removeItem(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wishlist'] })
   });
 
   const addToCartFromWishlistMutation = useMutation({
-    mutationFn: (item) => user ? backend.data.CartItem.create({ card_id: item.product_id, card_name: item.product_name, card_image: getCardImageUrl(item), price: item.price, quantity: 1, user_email: user.email }) : Promise.resolve(),
-    onSuccess: () => user && queryClient.invalidateQueries(['cart'])
+    mutationFn: (item) => cart.addItem({
+      card_id: item.product_id,
+      card_name: item.product_name,
+      card_image: getCardImageUrl(item),
+      price: item.price,
+      product_type: item.product_type,
+    }, 1),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cart'] })
   });
 
   const addToCartMutation = useMutation({
@@ -315,30 +287,22 @@ export default function MobileShop() {
       const stockCard = card?.stockCard || card;
       if (!stockCard) return;
 
-      if (user?.email) {
-        await backend.data.CartItem.create({
-          card_id: stockCard.id,
-          card_name: stockCard.name,
-          card_image: getCardImageUrl(stockCard),
-          price: stockCard.price,
-          quantity: 1,
-          user_email: user.email
-        });
-        return;
-      }
-
-      addToGuestCart({
+      await cart.addItem({
         card_id: stockCard.id,
         card_name: stockCard.name,
         card_image: getCardImageUrl(stockCard),
         price: stockCard.price,
-        quantity: 1
-      });
+        game: stockCard.game,
+        set_code: stockCard.set_code,
+        set_name: stockCard.set_name,
+        collector_number: stockCard.collector_number || stockCard.number,
+        finish: stockCard.finish,
+        condition: stockCard.condition,
+        language: stockCard.language || stockCard.lang,
+      }, 1);
     },
     onSuccess: () => {
-      if (user?.email) {
-        queryClient.invalidateQueries(['cart']);
-      }
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
       toast.success('Added to cart');
     }
   });
@@ -363,23 +327,13 @@ export default function MobileShop() {
 
   const hasSearch = Boolean(searchQuery.trim() || selectedGame !== 'all' || advancedSearchParam);
   const isBrowseMode = !advancedSearchParam && !searchQuery.trim() && selectedGame !== 'all';
-  const browseInventory = isBrowseMode
-    ? inventory
-      .filter((item) => item?.status === 'active' && item?.game === selectedGame)
-      .filter((item) => !inStockOnly || Number(item?.quantity || 0) > 0)
-      .slice()
-      .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')))
-    : [];
+  const browseInventory = isBrowseMode ? cardResults : [];
   const browsePageCount = Math.max(1, Math.ceil(browseInventory.length / BROWSE_PAGE_SIZE));
   const clampedBrowsePage = Math.min(browsePage, browsePageCount - 1);
   const browseCards = browseInventory.slice(
     clampedBrowsePage * BROWSE_PAGE_SIZE,
     (clampedBrowsePage + 1) * BROWSE_PAGE_SIZE
-  ).map((card) => ({
-    ...card,
-    stockCard: card,
-    inStock: Number(card?.quantity || 0) > 0
-  }));
+  );
   const displayedCards = isBrowseMode ? browseCards : cardResults;
   const showEmpty = !searching && displayedCards.length === 0 && hasSearch;
 
@@ -742,8 +696,8 @@ export default function MobileShop() {
       )}
 
       <MobileBottomNav
-        cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-        wishlistCount={wishlistItems.length}
+        cartCount={cart.itemCount}
+        wishlistCount={wishlist.count}
         onCartClick={() => setCartOpen(true)}
         onWishlistClick={() => setWishlistOpen(true)}
         currentPage="Shop"
@@ -752,8 +706,8 @@ export default function MobileShop() {
         open={cartOpen}
         onClose={() => setCartOpen(false)}
         items={cartItems}
-        onUpdateQuantity={(id, qty) => updateCartMutation.mutate({ id, quantity: qty })}
-        onRemove={(id) => removeFromCartMutation.mutate(id)}
+        onUpdateQuantity={(id, qty) => cart.setQuantity(id, qty)}
+        onRemove={(id) => cart.removeItem(id)}
       />
       <WishlistDrawer
         open={wishlistOpen}

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { searchMtgCatalog } from '@/lib/mtgLocalCatalog';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { searchOwner } from '@/services/search/searchOwner';
 
 /**
  * Clean a card name by stripping common deck-export annotations:
@@ -124,7 +124,7 @@ function parseCsv(text) {
 }
 
 async function fetchMagicCard(name) {
-  const results = await searchMtgCatalog(name, 8);
+  const results = await searchOwner.searchByGame(name, 'magic', 8, { includeInventory: false });
   const targetKey = normalizeCardKey(name);
   const bestLocal = Array.isArray(results) ?
     results.find((result) => normalizeCardKey(result.name) === targetKey) ||
@@ -138,7 +138,7 @@ async function fetchMagicCard(name) {
       name: bestLocal.name,
       set_name: bestLocal.set_name,
       image_url: bestLocal.image_url || bestLocal.image_small || null,
-      price: bestLocal.price || 0,
+      market_price: bestLocal.price || 0,
       type: bestLocal.type || bestLocal.type_line || '',
       product_type: 'magic',
       mana_cost: bestLocal.mana_cost || '',
@@ -146,26 +146,7 @@ async function fetchMagicCard(name) {
     };
   }
 
-  try {
-    const response = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
-    if (!response.ok) return null;
-    const card = await response.json();
-    if (!card?.id) return null;
-
-    return {
-      id: card.id,
-      name: card.name,
-      set_name: card.set_name,
-      image_url: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || null,
-      price: card.prices?.usd ? parseFloat(card.prices.usd) : 0,
-      type: card.type_line || '',
-      product_type: 'magic',
-      mana_cost: card.mana_cost || card.card_faces?.[0]?.mana_cost || '',
-      cmc: card.cmc ?? 0,
-    };
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export default function DeckImportModal({ game, onImport, onClose }) {

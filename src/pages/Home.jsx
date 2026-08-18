@@ -1,5 +1,4 @@
 import React from 'react';
-import { backend } from '@/services/backend';
 import { useQuery } from '@tanstack/react-query';
 import HeroBanner from '@/components/home/HeroBanner';
 import NewReleasesBar from '@/components/home/NewReleasesBar';
@@ -8,7 +7,7 @@ import GameTabs from '@/components/home/GameTabs';
 import TrendingCards from '@/components/home/TrendingCards';
 import CoreActionsSection from '@/components/home/CoreActionsSection';
 import { createPageUrl } from '@/utils';
-import { inventoryListings } from '@/services/inventoryListings';
+import { listingOwner } from '@/services/listing/listingOwner';
 import { useHomepageContent } from '@/hooks/useHomepageContent';
 
 export default function Home() {
@@ -16,14 +15,14 @@ export default function Home() {
 
   const { data: cards = [] } = useQuery({
     queryKey: ['home-cards'],
-    queryFn: () => inventoryListings.filter({ status: 'active' }, '-price'),
+    queryFn: () => listingOwner.filterCardListings({ status: 'active' }, '-price'),
   });
 
   const { data: products = [] } = useQuery({
     queryKey: ['home-products'],
     queryFn: async () => {
       try {
-        return await backend.data.Product.filter({ status: 'active' }, '-price');
+        return await listingOwner.filterProductListings({ status: 'active' }, '-price');
       } catch {
         return [];
       }

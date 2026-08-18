@@ -1,6 +1,6 @@
 import { handleCors } from '../_shared/cors.ts';
 import { getEnv } from '../_shared/env.ts';
-import { buildOrderFromCheckoutSession, getStripeClient, normalizeCartItem, normalizeShippingInfo, roundMoney, validateCheckoutPayload } from '../_shared/commerce.ts';
+import { buildOrderFromCheckoutSession, getStripeClient, normalizeShippingInfo, resolveTrustedCartItems, roundMoney, validateCheckoutPayload } from '../_shared/commerce.ts';
 import { errorResponse, jsonResponse } from '../_shared/http.ts';
 
 Deno.serve(async (req) => {
@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   try {
     const stripe = getStripeClient();
     const payload = await req.json();
-    const cartItems = Array.isArray(payload.cartItems) ? payload.cartItems.map(normalizeCartItem) : [];
+    const cartItems = await resolveTrustedCartItems(Array.isArray(payload.cartItems) ? payload.cartItems : []);
     const shippingInfo = normalizeShippingInfo(payload.shippingInfo || {});
     validateCheckoutPayload(cartItems, shippingInfo);
 

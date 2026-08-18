@@ -8,6 +8,7 @@ export function useCommanderHubData() {
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [browseLoading, setBrowseLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [searchRequestId, setSearchRequestId] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -44,13 +45,13 @@ export function useCommanderHubData() {
       } finally {
         if (mounted) setBrowseLoading(false);
       }
-    }, search.trim() ? 120 : 0);
+    }, searchRequestId > 0 ? 0 : search.trim() ? 120 : 0);
 
     return () => {
       mounted = false;
       clearTimeout(timeoutId);
     };
-  }, [search]);
+  }, [search, searchRequestId]);
 
   const rankedFeatured = useMemo(
     () => featuredCommanders.map((commander, index) => ({ ...commander, rank: index + 1 })),
@@ -65,6 +66,7 @@ export function useCommanderHubData() {
     browseLoading,
     search,
     setSearch,
+    submitSearch: () => setSearchRequestId((current) => current + 1),
     rankedFeatured
   };
 }

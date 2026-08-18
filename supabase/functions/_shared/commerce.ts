@@ -1,6 +1,8 @@
 import Stripe from 'npm:stripe@17.5.0';
 import { getEnv, requireEnv } from './env.ts';
 import { restRequest } from './rest.ts';
+import { applyInventoryDecrease } from '../../../src/services/inventory/inventoryCore.js';
+import { assertSellPriceAvailable } from '../../../src/services/pricing/pricingCore.js';
 
 export function matchesEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
@@ -39,6 +41,62 @@ export function normalizeCartItem(rawItem: Record<string, unknown> = {}) {
     price: unitPrice,
     quantity
   };
+}
+
+const CHECKOUT_LISTING_ENTITY_NAMES = ['Card', 'Product'] as const;
+
+type CheckoutListingEntityName = typeof CHECKOUT_LISTING_ENTITY_NAMES[number];
+
+function normalizeCheckoutListingRecord(record: Record<string, unknown> | null, entityName: CheckoutListingEntityName) {
+  if (!record) return null;
+  return {
+    ...record,
+    listing_id: String(record.id || '').trim(),
+    listing_persistence_type: entityName
+  };
+}
+
+export async function getCheckoutListingById(id: string) {
+  const listingId = String(id || '').trim();
+  if (!listingId) return null;
+
+  for (const entityName of CHECKOUT_LISTING_ENTITY_NAMES) {
+    const row = await getEntityById(entityName, listingId);
+    if (row) return normalizeCheckoutListingRecord(row, entityName);
+  }
+  return null;
+}
+
+export async function resolveTrustedCartItems(rawItems: Record<string, unknown>[] = []) {
+  const requestedItems = Array.isArray(rawItems) ? rawItems.map(normalizeCartItem) : [];
+  const trustedItems = [];
+
+  for (const item of requestedItems) {
+    if (!item.card_id) {
+      throw new Error(`Cannot price ${item.card_name || 'item'} without a listing id.`);
+    }
+
+    const listing = await getCheckoutListingById(item.card_id);
+
+    if (!listing) {
+      throw new Error(`Checkout item is no longer available: ${item.card_name || item.card_id}.`);
+    }
+
+    const pricing = assertSellPriceAvailable(listing, { floor: 1 });
+
+    trustedItems.push({
+      ...item,
+      card_name: String(listing.name || listing.product_name || item.card_name || 'Item').trim() || 'Item',
+      card_image: normalizeExternalImageUrl(String(listing.product_image || listing.image_url || item.card_image || '')),
+      price: pricing.sell_price,
+      pricing_identity_key: pricing.identity_key,
+      pricing_source: pricing.source_count > 0 ? 'pricing-owner' : 'listing-sell-price',
+      pricing_updated_at: pricing.updated_at,
+      pricing_stale: Boolean(pricing.stale)
+    });
+  }
+
+  return trustedItems;
 }
 
 export function normalizeShippingInfo(rawShipping: Record<string, unknown> = {}) {
@@ -197,6 +255,30 @@ export async function updateEntity(entityName: string, id: string, updates: Reco
   return normalizeGenericEntityRow(Array.isArray(rows) ? rows[0] : rows);
 }
 
+export async function finalizeCheckoutOrderAtomically(idempotencyKey: string, orderPayload: Record<string, unknown>) {
+  const result = await restRequest('/rest/v1/rpc/finalize_checkout_order_atomic', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_idempotency_key: idempotencyKey,
+      p_order_payload: orderPayload
+    })
+  });
+
+  const payload = Array.isArray(result) ? result[0] : result;
+  const order = payload?.order && typeof payload.order === 'object'
+    ? payload.order as Record<string, unknown>
+    : null;
+
+  if (!order) {
+    throw new Error('Atomic checkout finalization did not return an order.');
+  }
+
+  return {
+    order,
+    alreadyFinalized: Boolean(payload?.already_finalized || payload?.alreadyFinalized)
+  };
+}
+
 export async function findOrderByNumber(orderNumber: string, customerEmail = '') {
   const normalizedOrderNumber = String(orderNumber || '').trim().toLowerCase();
   const normalizedEmail = String(customerEmail || '').trim().toLowerCase();
@@ -246,21 +328,24 @@ export async function decrementInventoryForOrder(order: Record<string, unknown>)
   const items = Array.isArray(order?.items) ? order.items as Record<string, unknown>[] : [];
   for (const item of items) {
     const itemId = String(item.card_id || '').trim();
+    const requestedQuantity = Math.max(1, Math.floor(Number(item.quantity || 1)));
     if (!itemId) {
       continue;
     }
 
-    for (const entityName of ['Card', 'Product']) {
-      const current = await getEntityById(entityName, itemId);
-      if (!current) {
-        continue;
-      }
-
-      await updateEntity(entityName, itemId, {
-        quantity: Math.max(0, Number(current.quantity || 0) - Number(item.quantity || 0))
-      });
-      break;
+    const listing = await getCheckoutListingById(itemId);
+    if (!listing) {
+      throw new Error(`Inventory record not found for ${String(item.card_name || itemId)}.`);
     }
+
+    const next = applyInventoryDecrease(
+      { ...listing, name: String(listing.name || item.card_name || itemId) },
+      requestedQuantity
+    );
+
+    await updateEntity(String(listing.listing_persistence_type), itemId, {
+      quantity: next.quantity
+    });
   }
 }
 
@@ -429,3 +514,4 @@ export function getFallbackShippingRates() {
     { id: 'express', name: 'Priority Mail Express', price: 29.99, days: '1-2 business days' }
   ];
 }
+

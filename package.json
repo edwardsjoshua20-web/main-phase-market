@@ -71,7 +71,15 @@
     "snapshots:embed": "node scripts/build-site-static-snapshots.mjs",
     "clean:build": "node scripts/clean-build-output.cjs",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "inventory:verify": "node scripts/verify-inventory-owner.mjs",
+    "cart:verify": "node scripts/verify-cart-owner.mjs",
+    "wishlist:verify": "node scripts/verify-wishlist-owner.mjs",
+    "preview": "vite preview",
+    "checkout:idempotency:verify": "node scripts/verify-checkout-idempotency.mjs",
+    "pricing:verify": "node scripts/verify-pricing-owner.mjs",
+    "search:verify": "node scripts/verify-search-owner.mjs",
+    "search:runtime:verify": "node scripts/verify-search-runtime.mjs",
+    "listing:verify": "node scripts/verify-listing-owner.mjs"
   },
   "dependencies": {
     "@babel/core": "^7.25.0",
@@ -165,4 +173,3 @@
     "vite": "^6.1.0"
   }
 }
-

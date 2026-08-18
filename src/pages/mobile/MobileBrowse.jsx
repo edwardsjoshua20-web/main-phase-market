@@ -7,8 +7,9 @@ import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import CartDrawer from '@/components/store/CartDrawer';
 import WishlistDrawer from '@/components/store/WishlistDrawer';
 import { searchAllGamesLocal } from '@/lib/localSearch';
-import { getGuestCart, getGuestWishlist } from '@/components/utils/guestStorage';
 import { gameAssets } from '@/config/appAssets';
+import { useCartOwner } from '@/hooks/useCartOwner';
+import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
 const PRODUCT_TYPES = [
   { label: 'Single Cards', icon: '🃏', path: '/MobileShop?type=single_card' },
@@ -68,20 +69,10 @@ export default function MobileBrowse() {
     });
   }, []);
 
-  const { data: dbCartItems = [] } = useQuery({
-    queryKey: ['cart', user?.email],
-    queryFn: () => backend.data.CartItem.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
-  const { data: dbWishlistItems = [] } = useQuery({
-    queryKey: ['wishlist', user?.email],
-    queryFn: () => backend.data.Wishlist.filter({ user_email: user.email }),
-    enabled: !!user?.email
-  });
-  const [guestCart] = useState(getGuestCart());
-  const [guestWishlist] = useState(getGuestWishlist());
-  const cartItems = user ? dbCartItems : guestCart;
-  const wishlistItems = user ? dbWishlistItems : guestWishlist;
+  const cart = useCartOwner(user);
+  const wishlist = useWishlistOwner(user);
+  const cartItems = cart.items;
+  const wishlistItems = wishlist.items;
 
   const handleSearchChange = async (e) => {
     const val = e.target.value;
@@ -140,14 +131,15 @@ export default function MobileBrowse() {
       </main>
 
       <MobileBottomNav
-        cartCount={cartItems.reduce((s, i) => s + i.quantity, 0)}
-        wishlistCount={wishlistItems.length}
+        cartCount={cart.itemCount}
+        wishlistCount={wishlist.count}
         onCartClick={() => setCartOpen(true)}
         onWishlistClick={() => setWishlistOpen(true)}
         currentPage="Shop"
       />
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} items={cartItems}
-        onUpdateQuantity={() => {}} onRemove={() => {}} />
+        onUpdateQuantity={(id, quantity) => cart.setQuantity(id, quantity)}
+        onRemove={(id) => cart.removeItem(id)} />
       <WishlistDrawer open={wishlistOpen} onClose={() => setWishlistOpen(false)} items={wishlistItems}
         onAddToCart={() => {}} onRemove={() => {}} user={user} />
     </div>

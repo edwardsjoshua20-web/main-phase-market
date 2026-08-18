@@ -5,7 +5,8 @@ import { createPageUrl } from "@/utils";
 import { ChevronRight, Loader2, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import HomepageContentShell from '@/components/layout/HomepageContentShell';
-import { inventoryListings } from '@/services/inventoryListings';
+import { inventoryOwner } from '@/services/inventory/inventoryOwner';
+import { listingOwner } from '@/services/listing/listingOwner';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 export default function TrendingCards() {
@@ -16,8 +17,8 @@ export default function TrendingCards() {
     queryKey: ["inventory"],
     queryFn: async () => {
       try {
-        const cards = await inventoryListings.filter({ status: "active" }, "-price", 1000);
-        return cards.filter((card) => Number(card.quantity || 0) > 0 && getCardImageUrl(card));
+        const cards = await listingOwner.filterCardListings({ status: "active" }, "-price", 1000);
+        return cards.filter((card) => inventoryOwner.getStockState(card).inStock && getCardImageUrl(card));
       } catch {
         return [];
       }

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { backend } from '@/services/backend';
+import { inventoryOwner } from '@/services/inventory/inventoryOwner';
+import { listingOwner } from '@/services/listing/listingOwner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +21,7 @@ import {
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
+import { useCartOwner } from '@/hooks/useCartOwner';
 
 const conditionLabels = {
   mint: { label: 'Mint', description: 'Perfect condition, no visible wear' },
@@ -55,6 +58,7 @@ export default function ProductDetail() {
   const [user, setUser] = useState(null);
   const [addingToCart, setAddingToCart] = useState(false);
   const queryClient = useQueryClient();
+  const cart = useCartOwner(user);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -70,41 +74,30 @@ export default function ProductDetail() {
   const { data: product, isLoading } = useQuery({
     queryKey: ['product', productId],
     queryFn: async () => {
-      const products = await backend.data.Product.filter({ id: productId });
-      return products[0];
+      return listingOwner.getProductListingById(productId);
     },
     enabled: !!productId
   });
 
   const addToCartMutation = useMutation({
     mutationFn: async () => {
-      if (!user) {
-        backend.auth.redirectToLogin(window.location.href);
-        return;
-      }
-
-      const existingItems = await backend.data.CartItem.filter({
-        user_email: user.email,
-        card_id: productId
-      });
-
-      if (existingItems.length > 0) {
-        await backend.data.CartItem.update(existingItems[0].id, {
-          quantity: existingItems[0].quantity + quantity
-        });
-      } else {
-        await backend.data.CartItem.create({
-          card_id: productId,
-          card_name: product.name,
-          card_image: product.image_url,
-          price: product.price,
-          quantity: quantity,
-          user_email: user.email
-        });
-      }
+      await cart.addItem({
+        card_id: productId,
+        card_name: product.name,
+        card_image: product.image_url,
+        price: product.price,
+        product_type: product.product_type,
+        game: product.game,
+        set_code: product.set_code,
+        set_name: product.set_name,
+        collector_number: product.collector_number || product.number,
+        finish: product.finish,
+        condition: product.condition,
+        language: product.language || product.lang,
+      }, quantity);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['cart']);
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
       toast.success('Added to cart!');
       setAddingToCart(false);
     },
@@ -153,6 +146,7 @@ export default function ProductDetail() {
   }
 
   const condition = conditionLabels[product.condition] || {};
+  const stockState = inventoryOwner.getStockState(product, quantity);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -214,8 +208,8 @@ export default function ProductDetail() {
             <div className="bg-white rounded-lg p-6 border border-gray-200">
               <div className="flex items-baseline gap-3">
                 <span className="text-4xl font-bold text-gray-900">${product.price?.toFixed(2)}</span>
-                {product.quantity > 0 && product.quantity <= 5 && (
-                  <span className="text-red-500 text-sm font-medium">Only {product.quantity} left!</span>
+                {stockState.inStock && stockState.availableQuantity <= 5 && (
+                  <span className="text-red-500 text-sm font-medium">Only {stockState.availableQuantity} left!</span>
                 )}
               </div>
 
@@ -228,7 +222,7 @@ export default function ProductDetail() {
                 </div>
               )}
 
-              {product.quantity > 0 || product.is_preorder ? (
+              {stockState.inStock || product.is_preorder ? (
                 <div className="mt-6 space-y-4">
                   <div className="flex items-center gap-4">
                     <span className="text-gray-600">Quantity:</span>
@@ -247,14 +241,14 @@ export default function ProductDetail() {
                         variant="outline"
                         size="icon"
                         className="h-10 w-10 border-gray-300"
-                        onClick={() => setQuantity(Math.min(product.quantity || 99, quantity + 1))}
-                        disabled={quantity >= (product.quantity || 99)}
+                        onClick={() => setQuantity(Math.min(stockState.availableQuantity || 99, quantity + 1))}
+                        disabled={quantity >= (stockState.availableQuantity || 99)}
                       >
                         <Plus className="w-4 h-4" />
                       </Button>
                     </div>
                     {!product.is_preorder && (
-                      <span className="text-gray-500 text-sm">{product.quantity} available</span>
+                      <span className="text-gray-500 text-sm">{stockState.availableQuantity} available</span>
                     )}
                   </div>
 
@@ -325,5 +319,6 @@ export default function ProductDetail() {
     </div>
   );
 }
+
 
 

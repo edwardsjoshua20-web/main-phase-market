@@ -1,9 +1,7 @@
 import { handleCors } from '../_shared/cors.ts';
 import {
   buildOrderFromCheckoutSession,
-  createEntity,
-  decrementInventoryForOrder,
-  filterEntities,
+  finalizeCheckoutOrderAtomically,
   getStripeClient,
   sendOrderConfirmationEmail
 } from '../_shared/commerce.ts';
@@ -23,11 +21,6 @@ Deno.serve(async (req) => {
       return errorResponse('session_id is required.', 400);
     }
 
-    const existingOrder = (await filterEntities('Order', { stripe_session_id: sessionId }))[0] || null;
-    if (existingOrder) {
-      return jsonResponse({ order: existingOrder, alreadyFinalized: true });
-    }
-
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['payment_intent']
     });
@@ -37,17 +30,17 @@ Deno.serve(async (req) => {
     }
 
     const orderPayload = buildOrderFromCheckoutSession(session);
-    const order = await createEntity('Order', orderPayload);
+    const finalization = await finalizeCheckoutOrderAtomically(sessionId, orderPayload);
 
-    await decrementInventoryForOrder(order);
-
-    try {
-      await sendOrderConfirmationEmail(order);
-    } catch (emailError) {
-      console.warn('finalize-checkout-session email warning:', emailError);
+    if (!finalization.alreadyFinalized) {
+      try {
+        await sendOrderConfirmationEmail(finalization.order);
+      } catch (emailError) {
+        console.warn('finalize-checkout-session email warning:', emailError);
+      }
     }
 
-    return jsonResponse({ order, alreadyFinalized: false });
+    return jsonResponse({ order: finalization.order, alreadyFinalized: finalization.alreadyFinalized });
   } catch (error) {
     console.error('finalize-checkout-session error:', error);
     return errorResponse(error);

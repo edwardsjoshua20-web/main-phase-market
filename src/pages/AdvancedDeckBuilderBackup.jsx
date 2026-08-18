@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { backend } from '@/services/backend';
+import { listingOwner } from '@/services/listing/listingOwner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,8 @@ import DeckImportModal from '@/components/deckbuilder/DeckImportModal';
 import AISimulationResults from '@/components/deckbuilder/AISimulationResults';
 import DeckListSidebar from '@/components/deckbuilder/DeckListSidebar';
 import DeckStackView from '@/components/deckbuilder/DeckStackView';
+import { calculateDeckValue } from '@/services/pricing/pricingPipeline';
+import { searchOwner } from '@/services/search/searchOwner';
 import { toast } from 'sonner';
 
 const DECK_FORMATS = {
@@ -67,7 +70,7 @@ export default function AdvancedDeckBuilderBackup() {
     load();
   }, []);
 
-  // When a deck is loaded, backfill any items missing a `type` field by fetching from Scryfall
+  // When a deck is loaded, backfill any items missing a `type` field through the canonical Search Owner.
   useEffect(() => {
     if (!activeDeck?.id) return;
 
@@ -78,20 +81,19 @@ export default function AdvancedDeckBuilderBackup() {
     if (!missingType || missingType.length === 0) return;
 
     const backfillTypes = async () => {
-      // Fetch all missing cards in parallel
       const results = await Promise.all(
-        missingType.map(i =>
-          fetch(`https://api.scryfall.com/cards/${i.product_id}`)
-            .then(r => r.json())
-            .then(data => {
-              // For double-faced cards, card_faces[0].type_line has the front face type
-              const type = data.card_faces?.[0]?.type_line || data.type_line || '';
-              // Also upgrade image to normal quality if it's a small/thumbnail URL
-              const image = data.image_uris?.normal || data.card_faces?.[0]?.image_uris?.normal || i.product_image;
-              return { product_id: i.product_id, type, image };
-            })
-            .catch(() => ({ product_id: i.product_id, type: '', image: i.product_image }))
-        )
+        missingType.map(async (i) => {
+          const matches = await searchOwner.searchByGame(i.product_name, 'magic', 20, { includeInventory: false });
+          const resolved = matches.find((card) => card.id === i.product_id)
+            || matches.find((card) => String(card.set_code || '').toUpperCase() === String(i.set_code || '').toUpperCase())
+            || matches[0]
+            || null;
+          return {
+            product_id: i.product_id,
+            type: resolved?.type || resolved?.type_line || i.type || '',
+            image: resolved?.image_url || i.product_image
+          };
+        })
       );
 
       const fixMap = Object.fromEntries(results.map(r => [r.product_id, r]));
@@ -116,14 +118,14 @@ export default function AdvancedDeckBuilderBackup() {
 
   const { data: storeProductsRaw = [] } = useQuery({
     queryKey: ['storeProducts'],
-    queryFn: () => backend.data.Product.filter({ status: 'active' }),
+    queryFn: () => listingOwner.filterProductListings({ status: 'active' }),
     staleTime: 0,
     refetchInterval: 30 * 1000
   });
 
   const { data: storeCardsRaw = [] } = useQuery({
     queryKey: ['storeCards'],
-    queryFn: () => backend.data.Card.filter({ status: 'active' }),
+    queryFn: () => listingOwner.filterCardListings({ status: 'active' }),
     staleTime: 0,
     refetchInterval: 30 * 1000
   });
@@ -186,7 +188,7 @@ export default function AdvancedDeckBuilderBackup() {
         product_id: card.id,
         product_name: card.name,
         product_image: card.image_url,
-        price: card.price || 0,
+        market_price: card.market_price || card.price || 0,
         product_type: selectedGame,
         type: card.type,
         quantity: qty,
@@ -195,7 +197,7 @@ export default function AdvancedDeckBuilderBackup() {
       }];
     }
     
-    const newCost = updatedItems.reduce((sum, i) => sum + ((i.price || 0) * (i.quantity || 1)), 0);
+    const newCost = calculateDeckValue(updatedItems);
     await backend.data.CardList.update(activeDeck.id, { items: updatedItems, estimated_cost: newCost });
     const updatedDeck = { ...activeDeck, items: updatedItems, estimated_cost: newCost };
     setActiveDeck(updatedDeck);
@@ -237,28 +239,15 @@ export default function AdvancedDeckBuilderBackup() {
   const fetchCardVariants = async (cardName) => {
     setLoadingVariants(true);
     try {
-      let variants = [];
-      if (selectedGame === 'magic') {
-        const res = await fetch(`https://api.scryfall.com/cards/search?q=!"${encodeURIComponent(cardName)}"&unique=prints&order=released&sort=set`);
-        const data = await res.json();
-        variants = (data.data || []).map(c => ({
+      const variants = (await searchOwner.searchByGame(cardName, selectedGame, 100, { includeInventory: false }))
+        .map(c => ({
           id: c.id,
           name: c.name,
-          set_name: c.set_name,
-          set_code: c.set.toUpperCase(),
-          image_url: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal,
-          price: c.prices?.usd ? parseFloat(c.prices.usd) : null
+          set_name: c.set_name || c.set || c.set_code || 'Unknown',
+          set_code: String(c.set_code || c.set || '').toUpperCase(),
+          image_url: c.image_url || c.image || c.product_image,
+          market_price: c.market_price || c.price || null
         }));
-      } else if (selectedGame === 'pokemon') {
-        const res = await backend.actions.invoke('searchPokemonCards', { query: cardName });
-        const pokemonCards = res.data?.data || [];
-        variants = pokemonCards.map(c => ({
-          id: c.id,
-          name: c.name,
-          set_name: c.set?.name || 'Unknown',
-          image_url: c.images?.large || c.images?.small
-        }));
-      }
       setSetVariants(variants);
     } catch {
       toast.error('Could not load variants');
@@ -270,10 +259,10 @@ export default function AdvancedDeckBuilderBackup() {
   const updateCardVariant = async (item, newVariant) => {
     const updatedItems = activeDeck.items.map(i =>
       i.product_id === item.product_id 
-        ? { ...i, product_id: newVariant.id, product_image: newVariant.image_url, price: newVariant.price || i.price }
+        ? { ...i, product_id: newVariant.id, product_image: newVariant.image_url, market_price: newVariant.market_price || i.market_price }
         : i
     );
-    const newCost = updatedItems.reduce((sum, i) => sum + ((i.price || 0) * (i.quantity || 1)), 0);
+    const newCost = calculateDeckValue(updatedItems);
     await backend.data.CardList.update(activeDeck.id, { items: updatedItems, estimated_cost: newCost });
     setActiveDeck({ ...activeDeck, items: updatedItems, estimated_cost: newCost });
     setShowSetModal(null);
@@ -382,7 +371,7 @@ export default function AdvancedDeckBuilderBackup() {
         updatedItems.push(item);
       }
     }
-    const newCost = updatedItems.reduce((sum, i) => sum + ((i.price || 0) * (i.quantity || 1)), 0);
+    const newCost = calculateDeckValue(updatedItems);
     await backend.data.CardList.update(activeDeck.id, { items: updatedItems, estimated_cost: newCost });
     setActiveDeck({ ...activeDeck, items: updatedItems, estimated_cost: newCost });
     queryClient.invalidateQueries(['cardlists']);

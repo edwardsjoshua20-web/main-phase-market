@@ -1,90 +1,45 @@
-// Guest cart/wishlist localStorage management
-const CART_KEY = 'guestCart';
-const WISHLIST_KEY = 'guestWishlist';
+// Legacy guest storage adapter. Guest cart is owned by Cart Owner; guest wishlist
+// is owned by Wishlist Owner. Keep this file as a compatibility boundary only.
+import { cartOwner } from '@/services/cart/cartOwner';
+import { wishlistOwner } from '@/services/wishlist/wishlistOwner';
 
 export const getGuestCart = () => {
-  try {
-    const stored = localStorage.getItem(CART_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    localStorage.removeItem(CART_KEY);
-    return [];
-  }
+  return cartOwner.getGuestCart();
 };
 
 export const setGuestCart = (cart) => {
-  try {
-    localStorage.setItem(CART_KEY, JSON.stringify(cart));
-  } catch {
-    localStorage.removeItem(CART_KEY);
-  }
-  window.dispatchEvent(new Event('guestCartUpdated'));
+  return cartOwner.setGuestCart(cart);
 };
 
 export const addToGuestCart = (item) => {
-  const cart = getGuestCart();
-  const existing = cart.find(c => c.card_id === item.card_id);
-  if (existing) {
-    existing.quantity += item.quantity || 1;
-  } else {
-    cart.push({ ...item, id: `guest-${item.card_id}-${Date.now()}` });
-  }
-  setGuestCart(cart);
+  return cartOwner.addGuestItem(item, item.quantity || 1);
 };
 
 export const removeFromGuestCart = (itemId) => {
-  const cart = getGuestCart().filter(item => item.id !== itemId);
-  setGuestCart(cart);
+  return cartOwner.removeGuestItem(itemId);
 };
 
 export const updateGuestCartQuantity = (itemId, quantity) => {
-  const cart = getGuestCart();
-  if (quantity <= 0) {
-    removeFromGuestCart(itemId);
-  } else {
-    const item = cart.find(c => c.id === itemId);
-    if (item) {
-      item.quantity = quantity;
-      setGuestCart(cart);
-    }
-  }
+  return cartOwner.setGuestQuantity(itemId, quantity);
 };
 
 export const getGuestWishlist = () => {
-  try {
-    const stored = localStorage.getItem(WISHLIST_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    localStorage.removeItem(WISHLIST_KEY);
-    return [];
-  }
+  return wishlistOwner.getGuestWishlist();
 };
 
 export const setGuestWishlist = (wishlist) => {
-  try {
-    localStorage.setItem(WISHLIST_KEY, JSON.stringify(wishlist));
-  } catch {
-    localStorage.removeItem(WISHLIST_KEY);
-  }
-  window.dispatchEvent(new Event('guestWishlistUpdated'));
+  return wishlistOwner.setGuestWishlist(wishlist);
 };
 
 export const addToGuestWishlist = (item) => {
-  const wishlist = getGuestWishlist();
-  if (!wishlist.find(w => w.product_id === item.product_id)) {
-    wishlist.push({ ...item, id: `guest-${item.product_id}-${Date.now()}` });
-    setGuestWishlist(wishlist);
-  }
+  return wishlistOwner.addGuestItem(item);
 };
 
 export const removeFromGuestWishlist = (itemId) => {
-  const wishlist = getGuestWishlist().filter(w => w.id !== itemId);
-  setGuestWishlist(wishlist);
+  return wishlistOwner.removeGuestItem(itemId);
 };
 
 export const clearGuestStorage = () => {
-  localStorage.removeItem(CART_KEY);
-  localStorage.removeItem(WISHLIST_KEY);
-  window.dispatchEvent(new Event('guestCartUpdated'));
-  window.dispatchEvent(new Event('guestWishlistUpdated'));
+  cartOwner.clearGuestCart();
+  wishlistOwner.clearGuestWishlist();
 };
