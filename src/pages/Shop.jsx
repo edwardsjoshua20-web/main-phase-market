@@ -42,7 +42,8 @@ import { createPageUrl } from '@/utils';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
 function resolveListingSellPrice(listing = {}) {
-  const value = Number(listing.sell_price ?? listing.price ?? listing.display_price ?? 0);
+  const safeListing = listing || {};
+  const value = Number(safeListing.sell_price ?? safeListing.price ?? safeListing.display_price ?? 0);
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
