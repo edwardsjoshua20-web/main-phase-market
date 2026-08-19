@@ -1413,15 +1413,15 @@ export default function Shop() {
         })()
         }
 
-        {/* Hover Card Preview */}
-        {hoveredCardImage &&
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-            <div className="bg-white rounded-lg shadow-2xl p-3 max-w-xs pointer-events-none border-4 border-blue-500">
+      {/* Hover Card Preview */}
+      {hoveredCardImage &&
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div className="bg-white rounded-lg shadow-2xl p-3 w-72 pointer-events-none border-4 border-blue-500">
               <CardImage
               card={hoveredCardImage}
               alt={hoveredCardImage.name || 'Card preview'}
-              className="w-full h-auto rounded-lg"
-              fallbackClassName="flex aspect-[3/4] w-72 items-center justify-center rounded-lg bg-gray-100 text-sm text-gray-400"
+              className="aspect-[3/4] w-full rounded-lg object-contain"
+              fallbackClassName="flex aspect-[3/4] w-full items-center justify-center rounded-lg bg-gray-100 text-sm text-gray-400"
               loading="eager" />
 
             </div>
@@ -1980,12 +1980,12 @@ export default function Shop() {
       {/* Hover Card Preview */}
       {hoveredCard && getCardImageUrl(hoveredCard) &&
       <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-lg shadow-2xl p-3 max-w-xs pointer-events-none border-4 border-blue-500">
+          <div className="bg-white rounded-lg shadow-2xl p-3 w-72 pointer-events-none border-4 border-blue-500">
             <img
             src={getCardImageUrl(hoveredCard)}
             alt={hoveredCard.name}
             onError={(event) => handleCardImageError(event, hoveredCard)}
-            className="w-full h-auto rounded-lg mb-2" />
+            className="aspect-[3/4] w-full rounded-lg object-contain mb-2" />
 
             <h3 className="font-bold text-sm text-gray-900 mb-1">{hoveredCard.name}</h3>
             {hoveredCard.set_name &&
