@@ -14,7 +14,7 @@ import { AutomationHistoryCard, PipelineControlsCard } from '@/components/admin/
 import { ActionCenterCard, BridgeReadinessCard, DashboardAreaBoardCard, ReadinessCard, SectionCard } from '@/components/admin/AdminOperationsOverviewCards';
 import { CapabilityConfidenceCard, ControlPlaneCard, DataContractsCard, LaunchReadinessCard, OperationsIncidentCard, RecoveryPlaybookCard, RunnerAuditTimelineCard, ServiceLevelCard, SourceGovernanceCard } from '@/components/admin/AdminOperationsHealthCards';
 import { StatusBadge } from '@/components/admin/AdminOperationsShared';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Clock3, RefreshCw, ServerCrash } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Clock3, RefreshCw, ServerCrash, Truck } from 'lucide-react';
 
 function getHoursSince(timestamp) {
   if (!timestamp) return null;
@@ -479,6 +479,12 @@ export default function AdminOperations() {
                 Last checked: <span className="font-medium text-gray-800">{adminOperationsModel.formatDate(displayLastCheckedAt)}</span>
               </div>
             </div>
+            <Button type="button" variant="outline" asChild className="border-gray-200 bg-white">
+              <Link to="/AdminShippingFulfillment">
+                <Truck className="mr-2 h-4 w-4" />
+                Shipping & Fulfillment
+              </Link>
+            </Button>
             <Button
               type="button"
               onClick={handleRefresh}
