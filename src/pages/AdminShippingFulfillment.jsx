@@ -114,7 +114,7 @@ const numberInput = (value, onChange, props = {}) => (
   />
 );
 
-function SupplyIcon({ supply }) {
+function SupplyIcon({ supply, onPreviewChange }) {
   const imageUrl = String(supply.imageUrl || '').trim();
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -123,22 +123,37 @@ function SupplyIcon({ supply }) {
   }, [imageUrl]);
 
   if (imageUrl && !imageFailed) {
+    const showPreview = (event) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const previewSize = 176;
+      const left = Math.min(rect.right + 12, window.innerWidth - previewSize - 12);
+      const top = Math.max(12, Math.min(rect.top + rect.height / 2 - previewSize / 2, window.innerHeight - previewSize - 12));
+      onPreviewChange({
+        imageUrl,
+        name: supply.name,
+        left,
+        top,
+      });
+    };
+
     return (
-      <span className="group relative inline-flex">
+      <span
+        className="inline-flex"
+        onMouseEnter={showPreview}
+        onMouseLeave={() => onPreviewChange(null)}
+        onFocus={showPreview}
+        onBlur={() => onPreviewChange(null)}
+      >
         <img
           src={imageUrl}
           alt={`${supply.name} thumbnail`}
-          onError={() => setImageFailed(true)}
+          onError={() => {
+            setImageFailed(true);
+            onPreviewChange(null);
+          }}
+          tabIndex={0}
           className="h-12 w-12 rounded-lg border border-gray-200 bg-white object-contain"
         />
-        <span className="pointer-events-none absolute left-14 top-1/2 z-50 hidden -translate-y-1/2 rounded-xl border border-gray-200 bg-white p-2 shadow-2xl group-hover:block">
-          <img
-            src={imageUrl}
-            alt={`${supply.name} preview`}
-            onError={() => setImageFailed(true)}
-            className="h-40 w-40 object-contain"
-          />
-        </span>
       </span>
     );
   }
@@ -178,6 +193,7 @@ export default function AdminShippingFulfillment() {
   const [draft, setDraft] = useState(null);
   const [editingSupplyId, setEditingSupplyId] = useState(null);
   const [editingTierId, setEditingTierId] = useState(null);
+  const [supplyPreview, setSupplyPreview] = useState(null);
   const [planningOpen, setPlanningOpen] = useState(false);
   const [calculator, setCalculator] = useState({
     tierId: 'economy-letter',
@@ -402,7 +418,7 @@ export default function AdminShippingFulfillment() {
                           <tr className="align-middle hover:bg-gray-50">
                             <td className="p-3">
                               <div className="flex items-center gap-3">
-                                <SupplyIcon supply={supply} />
+                                <SupplyIcon supply={supply} onPreviewChange={setSupplyPreview} />
                                 <div className="min-w-0">
                                   <div className="font-semibold text-gray-900">{supply.name}</div>
                                   <div className="text-xs text-gray-500">{supply.category}</div>
@@ -677,6 +693,19 @@ export default function AdminShippingFulfillment() {
             </Card>
           </Collapsible>
         </div>
+        {supplyPreview ? (
+          <div
+            className="pointer-events-none fixed z-[100] rounded-xl border border-gray-200 bg-white p-2 shadow-2xl"
+            style={{ left: supplyPreview.left, top: supplyPreview.top }}
+          >
+            <img
+              src={supplyPreview.imageUrl}
+              alt={`${supplyPreview.name} preview`}
+              onError={() => setSupplyPreview(null)}
+              className="h-40 w-40 object-contain"
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );
