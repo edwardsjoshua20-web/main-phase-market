@@ -24,6 +24,7 @@ import RulesReference from './pages/RulesReference';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminInventory from './pages/AdminInventory';
 import AdminOperations from './pages/AdminOperations';
+import AdminShippingFulfillment from './pages/AdminShippingFulfillment';
 import AdvancedDeckBuilderBackup from './pages/AdvancedDeckBuilderBackup';
 import MobileShop from './pages/mobile/MobileShop';
 import MobileDeckBuilder from './pages/mobile/MobileDeckBuilder';
@@ -98,6 +99,7 @@ const AuthenticatedApp = () => {
         <Route path="/ForumThread" element={<ForumThread />} />
         <Route path="/MobileRules" element={<RulesReference />} />
         <Route path="/AdminInventory" element={<AdminInventory />} />
+        <Route path="/AdminShippingFulfillment" element={<AdminShippingFulfillment />} />
         {/* Redirect all other paths to mobile home */}
         <Route path="*" element={<MobileHome />} />
       </Routes>

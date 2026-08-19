@@ -24,7 +24,8 @@ import {
   SquareStack,
   MessagesSquare,
   Crown,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Truck
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -49,7 +50,7 @@ import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { useCartOwner } from '@/hooks/useCartOwner';
 import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
-const adminPages = ['AdminInventory', 'AdminOrders', 'AdminOperations'];
+const adminPages = ['AdminInventory', 'AdminOrders', 'AdminOperations', 'AdminShippingFulfillment'];
 
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
@@ -286,6 +287,7 @@ export default function Layout({ children, currentPageName }) {
                         <>
                           <DropdownMenuItem asChild className="text-gray-700 font-semibold"><Link to="/AdminInventory"><Package className="w-4 h-4 mr-2" />Inventory</Link></DropdownMenuItem>
                           <DropdownMenuItem asChild className="text-gray-700 font-semibold"><Link to="/AdminOperations"><Activity className="w-4 h-4 mr-2" />Operations</Link></DropdownMenuItem>
+                          <DropdownMenuItem asChild className="text-gray-700 font-semibold"><Link to="/AdminShippingFulfillment"><Truck className="w-4 h-4 mr-2" />Shipping</Link></DropdownMenuItem>
                           <DropdownMenuSeparator className="bg-gray-200" />
                         </>
                       )}
@@ -314,6 +316,7 @@ export default function Layout({ children, currentPageName }) {
                           <Link to={createPageUrl('AdminInventory')} onClick={() => setMobileMenuOpen(false)} className="text-lg text-gray-700 hover:text-blue-600">Inventory</Link>
                           <Link to={createPageUrl('AdminOrders')} onClick={() => setMobileMenuOpen(false)} className="text-lg text-gray-700 hover:text-blue-600">Orders</Link>
                           <Link to="/AdminOperations" onClick={() => setMobileMenuOpen(false)} className="text-lg text-gray-700 hover:text-blue-600">Operations</Link>
+                          <Link to="/AdminShippingFulfillment" onClick={() => setMobileMenuOpen(false)} className="text-lg text-gray-700 hover:text-blue-600">Shipping</Link>
                         </>
                       )}
                     </nav>
@@ -458,6 +461,7 @@ export default function Layout({ children, currentPageName }) {
                       <>
                         <DropdownMenuItem asChild className="text-gray-700 font-semibold"><Link to="/AdminInventory"><Package className="w-4 h-4 mr-2" />Inventory</Link></DropdownMenuItem>
                         <DropdownMenuItem asChild className="text-gray-700 font-semibold"><Link to="/AdminOperations"><Activity className="w-4 h-4 mr-2" />Operations</Link></DropdownMenuItem>
+                        <DropdownMenuItem asChild className="text-gray-700 font-semibold"><Link to="/AdminShippingFulfillment"><Truck className="w-4 h-4 mr-2" />Shipping</Link></DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-gray-200" />
                       </>
                     )}

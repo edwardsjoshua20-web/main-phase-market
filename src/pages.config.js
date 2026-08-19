@@ -49,6 +49,7 @@
  */
 import AdminInventory from './pages/AdminInventory';
 import AdminOrders from './pages/AdminOrders';
+import AdminShippingFulfillment from './pages/AdminShippingFulfillment';
 import AdvancedDeckBuilder from './pages/AdvancedDeckBuilder';
 import Article from './pages/Article';
 import CardDetail from './pages/CardDetail';
@@ -65,6 +66,7 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "AdminInventory": AdminInventory,
     "AdminOrders": AdminOrders,
+    "AdminShippingFulfillment": AdminShippingFulfillment,
     "AdvancedDeckBuilder": AdvancedDeckBuilder,
     "Article": Article,
     "CardDetail": CardDetail,
