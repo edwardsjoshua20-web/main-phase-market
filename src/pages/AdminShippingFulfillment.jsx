@@ -28,7 +28,10 @@ import {
 } from '@/services/admin/shippingFulfillmentConfig';
 
 const money = (value) => `$${Number(value || 0).toFixed(2)}`;
-const percent = (value) => `${Number(value || 0).toFixed(2)}%`;
+const LETTER_TIER_LIMITS_OZ = {
+  'economy-letter': 1,
+  'protected-letter': 3.5,
+};
 
 const calculateUnitCost = (supply) => {
   const packQuantity = Math.max(1, Number(supply.packQuantity || 1));
@@ -72,6 +75,34 @@ const getTierSummary = (tier, letterTrack) => {
   };
 };
 
+const isLetterTier = (tier) => Boolean(tier && Object.prototype.hasOwnProperty.call(LETTER_TIER_LIMITS_OZ, tier.id));
+
+const getSupplyById = (draft, supplyId) => draft?.supplies?.find((supply) => supply.id === supplyId);
+
+const getAdditionalOunceCost = (draft) => calculateUnitCost(getSupplyById(draft, 'additional-ounce') || {});
+
+const calculatePostageCost = (tier, weightOz, additionalOunceCost) => {
+  if (!tier) return 0;
+  if (!isLetterTier(tier)) return Number(tier.postageCost || 0);
+  const roundedOunces = Math.max(1, Math.ceil(Number(weightOz || 1)));
+  return Number(tier.postageCost || 0) + Math.max(0, roundedOunces - 1) * Number(additionalOunceCost || 0);
+};
+
+const getRecommendedTier = ({ draft, selectedTier, merchandiseTotal, highestSingleCardValue, weightOz }) => {
+  const tiers = draft?.shippingTiers || [];
+  const byId = (id) => tiers.find((tier) => tier.id === id);
+  const selectedLimit = LETTER_TIER_LIMITS_OZ[selectedTier?.id];
+  const isSelectedOverLimit = selectedLimit && Number(weightOz || 0) > selectedLimit;
+
+  if (highestSingleCardValue >= 75) return byId('high-value') || byId('tracked-package') || selectedTier;
+  if (highestSingleCardValue >= 20 || merchandiseTotal >= 35) return byId('tracked-package') || selectedTier;
+  if (isSelectedOverLimit && Number(weightOz || 0) <= LETTER_TIER_LIMITS_OZ['protected-letter']) {
+    return byId('protected-letter') || selectedTier;
+  }
+  if (isSelectedOverLimit) return byId('tracked-package') || selectedTier;
+  return selectedTier;
+};
+
 const numberInput = (value, onChange, props = {}) => (
   <Input
     type="number"
@@ -86,11 +117,16 @@ const numberInput = (value, onChange, props = {}) => (
 function SupplyIcon({ supply }) {
   if (supply.imageUrl) {
     return (
-      <img
-        src={supply.imageUrl}
-        alt=""
-        className="h-12 w-12 rounded-lg border border-gray-200 bg-white object-contain"
-      />
+      <span className="group relative inline-flex">
+        <img
+          src={supply.imageUrl}
+          alt=""
+          className="h-12 w-12 rounded-lg border border-gray-200 bg-white object-contain"
+        />
+        <span className="pointer-events-none absolute left-14 top-0 z-50 hidden rounded-xl border border-gray-200 bg-white p-2 shadow-2xl group-hover:block">
+          <img src={supply.imageUrl} alt={`${supply.name} preview`} className="h-40 w-40 object-contain" />
+        </span>
+      </span>
     );
   }
   const Icon = supply.id === 'knaon-y41bt' ? Printer : PackageCheck;
@@ -193,24 +229,46 @@ export default function AdminShippingFulfillment() {
 
   const fulfillmentMath = useMemo(() => {
     if (!draft || !selectedTier) return null;
-    const orderValue = Number(calculator.orderValue || 0);
-    const highestCardValue = Number(calculator.highestCardValue || 0);
-    const tierCharge = Number(selectedTier.customerCharge || 0);
-    const letterTrackCharge = calculator.letterTrack ? Number(draft.letterTrack?.customerAddOn || 0) : 0;
-    const letterTrackCost = calculator.letterTrack ? Number(draft.letterTrack?.cost || 0) : 0;
-    const fulfillmentCost = Number(selectedTier.postageCost || 0)
-      + Number(selectedTier.packagingCost || 0)
-      + Number(selectedTier.handlingCost || 0)
+    const merchandiseTotal = Number(calculator.orderValue || 0);
+    const highestSingleCardValue = Number(calculator.highestCardValue || 0);
+    const weightOz = Math.max(0, Number(calculator.weightOz || 0));
+    const additionalOunceCost = getAdditionalOunceCost(draft);
+    const recommendedTier = getRecommendedTier({
+      draft,
+      selectedTier,
+      merchandiseTotal,
+      highestSingleCardValue,
+      weightOz,
+    });
+    const letterTrackEligible = isLetterTier(recommendedTier) && highestSingleCardValue < 20 && merchandiseTotal < 35;
+    const letterTrackEnabled = calculator.letterTrack && letterTrackEligible;
+    const letterTrackCharge = letterTrackEnabled ? Number(draft.letterTrack?.customerAddOn || 0) : 0;
+    const letterTrackCost = letterTrackEnabled ? Number(draft.letterTrack?.cost || 0) : 0;
+    const postageCost = calculatePostageCost(recommendedTier, weightOz, additionalOunceCost);
+    const packagingAndHandling = Number(recommendedTier.packagingCost || 0) + Number(recommendedTier.handlingCost || 0);
+    const fulfillmentCost = postageCost
+      + packagingAndHandling
       + letterTrackCost;
-    const customerShipping = tierCharge + letterTrackCharge;
-    const grossCustomerTotal = orderValue + customerShipping;
+    const customerShipping = Number(recommendedTier.customerCharge || 0) + letterTrackCharge;
+    const grossCustomerTotal = merchandiseTotal + customerShipping;
     const paymentFee = grossCustomerTotal * (Number(draft.paymentFee?.percent || 0) / 100) + Number(draft.paymentFee?.fixed || 0);
-    const contribution = grossCustomerTotal - fulfillmentCost - paymentFee;
-    const recommendedTier = highestCardValue >= 20 || orderValue >= 35
-      ? 'Tracked Package'
-      : selectedTier.name;
+    const estimatedProfit = grossCustomerTotal - fulfillmentCost - paymentFee;
     const shippingMargin = customerShipping - fulfillmentCost;
-    return { customerShipping, fulfillmentCost, paymentFee, contribution, recommendedTier, shippingMargin, letterTrackCost };
+    return {
+      customerShipping,
+      fulfillmentCost,
+      paymentFee,
+      estimatedProfit,
+      recommendedTier,
+      recommendedTierName: recommendedTier.name,
+      shippingMargin,
+      letterTrackCost,
+      letterTrackEligible,
+      postageCost,
+      packagingAndHandling,
+      merchandiseTotal,
+      weightOz,
+    };
   }, [draft, selectedTier, calculator]);
 
   const breakEvenMath = useMemo(() => {
@@ -251,8 +309,8 @@ export default function AdminShippingFulfillment() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="mx-auto max-w-[1800px] px-3 py-6 lg:px-6">
+        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="mb-4 flex items-center gap-3">
               <Button variant="outline" asChild>
@@ -264,9 +322,6 @@ export default function AdminShippingFulfillment() {
               <Badge className="border-blue-200 bg-blue-50 text-blue-700">Admin only</Badge>
             </div>
             <h1 className="text-3xl font-bold text-gray-900">Shipping & Fulfillment</h1>
-            <p className="mt-2 max-w-3xl text-sm text-gray-600">
-              Manage shipping supplies, everyday shipping tiers, and fulfillment math without exposing every configuration field at once.
-            </p>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right text-xs text-gray-500">
@@ -284,50 +339,45 @@ export default function AdminShippingFulfillment() {
           </div>
         </div>
 
-        <div className="mb-6 grid gap-4 md:grid-cols-4">
-          <MetricCard label="Tracked supplies" value={supplySummary.total} note="Fulfillment supplies only" />
-          <MetricCard label="Low stock" value={supplySummary.low} note="At or below threshold" />
-          <MetricCard label="Out of stock" value={supplySummary.out} note="Needs source/restock" />
-          <MetricCard label="Supply value" value={money(supplySummary.totalValue)} note="On-hand estimate" />
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+          <Badge variant="outline" className="bg-white">Tracked supplies: {supplySummary.total}</Badge>
+          <Badge variant="outline" className="bg-white">Low stock: {supplySummary.low}</Badge>
+          <Badge variant="outline" className="bg-white">Out of stock: {supplySummary.out}</Badge>
+          <Badge variant="outline" className="bg-white">Supply value: {money(supplySummary.totalValue)}</Badge>
         </div>
 
-        <Card className="mb-6 border-blue-200 bg-blue-50/50">
-          <CardContent className="flex gap-3 p-4">
+        <div className="mb-5 flex gap-3 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" />
             <div className="text-sm text-blue-950">
               <div className="font-semibold">Locked business rule</div>
-              <p>
+              <p className="mt-0.5">
                 Shipping and handling can cover postage, packaging, labels, tracking tools, overhead, and a modest margin.
                 Keep it fair: no gouging, no hiding sellable card inventory inside fulfillment supplies.
               </p>
             </div>
-          </CardContent>
-        </Card>
+        </div>
 
         <div className="space-y-6">
-          <Card className="border-gray-200">
-            <CardHeader>
+          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2 text-xl">
+                  <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
                     <PackageCheck className="h-5 w-5" />
                     Shipping supplies
-                  </CardTitle>
-                  <p className="mt-1 text-sm text-gray-500">Day-to-day supply counts, unit cost, status, and restock links.</p>
+                  </h2>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto rounded-lg border border-gray-200">
-                <table className="w-full min-w-[780px] text-sm">
+              <div className="mt-4 overflow-visible rounded-lg border border-gray-200">
+                <table className="w-full min-w-[980px] text-sm">
                   <thead className="bg-gray-100 text-left text-xs uppercase tracking-wide text-gray-500">
                     <tr>
                       <th className="p-3">Supply</th>
                       <th className="p-3">On hand</th>
                       <th className="p-3">Unit</th>
                       <th className="p-3">Status</th>
+                      <th className="p-3">Supplier</th>
                       <th className="p-3">Restock</th>
-                      <th className="p-3 text-right">Manage</th>
+                      <th className="p-3 text-right">Edit</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
@@ -353,6 +403,9 @@ export default function AdminShippingFulfillment() {
                             <td className="p-3 font-semibold text-gray-900">{money(calculateUnitCost(supply))} each</td>
                             <td className="p-3">{statusBadge(status)}</td>
                             <td className="p-3">
+                              <div className="font-medium text-gray-900">{supply.sourceName || '—'}</div>
+                            </td>
+                            <td className="p-3">
                               {supply.sourceUrl ? (
                                 <Button variant="outline" size="sm" asChild>
                                   <a href={supply.sourceUrl} target="_blank" rel="noreferrer">
@@ -376,7 +429,7 @@ export default function AdminShippingFulfillment() {
                           </tr>
                           {isEditing ? (
                             <tr className="bg-slate-50/70">
-                              <td colSpan={6} className="p-4">
+                              <td colSpan={7} className="p-4">
                                 <div className="grid gap-4 lg:grid-cols-3">
                                   <Field label="Supply name">
                                     <Input value={supply.name} onChange={(event) => updateSupply(index, { name: event.target.value })} className="h-9" />
@@ -422,19 +475,14 @@ export default function AdminShippingFulfillment() {
                   </tbody>
                 </table>
               </div>
-            </CardContent>
-          </Card>
+          </section>
 
-          <Card className="border-gray-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
+          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
                 <Truck className="h-5 w-5" />
                 Shipping policy
-              </CardTitle>
-              <p className="text-sm text-gray-500">Readable customer-facing tiers first. Internal postage math stays one click deeper.</p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid gap-3 lg:grid-cols-3">
+              </h2>
+              <div className="mt-4 grid gap-3 lg:grid-cols-4">
                 {draft.shippingTiers.map((tier, index) => {
                   const summary = getTierSummary(tier, draft.letterTrack);
                   const isEditing = editingTierId === tier.id;
@@ -484,26 +532,21 @@ export default function AdminShippingFulfillment() {
                   );
                 })}
               </div>
-            </CardContent>
-          </Card>
+          </section>
 
-          <Card className="border-gray-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
+          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
                 <Calculator className="h-5 w-5" />
                 Fulfillment calculator
-              </CardTitle>
-              <p className="text-sm text-gray-500">Estimate the right shipping choice and margin for an order before packing it.</p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              </h2>
+              <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
                 <Field label="Cards">
                   {numberInput(calculator.cards, (value) => setCalculator((current) => ({ ...current, cards: value })))}
                 </Field>
-                <Field label="Order value">
+                <Field label="Merchandise total">
                   {numberInput(calculator.orderValue, (value) => setCalculator((current) => ({ ...current, orderValue: value })), { step: '0.01' })}
                 </Field>
-                <Field label="Highest card">
+                <Field label="Highest single card value">
                   {numberInput(calculator.highestCardValue, (value) => setCalculator((current) => ({ ...current, highestCardValue: value })), { step: '0.01' })}
                 </Field>
                 <Field label="Shipping tier">
@@ -528,28 +571,31 @@ export default function AdminShippingFulfillment() {
                 </label>
               </div>
               {fulfillmentMath ? (
-                <div className="rounded-lg border border-gray-200 bg-slate-50 p-4">
-                  <div className="mb-3 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-gray-500">Recommended tier</div>
-                      <div className="text-xl font-bold text-gray-900">{fulfillmentMath.recommendedTier}</div>
-                    </div>
-                    <Badge className={fulfillmentMath.shippingMargin >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}>
-                      Margin {money(fulfillmentMath.shippingMargin)}
-                    </Badge>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-                    <MetricCard label="Postage" value={money(Number(selectedTier.postageCost || 0))} />
-                    <MetricCard label="Packaging" value={money(Number(selectedTier.packagingCost || 0) + Number(selectedTier.handlingCost || 0))} note="packaging + handling" />
-                    <MetricCard label="LetterTrack" value={money(fulfillmentMath.letterTrackCost)} />
-                    <MetricCard label="Fulfillment cost" value={money(fulfillmentMath.fulfillmentCost)} />
-                    <MetricCard label="Customer S&H" value={money(fulfillmentMath.customerShipping)} />
-                    <MetricCard label="Contribution" value={money(fulfillmentMath.contribution)} note={`Fee ${money(fulfillmentMath.paymentFee)}`} />
+                <div className="mt-4 rounded-lg border border-gray-200 bg-slate-50 p-4">
+                  <div className="grid gap-x-8 gap-y-2 text-sm md:grid-cols-2 xl:grid-cols-3">
+                    {[
+                      ['Recommended Tier', fulfillmentMath.recommendedTierName],
+                      ['Merchandise Total', money(fulfillmentMath.merchandiseTotal)],
+                      ['Customer S&H', money(fulfillmentMath.customerShipping)],
+                      ['Postage', money(fulfillmentMath.postageCost)],
+                      ['Packaging', money(fulfillmentMath.packagingAndHandling)],
+                      ['LetterTrack', fulfillmentMath.letterTrackEligible ? money(fulfillmentMath.letterTrackCost) : 'Not eligible for this tier'],
+                      ['Fulfillment Cost', money(fulfillmentMath.fulfillmentCost)],
+                      ['Estimated Payment Processing Fee', money(fulfillmentMath.paymentFee)],
+                      ['Shipping Margin', money(fulfillmentMath.shippingMargin)],
+                      ['Estimated Profit', money(fulfillmentMath.estimatedProfit)],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between gap-4 border-b border-gray-200 py-2">
+                        <span className="font-medium text-gray-600">{label}</span>
+                        <span className={`font-semibold ${label === 'Estimated Profit' && fulfillmentMath.estimatedProfit < 0 ? 'text-red-700' : 'text-gray-950'}`}>
+                          {value}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : null}
-            </CardContent>
-          </Card>
+          </section>
 
           <Collapsible open={planningOpen} onOpenChange={setPlanningOpen}>
             <Card className="border-gray-200">

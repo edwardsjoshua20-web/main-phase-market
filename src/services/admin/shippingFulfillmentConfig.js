@@ -69,8 +69,8 @@ export const DEFAULT_SHIPPING_FULFILLMENT_CONFIG = {
       name: 'Resealable team bags',
       category: 'Packaging',
       imageUrl: '',
-      sourceName: '',
-      sourceUrl: '',
+      sourceName: 'Amazon',
+      sourceUrl: 'https://www.amazon.com/s?k=resealable+team+bags+trading+cards',
       expectedPurchasePrice: 6.99,
       packQuantity: 100,
       quantityOnHand: 0,
@@ -82,8 +82,8 @@ export const DEFAULT_SHIPPING_FULFILLMENT_CONFIG = {
       name: 'Plain envelopes',
       category: 'Packaging',
       imageUrl: '',
-      sourceName: '',
-      sourceUrl: '',
+      sourceName: 'Amazon',
+      sourceUrl: 'https://www.amazon.com/s?k=plain+white+envelopes',
       expectedPurchasePrice: 8.99,
       packQuantity: 100,
       quantityOnHand: 0,
@@ -95,8 +95,8 @@ export const DEFAULT_SHIPPING_FULFILLMENT_CONFIG = {
       name: '4x6 direct thermal labels',
       category: 'Labels',
       imageUrl: '',
-      sourceName: '',
-      sourceUrl: '',
+      sourceName: 'Amazon',
+      sourceUrl: 'https://www.amazon.com/s?k=4x6+direct+thermal+labels',
       expectedPurchasePrice: 12.99,
       packQuantity: 500,
       quantityOnHand: 0,
@@ -160,8 +160,8 @@ export const DEFAULT_SHIPPING_FULFILLMENT_CONFIG = {
       name: 'KNAON Y41BT thermal printer',
       category: 'Equipment',
       imageUrl: '',
-      sourceName: '',
-      sourceUrl: '',
+      sourceName: 'Amazon',
+      sourceUrl: 'https://www.amazon.com/s?k=KNAON+Y41BT+thermal+printer',
       expectedPurchasePrice: 79.99,
       packQuantity: 1,
       quantityOnHand: 0,
@@ -183,28 +183,36 @@ const createId = () => {
   return `supply-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
-const normalizeSupply = (supply = {}) => ({
-  id: String(supply.id || supply.name || createId()),
-  name: String(supply.name || 'Unnamed supply'),
-  category: String(supply.category || 'Supply'),
-  imageUrl: String(supply.imageUrl || ''),
-  sourceName: String(supply.sourceName || ''),
-  sourceUrl: String(supply.sourceUrl || ''),
-  expectedPurchasePrice: toNumber(supply.expectedPurchasePrice, 0),
-  packQuantity: Math.max(1, toNumber(supply.packQuantity, 1)),
-  quantityOnHand: Math.max(0, toNumber(supply.quantityOnHand, 0)),
-  lowStockThreshold: Math.max(0, toNumber(supply.lowStockThreshold, 0)),
-  notes: String(supply.notes || ''),
+const preferNonBlank = (value, fallback = '') => {
+  const text = String(value ?? '').trim();
+  return text || String(fallback ?? '');
+};
+
+const normalizeSupply = (supply = {}, defaultSupply = {}) => ({
+  id: String(supply.id || defaultSupply.id || supply.name || createId()),
+  name: preferNonBlank(supply.name, defaultSupply.name || 'Unnamed supply'),
+  category: preferNonBlank(supply.category, defaultSupply.category || 'Supply'),
+  imageUrl: preferNonBlank(supply.imageUrl, defaultSupply.imageUrl),
+  sourceName: preferNonBlank(supply.sourceName, defaultSupply.sourceName),
+  sourceUrl: preferNonBlank(supply.sourceUrl, defaultSupply.sourceUrl),
+  expectedPurchasePrice: toNumber(supply.expectedPurchasePrice, defaultSupply.expectedPurchasePrice || 0),
+  packQuantity: Math.max(1, toNumber(supply.packQuantity, defaultSupply.packQuantity || 1)),
+  quantityOnHand: Math.max(0, toNumber(supply.quantityOnHand, defaultSupply.quantityOnHand || 0)),
+  lowStockThreshold: Math.max(0, toNumber(supply.lowStockThreshold, defaultSupply.lowStockThreshold || 0)),
+  notes: preferNonBlank(supply.notes, defaultSupply.notes),
 });
 
 export function normalizeShippingFulfillmentConfig(config = {}) {
   const defaults = deepClone(DEFAULT_SHIPPING_FULFILLMENT_CONFIG);
+  const defaultSupplyById = new Map(defaults.supplies.map((supply) => [supply.id, supply]));
   return {
     ...defaults,
     ...config,
     id: SHIPPING_FULFILLMENT_CONFIG_ID,
     version: 1,
-    supplies: Array.isArray(config.supplies) ? config.supplies.map(normalizeSupply) : defaults.supplies,
+    supplies: Array.isArray(config.supplies)
+      ? config.supplies.map((supply) => normalizeSupply(supply, defaultSupplyById.get(supply?.id) || {}))
+      : defaults.supplies,
     shippingTiers: Array.isArray(config.shippingTiers) && config.shippingTiers.length
       ? config.shippingTiers.map((tier) => ({
           ...tier,
