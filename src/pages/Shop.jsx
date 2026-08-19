@@ -24,6 +24,7 @@ import {
 import { Search, X, Package, Loader2, ChevronDown, ChevronRight, Mail, Layers, Box, Dice1, Heart, ShoppingCart } from 'lucide-react';
 import QuickViewDialog from '@/components/store/QuickViewDialog';
 import AdvancedSearch from '@/components/store/AdvancedSearch';
+import CardImage from '@/components/cards/CardImage';
 import { toast } from 'sonner';
 import {
   GAME_OPTIONS,
@@ -258,14 +259,13 @@ export default function Shop() {
   };
 
   const getResultGridImageUrl = getCardImageUrl;
-  const getResultPreviewImageUrl = getCardImageUrl;
 
-  const handleCardImagePreviewEnter = (imageUrl) => {
-    if (!imageUrl) return;
+  const handleCardImagePreviewEnter = (card) => {
+    if (!getCardImageUrl(card)) return;
     const sequence = ++hoverSequenceRef.current;
     clearHoverTimer(hoveredCardTimerRef);
     setHoveredCard(null);
-    scheduleHoverState(hoveredCardImageTimerRef, setHoveredCardImage, imageUrl, HOVER_OPEN_DELAY_MS, sequence);
+    scheduleHoverState(hoveredCardImageTimerRef, setHoveredCardImage, card, HOVER_OPEN_DELAY_MS, sequence);
   };
 
   const handleCardImagePreviewLeave = () => {
@@ -1204,7 +1204,6 @@ export default function Shop() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
             {pagedResults.map((result, idx) => {
               const gridImageUrl = getResultGridImageUrl(result);
-              const previewImageUrl = getResultPreviewImageUrl(result);
               const listingSellPrice = resolveResultSellPrice(result);
               const marketPrice = resolveMarketPrice(result);
               const hasActiveListingPrice = result.inStock && listingSellPrice != null;
@@ -1269,7 +1268,7 @@ export default function Shop() {
                 openStarWarsCardDetail(result);
               }
             }}
-            onMouseEnter={() => handleCardImagePreviewEnter(previewImageUrl)}
+            onMouseEnter={() => handleCardImagePreviewEnter(result)}
             onMouseLeave={handleCardImagePreviewLeave}
             className={`group bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all duration-200 ${(groupedMagicSearchResults.length > 0 && result.oracle_id) || ((result.game === 'pokemon' || result.game === 'yugioh' || result.game === 'lorcana' || result.game === 'onepiece' || result.game === 'flesh_and_blood' || result.game === 'starwars') && result.id) ? 'cursor-pointer' : ''}`}>
 
@@ -1418,10 +1417,12 @@ export default function Shop() {
         {hoveredCardImage &&
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
             <div className="bg-white rounded-lg shadow-2xl p-3 max-w-xs pointer-events-none border-4 border-blue-500">
-              <img
-              src={hoveredCardImage}
-              alt="Card preview"
-              className="w-full h-auto rounded-lg" />
+              <CardImage
+              card={hoveredCardImage}
+              alt={hoveredCardImage.name || 'Card preview'}
+              className="w-full h-auto rounded-lg"
+              fallbackClassName="flex aspect-[3/4] w-72 items-center justify-center rounded-lg bg-gray-100 text-sm text-gray-400"
+              loading="eager" />
 
             </div>
           </div>
