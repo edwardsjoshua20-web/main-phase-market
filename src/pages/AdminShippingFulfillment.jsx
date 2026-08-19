@@ -115,16 +115,29 @@ const numberInput = (value, onChange, props = {}) => (
 );
 
 function SupplyIcon({ supply }) {
-  if (supply.imageUrl) {
+  const imageUrl = String(supply.imageUrl || '').trim();
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUrl]);
+
+  if (imageUrl && !imageFailed) {
     return (
       <span className="group relative inline-flex">
         <img
-          src={supply.imageUrl}
-          alt=""
+          src={imageUrl}
+          alt={`${supply.name} thumbnail`}
+          onError={() => setImageFailed(true)}
           className="h-12 w-12 rounded-lg border border-gray-200 bg-white object-contain"
         />
-        <span className="pointer-events-none absolute left-14 top-0 z-50 hidden rounded-xl border border-gray-200 bg-white p-2 shadow-2xl group-hover:block">
-          <img src={supply.imageUrl} alt={`${supply.name} preview`} className="h-40 w-40 object-contain" />
+        <span className="pointer-events-none absolute left-14 top-1/2 z-50 hidden -translate-y-1/2 rounded-xl border border-gray-200 bg-white p-2 shadow-2xl group-hover:block">
+          <img
+            src={imageUrl}
+            alt={`${supply.name} preview`}
+            onError={() => setImageFailed(true)}
+            className="h-40 w-40 object-contain"
+          />
         </span>
       </span>
     );
