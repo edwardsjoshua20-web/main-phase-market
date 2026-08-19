@@ -57,6 +57,9 @@ function buildDueJobs(now: Date): PlannedJob[] {
       { jobId: 'card-backfill-refresh', reason: 'daily raw card refresh' }
     );
   }
+  if (hour === 14) {
+    jobs.push({ jobId: 'inventory-backup', reason: 'daily physical inventory backup' });
+  }
   if (hour === 15 && isEveryOtherUtcDay(now)) {
     jobs.push({ jobId: 'catalog-refresh', reason: 'every-other-day catalog normalization' });
   }

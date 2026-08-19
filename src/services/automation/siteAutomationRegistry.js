@@ -81,6 +81,22 @@ export const siteAutomationRegistry = [
     purpose: 'Refresh normalized source snapshots, then compute Main Phase Market target pricing from the merged source pipeline.'
   },
   {
+    id: 'inventory-backup',
+    label: 'Physical inventory backup',
+    cadence: 'daily',
+    owner: 'inventory',
+    runnerJob: 'inventory-backup',
+    script: 'npm run automation:inventory-backup',
+    commands: [
+      ['node', 'scripts/run-inventory-backup.mjs']
+    ],
+    dependsOn: [],
+    blocks: [],
+    readiness: 'Safe to run independently. Captures physical Card/Product stock before any large inventory entry or maintenance work.',
+    outputs: ['inventory_backup_runs', 'inventory_backup_items', 'inventory_mutation_audit'],
+    purpose: 'Create a durable Supabase snapshot of physical inventory and keep restore/audit proof visible in Operations.'
+  },
+  {
     id: 'system-health-report',
     label: 'System health report',
     cadence: 'hourly',
@@ -95,12 +111,13 @@ export const siteAutomationRegistry = [
     blocks: [],
     readiness: 'Safe after any pipeline. Rebuilds the operational report Admin Operations reads.',
     outputs: ['public/data/site/system-health.json'],
-    purpose: 'Track freshness and coverage for homepage feeds, catalogs, image mirrors, and pricing so problems are visible before users find them.'
+    purpose: 'Track freshness and coverage for homepage feeds, catalogs, image mirrors, pricing, inventory backups, and readiness so problems are visible before users find them.'
   }
 ];
 
 export const siteAutomationSections = {
   homepage: ['homepage-upcoming-releases', 'system-health-report'],
+  inventory: ['inventory-backup', 'system-health-report'],
   catalogs: ['card-backfill-refresh', 'catalog-refresh'],
   images: ['image-repair-sync'],
   pricing: ['pricing-refresh'],
@@ -127,6 +144,10 @@ export const siteAutomationPipelines = {
   pricing: {
     label: 'Pricing pipeline',
     steps: ['pricing-refresh', 'system-health-report']
+  },
+  'inventory-backup': {
+    label: 'Inventory backup pipeline',
+    steps: ['inventory-backup', 'system-health-report']
   },
   health: {
     label: 'Health pipeline',

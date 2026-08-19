@@ -33,6 +33,7 @@ function getBusinessCoreSummary(sections = {}) {
     { key: 'catalogs', label: 'Card catalogs', status: normalizeStatus(sections.catalogs?.overallStatus) },
     { key: 'images', label: 'Image pipelines', status: normalizeStatus(sections.images?.overallStatus) },
     { key: 'pricing', label: 'Pricing', status: normalizeStatus(sections.pricing?.status) },
+    { key: 'inventory', label: 'Inventory durability', status: normalizeStatus(sections.inventory?.status) },
     { key: 'readiness', label: 'Launch readiness', status: normalizeStatus(sections.readiness?.overallStatus) }
   ];
   const healthy = systems.filter((system) => system.status === 'ok').length;
@@ -182,7 +183,7 @@ function getBeastLayers({ businessCoreSummary, reportFreshnessStatus, controlSta
       status: businessCoreSummary.topStatus,
       headline: businessCoreSummary.topStatus === 'ok' ? 'Running' : 'Needs work',
       detail: businessCoreSummary.topStatus === 'ok'
-        ? 'Catalogs, images, pricing, homepage, and launch readiness are healthy.'
+        ? 'Catalogs, images, pricing, inventory backups, homepage, and launch readiness are healthy.'
         : `${businessCoreSummary.healthy}/${businessCoreSummary.total} core business systems are currently green.`
     },
     {
@@ -312,6 +313,12 @@ export default function AdminOperations() {
           detail: sections.pricing?.diagnostics?.[0] || 'Pricing data is not current yet.'
         }
       : null,
+    sections.inventory?.status !== 'ok'
+      ? {
+          title: 'Inventory backup protection needs attention',
+          detail: sections.inventory?.diagnostics?.[0] || 'Inventory backup/audit proof is not healthy yet.'
+        }
+      : null,
     reportFreshnessStatus !== 'ok'
       ? {
           title: 'Hosted report is out of date',
@@ -367,6 +374,8 @@ export default function AdminOperations() {
     schedulerEnabled,
     attentionItems
   });
+  const topBlocker = attentionItems[0] || null;
+
   const ownerInvestorSnapshot = buildOwnerInvestorSnapshot({
     summary,
     businessCoreSummary,
@@ -387,7 +396,6 @@ export default function AdminOperations() {
     ? controlStatus.bridge.activationContract
     : [];
 
-  const topBlocker = attentionItems[0] || null;
   const operatorControlStatus = !controlStatus?.available
     ? 'degraded'
     : schedulerEnabled
@@ -424,6 +432,13 @@ export default function AdminOperations() {
       tertiary: `Last update: ${adminOperationsModel.formatDate(sections.pricing?.snapshot?.file?.modifiedAt || generatedAt)}`
     },
     {
+      title: 'Inventory Backup',
+      status: sections.inventory?.status || 'missing',
+      primary: sections.inventory?.status === 'ok' ? 'Protected' : 'Needs attention',
+      secondary: `Items backed up: ${sections.inventory?.latestBackup?.entityCount ?? 0} • Audit rows: ${sections.inventory?.audit?.mutationRows ?? 0}`,
+      tertiary: `Last backup: ${adminOperationsModel.formatDate(sections.inventory?.latestBackup?.createdAt)}`
+    },
+    {
       title: 'Automations',
       status: controlStatus?.available && schedulerEnabled ? 'ok' : 'degraded',
       primary: schedulerEnabled ? 'Running on schedule' : 'Scheduler not active yet',
@@ -453,7 +468,7 @@ export default function AdminOperations() {
               <Link to="/" className="text-sm text-gray-500 hover:text-gray-800">Site</Link>
             </div>
             <h1 className="text-3xl font-bold text-gray-900">Admin Operations</h1>
-            <p className="text-gray-500 mt-1">The business control room for catalogs, images, pricing, homepage feeds, and the automations that keep them alive.</p>
+            <p className="text-gray-500 mt-1">The business control room for catalogs, images, pricing, physical inventory protection, homepage feeds, and the automations that keep them alive.</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-sm text-gray-500 text-right space-y-1">
@@ -772,7 +787,7 @@ export default function AdminOperations() {
         <Card className="border-gray-200">
           <CardHeader>
             <CardTitle className="text-xl text-gray-900">Business systems</CardTitle>
-            <p className="text-sm text-gray-500 mt-1">The five systems that matter most day to day.</p>
+            <p className="text-sm text-gray-500 mt-1">The core systems that matter most day to day, including physical inventory protection.</p>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -927,6 +942,7 @@ export default function AdminOperations() {
               <SectionCard title="Catalog pipelines" sectionKey="catalogs" section={sections.catalogs} automationRuns={automationRuns} />
               <SectionCard title="Image pipelines" sectionKey="images" section={sections.images} automationRuns={automationRuns} />
               <SectionCard title="Pricing pipelines" sectionKey="pricing" section={sections.pricing} automationRuns={automationRuns} />
+              <SectionCard title="Inventory durability" sectionKey="inventory" section={sections.inventory} automationRuns={automationRuns} />
             </div>
           </div>
         </details>

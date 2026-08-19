@@ -31,7 +31,8 @@ const STALE_ACTIVE_LIMITS_MS: Record<string, number> = {
   'pricing-refresh': 45 * 60 * 1000,
   'card-backfill-refresh': 2 * 60 * 60 * 1000,
   'catalog-refresh': 2 * 60 * 60 * 1000,
-  'image-repair-sync': 6 * 60 * 60 * 1000
+  'image-repair-sync': 6 * 60 * 60 * 1000,
+  'inventory-backup': 30 * 60 * 1000
 };
 
 function serviceHeaders() {

@@ -24,7 +24,8 @@ const AGE_LIMITS_HOURS = {
   pricingSnapshot: 36,
   pricingSource: 36,
   catalog: 72,
-  imageManifest: 48
+  imageManifest: 48,
+  inventoryBackup: 30
 };
 const STALE_ACTIVE_LIMITS_MS = {
   'system-health-report': 15 * 60 * 1000,
@@ -32,7 +33,8 @@ const STALE_ACTIVE_LIMITS_MS = {
   'pricing-refresh': 45 * 60 * 1000,
   'card-backfill-refresh': 2 * 60 * 60 * 1000,
   'catalog-refresh': 2 * 60 * 60 * 1000,
-  'image-repair-sync': 6 * 60 * 60 * 1000
+  'image-repair-sync': 6 * 60 * 60 * 1000,
+  'inventory-backup': 30 * 60 * 1000
 };
 
 function ensureDir(dirPath) {
@@ -755,6 +757,132 @@ function buildPricingHealth() {
   };
 }
 
+async function readSupabaseJson(config, relativePath, { headers = {} } = {}) {
+  const response = await fetch(`${String(config.supabaseUrl).replace(/\/+$/, '')}${relativePath}`, {
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      Accept: 'application/json',
+      ...headers
+    }
+  });
+
+  const text = await response.text().catch(() => '');
+  if (!response.ok) {
+    throw new Error(`Supabase request failed ${response.status}: ${text.slice(0, 300)}`);
+  }
+
+  return {
+    data: text ? JSON.parse(text) : null,
+    response
+  };
+}
+
+function parseContentRangeTotal(value) {
+  const match = String(value || '').match(/\/(\d+)$/);
+  return match ? Number(match[1]) : null;
+}
+
+async function getSupabaseCount(config, relativePath) {
+  const { response } = await readSupabaseJson(config, relativePath, {
+    headers: {
+      Prefer: 'count=exact',
+      Range: '0-0'
+    }
+  });
+  return parseContentRangeTotal(response.headers?.get?.('content-range'));
+}
+
+async function buildInventoryDurabilityHealth() {
+  let config;
+  try {
+    config = readSupabaseUploadConfig(ROOT);
+  } catch (error) {
+    return {
+      area: 'inventory',
+      status: 'missing',
+      diagnostics: [`Supabase service configuration is unavailable: ${error?.message || 'unknown error'}`]
+    };
+  }
+
+  if (!config.supabaseUrl || !config.serviceRoleKey) {
+    return {
+      area: 'inventory',
+      status: 'missing',
+      diagnostics: ['Supabase URL or service role key is missing, so inventory backup status cannot be verified.']
+    };
+  }
+
+  try {
+    const latest = await readSupabaseJson(
+      config,
+      '/rest/v1/inventory_backup_runs?select=*&order=created_at.desc&limit=1'
+    );
+    const latestBackup = Array.isArray(latest.data) ? latest.data[0] || null : null;
+    const backupAgeHours = hoursSince(latestBackup?.created_at);
+    const stale = backupAgeHours != null && backupAgeHours > AGE_LIMITS_HOURS.inventoryBackup;
+    const currentInventoryCount = await getSupabaseCount(
+      config,
+      '/rest/v1/app_entities?select=id&entity_name=in.(Card,Product)'
+    );
+    const auditCount = await getSupabaseCount(
+      config,
+      '/rest/v1/inventory_mutation_audit?select=id'
+    );
+
+    const diagnostics = [];
+    if (!latestBackup) {
+      diagnostics.push('No inventory backup run has been recorded yet.');
+    } else if (stale) {
+      diagnostics.push(`Latest inventory backup is ${backupAgeHours.toFixed(1)} hours old, beyond the ${AGE_LIMITS_HOURS.inventoryBackup} hour target.`);
+    }
+    if (latestBackup?.status && latestBackup.status !== 'ok') {
+      diagnostics.push(`Latest inventory backup status is ${latestBackup.status}.`);
+    }
+    if (auditCount === 0) {
+      diagnostics.push('Inventory mutation audit has no rows yet.');
+    }
+    if (diagnostics.length === 0) {
+      diagnostics.push('Inventory backup and audit protection are visible.');
+    }
+
+    return {
+      area: 'inventory',
+      status: statusFromChecks({
+        exists: Boolean(latestBackup),
+        stale,
+        degraded: latestBackup?.status && latestBackup.status !== 'ok'
+      }),
+      latestBackup: latestBackup
+        ? {
+            id: latestBackup.id,
+            reason: latestBackup.reason,
+            status: latestBackup.status,
+            createdAt: latestBackup.created_at,
+            createdBy: latestBackup.created_by,
+            entityCount: Number(latestBackup.entity_count || 0),
+            cardCount: Number(latestBackup.card_count || 0),
+            productCount: Number(latestBackup.product_count || 0),
+            freshnessHours: backupAgeHours
+          }
+        : null,
+      currentInventory: {
+        count: currentInventoryCount
+      },
+      audit: {
+        mutationRows: auditCount
+      },
+      diagnostics
+    };
+  } catch (error) {
+    return {
+      area: 'inventory',
+      status: 'degraded',
+      diagnostics: [`Inventory durability health check failed: ${error?.message || 'unknown error'}`]
+    };
+  }
+}
+
 function buildGameReadiness(catalogs, images) {
   const catalogMap = new Map((catalogs?.entries || []).map((entry) => [entry.game, entry]));
   const imageMap = new Map((images?.entries || []).map((entry) => [entry.game, entry]));
@@ -863,6 +991,7 @@ async function main() {
   const catalogs = await buildCatalogHealth(checkPublishedObject);
   const images = await buildImagesHealth(checkPublishedObject);
   const pricing = buildPricingHealth();
+  const inventory = await buildInventoryDurabilityHealth();
   const readiness = buildGameReadiness(catalogs, images);
 
   const sections = {
@@ -870,6 +999,7 @@ async function main() {
     catalogs,
     images,
     pricing,
+    inventory,
     readiness
   };
 
@@ -877,7 +1007,7 @@ async function main() {
 
   const payload = {
     generatedAt: new Date().toISOString(),
-    overallStatus: buildSummary([homepage, catalogs, images, pricing, readiness]),
+    overallStatus: buildSummary([homepage, catalogs, images, pricing, inventory, readiness]),
     automationLedger: {
       status: ledger.status,
       reason: ledger.reason || null,
@@ -895,6 +1025,7 @@ async function main() {
     catalogs: catalogs.overallStatus,
     images: images.overallStatus,
     pricing: pricing.status,
+    inventory: inventory.status,
     readiness: readiness.overallStatus
   }, null, 2));
 }
