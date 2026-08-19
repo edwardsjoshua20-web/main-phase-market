@@ -223,6 +223,7 @@ export default function Shop() {
   const hoveredCardTimerRef = useRef(null);
   const hoveredCardImageTimerRef = useRef(null);
   const hoveredBoxImageTimerRef = useRef(null);
+  const hoverSequenceRef = useRef(0);
 
   const clearHoverTimer = (timerRef) => {
     if (timerRef.current) {
@@ -231,9 +232,13 @@ export default function Shop() {
     }
   };
 
-  const scheduleHoverState = (timerRef, setter, nextValue, delay) => {
+  const scheduleHoverState = (timerRef, setter, nextValue, delay, sequence = null) => {
     clearHoverTimer(timerRef);
     timerRef.current = setTimeout(() => {
+      if (sequence != null && sequence !== hoverSequenceRef.current) {
+        timerRef.current = null;
+        return;
+      }
       setter(nextValue);
       timerRef.current = null;
     }, delay);
@@ -241,11 +246,15 @@ export default function Shop() {
 
   const handleCardPreviewEnter = (card) => {
     if (!getCardImageUrl(card)) return;
-    scheduleHoverState(hoveredCardTimerRef, setHoveredCard, card, HOVER_OPEN_DELAY_MS);
+    const sequence = ++hoverSequenceRef.current;
+    clearHoverTimer(hoveredCardImageTimerRef);
+    setHoveredCardImage(null);
+    scheduleHoverState(hoveredCardTimerRef, setHoveredCard, card, HOVER_OPEN_DELAY_MS, sequence);
   };
 
   const handleCardPreviewLeave = () => {
-    scheduleHoverState(hoveredCardTimerRef, setHoveredCard, null, HOVER_CLOSE_DELAY_MS);
+    const sequence = ++hoverSequenceRef.current;
+    scheduleHoverState(hoveredCardTimerRef, setHoveredCard, null, HOVER_CLOSE_DELAY_MS, sequence);
   };
 
   const getResultGridImageUrl = getCardImageUrl;
@@ -253,11 +262,15 @@ export default function Shop() {
 
   const handleCardImagePreviewEnter = (imageUrl) => {
     if (!imageUrl) return;
-    scheduleHoverState(hoveredCardImageTimerRef, setHoveredCardImage, imageUrl, HOVER_OPEN_DELAY_MS);
+    const sequence = ++hoverSequenceRef.current;
+    clearHoverTimer(hoveredCardTimerRef);
+    setHoveredCard(null);
+    scheduleHoverState(hoveredCardImageTimerRef, setHoveredCardImage, imageUrl, HOVER_OPEN_DELAY_MS, sequence);
   };
 
   const handleCardImagePreviewLeave = () => {
-    scheduleHoverState(hoveredCardImageTimerRef, setHoveredCardImage, null, HOVER_CLOSE_DELAY_MS);
+    const sequence = ++hoverSequenceRef.current;
+    scheduleHoverState(hoveredCardImageTimerRef, setHoveredCardImage, null, HOVER_CLOSE_DELAY_MS, sequence);
   };
 
   const handleBoxImagePreviewEnter = (imageUrl) => {

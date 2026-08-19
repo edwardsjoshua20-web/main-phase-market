@@ -25,6 +25,7 @@ export default function SearchResultCard({ result, user, onQuickView, onHoverIma
   });
 
   const isWishlisted = wishlist.contains({ product_id: result.id });
+  const previewImageUrl = getCardImageUrl(result);
 
   const addToWishlist = async () => {
     if (!user) { backend.auth.redirectToLogin(window.location.href); return; }
@@ -69,15 +70,16 @@ export default function SearchResultCard({ result, user, onQuickView, onHoverIma
   };
 
   return (
-    <div className="group bg-white rounded-lg border border-gray-200 overflow-visible hover:shadow-lg hover:border-gray-400 transition-all duration-200 relative">
+    <div
+      className="group bg-white rounded-lg border border-gray-200 overflow-visible hover:shadow-lg hover:border-gray-400 transition-all duration-200 relative"
+      onMouseEnter={() => onHoverImage?.(previewImageUrl)}
+      onMouseLeave={() => onHoverImage?.(null)}>
       <div className="aspect-square bg-gray-100 relative overflow-hidden rounded-t-lg">
         <CardImage
           card={result}
           alt={result.name}
           className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300 cursor-pointer"
           fallbackClassName="flex w-full h-full items-center justify-center text-gray-400"
-          onMouseEnter={() => onHoverImage?.(getCardImageUrl(result))}
-          onMouseLeave={() => onHoverImage?.(null)}
         />
 
         {/* Heart button */}
