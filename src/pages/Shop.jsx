@@ -1268,11 +1268,12 @@ export default function Shop() {
                 openStarWarsCardDetail(result);
               }
             }}
-            onMouseEnter={() => handleCardImagePreviewEnter(result)}
-            onMouseLeave={handleCardImagePreviewLeave}
             className={`group bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all duration-200 ${(groupedMagicSearchResults.length > 0 && result.oracle_id) || ((result.game === 'pokemon' || result.game === 'yugioh' || result.game === 'lorcana' || result.game === 'onepiece' || result.game === 'flesh_and_blood' || result.game === 'starwars') && result.id) ? 'cursor-pointer' : ''}`}>
 
-                <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                <div
+                  className="aspect-square bg-gray-100 relative overflow-hidden"
+                  onMouseEnter={() => handleCardImagePreviewEnter(result)}
+                  onMouseLeave={handleCardImagePreviewLeave}>
                     {gridImageUrl ?
                 <img
                   src={gridImageUrl}

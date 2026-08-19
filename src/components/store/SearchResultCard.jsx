@@ -71,10 +71,11 @@ export default function SearchResultCard({ result, user, onQuickView, onHoverIma
 
   return (
     <div
-      className="group bg-white rounded-lg border border-gray-200 overflow-visible hover:shadow-lg hover:border-gray-400 transition-all duration-200 relative"
-      onMouseEnter={() => onHoverImage?.(previewImageUrl)}
-      onMouseLeave={() => onHoverImage?.(null)}>
-      <div className="aspect-square bg-gray-100 relative overflow-hidden rounded-t-lg">
+      className="group bg-white rounded-lg border border-gray-200 overflow-visible hover:shadow-lg hover:border-gray-400 transition-all duration-200 relative">
+      <div
+        className="aspect-square bg-gray-100 relative overflow-hidden rounded-t-lg"
+        onMouseEnter={() => onHoverImage?.(previewImageUrl)}
+        onMouseLeave={() => onHoverImage?.(null)}>
         <CardImage
           card={result}
           alt={result.name}
