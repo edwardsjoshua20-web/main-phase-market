@@ -269,8 +269,9 @@ export default function Shop() {
   };
 
   const handleCardImagePreviewLeave = () => {
-    const sequence = ++hoverSequenceRef.current;
-    scheduleHoverState(hoveredCardImageTimerRef, setHoveredCardImage, null, HOVER_CLOSE_DELAY_MS, sequence);
+    ++hoverSequenceRef.current;
+    clearHoverTimer(hoveredCardImageTimerRef);
+    setHoveredCardImage(null);
   };
 
   const handleBoxImagePreviewEnter = (imageUrl) => {
@@ -1270,10 +1271,7 @@ export default function Shop() {
             }}
             className={`group bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all duration-200 ${(groupedMagicSearchResults.length > 0 && result.oracle_id) || ((result.game === 'pokemon' || result.game === 'yugioh' || result.game === 'lorcana' || result.game === 'onepiece' || result.game === 'flesh_and_blood' || result.game === 'starwars') && result.id) ? 'cursor-pointer' : ''}`}>
 
-                <div
-                  className="aspect-square bg-gray-100 relative overflow-hidden"
-                  onMouseEnter={() => handleCardImagePreviewEnter(result)}
-                  onMouseLeave={handleCardImagePreviewLeave}>
+                <div className="aspect-square bg-gray-100 relative overflow-hidden">
                     {gridImageUrl ?
                 <img
                   src={gridImageUrl}
@@ -1284,6 +1282,13 @@ export default function Shop() {
                   onError={(e) => handleResultImageError(e, result, gridImageUrl)} /> : null}
 
               <div data-image-fallback className={`${gridImageUrl ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-gray-400`}>No Image</div>
+                  {gridImageUrl &&
+                  <div
+                    aria-hidden="true"
+                    className="absolute top-2 bottom-2 left-1/2 aspect-[63/88] -translate-x-1/2"
+                    onMouseEnter={() => handleCardImagePreviewEnter(result)}
+                    onMouseLeave={handleCardImagePreviewLeave} />
+                  }
                   {result.inStock && <Badge className="absolute top-2 right-2 bg-green-600 text-white">In Stock</Badge>}
                 </div>
                 <div className="p-3">

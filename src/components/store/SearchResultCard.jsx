@@ -69,19 +69,29 @@ export default function SearchResultCard({ result, user, onQuickView, onHoverIma
     setPopupOpen(false);
   };
 
+  const handleImagePreviewLeave = () => {
+    onHoverImage?.(null);
+  };
+
   return (
     <div
       className="group bg-white rounded-lg border border-gray-200 overflow-visible hover:shadow-lg hover:border-gray-400 transition-all duration-200 relative">
-      <div
-        className="aspect-square bg-gray-100 relative overflow-hidden rounded-t-lg"
-        onMouseEnter={() => onHoverImage?.(previewImageUrl)}
-        onMouseLeave={() => onHoverImage?.(null)}>
+      <div className="aspect-square bg-gray-100 relative overflow-hidden rounded-t-lg">
         <CardImage
           card={result}
           alt={result.name}
           className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300 cursor-pointer"
           fallbackClassName="flex w-full h-full items-center justify-center text-gray-400"
         />
+
+        {previewImageUrl && (
+          <div
+            aria-hidden="true"
+            className="absolute top-2 bottom-2 left-1/2 aspect-[63/88] -translate-x-1/2"
+            onMouseEnter={() => onHoverImage?.(previewImageUrl)}
+            onMouseLeave={handleImagePreviewLeave}
+          />
+        )}
 
         {/* Heart button */}
         <div className="absolute top-2 right-2">
