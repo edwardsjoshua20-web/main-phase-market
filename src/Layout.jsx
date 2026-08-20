@@ -264,11 +264,13 @@ export default function Layout({ children, currentPageName }) {
             {/* Logo */}
             <div className="flex items-center justify-between w-full md:w-auto gap-4">
               <Link to={createPageUrl('Home')} className="flex h-12 w-12 shrink-0 items-center justify-center gap-2 md:h-[60px] md:w-auto">
-                 <img
-                   src={brandAssets.logo}
-                   alt="Main Phase Market"
-                   className="h-10 md:h-14 md:scale-[1.65] md:transform-gpu w-auto"
-                 />
+                <span className="relative h-[52px] w-20 shrink-0 overflow-hidden">
+                  <img
+                    src={brandAssets.logo}
+                    alt="Main Phase Market"
+                    className="absolute left-1/2 top-1/2 h-[100px] w-auto max-w-none -translate-x-1/2 -translate-y-[45%]"
+                  />
+                </span>
                 <span className="hidden text-[17px] font-semibold tracking-wide text-white sm:block">Main Phase Market</span>
               </Link>
 
