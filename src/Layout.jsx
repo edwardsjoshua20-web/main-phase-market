@@ -269,7 +269,7 @@ export default function Layout({ children, currentPageName }) {
                   style={{ width: 80, height: 52 }}
                 >
                   <img
-                    src="/logo-mark.png"
+                    src="/logo-mark.png?v=20260820"
                     alt="Main Phase Market"
                     style={{ width: 52, height: 52, objectFit: 'contain' }}
                   />
