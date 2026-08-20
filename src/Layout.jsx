@@ -266,22 +266,17 @@ export default function Layout({ children, currentPageName }) {
               <Link to={createPageUrl('Home')} className="flex h-12 w-12 shrink-0 items-center justify-center gap-2 md:h-[60px] md:w-auto">
                 <span
                   className="relative block shrink-0 overflow-hidden"
-                  style={{ width: 80, height: 52 }}
-                >
-                  <img
-                    src={brandAssets.logo}
-                    alt="Main Phase Market"
-                    className="absolute"
-                    style={{
-                      left: '50%',
-                      top: '50%',
-                      height: 100,
-                      width: 'auto',
-                      maxWidth: 'none',
-                      transform: 'translate(-50%, -46%)'
-                    }}
-                  />
-                </span>
+                  role="img"
+                  aria-label="Main Phase Market"
+                  style={{
+                    width: 80,
+                    height: 52,
+                    backgroundImage: `url(${brandAssets.logo})`,
+                    backgroundPosition: 'center 46%',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '141px 100px'
+                  }}
+                />
                 <span className="hidden text-[17px] font-semibold tracking-wide text-white sm:block">Main Phase Market</span>
               </Link>
 
