@@ -6,7 +6,7 @@
       "label": "Refresh MTG source before image repair",
       "command": "npm",
       "args": ["run", "mtg:refresh:source"],
-      "timeoutMs": 900000,
+      "timeoutMs": 3600000,
       "enabled": true
     },
     {

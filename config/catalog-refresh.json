@@ -1,6 +1,14 @@
 {
   "jobs": [
     {
+      "id": "mtg-source",
+      "label": "Refresh MTG source before catalog build",
+      "command": "npm",
+      "args": ["run", "mtg:refresh:source"],
+      "timeoutMs": 3600000,
+      "enabled": true
+    },
+    {
       "id": "mtg-build",
       "label": "Build MTG catalog",
       "command": "npm",
