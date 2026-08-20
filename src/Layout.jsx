@@ -166,6 +166,25 @@ export default function Layout({ children, currentPageName }) {
     backend.auth.logout();
   };
 
+  const primaryNavItems = [
+    { label: 'Home', to: '/', pages: ['Home'] },
+    { label: 'Shop', to: '/Shop', pages: ['Shop'] },
+    { label: 'Deck Builder', to: '/AdvancedDeckBuilder', pages: ['AdvancedDeckBuilder', 'DeckBuilder'] },
+    { label: 'Commander Hub', to: '/CommanderHub', pages: ['CommanderHub', 'CommanderDetail'], icon: Swords },
+    { label: 'Community', to: '/CommunityDecks', pages: ['CommunityDecks'], icon: SquareStack },
+    { label: 'Forum', to: '/Forum', pages: ['Forum', 'ForumThread'], icon: MessagesSquare }
+  ];
+
+  const primaryNavClass = (item) => {
+    const isActive = item.pages.includes(currentPageName);
+    return [
+      'relative h-9 items-center gap-1.5 whitespace-nowrap border-b-2 px-1 text-sm font-medium transition-colors',
+      isActive
+        ? 'border-sky-300 text-white'
+        : 'border-transparent text-slate-300 hover:text-white'
+    ].join(' ');
+  };
+
   if (isMobile) {
     return (
       <div className="min-h-screen bg-white w-full flex flex-col overflow-x-hidden pb-16">
@@ -238,18 +257,19 @@ export default function Layout({ children, currentPageName }) {
   return (
     <div className="min-h-screen bg-white w-full overflow-x-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-gradient-to-br from-gray-900 via-gray-800 to-black shadow-sm w-full border-b-2 border-gray-700">
+      <header className="sticky top-0 z-50 w-full border-b border-slate-950/80 bg-slate-950 shadow-sm">
+        <div className="bg-[#071323]">
          <HeaderShell>
-           <div className="flex flex-col md:flex-row md:items-center md:h-20 gap-2 py-3 md:py-0 md:gap-6">
+           <div className="flex flex-col md:h-[60px] md:flex-row md:items-center gap-2 py-2 md:py-0 md:gap-4 xl:gap-5">
             {/* Logo */}
             <div className="flex items-center justify-between w-full md:w-auto gap-4">
-              <Link to={createPageUrl('Home')} className="flex items-center gap-2 shrink-0 h-20 w-20 md:h-20 md:w-auto flex items-center justify-center">
+              <Link to={createPageUrl('Home')} className="flex h-12 w-12 shrink-0 items-center justify-center gap-2 md:h-[60px] md:w-auto">
                  <img
                    src={brandAssets.logo}
                    alt="Main Phase Market"
-                   className="h-16 md:h-16 w-auto"
+                   className="h-10 md:h-11 w-auto"
                  />
-                <span className="text-white font-bold text-xl hidden sm:block">Main Phase Market</span>
+                <span className="hidden text-[17px] font-semibold tracking-wide text-white sm:block">Main Phase Market</span>
               </Link>
 
               {/* Mobile-only actions (right side of logo row on mobile) */}
@@ -326,11 +346,11 @@ export default function Layout({ children, currentPageName }) {
             </div>
 
             {/* Search Bar */}
-            <div className="flex flex-1 w-full gap-2 justify-center max-w-2xl mx-auto">
+            <div className="flex flex-1 w-full min-w-0 gap-0 justify-center max-w-3xl mx-auto">
               <select
                 value={selectedGame}
                 onChange={(e) => setSelectedGame(e.target.value)}
-                className="px-3 bg-gray-700 border border-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-600 focus:outline-none focus:bg-gray-600 cursor-pointer"
+                className="h-9 w-[150px] rounded-l-md border border-slate-600/80 border-r-slate-700 bg-[#0d2032] px-3 text-sm font-medium text-white outline-none transition-colors hover:bg-[#132b42] focus:bg-[#132b42] cursor-pointer"
               >
                 <option value="magic">Magic</option>
                 <option value="pokemon">Pokémon</option>
@@ -346,11 +366,11 @@ export default function Layout({ children, currentPageName }) {
                   value={searchQuery}
                   onChange={handleSearchChange}
                   onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
-                  className="pl-4 pr-12 bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 focus:bg-gray-600"
+                  className="h-9 rounded-none rounded-r-md border-slate-600/80 bg-[#0d2032] pl-4 pr-11 text-sm text-white placeholder:text-slate-400 focus:bg-[#132b42]"
                 />
                 <button
                   onClick={handleSearchButton}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 h-9 px-3 border-l border-gray-600 text-gray-400 hover:text-white hover:bg-gray-600 transition-colors flex items-center justify-center"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 h-9 px-3 border-l border-slate-600/80 text-slate-400 hover:text-white hover:bg-[#18344f] transition-colors flex items-center justify-center"
                 >
                   <Search className="w-4 h-4" />
                 </button>
@@ -420,7 +440,7 @@ export default function Layout({ children, currentPageName }) {
                 <Button
                   type="button"
                   onClick={() => navigate(createPageUrl('Shop') + `?type=single_card&game=${selectedGame}&advancedSearch=1`)}
-                  className="hidden lg:inline-flex bg-gray-700 border border-gray-600 text-white hover:bg-gray-600"
+                  className="hidden h-9 rounded-md border border-slate-600/80 bg-[#0d2032] px-3 text-sm font-medium text-slate-100 hover:bg-[#132b42] lg:inline-flex"
                 >
                   <SlidersHorizontal className="w-4 h-4 mr-2" />
                   Advanced Search
@@ -431,22 +451,22 @@ export default function Layout({ children, currentPageName }) {
             {/* Desktop-only actions (far right) */}
             <div className="hidden md:flex items-center gap-1 shrink-0">
               {!isAdminPage && (
-                <Button variant="ghost" size="icon" className="relative text-white hover:bg-gray-700 hover:text-white" onClick={() => setWishlistOpen(true)}>
-                <Heart className="w-5 h-5" />
-                {wishlist.count > 0 && <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-red-400 text-white text-xs font-bold">{wishlist.count}</Badge>}
+                <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-md text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={() => setWishlistOpen(true)}>
+                <Heart className="w-4 h-4" />
+                {wishlist.count > 0 && <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 flex items-center justify-center rounded-full bg-red-400 text-white text-[10px] font-bold">{wishlist.count}</Badge>}
               </Button>
               )}
               {!isAdminPage && (
-                <Button variant="ghost" size="icon" className="relative text-white hover:bg-gray-700 hover:text-white" onClick={() => setCartOpen(true)}>
-                  <ShoppingCart className="w-5 h-5" />
-                  {cartCount > 0 && <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-yellow-400 text-gray-900 text-xs font-bold">{cartCount}</Badge>}
+                <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-md text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={() => setCartOpen(true)}>
+                  <ShoppingCart className="w-4 h-4" />
+                  {cartCount > 0 && <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 flex items-center justify-center rounded-full bg-yellow-400 text-gray-900 text-[10px] font-bold">{cartCount}</Badge>}
                 </Button>
               )}
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="text-white hover:bg-gray-700 hover:text-white flex items-center gap-1.5 px-2">
-                      <User className="w-5 h-5" />
+                    <Button variant="ghost" size="sm" className="h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white flex items-center gap-1.5">
+                      <User className="w-4 h-4" />
                       <span className="text-sm font-medium">{user.full_name?.split(' ')[0]}</span>
                     </Button>
                   </DropdownMenuTrigger>
@@ -469,36 +489,29 @@ export default function Layout({ children, currentPageName }) {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Button variant="ghost" size="sm" className="text-white hover:bg-gray-700 hover:text-white" onClick={handleLogin}>
+                <Button variant="ghost" size="sm" className="h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={handleLogin}>
                   <LogIn className="w-4 h-4 mr-2" />Sign In
                 </Button>
               )}
             </div>
             </div>
             </HeaderShell>
+        </div>
 
             {/* Primary Navigation */}
-        <div className="bg-gray-800 border-t border-gray-700">
+        <div className="bg-[#0d2032] border-t border-white/5">
           <HeaderShell>
-            <nav className="flex items-center gap-6 h-11 overflow-x-auto">
-              <Link to="/" className="text-gray-300 hover:text-white text-sm font-medium whitespace-nowrap">
-                Home
-              </Link>
-              <Link to="/Shop" className="text-gray-300 hover:text-white text-sm font-medium whitespace-nowrap">
-                Shop
-              </Link>
-              <Link to="/AdvancedDeckBuilder" className="text-gray-300 hover:text-white text-sm font-medium whitespace-nowrap">
-                Deck Builder
-              </Link>
-              <Link to="/CommanderHub" className="hidden md:flex items-center gap-1.5 text-gray-300 hover:text-white text-sm font-medium whitespace-nowrap">
-                <Swords className="w-4 h-4" /> Commander Hub
-              </Link>
-              <Link to="/CommunityDecks" className="hidden md:flex items-center gap-1.5 text-gray-300 hover:text-white text-sm font-medium whitespace-nowrap">
-                <SquareStack className="w-4 h-4" /> Community
-              </Link>
-              <Link to="/Forum" className="hidden md:flex items-center gap-1.5 text-gray-300 hover:text-white text-sm font-medium whitespace-nowrap">
-                <MessagesSquare className="w-4 h-4" /> Forum
-              </Link>
+            <nav className="flex h-9 items-center gap-5 overflow-x-auto">
+              {primaryNavItems.map((item) => {
+                const Icon = item.icon;
+                const hideClass = item.icon ? 'hidden md:flex' : 'flex';
+                return (
+                  <Link key={item.to} to={item.to} className={`${hideClass} ${primaryNavClass(item)}`}>
+                    {Icon && <Icon className="w-3.5 h-3.5" />}
+                    {item.label}
+                  </Link>
+                );
+              })}
             </nav>
           </HeaderShell>
         </div>
