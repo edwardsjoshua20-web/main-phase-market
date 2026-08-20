@@ -267,7 +267,7 @@ export default function Layout({ children, currentPageName }) {
                  <img
                    src={brandAssets.logo}
                    alt="Main Phase Market"
-                   className="h-10 md:h-11 w-auto"
+                   className="h-10 md:h-12 w-auto"
                  />
                 <span className="hidden text-[17px] font-semibold tracking-wide text-white sm:block">Main Phase Market</span>
               </Link>
