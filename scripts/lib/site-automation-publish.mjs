@@ -3,7 +3,7 @@ import path from 'node:path';
 import { getRuntimeAutomationRunsPath, getRuntimeSystemHealthPath } from './runtime-site-data-paths.mjs';
 import { hasSupabaseUploadConfig, uploadPublicDataSelection } from './supabase-public-data-upload.mjs';
 
-const GAMES = ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
+const PUBLIC_DATA_GAMES = ['mtg', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -27,7 +27,7 @@ function buildPublishSelection(pipelineId) {
       };
     case 'cards':
       return {
-        relativePaths: GAMES.flatMap((game) => [
+        relativePaths: PUBLIC_DATA_GAMES.flatMap((game) => [
           `data/${game}/cards.json`,
           `data/${game}/cards-manifest.json`,
           `data/${game}/manifest.json`
@@ -36,7 +36,7 @@ function buildPublishSelection(pipelineId) {
     case 'catalog':
       return {
         relativePaths: [
-          ...GAMES.flatMap((game) => [
+          ...PUBLIC_DATA_GAMES.flatMap((game) => [
           `data/${game}/cards.json`,
           `data/${game}/cards-manifest.json`,
           `data/${game}/manifest.json`,
@@ -48,7 +48,7 @@ function buildPublishSelection(pipelineId) {
       };
     case 'images':
       return {
-        relativePaths: GAMES.flatMap((game) => [
+        relativePaths: PUBLIC_DATA_GAMES.flatMap((game) => [
           `data/${game}/images`
         ]),
         includeImages: true

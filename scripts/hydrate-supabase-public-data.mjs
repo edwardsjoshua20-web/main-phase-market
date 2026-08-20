@@ -2,14 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readSupabaseUploadConfig, toObjectKey, toStorageBaseUrl } from './lib/supabase-public-data-upload.mjs';
 
-const GAMES = ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
+const PUBLIC_DATA_GAMES = ['mtg', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'fab', 'starwars'];
 const SITE_FILES = [
   'data/site/upcoming-releases.json',
   'data/site/system-health.json',
   'data/site/automation-runs.json',
   'data/site/pricing-snapshot.json'
 ];
-const GAME_FILES = GAMES.flatMap((game) => [
+const GAME_FILES = PUBLIC_DATA_GAMES.flatMap((game) => [
   `data/${game}/cards.json`,
   `data/${game}/cards-manifest.json`,
   `data/${game}/manifest.json`,
