@@ -265,18 +265,15 @@ export default function Layout({ children, currentPageName }) {
             <div className="flex items-center justify-between w-full md:w-auto gap-4">
               <Link to={createPageUrl('Home')} className="flex h-12 w-12 shrink-0 items-center justify-center gap-2 md:h-[60px] md:w-auto">
                 <span
-                  className="relative block shrink-0 overflow-hidden"
-                  role="img"
-                  aria-label="Main Phase Market"
-                  style={{
-                    width: 80,
-                    height: 52,
-                    backgroundImage: `url(${brandAssets.logo})`,
-                    backgroundPosition: 'center 46%',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: '141px 100px'
-                  }}
-                />
+                  className="flex shrink-0 items-center justify-center"
+                  style={{ width: 80, height: 52 }}
+                >
+                  <img
+                    src="/logo-mark.png"
+                    alt="Main Phase Market"
+                    style={{ width: 52, height: 52, objectFit: 'contain' }}
+                  />
+                </span>
                 <span className="hidden text-[17px] font-semibold tracking-wide text-white sm:block">Main Phase Market</span>
               </Link>
 
