@@ -268,7 +268,8 @@ export default function Layout({ children, currentPageName }) {
                   <img
                     src={brandAssets.logo}
                     alt="Main Phase Market"
-                    className="absolute left-1/2 top-1/2 h-[100px] w-auto max-w-none -translate-x-1/2 -translate-y-[45%]"
+                    className="absolute left-1/2 top-1/2 h-[100px] w-auto max-w-none"
+                    style={{ transform: 'translate(-50%, -46%)' }}
                   />
                 </span>
                 <span className="hidden text-[17px] font-semibold tracking-wide text-white sm:block">Main Phase Market</span>
