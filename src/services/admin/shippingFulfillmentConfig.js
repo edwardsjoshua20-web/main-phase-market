@@ -13,7 +13,7 @@ export const DEFAULT_SHIPPING_FULFILLMENT_CONFIG = {
       id: 'economy-letter',
       name: 'Economy Letter',
       customerCharge: 1.99,
-      postageCost: 0.78,
+      postageCost: 0.82,
       packagingCost: 0.18,
       handlingCost: 0.12,
       policy: '$1.99 S&H for cheap cards. LetterTrack is optional, not true package tracking.',
@@ -22,7 +22,7 @@ export const DEFAULT_SHIPPING_FULFILLMENT_CONFIG = {
       id: 'protected-letter',
       name: 'Protected Letter',
       customerCharge: 2.49,
-      postageCost: 1.02,
+      postageCost: 1.11,
       packagingCost: 0.38,
       handlingCost: 0.18,
       policy: '$2.49–$2.99 S&H when the card needs more rigid protection.',
@@ -49,7 +49,7 @@ export const DEFAULT_SHIPPING_FULFILLMENT_CONFIG = {
   letterTrack: {
     cost: 0.32,
     customerAddOn: 0.49,
-    note: 'LetterTrack is optional visibility for letters. It is not a replacement for true USPS package tracking.',
+    note: 'LetterTrack starter-tier cost is $0.32 per transaction. The $0.49 customer add-on is the configured business charge, not the supplier cost.',
   },
   paymentFee: {
     percent: 2.9,
@@ -66,107 +66,120 @@ export const DEFAULT_SHIPPING_FULFILLMENT_CONFIG = {
   supplies: [
     {
       id: 'team-bags',
-      name: 'Resealable team bags',
+      name: 'Card Capsule Standard Size Team Bags',
       category: 'Packaging',
-      imageUrl: 'https://i5.walmartimages.com/seo/Max-Protection-Team-Bags-for-Trading-Cards-Resealable-3-3-8-x-4-1-4-Fits-25-Cards-or-120pt-Top-Loader-100ct-Acid-Free-Clear-Polypropylene_347ffae3-ea04-404f-990b-58918cd3bb7e.9252be653b3c07579ac64a8a11bcc2c1.jpeg?odnBg=FFFFFF&odnHeight=576&odnWidth=576',
-      sourceName: 'Amazon',
-      sourceUrl: 'https://www.amazon.com/s?k=resealable+team+bags+trading+cards',
-      expectedPurchasePrice: 6.99,
+      imageUrl: 'https://cardcapsule.com/cdn/shop/files/TeamBags1.jpg?v=1761599679',
+      sourceName: 'Card Capsule',
+      sourceUrl: 'https://cardcapsule.com/products/standard-size-team-bags',
+      expectedPurchasePrice: 2.59,
       packQuantity: 100,
       quantityOnHand: 0,
       lowStockThreshold: 25,
-      notes: 'Used to protect singles inside letter/package mailers.',
+      notes: '100-count resealable team bags for protecting singles inside letter/package mailers.',
     },
     {
       id: 'plain-envelopes',
-      name: 'Plain envelopes',
+      name: 'Staples Gummed #6 3/4 Business Envelopes',
       category: 'Packaging',
-      imageUrl: 'https://img.uline.com/is/image/uline/S-7801',
-      sourceName: 'Amazon',
-      sourceUrl: 'https://www.amazon.com/s?k=plain+white+envelopes',
-      expectedPurchasePrice: 8.99,
-      packQuantity: 100,
+      imageUrl: 'https://i5.walmartimages.com/asr/72c2e14d-ba8e-4c71-b2ea-03d2005fe872.723e5fab1da96932979777bd562f4c64.jpeg?odnBg=FFFFFF&odnHeight=768&odnWidth=768',
+      sourceName: 'Walmart / Staples',
+      sourceUrl: 'https://www.walmart.com/ip/2842957623',
+      expectedPurchasePrice: 25.15,
+      packQuantity: 1000,
       quantityOnHand: 0,
       lowStockThreshold: 30,
-      notes: 'Economy letter shipping base supply.',
+      notes: 'Preferred bulk #6 3/4 white business envelope listing; sold as 1000/carton.',
     },
     {
       id: 'thermal-labels',
-      name: '4x6 direct thermal labels',
+      name: 'MUNBYN 2x1 white thermal address labels',
       category: 'Labels',
-      imageUrl: 'https://img.avery.com/web/products/labels/72782-04156-p04p',
-      sourceName: 'Amazon',
-      sourceUrl: 'https://www.amazon.com/s?k=4x6+direct+thermal+labels',
-      expectedPurchasePrice: 12.99,
+      imageUrl: 'https://munbyn.com/cdn/shop/files/ITL-21-PT-WH.jpg?v=1770877523',
+      sourceName: 'MUNBYN',
+      sourceUrl: 'https://munbyn.com/products/munbyn-white-2x1-inch-thermal-sticker-labels-1000-labels-1-roll',
+      expectedPurchasePrice: 9.99,
+      packQuantity: 1000,
+      quantityOnHand: 0,
+      lowStockThreshold: 75,
+      notes: '2x1 direct thermal address/barcode labels; no ink required.',
+    },
+    {
+      id: 'package-labels-4x6',
+      name: 'DuraFast 4x6 direct thermal package labels',
+      category: 'Labels',
+      imageUrl: 'https://cdn11.bigcommerce.com/s-971xibeh/products/4060/images/25658/137598__85743.1759773345.500.750.jpg?c=2',
+      sourceName: 'DuraFast Label Company',
+      sourceUrl: 'https://www.durafastlabel.com/labels-direct-thermal/direct-thermal-4-x-6-labels-500-roll-1-core-5-od/',
+      expectedPurchasePrice: 9,
       packQuantity: 500,
       quantityOnHand: 0,
       lowStockThreshold: 75,
-      notes: 'Direct thermal labels; no ink required.',
+      notes: 'Direct 500-count 4x6 thermal package label roll; no ink required.',
     },
     {
       id: 'forever-stamps',
-      name: 'Forever stamps',
+      name: 'USPS U.S. Flag 2026 Forever stamps',
       category: 'Postage',
-      imageUrl: 'https://www.usps.com/ecp/asset/images/130104-00_100x100.jpg',
+      imageUrl: 'https://www.usps.com/ecp/asset/images/130104-L0.jpg',
       sourceName: 'USPS',
-      sourceUrl: 'https://store.usps.com/store/results/stamps/_/N-9y93lv',
-      expectedPurchasePrice: 14.6,
+      sourceUrl: 'https://store.usps.com/store/product/buy-stamps/us-flag-2026-stamps-S_130104',
+      expectedPurchasePrice: 16.4,
       packQuantity: 20,
       quantityOnHand: 0,
       lowStockThreshold: 20,
-      notes: 'Primary stamp supply for letter shipments.',
+      notes: 'Primary first-ounce stamp supply for letter shipments; current denomination is $0.82.',
     },
     {
       id: 'additional-ounce',
-      name: 'Additional-ounce postage',
+      name: 'USPS School Bus additional-ounce stamps',
       category: 'Postage',
-      imageUrl: 'https://www.usps.com/ecp/asset/images/122404-00_100x100.jpg',
+      imageUrl: 'https://www.usps.com/ecp/asset/images/122404-L0.jpg',
       sourceName: 'USPS',
-      sourceUrl: 'https://store.usps.com/store/results/stamps/_/N-9y93lv',
-      expectedPurchasePrice: 5.6,
+      sourceUrl: 'https://store.usps.com/store/product/school-bus-stamps-S_122404',
+      expectedPurchasePrice: 5.8,
       packQuantity: 20,
       quantityOnHand: 0,
       lowStockThreshold: 20,
-      notes: 'Use when a protected letter exceeds base letter assumptions.',
+      notes: 'Use when a protected letter exceeds base letter assumptions; current denomination is $0.29.',
     },
     {
       id: 'lettertrack-credits',
-      name: 'LetterTrack credits',
+      name: 'LetterTrack first-class mail tracking credits',
       category: 'Tracking add-on',
       imageUrl: 'https://dvow0vltefbxy.cloudfront.net/assets/landing/carriers/lettertrack-ae07f914d2fe9005fa03929154c0fcf1c7628113477dcc14f91cf3bb7decac25.png',
       sourceName: 'LetterTrack',
-      sourceUrl: 'https://www.letter-track.com/',
-      expectedPurchasePrice: 32,
-      packQuantity: 100,
+      sourceUrl: 'https://www.letter-track.com/pricing-firstclassmailtracking.html',
+      expectedPurchasePrice: 16,
+      packQuantity: 50,
       quantityOnHand: 0,
       lowStockThreshold: 25,
-      notes: 'Optional customer add-on. Not true USPS package tracking.',
+      notes: 'Starter tier: 50 transactions at $0.32 each. Optional customer add-on remains configured at $0.49.',
     },
     {
       id: 'bcw-top-loaders',
-      name: 'BCW 3x4 top loaders',
+      name: 'BCW 3x4 Topload Card Holder - Standard (100 CT. Pack)',
       category: 'Protection',
       imageUrl: 'https://i5.walmartimages.com/seo/BCW-3X4-TOPLOAD-CARD-HOLDER-STANDARD-100-CT-PACK_295245bd-1679-4091-b00e-8c0acfc1989f.a3a4b7d8137fbd28bfbd40d2b0fa3e00.jpeg',
       sourceName: 'BCW',
-      sourceUrl: 'https://www.bcwsupplies.com/',
-      expectedPurchasePrice: 7.99,
+      sourceUrl: 'https://www.bcwsupplies.com/3x4-topload-card-holder-standard-100-ct-pack',
+      expectedPurchasePrice: 14.99,
       packQuantity: 100,
       quantityOnHand: 100,
       lowStockThreshold: 25,
-      notes: 'Existing on-hand count from launch setup.',
+      notes: 'Existing on-hand count from launch setup preserved at 100.',
     },
     {
       id: 'knaon-y41bt',
-      name: 'KNAON Y41BT thermal printer',
+      name: 'KNAON Y41BT Bluetooth Thermal Label Printer - White',
       category: 'Equipment',
-      imageUrl: 'https://knaon.com/cdn/shop/files/knaon-y41bt-white-bluetooth-usb-c-thermal-label-printer-desktop.jpg?v=1783572759&width=1600',
-      sourceName: 'Amazon',
-      sourceUrl: 'https://www.amazon.com/s?k=KNAON+Y41BT+thermal+printer',
-      expectedPurchasePrice: 79.99,
+      imageUrl: 'https://knaon.com/cdn/shop/files/knaon-y41bt-white-bluetooth-thermal-shipping-label-printer.jpg?v=1782877398',
+      sourceName: 'KNAON',
+      sourceUrl: 'https://knaon.com/products/y41bt-bluetooth-thermal-label-printer-white',
+      expectedPurchasePrice: 43.9,
       packQuantity: 1,
       quantityOnHand: 0,
       lowStockThreshold: 1,
-      notes: 'Recommended budget direct-thermal printer; no ink.',
+      notes: 'Recommended budget Bluetooth direct-thermal printer; no ink.',
     },
   ],
 };
@@ -176,6 +189,11 @@ const deepClone = (value) => JSON.parse(JSON.stringify(value));
 const toNumber = (value, fallback = 0) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const calculateSupplyUnitCost = (price, quantity) => {
+  const safeQuantity = Math.max(1, toNumber(quantity, 1));
+  return Number((toNumber(price, 0) / safeQuantity).toFixed(4));
 };
 
 const createId = () => {
@@ -188,31 +206,43 @@ const preferNonBlank = (value, fallback = '') => {
   return text || String(fallback ?? '');
 };
 
-const normalizeSupply = (supply = {}, defaultSupply = {}) => ({
-  id: String(supply.id || defaultSupply.id || supply.name || createId()),
-  name: preferNonBlank(supply.name, defaultSupply.name || 'Unnamed supply'),
-  category: preferNonBlank(supply.category, defaultSupply.category || 'Supply'),
-  imageUrl: preferNonBlank(supply.imageUrl, defaultSupply.imageUrl),
-  sourceName: preferNonBlank(supply.sourceName, defaultSupply.sourceName),
-  sourceUrl: preferNonBlank(supply.sourceUrl, defaultSupply.sourceUrl),
-  expectedPurchasePrice: toNumber(supply.expectedPurchasePrice, defaultSupply.expectedPurchasePrice || 0),
-  packQuantity: Math.max(1, toNumber(supply.packQuantity, defaultSupply.packQuantity || 1)),
-  quantityOnHand: Math.max(0, toNumber(supply.quantityOnHand, defaultSupply.quantityOnHand || 0)),
-  lowStockThreshold: Math.max(0, toNumber(supply.lowStockThreshold, defaultSupply.lowStockThreshold || 0)),
-  notes: preferNonBlank(supply.notes, defaultSupply.notes),
-});
+const normalizeSupply = (supply = {}, defaultSupply = {}) => {
+  const expectedPurchasePrice = toNumber(supply.expectedPurchasePrice, defaultSupply.expectedPurchasePrice || 0);
+  const packQuantity = Math.max(1, toNumber(supply.packQuantity, defaultSupply.packQuantity || 1));
+  return {
+    id: String(supply.id || defaultSupply.id || supply.name || createId()),
+    name: preferNonBlank(supply.name, defaultSupply.name || 'Unnamed supply'),
+    category: preferNonBlank(supply.category, defaultSupply.category || 'Supply'),
+    imageUrl: preferNonBlank(supply.imageUrl, defaultSupply.imageUrl),
+    sourceName: preferNonBlank(supply.sourceName, defaultSupply.sourceName),
+    sourceUrl: preferNonBlank(supply.sourceUrl, defaultSupply.sourceUrl),
+    expectedPurchasePrice,
+    packQuantity,
+    unitCost: calculateSupplyUnitCost(expectedPurchasePrice, packQuantity),
+    quantityOnHand: Math.max(0, toNumber(supply.quantityOnHand, defaultSupply.quantityOnHand || 0)),
+    lowStockThreshold: Math.max(0, toNumber(supply.lowStockThreshold, defaultSupply.lowStockThreshold || 0)),
+    notes: preferNonBlank(supply.notes, defaultSupply.notes),
+  };
+};
 
 export function normalizeShippingFulfillmentConfig(config = {}) {
   const defaults = deepClone(DEFAULT_SHIPPING_FULFILLMENT_CONFIG);
   const defaultSupplyById = new Map(defaults.supplies.map((supply) => [supply.id, supply]));
+  const configSupplies = Array.isArray(config.supplies) ? config.supplies : [];
+  const configSupplyById = new Map(configSupplies.map((supply) => [supply?.id, supply]));
+  const normalizedDefaultSupplies = defaults.supplies.map((defaultSupply) => normalizeSupply(
+    configSupplyById.get(defaultSupply.id) || defaultSupply,
+    defaultSupply,
+  ));
+  const normalizedCustomSupplies = configSupplies
+    .filter((supply) => supply?.id && !defaultSupplyById.has(supply.id))
+    .map((supply) => normalizeSupply(supply));
   return {
     ...defaults,
     ...config,
     id: SHIPPING_FULFILLMENT_CONFIG_ID,
     version: 1,
-    supplies: Array.isArray(config.supplies)
-      ? config.supplies.map((supply) => normalizeSupply(supply, defaultSupplyById.get(supply?.id) || {}))
-      : defaults.supplies,
+    supplies: [...normalizedDefaultSupplies, ...normalizedCustomSupplies],
     shippingTiers: Array.isArray(config.shippingTiers) && config.shippingTiers.length
       ? config.shippingTiers.map((tier) => ({
           ...tier,
