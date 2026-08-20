@@ -7,6 +7,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import { 
@@ -49,6 +56,16 @@ import { useCartOwner } from '@/hooks/useCartOwner';
 import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
 const adminPages = ['AdminInventory', 'AdminOrders', 'AdminOperations', 'AdminShippingFulfillment'];
+
+const gameOptions = [
+  { value: 'magic', label: 'Magic' },
+  { value: 'pokemon', label: 'Pokémon' },
+  { value: 'yugioh', label: 'Yu-Gi-Oh!' },
+  { value: 'lorcana', label: 'Lorcana' },
+  { value: 'onepiece', label: 'One Piece' },
+  { value: 'flesh_and_blood', label: 'Flesh & Blood' },
+  { value: 'starwars', label: 'Star Wars Unlimited' },
+];
 
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
@@ -181,7 +198,7 @@ export default function Layout({ children, currentPageName }) {
   const primaryNavClass = (item) => {
     const isActive = item.pages.includes(currentPageName);
     return [
-      'relative h-9 items-center whitespace-nowrap border-b-2 px-1 text-sm font-medium transition-colors',
+      'relative h-8 items-center whitespace-nowrap border-b-2 px-1 text-sm font-medium transition-colors',
       isActive
         ? 'border-sky-300 text-white'
         : 'border-transparent text-slate-300 hover:text-white'
@@ -263,10 +280,10 @@ export default function Layout({ children, currentPageName }) {
       <header className="sticky top-0 z-50 w-full border-b border-slate-950/80 bg-slate-950 shadow-sm">
         <div className="bg-[#020814]">
          <HeaderShell>
-           <div className="flex flex-col md:h-[60px] md:flex-row md:items-center gap-2 py-2 md:py-0 md:gap-4 xl:gap-5">
+           <div className="flex flex-col md:h-[56px] md:flex-row md:items-center gap-2 py-2 md:py-0 md:gap-3 xl:gap-4">
             {/* Logo */}
             <div className="flex items-center justify-between w-full md:w-auto gap-4">
-              <Link to={createPageUrl('Home')} className="flex h-12 w-12 shrink-0 items-center justify-center gap-2 md:h-[60px] md:w-auto">
+              <Link to={createPageUrl('Home')} className="flex h-12 w-12 shrink-0 items-center justify-center gap-2 md:h-[56px] md:w-auto">
                 <span
                   className="flex shrink-0 items-center justify-center"
                   style={{ width: 80, height: 52 }}
@@ -355,30 +372,36 @@ export default function Layout({ children, currentPageName }) {
 
             {/* Search Bar */}
             <div className="flex flex-1 w-full min-w-0 gap-0 justify-center max-w-3xl mx-auto">
-              <select
+              <Select
                 value={selectedGame}
-                onChange={(e) => setSelectedGame(e.target.value)}
-                className="h-9 w-[150px] rounded-l-md border border-slate-600/80 border-r-slate-700 bg-[#0d2032] px-3 text-sm font-medium text-white outline-none transition-colors hover:bg-[#132b42] focus:bg-[#132b42] cursor-pointer"
+                onValueChange={setSelectedGame}
               >
-                <option value="magic">Magic</option>
-                <option value="pokemon">Pokémon</option>
-                <option value="yugioh">Yu-Gi-Oh!</option>
-                <option value="lorcana">Lorcana</option>
-                <option value="onepiece">One Piece</option>
-                <option value="flesh_and_blood">Flesh & Blood</option>
-                <option value="starwars">Star Wars Unlimited</option>
-              </select>
+                <SelectTrigger className="h-8 w-[150px] rounded-l-[5px] rounded-r-none border border-slate-700/80 border-r-slate-700 bg-[#020814] px-3 py-0 text-sm font-medium text-slate-100 shadow-none ring-offset-transparent hover:bg-[#071323] focus:ring-0 data-[state=open]:bg-[#071323]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-[5px] border-slate-700/80 bg-[#020814] text-slate-100 shadow-xl">
+                  {gameOptions.map((game) => (
+                    <SelectItem
+                      key={game.value}
+                      value={game.value}
+                      className="rounded-[4px] text-slate-100 focus:bg-white/10 focus:text-white data-[state=checked]:bg-white/10 data-[state=checked]:text-white"
+                    >
+                      {game.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <div className="relative flex-1 search-dropdown">
                 <Input
                   placeholder="Search cards..."
                   value={searchQuery}
                   onChange={handleSearchChange}
                   onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
-                  className="h-9 rounded-none rounded-r-md border-slate-300 bg-slate-50 pl-4 pr-11 text-sm text-slate-900 placeholder:text-slate-500 focus:bg-white"
+                  className="h-8 rounded-none rounded-r-[5px] border-slate-300 bg-slate-50 pl-4 pr-11 text-sm text-slate-900 placeholder:text-slate-500 focus:bg-white"
                 />
                 <button
                   onClick={handleSearchButton}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 h-9 px-3 border-l border-slate-300 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center justify-center"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 h-8 px-3 border-l border-slate-300 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center justify-center"
                 >
                   <Search className="w-4 h-4" />
                 </button>
@@ -448,7 +471,7 @@ export default function Layout({ children, currentPageName }) {
                 <Button
                   type="button"
                   onClick={() => navigate(createPageUrl('Shop') + `?type=single_card&game=${selectedGame}&advancedSearch=1`)}
-                  className="hidden h-9 rounded-md border border-slate-600/80 bg-[#0d2032] px-3 text-sm font-medium text-slate-100 hover:bg-[#132b42] lg:inline-flex"
+                  className="hidden h-8 rounded-[5px] border border-slate-700/80 bg-[#020814] px-3 text-sm font-medium text-slate-100 hover:bg-[#071323] lg:inline-flex"
                 >
                   <SlidersHorizontal className="w-4 h-4 mr-2" />
                   Advanced Search
@@ -457,25 +480,31 @@ export default function Layout({ children, currentPageName }) {
             </div>
 
             {/* Desktop-only actions (far right) */}
-            <div className="hidden md:flex items-center gap-1 shrink-0">
+            <div className="hidden md:flex items-center gap-0 shrink-0">
               {!isAdminPage && (
-                <Button variant="ghost" size="sm" className="relative h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={() => setWishlistOpen(true)}>
+                <Button variant="ghost" size="sm" className="relative h-8 rounded-[5px] px-2 text-slate-200 hover:bg-[#071323] hover:text-white" onClick={() => setWishlistOpen(true)}>
                 <Heart className="w-4 h-4 mr-1.5" />
                 <span>Wishlist</span>
                 {wishlist.count > 0 && <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 flex items-center justify-center rounded-full bg-red-400 text-white text-[10px] font-bold">{wishlist.count}</Badge>}
               </Button>
               )}
               {!isAdminPage && (
-                <Button variant="ghost" size="sm" className="relative h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={() => setCartOpen(true)}>
+                <span className="mx-1 h-4 w-px bg-slate-600/70" aria-hidden="true" />
+              )}
+              {!isAdminPage && (
+                <Button variant="ghost" size="sm" className="relative h-8 rounded-[5px] px-2 text-slate-200 hover:bg-[#071323] hover:text-white" onClick={() => setCartOpen(true)}>
                   <ShoppingCart className="w-4 h-4 mr-1.5" />
                   <span>Cart</span>
                   {cartCount > 0 && <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 flex items-center justify-center rounded-full bg-yellow-400 text-gray-900 text-[10px] font-bold">{cartCount}</Badge>}
                 </Button>
               )}
+              {!isAdminPage && (
+                <span className="mx-1 h-4 w-px bg-slate-600/70" aria-hidden="true" />
+              )}
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white flex items-center gap-1.5">
+                    <Button variant="ghost" size="sm" className="h-8 rounded-[5px] px-2 text-slate-200 hover:bg-[#071323] hover:text-white flex items-center gap-1.5">
                       <User className="w-4 h-4" />
                       <span className="text-sm font-medium">{user.full_name?.split(' ')[0]}</span>
                     </Button>
@@ -500,10 +529,11 @@ export default function Layout({ children, currentPageName }) {
                 </DropdownMenu>
               ) : (
                 <>
-                  <Button variant="ghost" size="sm" className="h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={handleLogin}>
+                  <Button variant="ghost" size="sm" className="h-8 rounded-[5px] px-2 text-slate-200 hover:bg-[#071323] hover:text-white" onClick={handleLogin}>
                     <LogIn className="w-4 h-4 mr-2" />Sign In
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={handleCreateAccount}>
+                  <span className="mx-1 h-4 w-px bg-slate-600/70" aria-hidden="true" />
+                  <Button variant="ghost" size="sm" className="h-8 rounded-[5px] px-2 text-slate-200 hover:bg-[#071323] hover:text-white" onClick={handleCreateAccount}>
                     Create Account
                   </Button>
                 </>
@@ -516,7 +546,7 @@ export default function Layout({ children, currentPageName }) {
             {/* Primary Navigation */}
         <div className="bg-[#0d2032] border-t border-white/5">
           <HeaderShell>
-            <nav className="flex h-9 items-center gap-5 overflow-x-auto">
+            <nav className="flex h-8 items-center gap-5 overflow-x-auto">
               {primaryNavItems.map((item) => {
                 const hideClass = item.desktopOnly ? 'hidden md:flex' : 'flex';
                 return (
