@@ -165,6 +165,19 @@ function buildOrderNumber() {
   return `MPM-${stamp}-${suffix}`;
 }
 
+function getStripePaymentIntentId(session: Stripe.Checkout.Session) {
+  const paymentIntent = session?.payment_intent;
+  if (typeof paymentIntent === 'string') {
+    return paymentIntent.trim() || null;
+  }
+
+  if (paymentIntent && typeof paymentIntent === 'object') {
+    return String(paymentIntent.id || '').trim() || null;
+  }
+
+  return null;
+}
+
 function isEnabled(value: string) {
   return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
 }
@@ -261,7 +274,7 @@ export function buildOrderFromCheckoutSession(session: Stripe.Checkout.Session) 
 
   return {
     stripe_session_id: session.id,
-    stripe_payment_intent_id: String(session.payment_intent || '').trim() || null,
+    stripe_payment_intent_id: getStripePaymentIntentId(session),
     checkout_mode: checkoutMode,
     stripe_livemode: Boolean(session.livemode),
     order_number: buildOrderNumber(),

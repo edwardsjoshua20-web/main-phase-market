@@ -1,9 +1,12 @@
+const fallbackSupabaseUrl = 'https://wwvvyrhlybwijqlhubdv.supabase.co';
+const fallbackSupabaseAnonKey = 'sb_publishable_tWMznF-RAJFLR1XiQC7KEQ_VGoezQU9';
+
 const rawSupabaseUrl =
   (/** @type {{ env?: Record<string, string> }} */ (import.meta).env?.VITE_SUPABASE_URL) ||
-  '';
+  fallbackSupabaseUrl;
 const rawSupabaseAnonKey =
   (/** @type {{ env?: Record<string, string> }} */ (import.meta).env?.VITE_SUPABASE_ANON_KEY) ||
-  '';
+  fallbackSupabaseAnonKey;
 
 const supabaseUrl = String(rawSupabaseUrl || '').trim().replace(/\/+$/, '');
 const supabaseAnonKey = String(rawSupabaseAnonKey || '').trim();
