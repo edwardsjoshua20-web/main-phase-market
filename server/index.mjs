@@ -114,10 +114,41 @@ const mtgSourcePath =
 let mtgRowsCache = null;
 const mtgOraclePrintingsCache = new Map();
 
-function getStripeClient() {
-  const apiKey = getEnvValue('STRIPE_SECRET_KEY');
+const CHECKOUT_MODES = Object.freeze({
+  LIVE: 'live',
+  QA_TEST: 'qa_test'
+});
+
+function isEnabled(value) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function normalizeCheckoutMode(value) {
+  return String(value || '').trim().toLowerCase() === CHECKOUT_MODES.QA_TEST ? CHECKOUT_MODES.QA_TEST : CHECKOUT_MODES.LIVE;
+}
+
+function getCheckoutModeFromSessionId(sessionId) {
+  return String(sessionId || '').startsWith('cs_test_') ? CHECKOUT_MODES.QA_TEST : CHECKOUT_MODES.LIVE;
+}
+
+function getStripeClient(mode = CHECKOUT_MODES.LIVE) {
+  const checkoutMode = normalizeCheckoutMode(mode);
+  if (checkoutMode === CHECKOUT_MODES.QA_TEST && !isEnabled(getEnvValue('STRIPE_TEST_CHECKOUT_ENABLED'))) {
+    return null;
+  }
+
+  const keyName = checkoutMode === CHECKOUT_MODES.QA_TEST ? 'STRIPE_TEST_SECRET_KEY' : 'STRIPE_SECRET_KEY';
+  const apiKey = getEnvValue(keyName);
   if (!apiKey) {
     return null;
+  }
+
+  if (checkoutMode === CHECKOUT_MODES.QA_TEST && !apiKey.startsWith('sk_test_')) {
+    throw new Error('STRIPE_TEST_SECRET_KEY must be a Stripe test-mode secret key.');
+  }
+
+  if (checkoutMode === CHECKOUT_MODES.LIVE && apiKey.startsWith('sk_test_')) {
+    throw new Error('STRIPE_SECRET_KEY must not be a Stripe test-mode key for live checkout.');
   }
 
   return new Stripe(apiKey);
@@ -327,6 +358,7 @@ function validateCheckoutPayload(cartItems, shippingInfo) {
 }
 
 function buildOrderFromCheckoutSession(session) {
+  const checkoutMode = normalizeCheckoutMode(session?.metadata?.checkout_mode);
   const shippingInfo = parseJsonSafely(session?.metadata?.shipping_info || '{}', {}) || {};
   const cartItems = parseJsonSafely(session?.metadata?.cart_items || '[]', []) || [];
   const normalizedItems = Array.isArray(cartItems) ? cartItems.map(normalizeCartItem) : [];
@@ -337,6 +369,8 @@ function buildOrderFromCheckoutSession(session) {
   return {
     stripe_session_id: session.id,
     stripe_payment_intent_id: String(session.payment_intent || '').trim() || null,
+    checkout_mode: checkoutMode,
+    stripe_livemode: Boolean(session.livemode),
     order_number: buildOrderNumber(),
     customer_email: String(shippingInfo.email || '').trim().toLowerCase(),
     customer_name: String(shippingInfo.name || '').trim(),
@@ -407,7 +441,47 @@ async function decrementInventoryForOrder(order) {
   }
 }
 
-async function resolveTrustedCheckoutCartItems(rawItems = []) {
+function assertQaCheckoutListing(listing = {}) {
+  const isQa = listing.qa_checkout === true || normalizeCheckoutMode(listing.checkout_mode) === CHECKOUT_MODES.QA_TEST;
+  if (!isQa) {
+    throw new Error(`Stripe test checkout can only use QA checkout listings: ${String(listing?.name || listing?.id || 'item')}.`);
+  }
+}
+
+async function assertQaCheckoutOrderPayload(order) {
+  const items = Array.isArray(order?.items) ? order.items : [];
+  if (items.length === 0) {
+    throw new Error('Stripe test checkout order must contain at least one QA item.');
+  }
+
+  for (const item of items) {
+    const listing = await getCheckoutListingById(item.card_id);
+    if (!listing) {
+      throw new Error(`QA checkout listing no longer exists: ${String(item.card_id || 'item')}.`);
+    }
+    assertQaCheckoutListing(listing);
+  }
+}
+
+function assertCheckoutSessionMatchesMode(session, mode) {
+  const checkoutMode = normalizeCheckoutMode(mode);
+  if (checkoutMode === CHECKOUT_MODES.QA_TEST) {
+    if (session.livemode) {
+      throw new Error('Stripe test checkout session unexpectedly came from live mode.');
+    }
+    if (normalizeCheckoutMode(session.metadata?.checkout_mode) !== CHECKOUT_MODES.QA_TEST) {
+      throw new Error('Stripe test checkout session is missing QA metadata.');
+    }
+    return;
+  }
+
+  if (!session.livemode) {
+    throw new Error('Live checkout finalization rejected a Stripe test-mode session.');
+  }
+}
+
+async function resolveTrustedCheckoutCartItems(rawItems = [], options = {}) {
+  const checkoutMode = normalizeCheckoutMode(options.checkoutMode);
   const requestedItems = Array.isArray(rawItems) ? rawItems.map(normalizeCartItem) : [];
   const trustedItems = [];
 
@@ -421,6 +495,12 @@ async function resolveTrustedCheckoutCartItems(rawItems = []) {
       throw new Error(`Checkout item is no longer available: ${item.card_name || item.card_id}.`);
     }
 
+    if (checkoutMode === CHECKOUT_MODES.QA_TEST) {
+      assertQaCheckoutListing(listing);
+    } else if (listing.qa_checkout === true || normalizeCheckoutMode(listing.checkout_mode) === CHECKOUT_MODES.QA_TEST) {
+      throw new Error(`QA checkout listing is not available for live checkout: ${String(listing.name || listing.id || item.card_id)}.`);
+    }
+
     const pricing = assertSellPriceAvailable(listing, { floor: 1 });
 
     trustedItems.push({
@@ -431,7 +511,8 @@ async function resolveTrustedCheckoutCartItems(rawItems = []) {
       pricing_identity_key: pricing.identity_key,
       pricing_source: pricing.source_count > 0 ? 'pricing-owner' : 'listing-sell-price',
       pricing_updated_at: pricing.updated_at,
-      pricing_stale: Boolean(pricing.stale)
+      pricing_stale: Boolean(pricing.stale),
+      qa_checkout: checkoutMode === CHECKOUT_MODES.QA_TEST
     });
   }
 
@@ -439,6 +520,14 @@ async function resolveTrustedCheckoutCartItems(rawItems = []) {
 }
 
 async function sendOrderConfirmationEmail(order) {
+  if (normalizeCheckoutMode(order?.checkout_mode) === CHECKOUT_MODES.QA_TEST) {
+    return {
+      sent: false,
+      skipped: true,
+      reason: 'qa_test_checkout_email_suppressed'
+    };
+  }
+
   const resendApiKey = getEnvValue('RESEND_API_KEY');
   if (!resendApiKey || !order?.customer_email) {
     return { sent: false, skipped: true };
@@ -2278,13 +2367,25 @@ app.post('/api/local/actions/:name', async (req, res) => {
     }
 
     if (actionName === 'createCheckout') {
-      const stripe = getStripeClient();
+      const checkoutMode = normalizeCheckoutMode(payload.checkout_mode || payload.checkoutMode);
+      if (checkoutMode === CHECKOUT_MODES.QA_TEST) {
+        const configuredToken = getEnvValue('MPM_QA_CHECKOUT_TOKEN');
+        const suppliedToken = req.headers['x-mainphase-qa-checkout-token'] || payload.qaCheckoutToken || '';
+        if (!configuredToken || configuredToken !== suppliedToken) {
+          res.status(403).send('Administrator QA authorization is required for Stripe test checkout.');
+          return;
+        }
+      }
+
+      const stripe = getStripeClient(checkoutMode);
       if (!stripe) {
-        res.status(500).send('STRIPE_SECRET_KEY is not configured for the local backend.');
+        res.status(500).send(checkoutMode === CHECKOUT_MODES.QA_TEST
+          ? 'STRIPE_TEST_SECRET_KEY is not configured for the local backend.'
+          : 'STRIPE_SECRET_KEY is not configured for the local backend.');
         return;
       }
 
-      const cartItems = await resolveTrustedCheckoutCartItems(Array.isArray(payload.cartItems) ? payload.cartItems : []);
+      const cartItems = await resolveTrustedCheckoutCartItems(Array.isArray(payload.cartItems) ? payload.cartItems : [], { checkoutMode });
       const shippingInfo = normalizeShippingInfo(payload.shippingInfo);
       validateCheckoutPayload(cartItems, shippingInfo);
 
@@ -2324,6 +2425,7 @@ app.post('/api/local/actions/:name', async (req, res) => {
         cancel_url: `${origin}/checkout`,
         customer_email: shippingInfo.email,
         metadata: {
+          checkout_mode: checkoutMode,
           shipping_info: JSON.stringify(shippingInfo),
           cart_items: JSON.stringify(cartItems),
           user_email: String(payload.userEmail || shippingInfo.email || '').trim().toLowerCase()
@@ -2332,22 +2434,27 @@ app.post('/api/local/actions/:name', async (req, res) => {
 
       res.json({
         data: {
-          url: session.url
+          url: session.url,
+          mode: checkoutMode,
+          preview_order: buildOrderFromCheckoutSession(session)
         }
       });
       return;
     }
 
     if (actionName === 'finalizeCheckoutSession') {
-      const stripe = getStripeClient();
-      if (!stripe) {
-        res.status(500).send('STRIPE_SECRET_KEY is not configured for the local backend.');
-        return;
-      }
-
       const sessionId = String(payload.session_id || '').trim();
       if (!sessionId) {
         res.status(400).send('session_id is required.');
+        return;
+      }
+
+      const checkoutMode = getCheckoutModeFromSessionId(sessionId);
+      const stripe = getStripeClient(checkoutMode);
+      if (!stripe) {
+        res.status(500).send(checkoutMode === CHECKOUT_MODES.QA_TEST
+          ? 'STRIPE_TEST_SECRET_KEY is not configured for the local backend.'
+          : 'STRIPE_SECRET_KEY is not configured for the local backend.');
         return;
       }
 
@@ -2358,36 +2465,51 @@ app.post('/api/local/actions/:name', async (req, res) => {
         res.json({
           data: {
             order: existingOrder,
-            alreadyFinalized: true
+            alreadyFinalized: true,
+            confirmation: {
+              sent: false,
+              skipped: true,
+              reason: 'already_finalized'
+            }
           }
         });
         return;
       }
 
       const session = await stripe.checkout.sessions.retrieve(sessionId);
+      assertCheckoutSessionMatchesMode(session, checkoutMode);
       if (!session || session.payment_status !== 'paid') {
         res.status(400).send('Stripe session is not paid yet.');
         return;
       }
 
       const orderPayload = buildOrderFromCheckoutSession(session);
+      if (checkoutMode === CHECKOUT_MODES.QA_TEST) {
+        await assertQaCheckoutOrderPayload(orderPayload);
+      }
+
       const order = isSupabaseEntityStoreConfigured()
         ? await createSupabaseEntityRecord('Order', orderPayload)
         : createEntity('Order', orderPayload);
       await decrementInventoryForOrder(order);
 
-      let email = null;
+      let confirmation = null;
       try {
-        email = await sendOrderConfirmationEmail(order);
+        confirmation = await sendOrderConfirmationEmail(order);
       } catch (emailError) {
         console.warn('Order confirmation email failed:', emailError?.message || emailError);
+        confirmation = {
+          sent: false,
+          skipped: true,
+          reason: 'email_error'
+        };
       }
 
       res.json({
         data: {
           order,
           alreadyFinalized: false,
-          email
+          confirmation
         }
       });
       return;

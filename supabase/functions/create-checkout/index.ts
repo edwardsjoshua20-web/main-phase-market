@@ -1,6 +1,16 @@
 import { handleCors } from '../_shared/cors.ts';
 import { getEnv } from '../_shared/env.ts';
-import { buildOrderFromCheckoutSession, getStripeClient, normalizeShippingInfo, resolveTrustedCartItems, roundMoney, validateCheckoutPayload } from '../_shared/commerce.ts';
+import {
+  CHECKOUT_MODES,
+  authorizeQaCheckoutRequest,
+  buildOrderFromCheckoutSession,
+  getStripeClient,
+  normalizeCheckoutMode,
+  normalizeShippingInfo,
+  resolveTrustedCartItems,
+  roundMoney,
+  validateCheckoutPayload
+} from '../_shared/commerce.ts';
 import { errorResponse, jsonResponse } from '../_shared/http.ts';
 
 Deno.serve(async (req) => {
@@ -10,9 +20,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const stripe = getStripeClient();
     const payload = await req.json();
-    const cartItems = await resolveTrustedCartItems(Array.isArray(payload.cartItems) ? payload.cartItems : []);
+    const checkoutMode = normalizeCheckoutMode(payload.checkout_mode || payload.checkoutMode);
+    if (checkoutMode === CHECKOUT_MODES.QA_TEST) {
+      await authorizeQaCheckoutRequest(req);
+    }
+
+    const stripe = getStripeClient(checkoutMode);
+    const cartItems = await resolveTrustedCartItems(Array.isArray(payload.cartItems) ? payload.cartItems : [], { checkoutMode });
     const shippingInfo = normalizeShippingInfo(payload.shippingInfo || {});
     validateCheckoutPayload(cartItems, shippingInfo);
 
@@ -55,13 +70,14 @@ Deno.serve(async (req) => {
       cancel_url: `${origin}/checkout`,
       customer_email: shippingInfo.email,
       metadata: {
+        checkout_mode: checkoutMode,
         shipping_info: JSON.stringify(shippingInfo),
         cart_items: JSON.stringify(cartItems),
         user_email: String(payload.userEmail || shippingInfo.email || '').trim().toLowerCase()
       }
     });
 
-    return jsonResponse({ url: session.url, preview_order: buildOrderFromCheckoutSession(session) });
+    return jsonResponse({ url: session.url, mode: checkoutMode, preview_order: buildOrderFromCheckoutSession(session) });
   } catch (error) {
     console.error('create-checkout error:', error);
     return errorResponse(error);

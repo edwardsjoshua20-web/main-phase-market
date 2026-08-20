@@ -4,6 +4,13 @@ import { restRequest } from './rest.ts';
 import { applyInventoryDecrease } from '../../../src/services/inventory/inventoryCore.js';
 import { assertSellPriceAvailable } from '../../../src/services/pricing/pricingCore.js';
 
+export const CHECKOUT_MODES = {
+  LIVE: 'live',
+  QA_TEST: 'qa_test'
+} as const;
+
+type CheckoutMode = typeof CHECKOUT_MODES[keyof typeof CHECKOUT_MODES];
+
 export function matchesEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 }
@@ -67,7 +74,19 @@ export async function getCheckoutListingById(id: string) {
   return null;
 }
 
-export async function resolveTrustedCartItems(rawItems: Record<string, unknown>[] = []) {
+function isQaCheckoutListing(listing: Record<string, unknown>) {
+  return listing?.qa_checkout === true
+    || String(listing?.checkout_mode || '').trim().toLowerCase() === CHECKOUT_MODES.QA_TEST;
+}
+
+export function assertQaCheckoutListing(listing: Record<string, unknown>) {
+  if (!isQaCheckoutListing(listing)) {
+    throw new Error(`Stripe test checkout can only use QA checkout listings: ${String(listing?.name || listing?.id || 'item')}.`);
+  }
+}
+
+export async function resolveTrustedCartItems(rawItems: Record<string, unknown>[] = [], options: { checkoutMode?: CheckoutMode } = {}) {
+  const checkoutMode = options.checkoutMode || CHECKOUT_MODES.LIVE;
   const requestedItems = Array.isArray(rawItems) ? rawItems.map(normalizeCartItem) : [];
   const trustedItems = [];
 
@@ -82,6 +101,12 @@ export async function resolveTrustedCartItems(rawItems: Record<string, unknown>[
       throw new Error(`Checkout item is no longer available: ${item.card_name || item.card_id}.`);
     }
 
+    if (checkoutMode === CHECKOUT_MODES.QA_TEST) {
+      assertQaCheckoutListing(listing);
+    } else if (isQaCheckoutListing(listing)) {
+      throw new Error(`QA checkout listing is not available for live checkout: ${String(listing.name || listing.id || item.card_id)}.`);
+    }
+
     const pricing = assertSellPriceAvailable(listing, { floor: 1 });
 
     trustedItems.push({
@@ -92,7 +117,8 @@ export async function resolveTrustedCartItems(rawItems: Record<string, unknown>[
       pricing_identity_key: pricing.identity_key,
       pricing_source: pricing.source_count > 0 ? 'pricing-owner' : 'listing-sell-price',
       pricing_updated_at: pricing.updated_at,
-      pricing_stale: Boolean(pricing.stale)
+      pricing_stale: Boolean(pricing.stale),
+      qa_checkout: checkoutMode === CHECKOUT_MODES.QA_TEST
     });
   }
 
@@ -139,11 +165,93 @@ function buildOrderNumber() {
   return `MPM-${stamp}-${suffix}`;
 }
 
-export function getStripeClient() {
-  return new Stripe(requireEnv('STRIPE_SECRET_KEY'));
+function isEnabled(value: string) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function isMainphaseAdminUser(user: Record<string, unknown> | null) {
+  const metadata = user?.user_metadata && typeof user.user_metadata === 'object'
+    ? user.user_metadata as Record<string, unknown>
+    : {};
+  const appMetadata = user?.app_metadata && typeof user.app_metadata === 'object'
+    ? user.app_metadata as Record<string, unknown>
+    : {};
+  const role = String(metadata.role || appMetadata.role || '').trim().toLowerCase();
+  const email = String(user?.email || '').trim().toLowerCase();
+  return role === 'admin' || email === 'admin@mainphasemarket.net';
+}
+
+export function normalizeCheckoutMode(value: unknown): CheckoutMode {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === CHECKOUT_MODES.QA_TEST ? CHECKOUT_MODES.QA_TEST : CHECKOUT_MODES.LIVE;
+}
+
+export function getCheckoutModeFromSessionId(sessionId: string): CheckoutMode {
+  return String(sessionId || '').startsWith('cs_test_') ? CHECKOUT_MODES.QA_TEST : CHECKOUT_MODES.LIVE;
+}
+
+export function assertStripeModeConfigured(mode: CheckoutMode) {
+  if (mode === CHECKOUT_MODES.QA_TEST) {
+    if (!isEnabled(getEnv('STRIPE_TEST_CHECKOUT_ENABLED'))) {
+      throw new Error('Stripe test checkout is not enabled.');
+    }
+
+    const testKey = requireEnv('STRIPE_TEST_SECRET_KEY');
+    if (!testKey.startsWith('sk_test_')) {
+      throw new Error('STRIPE_TEST_SECRET_KEY must be a Stripe test-mode secret key.');
+    }
+
+    const liveKey = getEnv('STRIPE_SECRET_KEY');
+    if (liveKey && liveKey === testKey) {
+      throw new Error('Stripe live and test checkout keys must be different.');
+    }
+    return;
+  }
+
+  const liveKey = requireEnv('STRIPE_SECRET_KEY');
+  if (liveKey.startsWith('sk_test_')) {
+    throw new Error('STRIPE_SECRET_KEY must not be a Stripe test-mode key for live checkout.');
+  }
+}
+
+export function getStripeClient(mode: CheckoutMode = CHECKOUT_MODES.LIVE) {
+  assertStripeModeConfigured(mode);
+  const keyName = mode === CHECKOUT_MODES.QA_TEST ? 'STRIPE_TEST_SECRET_KEY' : 'STRIPE_SECRET_KEY';
+  return new Stripe(requireEnv(keyName));
+}
+
+export async function authorizeQaCheckoutRequest(request: Request) {
+  if (!isEnabled(getEnv('STRIPE_TEST_CHECKOUT_ENABLED'))) {
+    throw new Error('Stripe test checkout is not enabled.');
+  }
+
+  const configuredToken = getEnv('MPM_QA_CHECKOUT_TOKEN');
+  const suppliedToken = request.headers.get('x-mainphase-qa-checkout-token') || '';
+  if (configuredToken && suppliedToken && configuredToken === suppliedToken) {
+    return { authorized: true, method: 'qa-token' };
+  }
+
+  const authorization = request.headers.get('authorization') || '';
+  if (authorization) {
+    const supabaseUrl = requireEnv('SUPABASE_URL').replace(/\/+$/, '');
+    const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+    const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: authorization
+      }
+    });
+
+    if (response.ok && isMainphaseAdminUser(await response.json())) {
+      return { authorized: true, method: 'admin-session' };
+    }
+  }
+
+  throw new Error('Administrator QA authorization is required for Stripe test checkout.');
 }
 
 export function buildOrderFromCheckoutSession(session: Stripe.Checkout.Session) {
+  const checkoutMode = normalizeCheckoutMode(session?.metadata?.checkout_mode);
   const shippingInfo = (parseJsonSafely(String(session?.metadata?.shipping_info || '{}'), {}) || {}) as Record<string, unknown>;
   const cartItems = (parseJsonSafely(String(session?.metadata?.cart_items || '[]'), []) || []) as Record<string, unknown>[];
   const normalizedItems = Array.isArray(cartItems) ? cartItems.map(normalizeCartItem) : [];
@@ -154,6 +262,8 @@ export function buildOrderFromCheckoutSession(session: Stripe.Checkout.Session) 
   return {
     stripe_session_id: session.id,
     stripe_payment_intent_id: String(session.payment_intent || '').trim() || null,
+    checkout_mode: checkoutMode,
+    stripe_livemode: Boolean(session.livemode),
     order_number: buildOrderNumber(),
     customer_email: String(shippingInfo.email || '').trim().toLowerCase(),
     customer_name: String(shippingInfo.name || '').trim(),
@@ -279,6 +389,37 @@ export async function finalizeCheckoutOrderAtomically(idempotencyKey: string, or
   };
 }
 
+export function assertCheckoutSessionMatchesMode(session: Stripe.Checkout.Session, mode: CheckoutMode) {
+  if (mode === CHECKOUT_MODES.QA_TEST) {
+    if (session.livemode) {
+      throw new Error('Stripe test checkout session unexpectedly came from live mode.');
+    }
+    if (normalizeCheckoutMode(session.metadata?.checkout_mode) !== CHECKOUT_MODES.QA_TEST) {
+      throw new Error('Stripe test checkout session is missing QA metadata.');
+    }
+    return;
+  }
+
+  if (!session.livemode) {
+    throw new Error('Live checkout finalization rejected a Stripe test-mode session.');
+  }
+}
+
+export async function assertQaCheckoutOrderPayload(order: Record<string, unknown>) {
+  const items = Array.isArray(order?.items) ? order.items as Record<string, unknown>[] : [];
+  if (items.length === 0) {
+    throw new Error('Stripe test checkout order must contain at least one QA item.');
+  }
+
+  for (const item of items) {
+    const listing = await getCheckoutListingById(String(item.card_id || ''));
+    if (!listing) {
+      throw new Error(`QA checkout listing no longer exists: ${String(item.card_id || 'item')}.`);
+    }
+    assertQaCheckoutListing(listing);
+  }
+}
+
 export async function findOrderByNumber(orderNumber: string, customerEmail = '') {
   const normalizedOrderNumber = String(orderNumber || '').trim().toLowerCase();
   const normalizedEmail = String(customerEmail || '').trim().toLowerCase();
@@ -350,6 +491,14 @@ export async function decrementInventoryForOrder(order: Record<string, unknown>)
 }
 
 export async function sendOrderConfirmationEmail(order: Record<string, unknown>) {
+  if (normalizeCheckoutMode(order?.checkout_mode) === CHECKOUT_MODES.QA_TEST) {
+    return {
+      sent: false,
+      skipped: true,
+      reason: 'qa_test_checkout_email_suppressed'
+    };
+  }
+
   const resendApiKey = getEnv('RESEND_API_KEY');
   if (!resendApiKey || !order?.customer_email) {
     return { sent: false, skipped: true };

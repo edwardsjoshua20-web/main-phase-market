@@ -80,6 +80,7 @@
     "wishlist:verify": "node scripts/verify-wishlist-owner.mjs",
     "preview": "vite preview",
     "checkout:idempotency:verify": "node scripts/verify-checkout-idempotency.mjs",
+    "checkout:test-mode:verify": "node scripts/verify-stripe-test-checkout-mode.mjs",
     "pricing:verify": "node scripts/verify-pricing-owner.mjs",
     "search:verify": "node scripts/verify-search-owner.mjs",
     "search:runtime:verify": "node scripts/verify-search-runtime.mjs",
