@@ -25,7 +25,7 @@ function getGameLabel(set) {
   return { label: set.gameLabel || set.game || 'TCG', color: gameColors.other };
 }
 
-export default function NewReleasesBar({ upcomingSets = [] }) {
+export default function NewReleasesBar({ upcomingSets = [], hasActivePreorders = false }) {
   if (upcomingSets.length === 0) {
     return null;
   }
@@ -56,13 +56,15 @@ export default function NewReleasesBar({ upcomingSets = [] }) {
               </Link>;
             })}
           </div>
-          <Link
-            to={createPageUrl('Shop') + '?preorder=true'}
-            className="ml-auto flex items-center text-gray-700 hover:text-gray-900 text-sm font-medium shrink-0"
-          >
-            All Preorders
-            <ChevronRight className="w-4 h-4" />
-          </Link>
+          {hasActivePreorders && (
+            <Link
+              to={createPageUrl('Shop') + '?type=all&preorder=true'}
+              className="ml-auto flex items-center text-gray-700 hover:text-gray-900 text-sm font-medium shrink-0"
+            >
+              All Preorders
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          )}
         </div>
       </HomepageContentShell>
     </section>

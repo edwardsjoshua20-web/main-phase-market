@@ -33,19 +33,34 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
   const goPrev = () => goTo((currentIndex - 1 + safeReleases.length) % safeReleases.length);
 
   const current = safeReleases[currentIndex] || fallbackHomepageReleases[0];
-  const bannerImage = current.imageUrl || fallbackHomepageReleases[0].imageUrl;
+  const bannerImage = current.heroImageUrl || null;
+  const fallbackImage = current.heroFallbackImageUrl || current.imageUrl || fallbackHomepageReleases[0].heroFallbackImageUrl;
   const supportLine = current.supportLine || current.gameLabel || 'Upcoming release';
-  const singlesHref = current.links?.shopSearch || '/Shop';
+  const ctaHref = current.ctaHref || current.links?.shopSearch || '/Shop';
+  const ctaLabel = current.ctaLabel || 'View Set';
 
   return (
     <section className="relative overflow-hidden w-full bg-slate-950" style={{ height: '248px' }}>
-      <div className="absolute inset-0">
-        <img
-          src={bannerImage}
-          alt={current.name}
-          className="w-full h-full object-cover object-center"
-        />
-      </div>
+      {bannerImage ? (
+        <div className="absolute inset-0">
+          <img
+            src={bannerImage}
+            alt={current.name}
+            className="w-full h-full object-cover object-center"
+          />
+        </div>
+      ) : (
+        <div className="absolute inset-0 bg-[linear-gradient(120deg,#020617_0%,#111827_46%,#334155_100%)]">
+          {fallbackImage && (
+            <img
+              src={fallbackImage}
+              alt=""
+              aria-hidden="true"
+              className="absolute right-8 top-1/2 h-32 w-32 -translate-y-1/2 object-contain opacity-[0.18] blur-[1px]"
+            />
+          )}
+        </div>
+      )}
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.95)_0%,rgba(15,23,42,0.84)_38%,rgba(15,23,42,0.50)_65%,rgba(15,23,42,0.24)_100%)]" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.10)_0%,rgba(2,6,23,0.34)_100%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_24%,rgba(255,255,255,0.12),transparent_22%)]" />
@@ -60,9 +75,9 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
               {supportLine}
             </p>
 
-            <Link to={singlesHref}>
+            <Link to={ctaHref}>
               <Button size="default" className="bg-white text-slate-950 hover:bg-slate-100 font-bold shadow-lg rounded-xl px-5">
-                Shop now
+                {ctaLabel}
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             </Link>

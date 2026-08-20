@@ -45,7 +45,10 @@ export default function Home() {
         <HeroBanner releases={homepageContent?.heroReleases} />
       </div>
 
-      <NewReleasesBar upcomingSets={homepageContent?.upcomingReleases || []} />
+      <NewReleasesBar
+        upcomingSets={homepageContent?.upcomingReleases || []}
+        hasActivePreorders={(homepageContent?.sources?.products || 0) > 0}
+      />
 
       <CoreActionsSection />
       <div className="hidden md:block">

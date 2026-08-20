@@ -60,6 +60,7 @@ export function buildFilterParams(newFilters) {
   if (newFilters.priceMax) params.priceMax = newFilters.priceMax;
   if (newFilters.inStock) params.inStock = 'true';
   if (newFilters.setType !== 'all') params.setType = newFilters.setType;
+  if (newFilters.preorder) params.preorder = 'true';
 
   return params;
 }
@@ -72,6 +73,7 @@ export function hasActiveFilters(filters) {
     filters.rarity !== 'all' ||
     filters.set !== 'all' ||
     filters.inStock ||
+    filters.preorder ||
     filters.priceMin ||
     filters.priceMax ||
     filters.sort !== 'newest' ||

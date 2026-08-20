@@ -2,10 +2,10 @@ import { getSiteAssetUrl } from '@/config/publicAssetUrls';
 import { listingOwner } from '@/services/listing/listingOwner';
 import { fetchJsonWithEmbeddedFallback, getEmbeddedUpcomingReleasesManifest } from '@/services/siteStaticSnapshots';
 import {
+  balanceHomepageReleases,
   fallbackHomepageReleases,
   filterUpcomingReleases,
-  normalizeHomepageRelease,
-  sortUpcomingReleases
+  normalizeHomepageRelease
 } from '@/services/homepage/homepageReleaseFeed';
 
 async function fetchStaticUpcomingReleaseManifest() {
@@ -16,7 +16,7 @@ async function fetchStaticUpcomingReleaseManifest() {
       { cache: 'no-store' }
     );
     const releases = Array.isArray(payload?.releases) ? payload.releases : [];
-    return sortUpcomingReleases(releases.map((entry) => normalizeHomepageRelease(entry, 'manifest')));
+    return balanceHomepageReleases(releases.map((entry) => normalizeHomepageRelease(entry, 'manifest')), 12);
   } catch {
     return [];
   }
@@ -25,10 +25,11 @@ async function fetchStaticUpcomingReleaseManifest() {
 async function fetchUpcomingProductsFromBackend() {
   try {
     const products = await listingOwner.filterProductListings({ is_preorder: true }, 'release_date', 20);
-    return sortUpcomingReleases(
+    return balanceHomepageReleases(
       filterUpcomingReleases(
         (products || []).map((product) => normalizeHomepageRelease(product, 'product'))
-      )
+      ),
+      12
     );
   } catch {
     return [];
@@ -42,11 +43,13 @@ export async function getHomepageContent() {
   ]);
 
   const preferredReleases = productReleases.length > 0 ? productReleases : manifestReleases;
-  const heroReleases = preferredReleases.length > 0 ? preferredReleases : fallbackHomepageReleases;
+  const heroReleases = preferredReleases.length > 0
+    ? balanceHomepageReleases(preferredReleases, 12)
+    : fallbackHomepageReleases;
 
   return {
     heroReleases,
-    upcomingReleases: heroReleases.slice(0, 6),
+    upcomingReleases: balanceHomepageReleases(heroReleases, 6, { fillRemaining: false }),
     sources: {
       products: productReleases.length,
       manifest: manifestReleases.length

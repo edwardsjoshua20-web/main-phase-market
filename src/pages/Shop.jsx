@@ -77,7 +77,8 @@ export default function Shop() {
     priceMin: searchParams.get('priceMin') || '',
     priceMax: searchParams.get('priceMax') || '',
     inStock: searchParams.get('inStock') === 'true',
-    setType: searchParams.get('setType') || 'all'
+    setType: searchParams.get('setType') || 'all',
+    preorder: searchParams.get('preorder') === 'true'
   };
 
   const [quickViewItem, setQuickViewItem] = useState(null);
@@ -131,7 +132,7 @@ export default function Shop() {
   }, [advancedSearchOpen]);
 
   useEffect(() => {
-    if (!searchParams.get('type') && !advancedSearchOpen) {
+    if (!searchParams.get('type') && !advancedSearchOpen && !filters.preorder) {
       setSearchParams((prev) => {
         /** @type {Record<string, string>} */
         const p = {};
@@ -143,7 +144,7 @@ export default function Shop() {
         return p;
       });
     }
-  }, [advancedSearchOpen, searchParams, setSearchParams]);
+  }, [advancedSearchOpen, filters.preorder, searchParams, setSearchParams]);
 
   useEffect(() => {
     return () => {
@@ -362,10 +363,13 @@ export default function Shop() {
   });
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
-    queryKey: ['shop-products', filters.game],
+    queryKey: ['shop-products', filters.game, filters.preorder],
     queryFn: async () => {
       const allProducts = await listingOwner.listProductListings('-created_date', 100);
-      return allProducts.filter((p) => p.status === 'active' && inventoryOwner.getStockState(p).inStock && (filters.game === 'all' || p.game === filters.game));
+      return allProducts.filter((p) => {
+        const matchesPreorder = filters.preorder ? Boolean(p.is_preorder) : inventoryOwner.getStockState(p).inStock;
+        return p.status === 'active' && matchesPreorder && (filters.game === 'all' || p.game === filters.game);
+      });
     }
   });
 
@@ -594,7 +598,8 @@ export default function Shop() {
           priceMin: '',
           priceMax: '',
           inStock: false,
-          sort: 'newest'
+          sort: 'newest',
+          preorder: false
         }),
         advancedSearch: '1'
       });
@@ -612,7 +617,8 @@ export default function Shop() {
       priceMax: '',
       inStock: false,
       sort: 'newest',
-      setType: 'all'
+      setType: 'all',
+      preorder: false
     }));
   };
 
@@ -913,6 +919,7 @@ export default function Shop() {
         if (filters.type !== 'merch' && p.product_type !== filters.type) return false;
       }
       if (filters.search && !p.name?.toLowerCase().includes(filters.search.toLowerCase())) return false;
+      if (filters.preorder && !p.is_preorder) return false;
       return true;
     });
   }, [products, filters]);
