@@ -21,8 +21,6 @@ import {
   Heart,
   Loader2,
   Swords,
-  SquareStack,
-  MessagesSquare,
   Crown,
   SlidersHorizontal,
   Truck
@@ -162,6 +160,11 @@ export default function Layout({ children, currentPageName }) {
     backend.auth.redirectToLogin(window.location.href);
   };
 
+  const handleCreateAccount = () => {
+    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    navigate(`/MemberLogin?mode=signup&returnTo=${encodeURIComponent(returnTo)}`);
+  };
+
   const handleLogout = () => {
     backend.auth.logout();
   };
@@ -170,15 +173,15 @@ export default function Layout({ children, currentPageName }) {
     { label: 'Home', to: '/', pages: ['Home'] },
     { label: 'Shop', to: '/Shop', pages: ['Shop'] },
     { label: 'Deck Builder', to: '/AdvancedDeckBuilder', pages: ['AdvancedDeckBuilder', 'DeckBuilder'] },
-    { label: 'Commander Hub', to: '/CommanderHub', pages: ['CommanderHub', 'CommanderDetail'], icon: Swords },
-    { label: 'Community', to: '/CommunityDecks', pages: ['CommunityDecks'], icon: SquareStack },
-    { label: 'Forum', to: '/Forum', pages: ['Forum', 'ForumThread'], icon: MessagesSquare }
+    { label: 'Commander Hub', to: '/CommanderHub', pages: ['CommanderHub', 'CommanderDetail'], desktopOnly: true },
+    { label: 'Community', to: '/CommunityDecks', pages: ['CommunityDecks'], desktopOnly: true },
+    { label: 'Forum', to: '/Forum', pages: ['Forum', 'ForumThread'], desktopOnly: true }
   ];
 
   const primaryNavClass = (item) => {
     const isActive = item.pages.includes(currentPageName);
     return [
-      'relative h-9 items-center gap-1.5 whitespace-nowrap border-b-2 px-1 text-sm font-medium transition-colors',
+      'relative h-9 items-center whitespace-nowrap border-b-2 px-1 text-sm font-medium transition-colors',
       isActive
         ? 'border-sky-300 text-white'
         : 'border-transparent text-slate-300 hover:text-white'
@@ -258,7 +261,7 @@ export default function Layout({ children, currentPageName }) {
     <div className="min-h-screen bg-white w-full overflow-x-hidden">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-slate-950/80 bg-slate-950 shadow-sm">
-        <div className="bg-[#071323]">
+        <div className="bg-[#020814]">
          <HeaderShell>
            <div className="flex flex-col md:h-[60px] md:flex-row md:items-center gap-2 py-2 md:py-0 md:gap-4 xl:gap-5">
             {/* Logo */}
@@ -371,11 +374,11 @@ export default function Layout({ children, currentPageName }) {
                   value={searchQuery}
                   onChange={handleSearchChange}
                   onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
-                  className="h-9 rounded-none rounded-r-md border-slate-600/80 bg-[#0d2032] pl-4 pr-11 text-sm text-white placeholder:text-slate-400 focus:bg-[#132b42]"
+                  className="h-9 rounded-none rounded-r-md border-slate-300 bg-slate-50 pl-4 pr-11 text-sm text-slate-900 placeholder:text-slate-500 focus:bg-white"
                 />
                 <button
                   onClick={handleSearchButton}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 h-9 px-3 border-l border-slate-600/80 text-slate-400 hover:text-white hover:bg-[#18344f] transition-colors flex items-center justify-center"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 h-9 px-3 border-l border-slate-300 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center justify-center"
                 >
                   <Search className="w-4 h-4" />
                 </button>
@@ -456,14 +459,16 @@ export default function Layout({ children, currentPageName }) {
             {/* Desktop-only actions (far right) */}
             <div className="hidden md:flex items-center gap-1 shrink-0">
               {!isAdminPage && (
-                <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-md text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={() => setWishlistOpen(true)}>
-                <Heart className="w-4 h-4" />
+                <Button variant="ghost" size="sm" className="relative h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={() => setWishlistOpen(true)}>
+                <Heart className="w-4 h-4 mr-1.5" />
+                <span>Wishlist</span>
                 {wishlist.count > 0 && <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 flex items-center justify-center rounded-full bg-red-400 text-white text-[10px] font-bold">{wishlist.count}</Badge>}
               </Button>
               )}
               {!isAdminPage && (
-                <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-md text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={() => setCartOpen(true)}>
-                  <ShoppingCart className="w-4 h-4" />
+                <Button variant="ghost" size="sm" className="relative h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={() => setCartOpen(true)}>
+                  <ShoppingCart className="w-4 h-4 mr-1.5" />
+                  <span>Cart</span>
                   {cartCount > 0 && <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 flex items-center justify-center rounded-full bg-yellow-400 text-gray-900 text-[10px] font-bold">{cartCount}</Badge>}
                 </Button>
               )}
@@ -494,9 +499,14 @@ export default function Layout({ children, currentPageName }) {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Button variant="ghost" size="sm" className="h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={handleLogin}>
-                  <LogIn className="w-4 h-4 mr-2" />Sign In
-                </Button>
+                <>
+                  <Button variant="ghost" size="sm" className="h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={handleLogin}>
+                    <LogIn className="w-4 h-4 mr-2" />Sign In
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-9 rounded-md px-2 text-slate-200 hover:bg-[#132b42] hover:text-white" onClick={handleCreateAccount}>
+                    Create Account
+                  </Button>
+                </>
               )}
             </div>
             </div>
@@ -508,11 +518,9 @@ export default function Layout({ children, currentPageName }) {
           <HeaderShell>
             <nav className="flex h-9 items-center gap-5 overflow-x-auto">
               {primaryNavItems.map((item) => {
-                const Icon = item.icon;
-                const hideClass = item.icon ? 'hidden md:flex' : 'flex';
+                const hideClass = item.desktopOnly ? 'hidden md:flex' : 'flex';
                 return (
                   <Link key={item.to} to={item.to} className={`${hideClass} ${primaryNavClass(item)}`}>
-                    {Icon && <Icon className="w-3.5 h-3.5" />}
                     {item.label}
                   </Link>
                 );
