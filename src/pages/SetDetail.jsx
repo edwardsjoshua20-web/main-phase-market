@@ -12,6 +12,11 @@ import { createPageUrl } from '@/utils';
 function formatDate(value) {
   if (!value) return '';
   try {
+    const datePart = String(value).slice(0, 10);
+    const [year, month, day] = datePart.split('-').map((part) => Number(part));
+    if (year && month && day) {
+      return format(new Date(year, month - 1, day), 'MMMM d, yyyy');
+    }
     return format(new Date(value), 'MMMM d, yyyy');
   } catch {
     return '';
