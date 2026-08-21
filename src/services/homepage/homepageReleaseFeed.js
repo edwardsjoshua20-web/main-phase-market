@@ -35,7 +35,6 @@ const FALLBACK_THEME_MAP = {
 
 const HERO_FALLBACK_IMAGES = {
   magic: FALLBACK_THEME_MAP.magic.fallbackImage,
-  yugioh: FALLBACK_THEME_MAP.yugioh.fallbackImage,
   other: FALLBACK_THEME_MAP.other.fallbackImage
 };
 

@@ -34,10 +34,17 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
 
   const current = safeReleases[currentIndex] || fallbackHomepageReleases[0];
   const bannerImage = current.heroImageUrl || null;
-  const fallbackImage = current.heroFallbackImageUrl || current.imageUrl || fallbackHomepageReleases[0].heroFallbackImageUrl;
+  const containedImage = current.imageUrl || current.heroFallbackImageUrl || fallbackHomepageReleases[0].heroFallbackImageUrl;
   const supportLine = current.supportLine || current.gameLabel || 'Upcoming release';
   const ctaHref = current.ctaHref || current.links?.shopSearch || '/Shop';
   const ctaLabel = current.ctaLabel || 'View Set';
+  const fallbackInitials = String(current.gameLabel || current.game || 'TCG')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((word) => word[0])
+    .join('')
+    .toUpperCase();
 
   return (
     <section className="relative overflow-hidden w-full bg-slate-950" style={{ height: '248px' }}>
@@ -50,14 +57,22 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
           />
         </div>
       ) : (
-        <div className="absolute inset-0 bg-[linear-gradient(120deg,#020617_0%,#111827_46%,#334155_100%)]">
-          {fallbackImage && (
-            <img
-              src={fallbackImage}
-              alt=""
-              aria-hidden="true"
-              className="absolute right-8 top-1/2 h-32 w-32 -translate-y-1/2 object-contain opacity-[0.18] blur-[1px]"
-            />
+        <div className="absolute inset-0 bg-[linear-gradient(120deg,#020617_0%,#111827_48%,#1e293b_100%)]">
+          <div className="absolute inset-y-0 right-0 w-[54%] bg-[radial-gradient(circle_at_68%_50%,rgba(148,163,184,0.24),transparent_52%)]" />
+          <div className="absolute right-0 top-0 h-full w-[46%] bg-[linear-gradient(90deg,rgba(2,6,23,0)_0%,rgba(15,23,42,0.42)_42%,rgba(15,23,42,0.76)_100%)]" />
+          {containedImage ? (
+            <div className="absolute inset-y-3 right-8 hidden w-[38%] items-center justify-end md:flex">
+              <img
+                src={containedImage}
+                alt=""
+                aria-hidden="true"
+                className="max-h-full max-w-full object-contain opacity-80 drop-shadow-[0_22px_42px_rgba(0,0,0,0.46)]"
+              />
+            </div>
+          ) : (
+            <div className="absolute right-12 top-1/2 hidden h-32 w-32 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] text-3xl font-black tracking-wide text-white/40 md:flex">
+              {fallbackInitials}
+            </div>
           )}
         </div>
       )}
