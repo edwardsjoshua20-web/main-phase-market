@@ -1,3 +1,10 @@
+import {
+  getReleaseState,
+  getReleaseStateLabel,
+  getTodayStart,
+  isHomepagePromotableReleaseState
+} from '@/services/releases/releaseState';
+
 const FALLBACK_THEME_MAP = {
   magic: {
     label: 'Magic: The Gathering',
@@ -42,11 +49,6 @@ function parseReleaseDate(value) {
   if (!value) return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-export function getTodayStart() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 export function normalizeReleaseDateValue(value) {
@@ -205,7 +207,8 @@ export function normalizeHomepageRelease(input = {}, source = 'unknown') {
   const theme = getReleaseTheme({ ...input, game });
   const name = normalizeReleaseName(input, source);
   const hasPreorderListing = Boolean(input.has_preorder_listing ?? (source === 'product' && input.is_preorder));
-  const released = releaseDate ? parseReleaseDate(releaseDate) < getTodayStart() : false;
+  const releaseState = input.release_state || input.releaseState || getReleaseState(releaseDate);
+  const released = releaseState === 'RELEASED';
   const hasActiveListing = Boolean(input.has_active_listing ?? source === 'product');
   const ctaLabel = input.cta_label
     || (hasPreorderListing ? 'Preorder' : (released && hasActiveListing ? 'Shop Set' : 'View Set'));
@@ -223,6 +226,9 @@ export function normalizeHomepageRelease(input = {}, source = 'unknown') {
     productType: input.product_type || 'sealed_product',
     description: input.description || '',
     releaseDate,
+    releaseState,
+    releaseStateLabel: input.release_state_label || input.releaseStateLabel || getReleaseStateLabel(releaseState),
+    homepagePromotable: input.homepage_promotable ?? input.homepagePromotable ?? isHomepagePromotableReleaseState(releaseState),
     supportLine: input.supportLine || [
       theme.label,
       input.set_name && input.set_name !== input.name ? input.set_name : ''
@@ -270,9 +276,8 @@ export function sortUpcomingReleases(releases = []) {
 export function filterUpcomingReleases(releases = [], todayStart = getTodayStart()) {
   return releases.filter((release) => {
     if (!release?.preorder) return false;
-    const releaseDate = parseReleaseDate(release.releaseDate);
-    if (!releaseDate) return false;
-    return releaseDate >= todayStart;
+    const releaseState = release.releaseState || getReleaseState(release.releaseDate, todayStart);
+    return isHomepagePromotableReleaseState(releaseState);
   });
 }
 

@@ -1,6 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { applyHeroArtworkToReleases } from './lib/homepage-hero-art-generator.mjs';
+import {
+  getReleaseState,
+  getReleaseStateLabel,
+  isHomepagePromotableReleaseState
+} from '../src/services/releases/releaseState.js';
 
 const ROOT = process.cwd();
 const PUBLIC_DATA_ROOT = path.join(ROOT, 'public', 'data');
@@ -35,6 +40,18 @@ const GAME_FALLBACK_IMAGES = {
   onepiece: 'https://en.onepiece-cardgame.com/images/common/logo.png',
   fab: 'https://dhhim4ltzu1pj.cloudfront.net/media/images/global/fab_logo.original.png',
   starwars: 'https://starwarsunlimited.com/images/logos/swu-logo.png'
+};
+
+const RELEASE_ASSET_OVERRIDES = {
+  'magic:FRA': {
+    set_image_url: 'https://images.ctfassets.net/s5n2t79q9icq/wSQdOUyu2NFMRBDrH6Cgr/cb1d1e73e5e518368f89e9998fb48131/dravmeloqint-1920x1000.png?q=80&w=1920&h=1000&fit=crop&f=center&fm=webp',
+    source_url: 'https://magic.wizards.com/en/products/reality-fracture'
+  },
+  'magic:MBC': {
+    set_image_url: 'https://media.wizards.com/2026/images/daily/VbqFabKvbr/heqm2no634.webp',
+    image_large: 'https://media.wizards.com/2026/images/daily/VbqFabKvbr/wFKXx2Jn3B.webp',
+    source_url: 'https://www.magic.wizards.com/en/news/feature/whats-inside-mystery-booster-commander-edition'
+  }
 };
 
 function ensureDir(dirPath) {
@@ -161,19 +178,27 @@ function normalizeSet(game, set) {
 
   const name = normalizeTitle(set);
   const code = normalizeCode(set);
-  const heroImageUrl = heroImageForSet(set);
+  const override = RELEASE_ASSET_OVERRIDES[`${game}:${String(code || '').toUpperCase()}`] || {};
+  const enrichedSet = { ...set, ...override };
+  const heroImageUrl = heroImageForSet(enrichedSet);
+  const releaseState = getReleaseState(releaseDate);
 
   return {
     id: `${game}:${code || name}`,
     game,
     name,
-    set_name: set.series || name,
+    set_name: enrichedSet.series || name,
     parentKey: `${game}:${releaseDate.slice(0, 10)}:${normalizeParentName(game, name)}`,
     release_date: releaseDate,
-    set_image_url: imageForSet(set),
+    release_state: releaseState,
+    release_state_label: getReleaseStateLabel(releaseState),
+    homepage_promotable: isHomepagePromotableReleaseState(releaseState),
+    set_image_url: imageForSet(enrichedSet),
     hero_image_url: heroImageUrl,
     game_fallback_image_url: GAME_FALLBACK_IMAGES[game] || null,
-    supportLine: supportLineForSet(game, set),
+    source_url: enrichedSet.source_url || null,
+    image_large: enrichedSet.image_large || null,
+    supportLine: supportLineForSet(game, enrichedSet),
     is_preorder: true,
     has_preorder_listing: false,
     cta_label: 'View Set',
@@ -255,7 +280,6 @@ function balanceReleasesByGame(releases, limit = 12) {
 }
 
 async function main() {
-  const today = new Date();
   const allReleases = GAME_SOURCES.flatMap(({ game, file }) => {
     const rows = readJsonIfExists(file);
     return (Array.isArray(rows) ? rows : [])
@@ -264,9 +288,9 @@ async function main() {
   });
 
   const groupedReleases = groupParentReleases(allReleases);
-  const futureReleases = groupedReleases.filter((set) => new Date(set.release_date) >= today);
-  const releases = futureReleases.length > 0
-    ? balanceReleasesByGame(futureReleases, 12)
+  const promotableReleases = groupedReleases.filter((set) => isHomepagePromotableReleaseState(set.release_state));
+  const releases = promotableReleases.length > 0
+    ? balanceReleasesByGame(promotableReleases, 12)
     : [...groupedReleases]
         .sort((a, b) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime())
         .slice(0, 12)

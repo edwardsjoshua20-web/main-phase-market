@@ -16,7 +16,10 @@ async function fetchStaticUpcomingReleaseManifest() {
       { cache: 'no-store' }
     );
     const releases = Array.isArray(payload?.releases) ? payload.releases : [];
-    return balanceHomepageReleases(releases.map((entry) => normalizeHomepageRelease(entry, 'manifest')), 12);
+    return balanceHomepageReleases(
+      filterUpcomingReleases(releases.map((entry) => normalizeHomepageRelease(entry, 'manifest'))),
+      12
+    );
   } catch {
     return [];
   }
@@ -43,7 +46,8 @@ export async function getHomepageContent() {
   ]);
 
   const preferredReleases = productReleases.length > 0 ? productReleases : manifestReleases;
-  const eligibleHeroReleases = preferredReleases.filter((release) => release.heroEligible !== false && release.heroImageUrl);
+  const eligibleHeroReleases = filterUpcomingReleases(preferredReleases)
+    .filter((release) => release.heroEligible !== false && release.heroImageUrl);
   const heroReleases = eligibleHeroReleases.length > 0
     ? balanceHomepageReleases(eligibleHeroReleases, 12)
     : fallbackHomepageReleases;

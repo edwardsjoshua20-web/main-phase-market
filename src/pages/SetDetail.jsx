@@ -115,6 +115,7 @@ export default function SetDetail() {
   const releaseDate = formatDate(detail.releaseDate);
   const hasListings = detail.availability.activeListingCount > 0;
   const representativeImages = detail.representativeImages || [];
+  const releaseStateLabel = detail.releaseStateLabel || '';
   const setCards = Array.isArray(detail.setCards) ? detail.setCards : [];
   const visibleCardLimit = 60;
   const visibleCards = showAllCards ? setCards : setCards.slice(0, visibleCardLimit);
@@ -138,7 +139,12 @@ export default function SetDetail() {
               <Badge className="rounded bg-white/10 text-white hover:bg-white/10">{detail.gameLabel}</Badge>
               {detail.setCode && <Badge className="rounded bg-white/10 text-white hover:bg-white/10">{detail.setCode}</Badge>}
             </div>
-            <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight md:text-5xl">{detail.name}</h1>
+            {releaseStateLabel && (
+              <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
+                {releaseStateLabel}
+              </p>
+            )}
+            <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight md:text-5xl">{detail.name}</h1>
             <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/82">
               {releaseDate && (
                 <span className="inline-flex items-center gap-2">
@@ -208,8 +214,7 @@ export default function SetDetail() {
 
           {representativeImages.length > 0 && (
             <div>
-              <h2 className="text-xl font-black tracking-tight text-slate-950">Featured Visuals</h2>
-              <p className="mt-1 text-sm text-slate-600">Curated artwork for the set, separate from the card list below.</p>
+              <h2 className="text-xl font-black tracking-tight text-slate-950">Set Gallery</h2>
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {representativeImages.map((asset) => (
                   <FeaturedImage key={`${asset.name}:${asset.imageUrl}`} asset={{ ...asset, game: detail.game }} />
@@ -222,10 +227,12 @@ export default function SetDetail() {
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 className="text-xl font-black tracking-tight text-slate-950">Cards in This Set</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  {detail.cardCatalog?.knownLabel || 'Card list not yet available'}
-                  {detail.cardCatalog?.printingLabel ? ` • ${detail.cardCatalog.printingLabel}` : ''}
-                </p>
+                {setCards.length > 0 && (
+                  <p className="mt-1 text-sm text-slate-600">
+                    {detail.cardCatalog?.knownLabel}
+                    {detail.cardCatalog?.printingLabel ? ` • ${detail.cardCatalog.printingLabel}` : ''}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -248,9 +255,7 @@ export default function SetDetail() {
                 )}
               </>
             ) : (
-              <div className="mt-4 border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
-                Card list not yet available.
-              </div>
+              <p className="mt-2 text-sm text-slate-600">Card list not yet available.</p>
             )}
           </div>
         </div>

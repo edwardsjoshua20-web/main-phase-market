@@ -1,5 +1,6 @@
 import { getCatalogAssetUrl, getSiteAssetUrl } from '@/config/publicAssetUrls';
 import { listingOwner } from '@/services/listing/listingOwner';
+import { getReleaseState, getReleaseStateLabel } from '@/services/releases/releaseState';
 import { enrichCatalogResultsWithInventory } from '@/services/search/searchCore';
 import { fetchJsonWithEmbeddedFallback, getEmbeddedUpcomingReleasesManifest } from '@/services/siteStaticSnapshots';
 
@@ -159,6 +160,7 @@ function normalizeCatalogSet(row = {}, game) {
     heroImageUrl: firstImage([row.hero_image_url, row.heroImageUrl, row.promo_image_url, row.key_art, row.images?.hero, row.images?.banner]),
     productPageUrl: firstImage([row.product_page, row.productPage, row.url]),
     cardDatabaseUrl: firstImage([row.card_database, row.cardDatabase]),
+    sourceUrl: firstImage([row.source_url, row.sourceUrl]),
     raw: row
   };
 }
@@ -182,10 +184,13 @@ function normalizeManifestRelease(row = {}) {
     setImageUrl: imageFor(row),
     heroImageUrl: firstImage([row.hero_image_url, row.heroImageUrl]),
     heroVisualMode: row.hero_visual_mode || row.heroVisualMode || null,
+    releaseState: row.release_state || row.releaseState || null,
+    releaseStateLabel: row.release_state_label || row.releaseStateLabel || null,
     sourceAssets: normalizeSourceAssets(row),
     groupedReleaseIds: Array.isArray(row.grouped_release_ids) ? row.grouped_release_ids : [],
     variantCount: row.variant_count || row.variantCount || null,
     shopSearchUrl: row.links?.shopSearch || null,
+    sourceUrl: firstImage([row.source_url, row.sourceUrl]),
     raw: row
   };
 }
@@ -258,6 +263,8 @@ function mergeSetDetail({ release, catalogSet, game, setSlug }) {
     setCode: primary.setCode || catalogSet?.setCode || '',
     slug: setSlug,
     releaseDate: primary.releaseDate || catalogSet?.releaseDate || null,
+    releaseState: primary.releaseState || getReleaseState(primary.releaseDate || catalogSet?.releaseDate || null),
+    releaseStateLabel: primary.releaseStateLabel || getReleaseStateLabel(primary.releaseState || getReleaseState(primary.releaseDate || catalogSet?.releaseDate || null)),
     description: primary.description || catalogSet?.description || '',
     cardCount: primary.cardCount || catalogSet?.cardCount || null,
     setImageUrl: primary.setImageUrl || catalogSet?.setImageUrl || null,
@@ -265,7 +272,7 @@ function mergeSetDetail({ release, catalogSet, game, setSlug }) {
     heroVisualMode: release?.heroVisualMode || null,
     sourceAssets,
     representativeImages: sourceAssets.filter((asset) => asset.kind === 'card').slice(0, 5),
-    productPageUrl: catalogSet?.productPageUrl || null,
+    productPageUrl: primary.sourceUrl || catalogSet?.sourceUrl || catalogSet?.productPageUrl || null,
     cardDatabaseUrl: catalogSet?.cardDatabaseUrl || null,
     groupedReleaseIds: release?.groupedReleaseIds || [],
     variantCount: release?.variantCount || null,

@@ -36,7 +36,7 @@ export default function NewReleasesBar({ upcomingSets = [], hasActivePreorders =
         <div className="flex items-center gap-4 overflow-x-auto">
           <div className="flex items-center gap-2 shrink-0">
             <Calendar className="w-5 h-5 text-gray-700" />
-            <span className="font-semibold text-gray-900">Upcoming Releases:</span>
+            <span className="font-semibold text-gray-900">Releases:</span>
           </div>
           <div className="flex gap-4">
             {upcomingSets.map((set, i) => {
@@ -50,6 +50,11 @@ export default function NewReleasesBar({ upcomingSets = [], hasActivePreorders =
                   {label}
                 </span>
                 <span className="text-sm font-medium text-gray-900">{set.name}</span>
+                {set.releaseStateLabel && (
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    {set.releaseStateLabel}
+                  </span>
+                )}
                 <span className="text-xs text-gray-500">
                   {format(new Date(set.releaseDate || set.date), 'MMM d')}
                 </span>

@@ -43,6 +43,7 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
   const supportLine = current.supportLine || current.gameLabel || 'Upcoming release';
   const ctaHref = current.ctaHref || current.links?.shopSearch || '/Shop';
   const ctaLabel = current.ctaLabel || 'View Set';
+  const releaseStateLabel = current.releaseStateLabel || '';
   const fallbackInitials = String(current.gameLabel || current.game || 'TCG')
     .split(/\s+/)
     .filter(Boolean)
@@ -94,6 +95,11 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
       <div className="relative z-10 h-full w-full px-4 py-5">
         <div className="h-full flex items-center">
           <div className={`text-white transition-opacity duration-400 ${animating ? 'opacity-0' : 'opacity-100'} max-w-2xl`}>
+            {releaseStateLabel && (
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
+                {releaseStateLabel}
+              </p>
+            )}
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight leading-[0.96] mb-2 text-balance max-w-3xl">
               {current.name}
             </h1>
