@@ -1,5 +1,6 @@
 import { getCatalogAssetUrl, getSiteAssetUrl } from '@/config/publicAssetUrls';
 import { listingOwner } from '@/services/listing/listingOwner';
+import { enrichCatalogResultsWithInventory } from '@/services/search/searchCore';
 import { fetchJsonWithEmbeddedFallback, getEmbeddedUpcomingReleasesManifest } from '@/services/siteStaticSnapshots';
 
 const GAME_ROUTE_ALIASES = {
@@ -30,6 +31,10 @@ const GAME_LABELS = {
 
 const CATALOG_ASSET_GAMES = {
   magic: 'mtg'
+};
+
+const SEARCH_GAMES = {
+  fab: 'flesh_and_blood'
 };
 
 function cleanText(value) {
@@ -67,6 +72,16 @@ function firstText(values = []) {
 
 function firstImage(values = []) {
   return values.find((value) => typeof value === 'string' && value.trim()) || null;
+}
+
+function uniqueBy(items = [], keyForItem = (item) => item) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = keyForItem(item);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function setCodeFor(row = {}) {
@@ -196,6 +211,18 @@ async function fetchCatalogSets(game) {
   }
 }
 
+async function fetchCatalogCards(game) {
+  try {
+    const assetGame = CATALOG_ASSET_GAMES[game] || game;
+    const response = await fetch(getCatalogAssetUrl(assetGame, 'cards.json'), { cache: 'no-store' });
+    if (!response.ok) return [];
+    const rows = await response.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
 function releaseMatches(release, game, setSlug) {
   if (routeGameKey(release.game) !== game) return false;
   const candidateSlugs = [
@@ -237,7 +264,7 @@ function mergeSetDetail({ release, catalogSet, game, setSlug }) {
     heroImageUrl: primary.heroImageUrl || catalogSet?.heroImageUrl || primary.setImageUrl || catalogSet?.setImageUrl || null,
     heroVisualMode: release?.heroVisualMode || null,
     sourceAssets,
-    representativeImages: sourceAssets.filter((asset) => asset.kind === 'card').slice(0, 6),
+    representativeImages: sourceAssets.filter((asset) => asset.kind === 'card').slice(0, 5),
     productPageUrl: catalogSet?.productPageUrl || null,
     cardDatabaseUrl: catalogSet?.cardDatabaseUrl || null,
     groupedReleaseIds: release?.groupedReleaseIds || [],
@@ -245,6 +272,235 @@ function mergeSetDetail({ release, catalogSet, game, setSlug }) {
     shopSearchUrl: release?.shopSearchUrl || `/Shop?type=single_card&game=${encodeURIComponent(game)}&search=${encodeURIComponent(primary.name)}`,
     source: release ? 'release-manifest' : 'catalog-set'
   };
+}
+
+function imageForCatalogCard(card = {}, printing = {}) {
+  return firstImage([
+    printing.image_url,
+    printing.image,
+    printing.image_large,
+    printing.image_normal,
+    printing.images?.large,
+    printing.images?.normal,
+    card.product_image,
+    card.card_image,
+    card.image_url,
+    card.english_image_url,
+    card.image_normal,
+    card.image_large,
+    card.image_small,
+    card.thumbnail_url,
+    card.images?.large,
+    card.images?.normal,
+    card.images?.small,
+    card.image_uris?.png,
+    card.image_uris?.large,
+    card.image_uris?.normal,
+    card.card_faces?.[0]?.image_uris?.png,
+    card.card_faces?.[0]?.image_uris?.large,
+    card.card_faces?.[0]?.image_uris?.normal,
+    card.card_images?.[0]?.image_url,
+    card.card_images?.[0]?.image_url_small
+  ]);
+}
+
+function normalizeRarity(value) {
+  return cleanText(value);
+}
+
+function sortCardNumber(left = '', right = '') {
+  return String(left).localeCompare(String(right), undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function normalizeYugiohSetCards(rows = [], detail = {}) {
+  const setCode = cleanText(detail.setCode).toUpperCase();
+  if (!setCode) return [];
+
+  const grouped = new Map();
+  rows.forEach((card) => {
+    (card.card_sets || [])
+      .filter((printing) => cleanText(printing.set_code).toUpperCase().startsWith(`${setCode}-`))
+      .forEach((printing) => {
+        const number = cleanText(printing.set_code);
+        const key = `${card.id || card.name}:${number}`;
+        const existing = grouped.get(key);
+        const rarity = normalizeRarity(printing.set_rarity);
+        if (existing) {
+          if (rarity && !existing.rarities.includes(rarity)) existing.rarities.push(rarity);
+          existing.printingCount += 1;
+          return;
+        }
+
+        grouped.set(key, {
+          id: `yugioh:${card.id || cleanText(card.name)}:${number}`,
+          game: 'yugioh',
+          name: cleanText(card.name),
+          set_name: detail.name,
+          set_code: setCode,
+          collector_number: number,
+          card_number: number,
+          rarity,
+          rarities: rarity ? [rarity] : [],
+          printingCount: 1,
+          image_url: imageForCatalogCard(card),
+          type_line: cleanText(card.type),
+          raw: card
+        });
+      });
+  });
+
+  return [...grouped.values()].sort((left, right) => sortCardNumber(left.collector_number, right.collector_number));
+}
+
+function normalizeFabSetCards(rows = [], detail = {}) {
+  const setCode = cleanText(detail.setCode).toUpperCase();
+  if (!setCode) return [];
+
+  const grouped = new Map();
+  rows.forEach((card) => {
+    (card.printings || [])
+      .filter((printing) => cleanText(printing.set_id).toUpperCase() === setCode)
+      .forEach((printing) => {
+        const number = cleanText(printing.id || printing.card_number);
+        const key = `${cleanText(card.name)}:${number || printing.unique_id || card.unique_id}`;
+        const rarity = normalizeRarity(printing.rarity);
+        const imageUrl = imageForCatalogCard(card, printing);
+        const existing = grouped.get(key);
+        if (existing) {
+          if (rarity && !existing.rarities.includes(rarity)) existing.rarities.push(rarity);
+          if (!existing.image_url && imageUrl) existing.image_url = imageUrl;
+          existing.printingCount += 1;
+          return;
+        }
+
+        grouped.set(key, {
+          id: `fab:${printing.unique_id || card.unique_id || key}`,
+          game: SEARCH_GAMES.fab,
+          name: cleanText(card.name),
+          set_name: detail.name,
+          set_code: setCode,
+          collector_number: number,
+          card_number: number,
+          rarity,
+          rarities: rarity ? [rarity] : [],
+          printingCount: 1,
+          image_url: imageUrl,
+          type_line: cleanText(card.type_text),
+          raw: card
+        });
+      });
+  });
+
+  return [...grouped.values()].sort((left, right) => sortCardNumber(left.collector_number, right.collector_number));
+}
+
+function normalizeMagicSetCards(rows = [], detail = {}) {
+  const setCode = cleanText(detail.setCode).toUpperCase();
+  if (!setCode) return [];
+
+  return rows
+    .filter((card) => cleanText(card.set_code || card.set).toUpperCase() === setCode)
+    .map((card) => ({
+      id: `magic:${card.id || card.oracle_id || cleanText(card.name)}:${card.collector_number || card.number || ''}`,
+      game: 'magic',
+      name: cleanText(card.name || card.printed_name),
+      set_name: detail.name,
+      set_code: setCode,
+      collector_number: cleanText(card.collector_number || card.number),
+      card_number: cleanText(card.collector_number || card.number),
+      rarity: normalizeRarity(card.rarity),
+      rarities: normalizeRarity(card.rarity) ? [normalizeRarity(card.rarity)] : [],
+      printingCount: 1,
+      image_url: imageForCatalogCard(card),
+      type_line: cleanText(card.type_line || card.type),
+      raw: card
+    }))
+    .sort((left, right) => sortCardNumber(left.collector_number, right.collector_number));
+}
+
+function normalizeGenericSetCards(rows = [], detail = {}) {
+  const setCode = cleanText(detail.setCode).toUpperCase();
+  const setNames = [detail.name, detail.setName].map((value) => cleanText(value).toLowerCase()).filter(Boolean);
+
+  return rows
+    .filter((card) => {
+      const cardSetCode = cleanText(card.set_code || card.set_id || card.set).toUpperCase();
+      if (setCode && cardSetCode === setCode) return true;
+      const cardSetName = cleanText(card.set_name || card.setName).toLowerCase();
+      return cardSetName && setNames.includes(cardSetName);
+    })
+    .map((card) => ({
+      id: `${detail.game}:${card.id || card.api_id || cleanText(card.name)}`,
+      game: detail.game,
+      name: cleanText(card.name || card.product_name),
+      set_name: detail.name,
+      set_code: detail.setCode,
+      collector_number: cleanText(card.collector_number || card.card_number || card.number),
+      card_number: cleanText(card.collector_number || card.card_number || card.number),
+      rarity: normalizeRarity(card.rarity),
+      rarities: normalizeRarity(card.rarity) ? [normalizeRarity(card.rarity)] : [],
+      printingCount: 1,
+      image_url: imageForCatalogCard(card),
+      type_line: cleanText(card.type_line || card.type),
+      raw: card
+    }))
+    .sort((left, right) => sortCardNumber(left.collector_number, right.collector_number));
+}
+
+function normalizeSetCards(rows = [], detail = {}) {
+  if (detail.game === 'yugioh') return normalizeYugiohSetCards(rows, detail);
+  if (detail.game === 'fab') return normalizeFabSetCards(rows, detail);
+  if (detail.game === 'magic') return normalizeMagicSetCards(rows, detail);
+  return normalizeGenericSetCards(rows, detail);
+}
+
+function buildCatalogCardSummary(detail = {}, cards = []) {
+  const expectedCount = detail.cardCount || null;
+  const knownCount = cards.length;
+  const printingCount = cards.reduce((total, card) => total + (Number(card.printingCount) || 1), 0);
+  const hasKnownCards = knownCount > 0;
+  const isComplete = Boolean(expectedCount && knownCount >= expectedCount);
+  const isPartial = Boolean(expectedCount && hasKnownCards && knownCount < expectedCount);
+
+  return {
+    expectedCount,
+    knownCount,
+    printingCount,
+    status: hasKnownCards ? (isComplete ? 'complete' : isPartial ? 'partial' : 'known') : 'unavailable',
+    heroLabel: hasKnownCards
+      ? `${knownCount} known card${knownCount === 1 ? '' : 's'}`
+      : expectedCount
+        ? `Set size ${expectedCount}`
+        : '',
+    setSizeLabel: expectedCount ? `${expectedCount} card${expectedCount === 1 ? '' : 's'}` : '',
+    knownLabel: hasKnownCards
+      ? `${knownCount}${expectedCount && knownCount < expectedCount ? ` of ${expectedCount}` : ''} card${knownCount === 1 ? '' : 's'} known`
+      : 'Card list not yet available',
+    printingLabel: printingCount > knownCount
+      ? `${printingCount} catalog printing${printingCount === 1 ? '' : 's'}`
+      : ''
+  };
+}
+
+function representativeImagesFor(detail = {}, setCards = []) {
+  const releaseImages = (detail.representativeImages || []).slice(0, 5);
+  if (releaseImages.length > 0) return releaseImages;
+
+  const cardImages = uniqueBy(
+    setCards
+      .filter((card) => card.image_url)
+      .map((card) => ({
+        kind: 'card',
+        name: card.name,
+        imageUrl: card.image_url
+      })),
+    (asset) => asset.imageUrl
+  ).slice(0, 5);
+  if (cardImages.length > 0) return cardImages;
+
+  return detail.setImageUrl
+    ? [{ kind: 'set', name: detail.name, imageUrl: detail.setImageUrl }]
+    : [];
 }
 
 function listingMatchesSet(listing = {}, detail = {}) {
@@ -276,15 +532,31 @@ export async function resolveSetDetail({ game, setSlug }) {
   if (!detail) return null;
 
   let activeListings = [];
+  let setCards = [];
+  let allListings = [];
+
   try {
-    const listings = await listingOwner.listStorefrontListings({ game: 'all', sellableOnly: true, limit: 5000 });
-    activeListings = listings.filter((listing) => listingMatchesSet(listing, detail));
+    allListings = await listingOwner.listStorefrontListings({ game: 'all', sellableOnly: true, limit: 5000 });
+    activeListings = allListings.filter((listing) => listingMatchesSet(listing, detail));
   } catch {
+    allListings = [];
     activeListings = [];
   }
 
+  try {
+    const catalogCards = await fetchCatalogCards(routeGame);
+    setCards = enrichCatalogResultsWithInventory(normalizeSetCards(catalogCards, detail), allListings);
+  } catch {
+    setCards = [];
+  }
+
+  const cardCatalog = buildCatalogCardSummary(detail, setCards);
+
   return {
     ...detail,
+    representativeImages: representativeImagesFor(detail, setCards),
+    cardCatalog,
+    setCards,
     availability: {
       activeListingCount: activeListings.length,
       sampleListings: activeListings.slice(0, 6)

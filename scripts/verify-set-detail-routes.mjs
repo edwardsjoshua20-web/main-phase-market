@@ -59,6 +59,72 @@ function catalogRows(game) {
   return Array.isArray(rows) ? rows : [];
 }
 
+function catalogCards(game) {
+  const assetGame = ASSET_GAME[game] || game;
+  const filePath = path.join(ROOT, 'public', 'data', assetGame, 'cards.json');
+  const rows = readJson(filePath);
+  return Array.isArray(rows) ? rows : [];
+}
+
+function countSetCards(game, code, cards = []) {
+  const setCode = String(code || '').trim().toUpperCase();
+  if (!setCode) return { knownCards: 0, printings: 0, images: 0 };
+
+  if (game === 'yugioh') {
+    const grouped = new Map();
+    let printings = 0;
+    for (const card of cards) {
+      for (const printing of card.card_sets || []) {
+        if (!String(printing.set_code || '').trim().toUpperCase().startsWith(`${setCode}-`)) continue;
+        printings += 1;
+        const number = String(printing.set_code || '').trim();
+        const key = `${card.id || card.name}:${number}`;
+        if (!grouped.has(key)) {
+          grouped.set(key, Boolean(card.card_images?.[0]?.image_url || card.image_url));
+        }
+      }
+    }
+    return {
+      knownCards: grouped.size,
+      printings,
+      images: [...grouped.values()].filter(Boolean).length
+    };
+  }
+
+  if (game === 'fab') {
+    const grouped = new Map();
+    let printings = 0;
+    for (const card of cards) {
+      for (const printing of card.printings || []) {
+        if (String(printing.set_id || '').trim().toUpperCase() !== setCode) continue;
+        printings += 1;
+        const number = String(printing.id || printing.card_number || '').trim();
+        const key = `${card.name}:${number || printing.unique_id || card.unique_id}`;
+        const hasImage = Boolean(printing.image_url || printing.image || card.image_url);
+        if (!grouped.has(key)) grouped.set(key, hasImage);
+      }
+    }
+    return {
+      knownCards: grouped.size,
+      printings,
+      images: [...grouped.values()].filter(Boolean).length
+    };
+  }
+
+  const grouped = new Map();
+  for (const card of cards) {
+    if (String(card.set_code || card.set || '').trim().toUpperCase() !== setCode) continue;
+    const number = String(card.collector_number || card.number || '').trim();
+    const key = `${card.id || card.oracle_id || card.name}:${number}`;
+    grouped.set(key, Boolean(card.image_url || card.image_normal || card.images?.normal || card.image_uris?.normal));
+  }
+  return {
+    knownCards: grouped.size,
+    printings: grouped.size,
+    images: [...grouped.values()].filter(Boolean).length
+  };
+}
+
 const manifest = readJson(MANIFEST_PATH);
 if (!manifest || !Array.isArray(manifest.releases)) {
   fail(`Missing release manifest at ${MANIFEST_PATH}`);
@@ -81,6 +147,14 @@ const report = TARGETS.map(([game, slug]) => {
   const sourceAssets = Array.isArray(release?.hero_source_assets) ? release.hero_source_assets : [];
   const hasVisual = Boolean(release?.hero_image_url || release?.set_image_url || catalog?.set_image || catalog?.set_logo || catalog?.image_url || sourceAssets.length);
   const cardCount = release?.card_count || catalog?.card_count || catalog?.total_cards || catalog?.num_of_cards || null;
+  const cards = countSetCards(game, release?.set_code || setCode(catalog), catalogCards(game));
+
+  if (cards.knownCards === 0 && !cardCount && !hasVisual) {
+    fail(`/set/${game}/${slug} has neither a known set size, catalog card records, nor visual release data.`);
+  }
+  if (cards.knownCards > 0 && cards.images === 0) {
+    fail(`/set/${game}/${slug} resolved catalog cards but no usable card images.`);
+  }
 
   return {
     route: `/set/${game}/${slug}`,
@@ -88,7 +162,11 @@ const report = TARGETS.map(([game, slug]) => {
     source: release ? 'release-manifest' : 'catalog-set',
     setCode: release?.set_code || setCode(catalog) || null,
     hasVisual,
-    cardCount
+    setSize: cardCount,
+    knownCards: cards.knownCards,
+    catalogPrintings: cards.printings,
+    knownCardImages: cards.images,
+    cardListState: cards.knownCards > 0 ? 'cards-renderable' : 'card-list-not-yet-available'
   };
 });
 
@@ -96,4 +174,3 @@ console.log(JSON.stringify({
   checked: report.length,
   routes: report
 }, null, 2));
-

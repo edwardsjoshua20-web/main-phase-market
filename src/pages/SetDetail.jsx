@@ -50,6 +50,35 @@ function FeaturedImage({ asset }) {
   );
 }
 
+function CardListTile({ card }) {
+  const price = card.listingSellPrice ? Number(card.listingSellPrice).toFixed(2) : '';
+  const rarityLabel = Array.isArray(card.rarities) && card.rarities.length > 1
+    ? `${card.rarities.length} rarities`
+    : card.rarity || card.rarities?.[0] || '';
+
+  return (
+    <div className="min-w-0 border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="aspect-[63/88] overflow-hidden rounded-md border border-slate-200 bg-slate-100">
+        <CardImage
+          card={card}
+          alt={card.name}
+          className="h-full w-full object-contain"
+          fallbackClassName="flex h-full w-full items-center justify-center px-3 text-center text-xs font-semibold text-slate-500"
+        />
+      </div>
+      <div className="mt-3 space-y-1">
+        <p className="line-clamp-2 text-sm font-bold leading-snug text-slate-950">{card.name}</p>
+        <p className="text-xs font-semibold text-slate-500">
+          {[card.collector_number, rarityLabel].filter(Boolean).join(' • ')}
+        </p>
+        <p className={`text-xs font-bold ${card.inStock ? 'text-emerald-700' : 'text-slate-500'}`}>
+          {card.inStock ? `In stock${price ? ` • $${price}` : ''}` : 'Catalog card'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function SetDetail() {
   const { game, setSlug } = useParams();
   const { data: detail, isLoading } = useQuery({
@@ -57,6 +86,7 @@ export default function SetDetail() {
     queryFn: () => resolveSetDetail({ game, setSlug }),
     staleTime: 60_000
   });
+  const [showAllCards, setShowAllCards] = React.useState(false);
 
   if (isLoading) {
     return (
@@ -84,11 +114,11 @@ export default function SetDetail() {
 
   const releaseDate = formatDate(detail.releaseDate);
   const hasListings = detail.availability.activeListingCount > 0;
-  const representativeImages = detail.representativeImages.length > 0
-    ? detail.representativeImages
-    : detail.setImageUrl
-      ? [{ kind: 'set', name: detail.name, imageUrl: detail.setImageUrl }]
-      : [];
+  const representativeImages = detail.representativeImages || [];
+  const setCards = Array.isArray(detail.setCards) ? detail.setCards : [];
+  const visibleCardLimit = 60;
+  const visibleCards = showAllCards ? setCards : setCards.slice(0, visibleCardLimit);
+  const hiddenCardCount = Math.max(0, setCards.length - visibleCards.length);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -116,10 +146,10 @@ export default function SetDetail() {
                   {releaseDate}
                 </span>
               )}
-              {detail.cardCount && (
+              {detail.cardCatalog?.heroLabel && (
                 <span className="inline-flex items-center gap-2">
                   <Layers className="h-4 w-4" />
-                  {detail.cardCount} cards
+                  {detail.cardCatalog.heroLabel}
                 </span>
               )}
             </div>
@@ -161,10 +191,16 @@ export default function SetDetail() {
                   <p>{releaseDate}</p>
                 </div>
               )}
-              {detail.cardCount && (
+              {detail.cardCatalog?.expectedCount && (
                 <div>
-                  <p className="font-bold text-slate-950">Card Count</p>
-                  <p>{detail.cardCount}</p>
+                  <p className="font-bold text-slate-950">Set Size</p>
+                  <p>{detail.cardCatalog.setSizeLabel}</p>
+                </div>
+              )}
+              {detail.cardCatalog?.knownCount > 0 && (
+                <div>
+                  <p className="font-bold text-slate-950">Known Cards</p>
+                  <p>{detail.cardCatalog.knownLabel}</p>
                 </div>
               )}
             </div>
@@ -173,6 +209,7 @@ export default function SetDetail() {
           {representativeImages.length > 0 && (
             <div>
               <h2 className="text-xl font-black tracking-tight text-slate-950">Featured Visuals</h2>
+              <p className="mt-1 text-sm text-slate-600">Curated artwork for the set, separate from the card list below.</p>
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {representativeImages.map((asset) => (
                   <FeaturedImage key={`${asset.name}:${asset.imageUrl}`} asset={{ ...asset, game: detail.game }} />
@@ -180,6 +217,42 @@ export default function SetDetail() {
               </div>
             </div>
           )}
+
+          <div>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black tracking-tight text-slate-950">Cards in This Set</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  {detail.cardCatalog?.knownLabel || 'Card list not yet available'}
+                  {detail.cardCatalog?.printingLabel ? ` • ${detail.cardCatalog.printingLabel}` : ''}
+                </p>
+              </div>
+            </div>
+
+            {setCards.length > 0 ? (
+              <>
+                <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {visibleCards.map((card) => (
+                    <CardListTile key={card.searchIdentity || card.id} card={card} />
+                  ))}
+                </div>
+                {hiddenCardCount > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-5 rounded-md border-slate-300 text-slate-900 hover:bg-slate-100"
+                    onClick={() => setShowAllCards(true)}
+                  >
+                    Show all {setCards.length} known cards
+                  </Button>
+                )}
+              </>
+            ) : (
+              <div className="mt-4 border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
+                Card list not yet available.
+              </div>
+            )}
+          </div>
         </div>
 
         <aside className="h-fit border border-slate-200 bg-white p-5 shadow-sm">
