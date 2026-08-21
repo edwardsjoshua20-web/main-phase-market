@@ -259,6 +259,11 @@ function selectCompositeAssets(assets) {
     .filter((asset) => asset.kind === 'card')
     .sort((a, b) => scoreCompositeAsset(b) - scoreCompositeAsset(a))
     .slice(0, 3);
+
+  if (cards.length >= 2) {
+    return cards;
+  }
+
   const product = usable
     .filter((asset) => asset.kind === 'product')
     .sort((a, b) => scoreCompositeAsset(b) - scoreCompositeAsset(a))[0];
