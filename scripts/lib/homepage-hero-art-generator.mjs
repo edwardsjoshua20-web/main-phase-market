@@ -234,11 +234,11 @@ function getBaseAssetsForRelease(release) {
   ]);
 }
 
-function selectPremiumAsset(assets) {
+function selectWideKeyArtAsset(assets) {
   return assets.find((asset) => {
     if (!['premium', 'product'].includes(asset.kind)) return false;
     if (isLikelyLogoOrSymbol(asset.url)) return false;
-    return asset.width >= 1200 && asset.height >= 300 && asset.ratio >= 2.15 && asset.ratio <= 5.4;
+    return asset.width >= 1400 && asset.height >= 650 && asset.ratio >= 1.55 && asset.ratio <= 2.45;
   }) || null;
 }
 
@@ -253,30 +253,39 @@ function scoreCompositeAsset(asset) {
   return score;
 }
 
-function selectCompositeAssets(assets) {
+function selectApprovedComposition(assets) {
   const usable = assets.filter((asset) => asset.width >= 140 && asset.height >= 140 && asset.megapixels >= 40000);
   const cards = usable
     .filter((asset) => asset.kind === 'card')
     .sort((a, b) => scoreCompositeAsset(b) - scoreCompositeAsset(a))
     .slice(0, 3);
+  const products = usable
+    .filter((asset) => ['product', 'premium'].includes(asset.kind) && !isLikelyLogoOrSymbol(asset.url))
+    .map((asset) => ({ ...asset, kind: 'product' }))
+    .sort((a, b) => scoreCompositeAsset(b) - scoreCompositeAsset(a))
+    .slice(0, 3);
 
-  if (cards.length >= 2) {
-    return cards;
+  if (cards.length >= 3) {
+    return { mode: 'three-card-composite', assets: cards, reason: 'three-card-composite' };
   }
 
-  const product = usable
-    .filter((asset) => asset.kind === 'product')
-    .sort((a, b) => scoreCompositeAsset(b) - scoreCompositeAsset(a))[0];
-  const logo = usable
-    .filter((asset) => asset.kind === 'logo')
-    .sort((a, b) => scoreCompositeAsset(b) - scoreCompositeAsset(a))[0];
+  if (products.length >= 2 && cards.length === 0) {
+    return { mode: 'three-product-composite', assets: products, reason: 'product-pack-composite' };
+  }
 
-  return [product, ...cards, logo].filter(Boolean).slice(0, 4);
-}
+  if (products.length >= 1 && cards.length >= 1) {
+    return {
+      mode: 'product-card-composite',
+      assets: [products[0], ...cards.slice(0, 2)],
+      reason: 'product-with-supporting-cards'
+    };
+  }
 
-function hasEnoughCompositeAssets(assets) {
-  const meaningful = assets.filter((asset) => asset.kind !== 'logo');
-  return meaningful.length >= 1 || assets.length >= 2;
+  if (products.length === 1 && products[0].megapixels >= 700000 && products[0].ratio < 1.55) {
+    return { mode: 'three-product-composite', assets: products, reason: 'single-strong-product-composite' };
+  }
+
+  return { mode: 'ineligible', assets: [...products, ...cards], reason: usable.length > 0 ? 'no-approved-composition' : 'no-usable-assets' };
 }
 
 function backgroundSvg(game) {
@@ -329,39 +338,30 @@ async function prepareCardLayer(asset, index, count) {
   };
 }
 
-async function prepareProductLayer(asset, hasCards) {
+async function prepareProductLayer(asset, index, count, hasCards) {
+  const angle = count === 1 ? -2 : [-7, 5, 10][index] || 0;
+  const targetWidth = hasCards ? 760 : count === 1 ? 1180 : 900;
+  const targetHeight = hasCards ? 660 : count === 1 ? 760 : 720;
   const image = await sharp(asset.buffer)
     .resize({
-      width: hasCards ? 820 : 1120,
-      height: hasCards ? 680 : 760,
+      width: targetWidth,
+      height: targetHeight,
       fit: 'inside',
       withoutEnlargement: true
     })
+    .rotate(angle, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .webp({ quality: 92 })
     .toBuffer();
   const metadata = await sharp(image).metadata();
+  const productPositions = count === 1
+    ? [2440]
+    : count === 2
+      ? [2350, 2940]
+      : [2190, 2700, 3190];
   return {
     input: image,
-    left: hasCards ? 2940 : 2360,
-    top: Math.round((CANVAS_HEIGHT - metadata.height) / 2)
-  };
-}
-
-async function prepareLogoLayer(asset, hasCardsOrProduct) {
-  const image = await sharp(asset.buffer)
-    .resize({
-      width: hasCardsOrProduct ? 620 : 900,
-      height: hasCardsOrProduct ? 240 : 360,
-      fit: 'inside',
-      withoutEnlargement: true
-    })
-    .webp({ quality: 92 })
-    .toBuffer();
-  const metadata = await sharp(image).metadata();
-  return {
-    input: image,
-    left: hasCardsOrProduct ? 3020 : 2460,
-    top: hasCardsOrProduct ? 690 : Math.round((CANVAS_HEIGHT - metadata.height) / 2)
+    left: hasCards ? 2920 : productPositions[index],
+    top: Math.round((CANVAS_HEIGHT - metadata.height) / 2) + ([-4, -28, 22][index] || 0)
   };
 }
 
@@ -373,24 +373,72 @@ function shadowLayer(left, top, width, height) {
   };
 }
 
+async function composeWideHero(projectRoot, release, asset, outputRelativePath) {
+  const visualWidth = 2580;
+  const visualLeft = CANVAS_WIDTH - visualWidth;
+  const mask = Buffer.from(`
+    <svg width="${visualWidth}" height="${CANVAS_HEIGHT}" viewBox="0 0 ${visualWidth} ${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="fade" x1="0" x2="1">
+          <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+          <stop offset="0.26" stop-color="#fff" stop-opacity="0.18"/>
+          <stop offset="0.48" stop-color="#fff" stop-opacity="0.82"/>
+          <stop offset="1" stop-color="#fff" stop-opacity="1"/>
+        </linearGradient>
+      </defs>
+      <rect width="${visualWidth}" height="${CANVAS_HEIGHT}" fill="url(#fade)"/>
+    </svg>
+  `);
+  const wideImage = await sharp(asset.buffer)
+    .resize({ width: visualWidth, height: CANVAS_HEIGHT, fit: 'cover', position: 'right' })
+    .composite([{ input: mask, blend: 'dest-in' }])
+    .webp({ quality: 92 })
+    .toBuffer();
+  const glaze = Buffer.from(`
+    <svg width="${visualWidth}" height="${CANVAS_HEIGHT}" viewBox="0 0 ${visualWidth} ${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="shade" x1="0" x2="1">
+          <stop offset="0" stop-color="#020617" stop-opacity="0.74"/>
+          <stop offset="0.34" stop-color="#020617" stop-opacity="0.34"/>
+          <stop offset="1" stop-color="#020617" stop-opacity="0.08"/>
+        </linearGradient>
+      </defs>
+      <rect width="${visualWidth}" height="${CANVAS_HEIGHT}" fill="url(#shade)"/>
+    </svg>
+  `);
+  const fullOutputPath = path.join(projectRoot, 'public', outputRelativePath);
+  ensureDir(path.dirname(fullOutputPath));
+  await sharp(backgroundSvg(normalizeGame(release.game)))
+    .resize(CANVAS_WIDTH, CANVAS_HEIGHT)
+    .composite([
+      { input: wideImage, left: visualLeft, top: 0 },
+      { input: glaze, left: visualLeft, top: 0 }
+    ])
+    .webp({ quality: 86, effort: 5 })
+    .toFile(fullOutputPath);
+
+  const metadata = await sharp(fullOutputPath).metadata();
+  return {
+    path: fullOutputPath,
+    width: metadata.width,
+    height: metadata.height,
+    bytes: fs.statSync(fullOutputPath).size
+  };
+}
+
 async function composeHero(projectRoot, release, assets, outputRelativePath) {
   const cards = assets.filter((asset) => asset.kind === 'card');
-  const product = assets.find((asset) => asset.kind === 'product');
-  const logo = assets.find((asset) => asset.kind === 'logo');
+  const products = assets.filter((asset) => asset.kind === 'product');
   const layers = [];
 
-  if (product) {
-    const layer = await prepareProductLayer(product, cards.length > 0);
+  for (let index = 0; index < products.length; index += 1) {
+    const layer = await prepareProductLayer(products[index], index, products.length, cards.length > 0);
     layers.push(shadowLayer(layer.left, layer.top, 760, 640), layer);
   }
 
   for (let index = 0; index < cards.length; index += 1) {
     const layer = await prepareCardLayer(cards[index], index, cards.length);
     layers.push(shadowLayer(layer.left, layer.top, 470, 660), layer);
-  }
-
-  if (logo) {
-    layers.push(await prepareLogoLayer(logo, Boolean(cards.length || product)));
   }
 
   const fullOutputPath = path.join(projectRoot, 'public', outputRelativePath);
@@ -434,42 +482,48 @@ async function classifyRelease(projectRoot, release) {
     if (result) inspected.push(result);
   }
 
-  const premium = selectPremiumAsset(inspected);
-  if (premium) {
-    return {
-      mode: 'premium',
-      eligible: true,
-      heroImageUrl: premium.url,
-      sourceAssets: [premium],
-      reason: 'wide-key-art'
-    };
-  }
-
-  const compositeAssets = selectCompositeAssets(inspected);
-  if (!hasEnoughCompositeAssets(compositeAssets)) {
-    return {
-      mode: 'ineligible',
-      eligible: false,
-      heroImageUrl: null,
-      sourceAssets: compositeAssets,
-      reason: inspected.length > 0 ? 'insufficient-composite-assets' : 'no-usable-assets'
-    };
-  }
-
+  const composition = selectApprovedComposition(inspected);
   const game = normalizeGame(release.game);
   const slug = `${game}-${slugify(releaseName(release) || release.id)}.webp`;
   const outputRelativePath = `${HERO_OUTPUT_RELATIVE_DIR}/${slug}`;
-  const output = await composeHero(projectRoot, release, compositeAssets, outputRelativePath);
+
+  if (composition.mode !== 'ineligible') {
+    const output = await composeHero(projectRoot, release, composition.assets, outputRelativePath);
+    return {
+      mode: composition.mode,
+      eligible: true,
+      heroImageUrl: publicUrlForGeneratedAsset(projectRoot, outputRelativePath),
+      generatedPath: outputRelativePath,
+      generatedWidth: output.width,
+      generatedHeight: output.height,
+      generatedBytes: output.bytes,
+      sourceAssets: composition.assets,
+      reason: composition.reason
+    };
+  }
+
+  const wideKeyArt = selectWideKeyArtAsset(inspected);
+  if (wideKeyArt) {
+    const output = await composeWideHero(projectRoot, release, wideKeyArt, outputRelativePath);
+    return {
+      mode: 'wide-key-art',
+      eligible: true,
+      heroImageUrl: publicUrlForGeneratedAsset(projectRoot, outputRelativePath),
+      generatedPath: outputRelativePath,
+      generatedWidth: output.width,
+      generatedHeight: output.height,
+      generatedBytes: output.bytes,
+      sourceAssets: [wideKeyArt],
+      reason: 'blended-wide-key-art'
+    };
+  }
+
   return {
-    mode: 'composite',
-    eligible: true,
-    heroImageUrl: publicUrlForGeneratedAsset(projectRoot, outputRelativePath),
-    generatedPath: outputRelativePath,
-    generatedWidth: output.width,
-    generatedHeight: output.height,
-    generatedBytes: output.bytes,
-    sourceAssets: compositeAssets,
-    reason: 'generated-from-release-assets'
+    mode: 'ineligible',
+    eligible: false,
+    heroImageUrl: null,
+    sourceAssets: composition.assets,
+    reason: composition.reason
   };
 }
 

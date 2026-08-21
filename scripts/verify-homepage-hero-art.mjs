@@ -6,6 +6,13 @@ const ROOT = process.cwd();
 const MANIFEST_PATH = path.join(ROOT, 'public', 'data', 'site', 'upcoming-releases.json');
 const EXPECTED_WIDTH = 3840;
 const EXPECTED_HEIGHT = 960;
+const APPROVED_MODES = new Set([
+  'wide-key-art',
+  'three-card-composite',
+  'three-product-composite',
+  'product-card-composite',
+  'ineligible'
+]);
 
 function fail(message) {
   console.error(`[homepage:hero-art:verify] ${message}`);
@@ -38,7 +45,7 @@ async function verify() {
 
   for (const release of releases) {
     const mode = String(release.hero_visual_mode || '').toLowerCase();
-    if (!['premium', 'composite', 'ineligible'].includes(mode)) {
+    if (!APPROVED_MODES.has(mode)) {
       fail(`${release.game}:${release.name} has missing/invalid hero_visual_mode.`);
       continue;
     }
@@ -52,10 +59,6 @@ async function verify() {
 
     if (!release.hero_image_url) {
       fail(`${release.game}:${release.name} is hero-eligible without hero_image_url.`);
-    }
-
-    if (mode !== 'composite') {
-      continue;
     }
 
     const filePath = localPathForGeneratedAsset(release);

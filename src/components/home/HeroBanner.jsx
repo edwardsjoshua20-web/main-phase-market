@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fallbackHomepageReleases } from '@/services/homepage/homepageReleaseFeed';
 
 export default function HeroBanner({ releases = fallbackHomepageReleases }) {
@@ -92,47 +92,53 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.10)_0%,rgba(2,6,23,0.34)_100%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_24%,rgba(255,255,255,0.12),transparent_22%)]" />
 
-      <div className="relative z-10 h-full w-full px-4 py-5">
+      <div className="relative z-10 h-full w-full px-4 py-4">
         <div className="h-full flex items-center">
-          <div className={`text-white transition-opacity duration-400 ${animating ? 'opacity-0' : 'opacity-100'} max-w-2xl`}>
-            {releaseStateLabel && (
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
-                {releaseStateLabel}
-              </p>
-            )}
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight leading-[0.96] mb-2 text-balance max-w-3xl">
-              {current.name}
-            </h1>
-            <p className="text-sm md:text-base text-white/86 mb-5 max-w-xl">
+          <div className={`grid h-[204px] max-w-2xl grid-rows-[16px_74px_22px_36px_16px_24px] text-white transition-opacity duration-400 ${animating ? 'opacity-0' : 'opacity-100'}`}>
+            <div className="flex items-start">
+              {releaseStateLabel && (
+                <p className="text-[10px] font-semibold uppercase leading-none tracking-[0.22em] text-white/68">
+                  {releaseStateLabel}
+                </p>
+              )}
+            </div>
+            <div className="flex items-start">
+              <h1 className="max-w-3xl text-3xl font-bold leading-[0.96] tracking-tight text-balance md:text-4xl">
+                {current.name}
+              </h1>
+            </div>
+            <p className="max-w-xl text-sm text-white/86 md:text-base">
               {supportLine}
             </p>
 
-            <Link to={ctaHref}>
-              <Button size="default" className="bg-white text-slate-950 hover:bg-slate-100 font-bold shadow-lg rounded-xl px-5">
-                {ctaLabel}
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
+            <div className="flex items-start">
+              <Link to={ctaHref}>
+                <Button size="sm" className="h-9 rounded-md border border-white/18 bg-white text-sm font-bold text-slate-950 shadow-[0_12px_28px_rgba(0,0,0,0.22)] hover:bg-slate-100">
+                  {ctaLabel}
+                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </div>
+
+            <div aria-hidden="true" />
+
+            {safeReleases.length > 1 && (
+              <div className="flex items-end gap-3 text-white/68">
+                <span className="min-w-[54px] text-[11px] font-semibold tabular-nums tracking-[0.18em]">
+                  {String(currentIndex + 1).padStart(2, '0')} / {String(safeReleases.length).padStart(2, '0')}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button onClick={goPrev} className="flex h-6 w-6 items-center justify-center border border-white/12 bg-white/[0.04] text-white/62 transition-colors hover:border-white/24 hover:bg-white/[0.08] hover:text-white">
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button onClick={goNext} className="flex h-6 w-6 items-center justify-center border border-white/12 bg-white/[0.04] text-white/62 transition-colors hover:border-white/24 hover:bg-white/[0.08] hover:text-white">
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {safeReleases.length > 1 && (
-          <div className="absolute bottom-4 left-4 flex items-center gap-2">
-            <button onClick={goPrev} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/20 text-white/70 hover:text-white hover:bg-white/10 transition-colors backdrop-blur-sm">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            {safeReleases.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => goTo(idx)}
-                className={`h-2 rounded-full transition-all duration-300 ${idx === currentIndex ? 'bg-white w-7' : 'bg-white/30 hover:bg-white/70 w-2'}`}
-              />
-            ))}
-            <button onClick={goNext} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/20 text-white/70 hover:text-white hover:bg-white/10 transition-colors backdrop-blur-sm">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
       </div>
     </section>
   );
