@@ -43,7 +43,7 @@ export default function NewReleasesBar({ upcomingSets = [], hasActivePreorders =
               const { label, color } = getGameLabel(set);
               return <Link
                 key={set.id || i}
-                to={set.links?.shopSearch || (createPageUrl('Shop') + `?search=${encodeURIComponent(set.name)}`)}
+                to={set.links?.setDetail || set.links?.shopSearch || (createPageUrl('Shop') + `?search=${encodeURIComponent(set.name)}`)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-gray-200 hover:border-gray-400 hover:shadow-sm transition-all whitespace-nowrap"
               >
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${color}`}>

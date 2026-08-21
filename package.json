@@ -61,6 +61,7 @@
     "supabase:sync:entities": "node scripts/sync-entity-store-to-supabase.mjs",
     "automation:homepage": "node scripts/run-site-automation.mjs homepage",
     "homepage:hero-art:verify": "node scripts/verify-homepage-hero-art.mjs",
+    "set-detail:verify": "node scripts/verify-set-detail-routes.mjs",
     "automation:catalog": "npm run automation:catalog:refresh",
     "automation:images": "npm run automation:images:refresh",
     "supabase:hydrate:public-data": "node scripts/hydrate-supabase-public-data.mjs",

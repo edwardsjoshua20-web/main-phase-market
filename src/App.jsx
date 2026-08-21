@@ -26,6 +26,7 @@ import AdminInventory from './pages/AdminInventory';
 import AdminOperations from './pages/AdminOperations';
 import AdminShippingFulfillment from './pages/AdminShippingFulfillment';
 import AdvancedDeckBuilderBackup from './pages/AdvancedDeckBuilderBackup';
+import SetDetail from './pages/SetDetail';
 import MobileShop from './pages/mobile/MobileShop';
 import MobileDeckBuilder from './pages/mobile/MobileDeckBuilder';
 import MobileBrowse from './pages/mobile/MobileBrowse';
@@ -100,6 +101,7 @@ const AuthenticatedApp = () => {
         <Route path="/MobileRules" element={<RulesReference />} />
         <Route path="/AdminInventory" element={<AdminInventory />} />
         <Route path="/AdminShippingFulfillment" element={<AdminShippingFulfillment />} />
+        <Route path="/set/:game/:setSlug" element={<SetDetail />} />
         {/* Redirect all other paths to mobile home */}
         <Route path="*" element={<MobileHome />} />
       </Routes>
@@ -140,6 +142,7 @@ const AuthenticatedApp = () => {
       <Route path="/Forum" element={<LayoutWrapper currentPageName="Forum"><Forum /></LayoutWrapper>} />
       <Route path="/ForumThread" element={<LayoutWrapper currentPageName="ForumThread"><ForumThread /></LayoutWrapper>} />
       <Route path="/RulesReference" element={<LayoutWrapper currentPageName="RulesReference"><RulesReference /></LayoutWrapper>} />
+      <Route path="/set/:game/:setSlug" element={<LayoutWrapper currentPageName="SetDetail"><SetDetail /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

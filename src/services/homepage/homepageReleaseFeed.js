@@ -176,6 +176,22 @@ function buildShopSearchLink(input = {}, source = 'unknown') {
   return `/Shop?${params.toString()}`;
 }
 
+function routeGameKey(game) {
+  if (game === 'flesh_and_blood') return 'fab';
+  return game || 'magic';
+}
+
+function buildSetDetailLink(input = {}, source = 'unknown') {
+  const name = normalizeReleaseName(input, source);
+  const game = routeGameKey(inferGameKey(input));
+  const slug = String(name)
+    .toLowerCase()
+    .replace(/['']/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'set';
+  return `/set/${game}/${slug}`;
+}
+
 export function normalizeHomepageRelease(input = {}, source = 'unknown') {
   const releaseDate = normalizeReleaseDateValue(
     input.release_date
@@ -194,6 +210,7 @@ export function normalizeHomepageRelease(input = {}, source = 'unknown') {
   const ctaLabel = input.cta_label
     || (hasPreorderListing ? 'Preorder' : (released && hasActiveListing ? 'Shop Set' : 'View Set'));
   const shopSearch = input.links?.shopSearch || buildShopSearchLink({ ...input, game, name }, source);
+  const setDetail = input.links?.setDetail || buildSetDetailLink({ ...input, game, name }, source);
 
   return {
     id: input.id || input.code || input.set_code || `${source}:${name}`,
@@ -222,9 +239,10 @@ export function normalizeHomepageRelease(input = {}, source = 'unknown') {
     hasActiveListing,
     featured: Boolean(input.featured ?? false),
     ctaLabel,
-    ctaHref: input.cta_href || input.links?.preorder || shopSearch,
+    ctaHref: ctaLabel === 'View Set' ? setDetail : (input.cta_href || input.links?.preorder || shopSearch),
     links: {
       ...(input.links || {}),
+      setDetail,
       shopSearch,
       preorder: hasPreorderListing ? shopSearch : null
     },
