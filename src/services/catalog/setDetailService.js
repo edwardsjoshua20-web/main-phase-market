@@ -70,7 +70,11 @@ function firstImage(values = []) {
 }
 
 function setCodeFor(row = {}) {
-  return firstText([row.set_code, row.code, row.id, row.ptcgoCode, row.uuid, row.pack_id]);
+  const direct = firstText([row.set_code, row.code, row.ptcgoCode, row.pack_id]);
+  if (direct) return direct;
+  const id = firstText([row.id]);
+  if (id.includes(':')) return id.split(':').pop();
+  return firstText([id, row.uuid]);
 }
 
 function nameFor(row = {}) {

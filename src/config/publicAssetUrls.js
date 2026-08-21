@@ -6,7 +6,9 @@ function shouldUseHostedCatalogBase() {
     return false;
   }
 
-  return ['main-phase-market.pages.dev', 'mainphasemarket.net', 'www.mainphasemarket.net'].includes(window.location.hostname);
+  return ['mainphasemarket.net', 'www.mainphasemarket.net'].includes(window.location.hostname)
+    || window.location.hostname === 'main-phase-market.pages.dev'
+    || window.location.hostname.endsWith('.main-phase-market.pages.dev');
 }
 
 const rawPublicDataBaseUrl = String(
