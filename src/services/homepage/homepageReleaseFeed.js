@@ -13,7 +13,7 @@ const FALLBACK_THEME_MAP = {
   },
   lorcana: {
     label: 'Disney Lorcana',
-    fallbackImage: 'https://www.disneylorcana.com/_next/image?url=%2Fimages%2Flogo.png&w=1920&q=75'
+    fallbackImage: '/images/game-lorcana.png'
   },
   onepiece: {
     label: 'One Piece TCG',
@@ -321,7 +321,7 @@ export const fallbackHomepageReleases = sortUpcomingReleases([
     set_name: 'Disney Lorcana',
     game: 'lorcana',
     release_date: '2026-08-29',
-    set_image_url: 'https://www.disneylorcana.com/_next/image?url=%2Fimages%2Flogo.png&w=1920&q=75',
+    set_image_url: '/images/game-lorcana.png',
     is_preorder: true,
     featured: true
   }, 'fallback'),

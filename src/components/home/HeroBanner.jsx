@@ -7,6 +7,7 @@ import { fallbackHomepageReleases } from '@/services/homepage/homepageReleaseFee
 export default function HeroBanner({ releases = fallbackHomepageReleases }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [animating, setAnimating] = useState(false);
+  const [failedImageUrls, setFailedImageUrls] = useState({});
   const animatingRef = React.useRef(false);
 
   const safeReleases = releases.length > 0 ? releases : fallbackHomepageReleases;
@@ -34,7 +35,11 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
 
   const current = safeReleases[currentIndex] || fallbackHomepageReleases[0];
   const bannerImage = current.heroImageUrl || null;
-  const containedImage = current.imageUrl || current.heroFallbackImageUrl || fallbackHomepageReleases[0].heroFallbackImageUrl;
+  const containedImage = [
+    current.imageUrl,
+    current.heroFallbackImageUrl,
+    fallbackHomepageReleases[0].heroFallbackImageUrl
+  ].find((url) => url && !failedImageUrls[url]);
   const supportLine = current.supportLine || current.gameLabel || 'Upcoming release';
   const ctaHref = current.ctaHref || current.links?.shopSearch || '/Shop';
   const ctaLabel = current.ctaLabel || 'View Set';
@@ -45,6 +50,11 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
     .map((word) => word[0])
     .join('')
     .toUpperCase();
+
+  const markImageFailed = (url) => {
+    if (!url) return;
+    setFailedImageUrls((prev) => ({ ...prev, [url]: true }));
+  };
 
   return (
     <section className="relative overflow-hidden w-full bg-slate-950" style={{ height: '248px' }}>
@@ -66,6 +76,7 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
                 src={containedImage}
                 alt=""
                 aria-hidden="true"
+                onError={() => markImageFailed(containedImage)}
                 className="max-h-full max-w-full object-contain opacity-80 drop-shadow-[0_22px_42px_rgba(0,0,0,0.46)]"
               />
             </div>
