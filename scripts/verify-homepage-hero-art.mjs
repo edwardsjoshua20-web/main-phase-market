@@ -7,10 +7,10 @@ const MANIFEST_PATH = path.join(ROOT, 'public', 'data', 'site', 'upcoming-releas
 const EXPECTED_WIDTH = 3840;
 const EXPECTED_HEIGHT = 960;
 const APPROVED_MODES = new Set([
+  'identity-image',
   'wide-key-art',
+  'title-graphic',
   'three-card-composite',
-  'three-product-composite',
-  'product-card-composite',
   'ineligible'
 ]);
 
@@ -72,13 +72,14 @@ async function verify() {
       fail(`${release.game}:${release.name} generated hero has ${metadata.width}x${metadata.height}; expected ${EXPECTED_WIDTH}x${EXPECTED_HEIGHT}.`);
     }
 
-    if (fs.statSync(filePath).size < 30000) {
+    const minimumBytes = mode === 'title-graphic' ? 18000 : 30000;
+    if (fs.statSync(filePath).size < minimumBytes) {
       fail(`${release.game}:${release.name} generated hero is suspiciously small.`);
     }
 
     const sourceAssets = Array.isArray(release.hero_source_assets) ? release.hero_source_assets : [];
-    if (sourceAssets.length === 0) {
-      fail(`${release.game}:${release.name} composite has no recorded source assets.`);
+    if (mode !== 'title-graphic' && sourceAssets.length === 0) {
+      fail(`${release.game}:${release.name} generated hero has no recorded source assets.`);
     }
   }
 

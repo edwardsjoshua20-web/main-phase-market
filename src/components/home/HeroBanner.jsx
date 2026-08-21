@@ -6,7 +6,6 @@ import { fallbackHomepageReleases } from '@/services/homepage/homepageReleaseFee
 
 export default function HeroBanner({ releases = fallbackHomepageReleases }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [animating, setAnimating] = useState(false);
   const [failedImageUrls, setFailedImageUrls] = useState({});
   const animatingRef = React.useRef(false);
 
@@ -15,11 +14,9 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
   const goTo = (idx) => {
     if (animatingRef.current) return;
     animatingRef.current = true;
-    setAnimating(true);
     setCurrentIndex(idx);
     setTimeout(() => {
       animatingRef.current = false;
-      setAnimating(false);
     }, 400);
   };
 
@@ -94,7 +91,7 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
 
       <div className="relative z-10 h-full w-full px-4 py-4">
         <div className="h-full flex items-center">
-          <div className={`grid h-[204px] max-w-2xl grid-rows-[16px_74px_22px_36px_16px_24px] text-white transition-opacity duration-400 ${animating ? 'opacity-0' : 'opacity-100'}`}>
+          <div className="grid h-[204px] max-w-2xl grid-rows-[16px_74px_22px_36px_16px_24px] text-white">
             <div className="flex items-start">
               {releaseStateLabel && (
                 <p className="text-[10px] font-semibold uppercase leading-none tracking-[0.22em] text-white/68">
@@ -113,7 +110,7 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
 
             <div className="flex items-start">
               <Link to={ctaHref}>
-                <Button size="sm" className="h-9 rounded-md border border-white/18 bg-white text-sm font-bold text-slate-950 shadow-[0_12px_28px_rgba(0,0,0,0.22)] hover:bg-slate-100">
+                <Button size="sm" className="h-8 rounded-[4px] border border-white/18 bg-white/95 px-3.5 text-sm font-bold text-slate-950 shadow-[0_10px_22px_rgba(0,0,0,0.20)] hover:bg-white">
                   {ctaLabel}
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                 </Button>
