@@ -23,7 +23,10 @@ function buildPublishSelection(pipelineId) {
   switch (pipelineId) {
     case 'homepage':
       return {
-        relativePaths: ['data/site/upcoming-releases.json']
+        relativePaths: [
+          'data/site/upcoming-releases.json',
+          'data/site/hero'
+        ]
       };
     case 'cards':
       return {

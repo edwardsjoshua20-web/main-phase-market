@@ -28,8 +28,8 @@ export const siteAutomationRegistry = [
     dependsOn: [],
     blocks: [],
     readiness: 'Safe to run independently. Keeps the public hero/release feed current.',
-    outputs: ['public/data/site/upcoming-releases.json'],
-    purpose: 'Build one normalized upcoming-release feed for the hero banner and release bar.'
+    outputs: ['public/data/site/upcoming-releases.json', 'public/data/site/hero/*.webp'],
+    purpose: 'Build one normalized upcoming-release feed and deterministic hero artwork for the hero banner and release bar.'
   },
   {
     id: 'catalog-refresh',

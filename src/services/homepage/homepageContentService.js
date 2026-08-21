@@ -43,13 +43,14 @@ export async function getHomepageContent() {
   ]);
 
   const preferredReleases = productReleases.length > 0 ? productReleases : manifestReleases;
-  const heroReleases = preferredReleases.length > 0
-    ? balanceHomepageReleases(preferredReleases, 12)
+  const eligibleHeroReleases = preferredReleases.filter((release) => release.heroEligible !== false && release.heroImageUrl);
+  const heroReleases = eligibleHeroReleases.length > 0
+    ? balanceHomepageReleases(eligibleHeroReleases, 12)
     : fallbackHomepageReleases;
 
   return {
     heroReleases,
-    upcomingReleases: balanceHomepageReleases(heroReleases, 6, { fillRemaining: false }),
+    upcomingReleases: balanceHomepageReleases(preferredReleases.length > 0 ? preferredReleases : heroReleases, 6, { fillRemaining: false }),
     sources: {
       products: productReleases.length,
       manifest: manifestReleases.length

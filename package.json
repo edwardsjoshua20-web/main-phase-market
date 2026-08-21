@@ -60,6 +60,7 @@
     "automation:images:refresh": "node scripts/run-site-automation.mjs images",
     "supabase:sync:entities": "node scripts/sync-entity-store-to-supabase.mjs",
     "automation:homepage": "node scripts/run-site-automation.mjs homepage",
+    "homepage:hero-art:verify": "node scripts/verify-homepage-hero-art.mjs",
     "automation:catalog": "npm run automation:catalog:refresh",
     "automation:images": "npm run automation:images:refresh",
     "supabase:hydrate:public-data": "node scripts/hydrate-supabase-public-data.mjs",
@@ -173,6 +174,7 @@
     "eslint-plugin-unused-imports": "^4.3.0",
     "globals": "^15.14.0",
     "postcss": "^8.5.3",
+    "sharp": "^0.35.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.2",
     "vite": "^6.1.0"

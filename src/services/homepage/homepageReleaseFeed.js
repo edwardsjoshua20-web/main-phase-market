@@ -129,6 +129,13 @@ export function getReleaseHeroImage(input = {}) {
   return HERO_FALLBACK_IMAGES[game] || null;
 }
 
+function normalizeHeroEligibility(input = {}) {
+  if (input.hero_eligible === false || input.heroEligible === false) return false;
+  const mode = String(input.hero_visual_mode || input.heroVisualMode || '').toLowerCase();
+  if (mode === 'ineligible') return false;
+  return true;
+}
+
 function normalizeReleaseName(input = {}, source = 'unknown') {
   return input.name || input.set_name || input.setName || input.title || `${source} release`;
 }
@@ -205,6 +212,10 @@ export function normalizeHomepageRelease(input = {}, source = 'unknown') {
     ].filter(Boolean).join(' • '),
     imageUrl: getReleaseImage({ ...input, game }),
     heroImageUrl: getReleaseHeroImage({ ...input, game }),
+    heroVisualMode: input.hero_visual_mode || input.heroVisualMode || null,
+    heroEligible: normalizeHeroEligibility(input),
+    heroArtReason: input.hero_art_reason || input.heroArtReason || null,
+    heroGeneratedPath: input.hero_generated_path || input.heroGeneratedPath || null,
     heroFallbackImageUrl: input.game_fallback_image_url || theme.fallbackImage,
     preorder: Boolean(input.is_preorder ?? true),
     hasPreorderListing,

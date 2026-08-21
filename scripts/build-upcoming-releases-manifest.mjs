@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { applyHeroArtworkToReleases } from './lib/homepage-hero-art-generator.mjs';
 
 const ROOT = process.cwd();
 const PUBLIC_DATA_ROOT = path.join(ROOT, 'public', 'data');
@@ -253,7 +254,7 @@ function balanceReleasesByGame(releases, limit = 12) {
   return selected;
 }
 
-function main() {
+async function main() {
   const today = new Date();
   const allReleases = GAME_SOURCES.flatMap(({ game, file }) => {
     const rows = readJsonIfExists(file);
@@ -272,14 +273,23 @@ function main() {
         .reverse();
 
   ensureDir(OUTPUT_DIR);
+  const heroArtwork = await applyHeroArtworkToReleases(releases, { projectRoot: ROOT });
 
   const payload = {
     generatedAt: new Date().toISOString(),
-    releases
+    heroArtworkGeneratedAt: new Date().toISOString(),
+    releases: heroArtwork.releases,
+    heroArtwork: heroArtwork.results
   };
 
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(payload, null, 2));
   console.log(`Built upcoming releases manifest with ${payload.releases.length} releases at ${OUTPUT_PATH}`);
+  for (const result of heroArtwork.results) {
+    console.log(`[hero-art] ${result.game}:${result.name} mode=${result.mode} eligible=${result.eligible} reason=${result.reason}${result.generatedPath ? ` path=${result.generatedPath}` : ''}`);
+  }
 }
 
-main();
+main().catch((error) => {
+  console.error(error?.stack || error?.message || String(error));
+  process.exit(1);
+});
