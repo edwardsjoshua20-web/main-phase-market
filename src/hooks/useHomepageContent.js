@@ -8,7 +8,7 @@ export function useHomepageContent() {
     queryFn: getHomepageContent,
     staleTime: 60_000,
     refetchInterval: 60_000,
-    initialData: {
+    placeholderData: {
       heroReleases: fallbackHomepageReleases,
       upcomingReleases: fallbackHomepageReleases.slice(0, 6),
       sources: { products: 0, manifest: 0 }

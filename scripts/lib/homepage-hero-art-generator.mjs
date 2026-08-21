@@ -409,7 +409,9 @@ function publicUrlForGeneratedAsset(projectRoot, relativePath) {
   try {
     const config = readSupabaseUploadConfig(projectRoot);
     if (config.supabaseUrl && config.bucketName) {
-      return `${toStorageBaseUrl(config.supabaseUrl, config.bucketName)}/${toObjectKey(relativePath)}`;
+      const storageBaseUrl = toStorageBaseUrl(config.supabaseUrl, config.bucketName)
+        .replace('/storage/v1/object/', '/storage/v1/object/public/');
+      return `${storageBaseUrl}/${toObjectKey(relativePath)}`;
     }
   } catch {
     // Local-only generation can still use the public-relative path.
