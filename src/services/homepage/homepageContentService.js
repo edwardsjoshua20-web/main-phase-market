@@ -89,11 +89,10 @@ export async function getHomepageContent() {
   const preferredReleases = manifestReleases.length > 0
     ? enrichManifestReleasesWithProducts(manifestReleases, productReleases)
     : productReleases;
-  const eligibleHeroReleases = filterUpcomingReleases(preferredReleases)
+  const heroSourceReleases = manifestReleases.length > 0 ? preferredReleases : [];
+  const eligibleHeroReleases = filterUpcomingReleases(heroSourceReleases)
     .filter((release) => release.heroEligible !== false && release.heroImageUrl);
-  const heroReleases = eligibleHeroReleases.length > 0
-    ? balanceHomepageReleases(eligibleHeroReleases, 12)
-    : fallbackHomepageReleases;
+  const heroReleases = balanceHomepageReleases(eligibleHeroReleases, 12);
 
   return {
     heroReleases,

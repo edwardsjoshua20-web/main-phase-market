@@ -77,17 +77,18 @@ function isLikelyLogoOrSymbol(url = '') {
     || lower.endsWith('.svg');
 }
 
+function isLikelyOfficialIdentityAsset(asset = {}) {
+  const text = `${asset.name || ''} ${asset.url || ''}`.toLowerCase();
+  return ['product', 'pack', 'wrapper', 'deck', 'box', 'set image', 'set logo', 'key art', 'promo', 'hero', 'large image']
+    .some((needle) => text.includes(needle));
+}
+
 function xmlEscape(value = '') {
   return String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-}
-
-function isForcedTitleGraphicRelease(release = {}) {
-  const name = releaseName(release).toLowerCase();
-  return normalizeGame(release.game) === 'magic' && name === 'reality fracture';
 }
 
 function isRemoteUrl(url = '') {
@@ -129,15 +130,23 @@ async function inspectAsset(projectRoot, asset) {
   try {
     const buffer = await fetchImageBuffer(projectRoot, asset);
     if (!buffer?.length) return null;
-    const metadata = await sharp(buffer, { animated: false }).metadata();
+    const image = sharp(buffer, { animated: false });
+    const metadata = await image.metadata();
     if (!metadata.width || !metadata.height) return null;
+    const stats = await sharp(buffer, { animated: false })
+      .resize({ width: 320, withoutEnlargement: true })
+      .greyscale()
+      .stats();
+    const luma = stats.channels[0] || {};
     return {
       ...asset,
       buffer,
       width: metadata.width,
       height: metadata.height,
       ratio: metadata.width / metadata.height,
-      megapixels: metadata.width * metadata.height
+      megapixels: metadata.width * metadata.height,
+      lumaMean: luma.mean || 0,
+      lumaStdev: luma.stdev || 0
     };
   } catch {
     return null;
@@ -147,6 +156,32 @@ async function inspectAsset(projectRoot, asset) {
 function getCardImageFromYugioh(card) {
   const image = Array.isArray(card?.card_images) ? card.card_images[0] : null;
   return image?.image_url || image?.image_url_cropped || image?.image_url_small || null;
+}
+
+function getCardImageFromMagic(card) {
+  return card?.image_uris?.large
+    || card?.image_uris?.normal
+    || card?.image_uris?.art_crop
+    || card?.image_large
+    || card?.image_normal
+    || card?.image_url
+    || null;
+}
+
+function magicCardsForRelease(cards, release) {
+  const code = releaseCode(release).toLowerCase();
+  if (!code) return [];
+  return cards
+    .filter((card) => {
+      const setCode = String(card?.set || card?.set_code || card?.setCode || '').toLowerCase();
+      return setCode === code;
+    })
+    .map((card) => ({
+      kind: 'card',
+      name: card.name,
+      url: getCardImageFromMagic(card)
+    }))
+    .filter((asset) => asset.url);
 }
 
 function ygoCardsForRelease(cards, release) {
@@ -229,6 +264,7 @@ function getCardAssetsForRelease(projectRoot, release) {
   if (!Array.isArray(cards) || cards.length === 0) return [];
 
   if (game === 'yugioh') return ygoCardsForRelease(cards, release);
+  if (game === 'magic') return magicCardsForRelease(cards, release);
   if (game === 'fab') return fabCardsForRelease(cards, release);
   if (game === 'lorcana') return lorcanaCardsForRelease(cards, release);
   if (game === 'starwars') return starwarsCardsForRelease(cards, release);
@@ -247,11 +283,48 @@ function getBaseAssetsForRelease(release) {
   ]);
 }
 
-function selectIdentityAssets(assets, release) {
-  if (isForcedTitleGraphicRelease(release)) return [];
+function assetProjectedSize(asset, targetWidth, targetHeight) {
+  const scale = Math.min(targetWidth / asset.width, targetHeight / asset.height, 1);
+  const width = Math.round(asset.width * scale);
+  const height = Math.round(asset.height * scale);
+  return {
+    width,
+    height,
+    occupancy: (width * height) / (CANVAS_WIDTH * CANVAS_HEIGHT)
+  };
+}
+
+function visualOccupancyForAsset(asset, mode = 'identity') {
+  if (mode === 'wide') {
+    return (2580 * CANVAS_HEIGHT) / (CANVAS_WIDTH * CANVAS_HEIGHT);
+  }
+  const isLogo = asset.kind === 'logo' || isLikelyLogoOrSymbol(asset.url);
+  const targetWidth = isLogo ? 1380 : 1320;
+  const targetHeight = isLogo ? 430 : 760;
+  return assetProjectedSize(asset, targetWidth, targetHeight).occupancy;
+}
+
+function hasStrongSourceDimensions(asset) {
+  if (asset.kind === 'card') return asset.width >= 360 && asset.height >= 500 && asset.megapixels >= 180000;
+  if (asset.kind === 'logo') return asset.width >= 900 && asset.height >= 220 && asset.megapixels >= 250000;
+  return asset.width >= 760 && asset.height >= 520 && asset.megapixels >= 500000;
+}
+
+function hasMeaningfulContrast(asset, minimumMean = 18, minimumStdev = 18) {
+  return Number(asset.lumaMean || 0) >= minimumMean && Number(asset.lumaStdev || 0) >= minimumStdev;
+}
+
+function selectIdentityAssets(assets) {
   const usable = assets
     .filter((asset) => ['product', 'logo'].includes(asset.kind))
-    .filter((asset) => asset.width >= 240 && asset.height >= 140 && asset.megapixels >= 70000)
+    .filter((asset) => isLikelyOfficialIdentityAsset(asset))
+    .filter((asset) => hasStrongSourceDimensions(asset))
+    .filter((asset) => {
+      const occupancy = visualOccupancyForAsset(asset, 'identity');
+      const isLogo = asset.kind === 'logo' || isLikelyLogoOrSymbol(asset.url);
+      if (!isLogo && asset.ratio > 1.45) return false;
+      return isLogo ? occupancy >= 0.045 : occupancy >= 0.09;
+    })
     .sort((a, b) => {
       const kindDelta = (a.kind === 'product' ? 1 : 0) - (b.kind === 'product' ? 1 : 0);
       if (kindDelta !== 0) return -kindDelta;
@@ -260,11 +333,11 @@ function selectIdentityAssets(assets, release) {
   return usable.slice(0, 2);
 }
 
-function selectWideKeyArtAsset(assets, release) {
-  if (isForcedTitleGraphicRelease(release)) return null;
+function selectWideKeyArtAsset(assets) {
   return assets.find((asset) => {
     if (!['premium', 'product'].includes(asset.kind)) return false;
     if (isLikelyLogoOrSymbol(asset.url)) return false;
+    if (!hasMeaningfulContrast(asset, 18, 22)) return false;
     return asset.width >= 1400 && asset.height >= 650 && asset.ratio >= 1.55 && asset.ratio <= 2.45;
   }) || null;
 }
@@ -284,12 +357,48 @@ function selectThreeCardFallback(assets) {
   const usable = assets.filter((asset) => asset.width >= 140 && asset.height >= 140 && asset.megapixels >= 40000);
   const cards = usable
     .filter((asset) => asset.kind === 'card')
+    .filter((asset) => hasStrongSourceDimensions(asset))
     .sort((a, b) => scoreCompositeAsset(b) - scoreCompositeAsset(a))
     .slice(0, 3);
 
   return cards.length >= 3
     ? { mode: 'three-card-composite', assets: cards, reason: 'last-resort-card-composite' }
     : { mode: 'ineligible', assets: cards, reason: usable.length > 0 ? 'no-strong-identity-assets' : 'no-usable-assets' };
+}
+
+function selectProductComposition(assets) {
+  const products = assets
+    .filter((asset) => asset.kind === 'product')
+    .filter((asset) => isLikelyOfficialIdentityAsset(asset))
+    .filter((asset) => asset.width >= 420 && asset.height >= 420 && asset.megapixels >= 180000)
+    .filter((asset) => hasMeaningfulContrast(asset))
+    .sort((a, b) => scoreCompositeAsset(b) - scoreCompositeAsset(a))
+    .slice(0, 2);
+
+  if (products.length === 0) {
+    return { mode: 'ineligible', assets: [], reason: 'no-strong-product-assets' };
+  }
+
+  const occupancy = products.reduce((total, asset) => {
+    const projected = assetProjectedSize(asset, products.length > 1 ? 900 : 1180, products.length > 1 ? 720 : 760);
+    return total + projected.occupancy;
+  }, 0);
+
+  return occupancy >= 0.075
+    ? { mode: 'product-composition', assets: products, reason: 'official-product-composition' }
+    : { mode: 'ineligible', assets: products, reason: 'insufficient-product-visual-occupancy' };
+}
+
+function selectApprovedTitleGraphicSource(assets) {
+  const logo = assets
+    .filter((asset) => asset.kind === 'logo')
+    .filter((asset) => hasStrongSourceDimensions(asset))
+    .filter((asset) => visualOccupancyForAsset(asset, 'identity') >= 0.045)
+    .sort((a, b) => b.megapixels - a.megapixels)[0];
+
+  return logo
+    ? { mode: 'title-graphic', assets: [logo], reason: 'branded-title-graphic' }
+    : { mode: 'ineligible', assets: [], reason: 'no-approved-branded-title-source' };
 }
 
 function backgroundSvg(game) {
@@ -440,7 +549,7 @@ function wrapTitleLines(title, maxChars = 15) {
   return lines.slice(0, 3);
 }
 
-async function composeTitleHero(projectRoot, release, outputRelativePath) {
+async function composeTitleHero(projectRoot, release, outputRelativePath, assets = []) {
   const game = normalizeGame(release.game);
   const [accentA, accentB] = GAME_ACCENTS[game] || GAME_ACCENTS.other;
   const titleLines = wrapTitleLines(releaseName(release), 16);
@@ -470,9 +579,25 @@ async function composeTitleHero(projectRoot, release, outputRelativePath) {
 
   const fullOutputPath = path.join(projectRoot, 'public', outputRelativePath);
   ensureDir(path.dirname(fullOutputPath));
+  const composites = [{ input: titleLayer, left: 0, top: 0 }];
+
+  const logo = assets.find((asset) => asset.kind === 'logo');
+  if (logo) {
+    const logoImage = await sharp(logo.buffer)
+      .resize({ width: 1200, height: 360, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 94 })
+      .toBuffer();
+    const metadata = await sharp(logoImage).metadata();
+    composites.push({
+      input: logoImage,
+      left: Math.max(2100, Math.round(2780 - (metadata.width / 2))),
+      top: Math.max(92, Math.round(150 - (metadata.height / 2)))
+    });
+  }
+
   await sharp(backgroundSvg(game))
     .resize(CANVAS_WIDTH, CANVAS_HEIGHT)
-    .composite([{ input: titleLayer, left: 0, top: 0 }])
+    .composite(composites)
     .webp({ quality: 88, effort: 5 })
     .toFile(fullOutputPath);
 
@@ -598,7 +723,7 @@ async function classifyRelease(projectRoot, release) {
   const slug = `${game}-${slugify(releaseName(release) || release.id)}.webp`;
   const outputRelativePath = `${HERO_OUTPUT_RELATIVE_DIR}/${slug}`;
 
-  const identityAssets = selectIdentityAssets(inspected, release);
+  const identityAssets = selectIdentityAssets(inspected);
   if (identityAssets.length > 0) {
     const output = await composeIdentityHero(projectRoot, release, identityAssets, outputRelativePath);
     return {
@@ -614,7 +739,7 @@ async function classifyRelease(projectRoot, release) {
     };
   }
 
-  const wideKeyArt = selectWideKeyArtAsset(inspected, release);
+  const wideKeyArt = selectWideKeyArtAsset(inspected);
   if (wideKeyArt) {
     const output = await composeWideHero(projectRoot, release, wideKeyArt, outputRelativePath);
     return {
@@ -630,18 +755,19 @@ async function classifyRelease(projectRoot, release) {
     };
   }
 
-  if (releaseName(release)) {
-    const output = await composeTitleHero(projectRoot, release, outputRelativePath);
+  const productComposition = selectProductComposition(inspected);
+  if (productComposition.mode !== 'ineligible') {
+    const output = await composeHero(projectRoot, release, productComposition.assets, outputRelativePath);
     return {
-      mode: 'title-graphic',
+      mode: productComposition.mode,
       eligible: true,
       heroImageUrl: publicUrlForGeneratedAsset(projectRoot, outputRelativePath),
       generatedPath: outputRelativePath,
       generatedWidth: output.width,
       generatedHeight: output.height,
       generatedBytes: output.bytes,
-      sourceAssets: [],
-      reason: 'generated-set-title-graphic'
+      sourceAssets: productComposition.assets,
+      reason: productComposition.reason
     };
   }
 
@@ -661,12 +787,28 @@ async function classifyRelease(projectRoot, release) {
     };
   }
 
+  const titleGraphic = selectApprovedTitleGraphicSource(inspected);
+  if (titleGraphic.mode !== 'ineligible') {
+    const output = await composeTitleHero(projectRoot, release, outputRelativePath, titleGraphic.assets);
+    return {
+      mode: titleGraphic.mode,
+      eligible: true,
+      heroImageUrl: publicUrlForGeneratedAsset(projectRoot, outputRelativePath),
+      generatedPath: outputRelativePath,
+      generatedWidth: output.width,
+      generatedHeight: output.height,
+      generatedBytes: output.bytes,
+      sourceAssets: titleGraphic.assets,
+      reason: titleGraphic.reason
+    };
+  }
+
   return {
     mode: 'ineligible',
     eligible: false,
     heroImageUrl: null,
-    sourceAssets: composition.assets,
-    reason: composition.reason
+    sourceAssets: [...productComposition.assets, ...composition.assets, ...titleGraphic.assets],
+    reason: titleGraphic.reason || composition.reason || productComposition.reason
   };
 }
 

@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { getHomepageContent } from '@/services/homepage/homepageContentService';
-import { fallbackHomepageReleases } from '@/services/homepage/homepageReleaseFeed';
 
 export function useHomepageContent() {
   return useQuery({
@@ -9,8 +8,8 @@ export function useHomepageContent() {
     staleTime: 60_000,
     refetchInterval: 60_000,
     placeholderData: {
-      heroReleases: fallbackHomepageReleases,
-      upcomingReleases: fallbackHomepageReleases.slice(0, 6),
+      heroReleases: [],
+      upcomingReleases: [],
       sources: { products: 0, manifest: 0 }
     }
   });

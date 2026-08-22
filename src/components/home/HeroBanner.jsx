@@ -2,15 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
-import { fallbackHomepageReleases } from '@/services/homepage/homepageReleaseFeed';
 
-export default function HeroBanner({ releases = fallbackHomepageReleases }) {
+export default function HeroBanner({ releases = [] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [failedImageUrls, setFailedImageUrls] = useState({});
   const [loadedImageUrls, setLoadedImageUrls] = useState({});
   const animatingRef = React.useRef(false);
 
-  const safeReleases = releases.length > 0 ? releases : fallbackHomepageReleases;
+  const safeReleases = releases;
 
   const markImageLoaded = (url) => {
     if (!url) return;
@@ -80,12 +79,15 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
   const goNext = () => goTo((currentIndex + 1) % safeReleases.length);
   const goPrev = () => goTo((currentIndex - 1 + safeReleases.length) % safeReleases.length);
 
-  const current = safeReleases[currentIndex] || fallbackHomepageReleases[0];
+  if (safeReleases.length === 0) {
+    return null;
+  }
+
+  const current = safeReleases[currentIndex];
   const bannerImage = current.heroImageUrl && !failedImageUrls[current.heroImageUrl] ? current.heroImageUrl : null;
   const containedImage = [
     current.imageUrl,
-    current.heroFallbackImageUrl,
-    fallbackHomepageReleases[0].heroFallbackImageUrl
+    current.heroFallbackImageUrl
   ].find((url) => url && !failedImageUrls[url]);
   const supportLine = current.supportLine || current.gameLabel || 'Upcoming release';
   const ctaHref = current.ctaHref || current.links?.setDetail || current.links?.shopSearch || '/Shop';
