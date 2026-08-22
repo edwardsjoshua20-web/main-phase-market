@@ -39,13 +39,56 @@ async function fetchUpcomingProductsFromBackend() {
   }
 }
 
+function releaseMatchKeys(release = {}) {
+  return [
+    release.releaseKey,
+    release.id,
+    release.parentKey,
+    release.setCode ? `${release.game}:${release.setCode}` : null,
+    release.name && release.game ? `${release.game}:${String(release.name).toLowerCase()}` : null
+  ].filter(Boolean);
+}
+
+function buildProductReleaseMap(productReleases = []) {
+  const map = new Map();
+  for (const product of productReleases) {
+    for (const key of releaseMatchKeys(product)) {
+      if (!map.has(key)) map.set(key, product);
+    }
+  }
+  return map;
+}
+
+function enrichManifestReleasesWithProducts(manifestReleases = [], productReleases = []) {
+  if (manifestReleases.length === 0) return productReleases;
+
+  const productMap = buildProductReleaseMap(productReleases);
+  return manifestReleases.map((release) => {
+    const product = releaseMatchKeys(release).map((key) => productMap.get(key)).find(Boolean);
+    if (!product) return release;
+
+    return {
+      ...release,
+      hasPreorderListing: release.hasPreorderListing || product.hasPreorderListing,
+      hasActiveListing: release.hasActiveListing || product.hasActiveListing,
+      links: {
+        ...release.links,
+        preorder: product.links?.preorder || product.links?.shopSearch || release.links?.preorder || null,
+        shopSearch: product.links?.shopSearch || release.links?.shopSearch
+      }
+    };
+  });
+}
+
 export async function getHomepageContent() {
   const [productReleases, manifestReleases] = await Promise.all([
     fetchUpcomingProductsFromBackend(),
     fetchStaticUpcomingReleaseManifest()
   ]);
 
-  const preferredReleases = productReleases.length > 0 ? productReleases : manifestReleases;
+  const preferredReleases = manifestReleases.length > 0
+    ? enrichManifestReleasesWithProducts(manifestReleases, productReleases)
+    : productReleases;
   const eligibleHeroReleases = filterUpcomingReleases(preferredReleases)
     .filter((release) => release.heroEligible !== false && release.heroImageUrl);
   const heroReleases = eligibleHeroReleases.length > 0

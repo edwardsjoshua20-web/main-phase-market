@@ -7,40 +7,91 @@ import { fallbackHomepageReleases } from '@/services/homepage/homepageReleaseFee
 export default function HeroBanner({ releases = fallbackHomepageReleases }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [failedImageUrls, setFailedImageUrls] = useState({});
+  const [loadedImageUrls, setLoadedImageUrls] = useState({});
   const animatingRef = React.useRef(false);
 
   const safeReleases = releases.length > 0 ? releases : fallbackHomepageReleases;
 
+  const markImageLoaded = (url) => {
+    if (!url) return;
+    setLoadedImageUrls((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
+  };
+
+  const markImageFailed = (url) => {
+    if (!url) return;
+    setFailedImageUrls((prev) => ({ ...prev, [url]: true }));
+  };
+
   const goTo = (idx) => {
     if (animatingRef.current) return;
+    const target = safeReleases[idx];
+    const targetImage = target?.heroImageUrl;
     animatingRef.current = true;
-    setCurrentIndex(idx);
-    setTimeout(() => {
-      animatingRef.current = false;
-    }, 400);
+
+    const finish = () => {
+      setCurrentIndex(idx);
+      setTimeout(() => {
+        animatingRef.current = false;
+      }, 260);
+    };
+
+    if (targetImage && !loadedImageUrls[targetImage] && !failedImageUrls[targetImage]) {
+      const image = new Image();
+      image.onload = () => {
+        markImageLoaded(targetImage);
+        finish();
+      };
+      image.onerror = () => {
+        markImageFailed(targetImage);
+        finish();
+      };
+      image.src = targetImage;
+      return;
+    }
+
+    finish();
   };
 
   useEffect(() => {
+    for (const release of safeReleases) {
+      const url = release?.heroImageUrl;
+      if (!url || loadedImageUrls[url] || failedImageUrls[url]) continue;
+      const image = new Image();
+      image.onload = () => markImageLoaded(url);
+      image.onerror = () => markImageFailed(url);
+      image.src = url;
+    }
+  }, [safeReleases, loadedImageUrls, failedImageUrls]);
+
+  useEffect(() => {
+    if (currentIndex < safeReleases.length) return;
+    setCurrentIndex(0);
+  }, [currentIndex, safeReleases.length]);
+
+  useEffect(() => {
+    if (safeReleases.length <= 1) return undefined;
     const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % safeReleases.length);
+      if (animatingRef.current) return;
+      goTo((currentIndex + 1) % safeReleases.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, [safeReleases.length]);
+  }, [currentIndex, safeReleases.length, loadedImageUrls, failedImageUrls]);
 
   const goNext = () => goTo((currentIndex + 1) % safeReleases.length);
   const goPrev = () => goTo((currentIndex - 1 + safeReleases.length) % safeReleases.length);
 
   const current = safeReleases[currentIndex] || fallbackHomepageReleases[0];
-  const bannerImage = current.heroImageUrl || null;
+  const bannerImage = current.heroImageUrl && !failedImageUrls[current.heroImageUrl] ? current.heroImageUrl : null;
   const containedImage = [
     current.imageUrl,
     current.heroFallbackImageUrl,
     fallbackHomepageReleases[0].heroFallbackImageUrl
   ].find((url) => url && !failedImageUrls[url]);
   const supportLine = current.supportLine || current.gameLabel || 'Upcoming release';
-  const ctaHref = current.ctaHref || current.links?.shopSearch || '/Shop';
+  const ctaHref = current.ctaHref || current.links?.setDetail || current.links?.shopSearch || '/Shop';
   const ctaLabel = current.ctaLabel || 'View Set';
   const releaseStateLabel = current.releaseStateLabel || '';
+  const releaseIdentity = current.releaseKey || current.id || `${current.game || 'game'}:${current.name || 'release'}`;
   const fallbackInitials = String(current.gameLabel || current.game || 'TCG')
     .split(/\s+/)
     .filter(Boolean)
@@ -49,19 +100,25 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
     .join('')
     .toUpperCase();
 
-  const markImageFailed = (url) => {
-    if (!url) return;
-    setFailedImageUrls((prev) => ({ ...prev, [url]: true }));
-  };
-
   return (
-    <section className="relative overflow-hidden w-full bg-slate-950" style={{ height: '248px' }}>
+    <section
+      className="relative overflow-hidden w-full bg-slate-950"
+      style={{ height: '248px' }}
+      data-release-key={releaseIdentity}
+      data-release-id={current.id || ''}
+      data-release-code={current.setCode || ''}
+      data-hero-mode={current.heroVisualMode || ''}
+    >
       {bannerImage ? (
         <div className="absolute inset-0">
           <img
             src={bannerImage}
             alt={current.name}
-            className="w-full h-full object-cover object-center"
+            onLoad={() => markImageLoaded(bannerImage)}
+            onError={() => markImageFailed(bannerImage)}
+            className="w-full h-full object-cover object-center transition-opacity duration-300"
+            data-release-key={releaseIdentity}
+            data-hero-mode={current.heroVisualMode || ''}
           />
         </div>
       ) : (
@@ -109,7 +166,7 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
             </p>
 
             <div className="flex items-start">
-              <Link to={ctaHref}>
+              <Link to={ctaHref} data-release-key={releaseIdentity}>
                 <Button size="sm" className="h-8 rounded-[4px] border border-white/18 bg-white/95 px-3.5 text-sm font-bold text-slate-950 shadow-[0_10px_22px_rgba(0,0,0,0.20)] hover:bg-white">
                   {ctaLabel}
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -125,10 +182,10 @@ export default function HeroBanner({ releases = fallbackHomepageReleases }) {
                   {String(currentIndex + 1).padStart(2, '0')} / {String(safeReleases.length).padStart(2, '0')}
                 </span>
                 <div className="flex items-center gap-1">
-                  <button onClick={goPrev} className="flex h-6 w-6 items-center justify-center border border-white/12 bg-white/[0.04] text-white/62 transition-colors hover:border-white/24 hover:bg-white/[0.08] hover:text-white">
+                  <button type="button" onClick={goPrev} className="flex h-6 w-6 items-center justify-center border border-white/12 bg-white/[0.04] text-white/62 transition-colors hover:border-white/24 hover:bg-white/[0.08] hover:text-white">
                     <ChevronLeft className="h-4 w-4" />
                   </button>
-                  <button onClick={goNext} className="flex h-6 w-6 items-center justify-center border border-white/12 bg-white/[0.04] text-white/62 transition-colors hover:border-white/24 hover:bg-white/[0.08] hover:text-white">
+                  <button type="button" onClick={goNext} className="flex h-6 w-6 items-center justify-center border border-white/12 bg-white/[0.04] text-white/62 transition-colors hover:border-white/24 hover:bg-white/[0.08] hover:text-white">
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>

@@ -172,6 +172,18 @@ function normalizeParentName(game, name = '') {
     .replace(/^-+|-+$/g, '') || 'upcoming-release';
 }
 
+function normalizeSlug(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/['']/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'set';
+}
+
+function routeGameKey(game) {
+  return game === 'flesh_and_blood' ? 'fab' : (game || 'magic');
+}
+
 function normalizeSet(game, set) {
   const releaseDate = normalizeDateForSet(set);
   if (!releaseDate) return null;
@@ -182,12 +194,25 @@ function normalizeSet(game, set) {
   const enrichedSet = { ...set, ...override };
   const heroImageUrl = heroImageForSet(enrichedSet);
   const releaseState = getReleaseState(releaseDate);
+  const canonicalSlug = normalizeSlug(name);
+  const normalizedGame = routeGameKey(game);
+  const normalizedCode = code ? String(code).toUpperCase() : null;
+  const canonicalReleaseKey = [
+    normalizedGame,
+    normalizedCode || releaseDate.slice(0, 10),
+    normalizedCode ? '' : canonicalSlug
+  ].filter(Boolean).join(':');
 
   return {
-    id: `${game}:${code || name}`,
+    id: `${normalizedGame}:${normalizedCode || name}`,
     game,
+    game_key: normalizedGame,
     name,
+    code: normalizedCode,
+    set_code: normalizedCode,
     set_name: enrichedSet.series || name,
+    canonical_slug: canonicalSlug,
+    canonical_release_key: canonicalReleaseKey,
     parentKey: `${game}:${releaseDate.slice(0, 10)}:${normalizeParentName(game, name)}`,
     release_date: releaseDate,
     release_state: releaseState,
@@ -202,6 +227,10 @@ function normalizeSet(game, set) {
     is_preorder: true,
     has_preorder_listing: false,
     cta_label: 'View Set',
+    cta_href: `/set/${normalizedGame}/${canonicalSlug}`,
+    links: {
+      setDetail: `/set/${normalizedGame}/${canonicalSlug}`
+    },
     source: 'local-set-manifest'
   };
 }

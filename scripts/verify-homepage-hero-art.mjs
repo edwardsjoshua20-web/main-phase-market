@@ -14,6 +14,14 @@ const APPROVED_MODES = new Set([
   'ineligible'
 ]);
 
+function slugify(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/['']/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'set';
+}
+
 function fail(message) {
   console.error(`[homepage:hero-art:verify] ${message}`);
   process.exitCode = 1;
@@ -45,6 +53,30 @@ async function verify() {
 
   for (const release of releases) {
     const mode = String(release.hero_visual_mode || '').toLowerCase();
+    const gameKey = String(release.game_key || release.game || '').trim();
+    const setCode = String(release.set_code || release.code || '').trim();
+    const canonicalSlug = String(release.canonical_slug || '').trim();
+    const canonicalReleaseKey = String(release.canonical_release_key || '').trim();
+    const setDetailHref = String(release.links?.setDetail || release.cta_href || '').trim();
+    const expectedSlug = slugify(release.name);
+    const expectedHeroPath = `data/site/hero/${gameKey}-${expectedSlug}.webp`;
+
+    if (!gameKey || !canonicalSlug || !canonicalReleaseKey) {
+      fail(`${release.game}:${release.name} is missing canonical game/slug/release key identity.`);
+    }
+
+    if (canonicalSlug !== expectedSlug) {
+      fail(`${release.game}:${release.name} canonical_slug=${canonicalSlug} does not match normalized release name ${expectedSlug}.`);
+    }
+
+    if (setCode && !canonicalReleaseKey.includes(setCode)) {
+      fail(`${release.game}:${release.name} canonical_release_key=${canonicalReleaseKey} does not include set code ${setCode}.`);
+    }
+
+    if (setDetailHref !== `/set/${gameKey}/${canonicalSlug}`) {
+      fail(`${release.game}:${release.name} Set Detail route ${setDetailHref || '(blank)'} does not match canonical identity /set/${gameKey}/${canonicalSlug}.`);
+    }
+
     if (!APPROVED_MODES.has(mode)) {
       fail(`${release.game}:${release.name} has missing/invalid hero_visual_mode.`);
       continue;
@@ -59,6 +91,10 @@ async function verify() {
 
     if (!release.hero_image_url) {
       fail(`${release.game}:${release.name} is hero-eligible without hero_image_url.`);
+    }
+
+    if (release.hero_generated_path !== expectedHeroPath) {
+      fail(`${release.game}:${release.name} generated path ${release.hero_generated_path || '(blank)'} does not match canonical release identity ${expectedHeroPath}.`);
     }
 
     const filePath = localPathForGeneratedAsset(release);

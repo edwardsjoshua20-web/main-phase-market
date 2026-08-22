@@ -142,6 +142,43 @@ function normalizeReleaseName(input = {}, source = 'unknown') {
   return input.name || input.set_name || input.setName || input.title || `${source} release`;
 }
 
+function normalizeSlug(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/['']/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'set';
+}
+
+function normalizeReleaseCode(input = {}) {
+  const value = input.set_code || input.setCode || input.code || input.id?.split?.(':')?.pop?.();
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
+function buildCanonicalReleaseKey(input = {}, source = 'unknown') {
+  if (input.canonical_release_key || input.releaseKey) {
+    return String(input.canonical_release_key || input.releaseKey);
+  }
+
+  const game = inferGameKey(input);
+  const code = normalizeReleaseCode(input);
+  if (code) return `${game}:${code}`;
+
+  const releaseDate = normalizeReleaseDateValue(
+    input.release_date
+    || input.releaseDate
+    || input.released_at
+    || input.tcg_date
+    || input.date
+  );
+  return [
+    game,
+    releaseDate ? releaseDate.slice(0, 10) : source,
+    normalizeSlug(normalizeReleaseName(input, source))
+  ].join(':');
+}
+
 function normalizeReleaseParentKey(input = {}, source = 'unknown') {
   if (input.parentKey) return input.parentKey;
   const game = inferGameKey(input);
@@ -160,11 +197,7 @@ function normalizeReleaseParentKey(input = {}, source = 'unknown') {
       .replace(/\s+Prerelease(?:\s+Packs?)?$/i, '')
       .replace(/\s+Starter(?:\s+Kits?)?$/i, '');
   }
-  const slug = String(name)
-    .toLowerCase()
-    .replace(/['']/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'release';
+  const slug = normalizeSlug(name);
   return [game, releaseDate ? releaseDate.slice(0, 10) : 'undated', slug].join(':');
 }
 
@@ -186,11 +219,7 @@ function routeGameKey(game) {
 function buildSetDetailLink(input = {}, source = 'unknown') {
   const name = normalizeReleaseName(input, source);
   const game = routeGameKey(inferGameKey(input));
-  const slug = String(name)
-    .toLowerCase()
-    .replace(/['']/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'set';
+  const slug = input.canonical_slug || input.slug || normalizeSlug(name);
   return `/set/${game}/${slug}`;
 }
 
@@ -206,6 +235,9 @@ export function normalizeHomepageRelease(input = {}, source = 'unknown') {
   const game = inferGameKey(input);
   const theme = getReleaseTheme({ ...input, game });
   const name = normalizeReleaseName(input, source);
+  const setCode = normalizeReleaseCode(input);
+  const canonicalSlug = input.canonical_slug || input.slug || normalizeSlug(name);
+  const releaseKey = buildCanonicalReleaseKey({ ...input, game, name, set_code: setCode, canonical_slug: canonicalSlug }, source);
   const hasPreorderListing = Boolean(input.has_preorder_listing ?? (source === 'product' && input.is_preorder));
   const releaseState = input.release_state || input.releaseState || getReleaseState(releaseDate);
   const released = releaseState === 'RELEASED';
@@ -216,11 +248,15 @@ export function normalizeHomepageRelease(input = {}, source = 'unknown') {
   const setDetail = input.links?.setDetail || buildSetDetailLink({ ...input, game, name }, source);
 
   return {
-    id: input.id || input.code || input.set_code || `${source}:${name}`,
+    id: input.id || setCode || `${source}:${name}`,
+    releaseKey,
     source,
     game,
+    gameKey: input.game_key || game,
     gameLabel: theme.label,
     name,
+    setCode,
+    canonicalSlug,
     setName: input.set_name || input.setName || input.name || '',
     parentKey: normalizeReleaseParentKey({ ...input, game, name }, source),
     productType: input.product_type || 'sealed_product',
