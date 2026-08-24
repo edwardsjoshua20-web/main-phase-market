@@ -445,6 +445,17 @@ function selectApprovedSourceComposition(assets, mode) {
       : { mode: 'ineligible', assets: [], reason: 'approved-wide-source-unusable' };
   }
 
+  if (mode === 'approved-title-lockup') {
+    const lockup = assets
+      .filter((asset) => ['logo', 'product', 'premium'].includes(asset.kind))
+      .filter((asset) => asset.width >= 500 && asset.height >= 160 && asset.megapixels >= 80000)
+      .sort((a, b) => b.megapixels - a.megapixels)[0];
+
+    return lockup
+      ? { mode: 'approved-title-lockup', assets: [lockup], reason: 'approved-title-lockup' }
+      : { mode: 'ineligible', assets: [], reason: 'approved-title-lockup-unusable' };
+  }
+
   return { mode: 'ineligible', assets: [], reason: 'no-approved-source-mode' };
 }
 
@@ -575,6 +586,48 @@ async function composeIdentityHero(projectRoot, release, assets, outputRelativeP
     path: fullOutputPath,
     width: metadata.width,
     height: metadata.height,
+    bytes: fs.statSync(fullOutputPath).size
+  };
+}
+
+async function composeTitleLockupHero(projectRoot, release, asset, outputRelativePath) {
+  const targetWidth = 1540;
+  const targetHeight = 575;
+  const image = await sharp(asset.buffer, { animated: false })
+    .resize({ width: targetWidth, height: targetHeight, fit: 'inside' })
+    .removeAlpha()
+    .png()
+    .toBuffer();
+  const metadata = await sharp(image).metadata();
+  const alpha = await sharp(image)
+    .greyscale()
+    .threshold(148)
+    .blur(1.2)
+    .raw()
+    .toBuffer();
+  const lockup = await sharp(image)
+    .joinChannel(alpha, { raw: { width: metadata.width, height: metadata.height, channels: 1 } })
+    .webp({ quality: 94 })
+    .toBuffer();
+  const lockupMetadata = await sharp(lockup).metadata();
+  const left = Math.round(2840 - (lockupMetadata.width / 2));
+  const top = Math.round((CANVAS_HEIGHT - lockupMetadata.height) / 2);
+
+  const fullOutputPath = path.join(projectRoot, 'public', outputRelativePath);
+  ensureDir(path.dirname(fullOutputPath));
+  await sharp(backgroundSvg(normalizeGame(release.game)))
+    .resize(CANVAS_WIDTH, CANVAS_HEIGHT)
+    .composite([
+      { input: lockup, left: Math.max(1960, left), top: Math.max(80, top) }
+    ])
+    .webp({ quality: 88, effort: 5 })
+    .toFile(fullOutputPath);
+
+  const outputMetadata = await sharp(fullOutputPath).metadata();
+  return {
+    path: fullOutputPath,
+    width: outputMetadata.width,
+    height: outputMetadata.height,
     bytes: fs.statSync(fullOutputPath).size
   };
 }
@@ -816,6 +869,21 @@ async function classifyRelease(projectRoot, release) {
 
     if (approvedSourceSelection.mode === 'wide-key-art') {
       const output = await composeWideHero(projectRoot, release, approvedSourceSelection.assets[0], outputRelativePath);
+      return {
+        mode: approvedSourceSelection.mode,
+        eligible: true,
+        heroImageUrl: publicUrlForGeneratedAsset(projectRoot, outputRelativePath),
+        generatedPath: outputRelativePath,
+        generatedWidth: output.width,
+        generatedHeight: output.height,
+        generatedBytes: output.bytes,
+        sourceAssets: approvedSourceSelection.assets,
+        reason: approvedSourceSelection.reason
+      };
+    }
+
+    if (approvedSourceSelection.mode === 'approved-title-lockup') {
+      const output = await composeTitleLockupHero(projectRoot, release, approvedSourceSelection.assets[0], outputRelativePath);
       return {
         mode: approvedSourceSelection.mode,
         eligible: true,

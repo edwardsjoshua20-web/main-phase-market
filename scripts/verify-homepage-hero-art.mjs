@@ -11,10 +11,12 @@ const APPROVED_MODES = new Set([
   'wide-key-art',
   'product-composition',
   'title-graphic',
+  'approved-title-lockup',
   'three-card-composite',
   'ineligible'
 ]);
 const REQUIRED_RELEASE_MODES = {
+  'magic:FRA': 'approved-title-lockup',
   'yugioh:MAMS': 'three-card-composite'
 };
 
@@ -22,6 +24,7 @@ const MIN_SOURCE = {
   card: { width: 360, height: 500, megapixels: 180000 },
   logo: { width: 900, height: 220, megapixels: 250000 },
   product: { width: 420, height: 420, megapixels: 180000 },
+  titleLockup: { width: 500, height: 160, megapixels: 80000 },
   identityProduct: { width: 760, height: 520, megapixels: 500000 }
 };
 
@@ -108,6 +111,14 @@ function verifySourceAssets(release, mode, sourceAssets) {
     }, 0);
     if (weak.length > 0 || occupancy < 0.075) {
       fail(`${release.game}:${release.name} product-composition has insufficient source quality or visual occupancy.`);
+    }
+    return;
+  }
+
+  if (mode === 'approved-title-lockup') {
+    const weak = sourceAssets.filter((asset) => !sourceMeetsMinimum(asset, MIN_SOURCE.titleLockup));
+    if (weak.length > 0) {
+      fail(`${release.game}:${release.name} approved-title-lockup uses weak source asset(s): ${weak.map((asset) => `${asset.name || asset.kind}:${asset.width}x${asset.height}`).join(', ')}.`);
     }
     return;
   }

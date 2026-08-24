@@ -44,7 +44,15 @@ const GAME_FALLBACK_IMAGES = {
 
 const RELEASE_ASSET_OVERRIDES = {
   'magic:FRA': {
-    set_image_url: 'https://images.ctfassets.net/s5n2t79q9icq/wSQdOUyu2NFMRBDrH6Cgr/cb1d1e73e5e518368f89e9998fb48131/dravmeloqint-1920x1000.png?q=80&w=1920&h=1000&fit=crop&f=center&fm=webp',
+    set_image_url: '/images/releases/reality-fracture-approved.png',
+    hero_source_mode: 'approved-title-lockup',
+    hero_source_assets: [
+      {
+        kind: 'logo',
+        name: 'Reality Fracture approved title lockup',
+        url: '/images/releases/reality-fracture-approved.png'
+      }
+    ],
     source_url: 'https://magic.wizards.com/en/products/reality-fracture'
   },
   'magic:MBC': {
