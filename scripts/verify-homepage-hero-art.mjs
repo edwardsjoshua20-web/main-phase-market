@@ -14,6 +14,9 @@ const APPROVED_MODES = new Set([
   'three-card-composite',
   'ineligible'
 ]);
+const REQUIRED_RELEASE_MODES = {
+  'yugioh:MAMS': 'three-card-composite'
+};
 
 const MIN_SOURCE = {
   card: { width: 360, height: 500, megapixels: 180000 },
@@ -153,6 +156,7 @@ async function verify() {
     const mode = String(release.hero_visual_mode || '').toLowerCase();
     const gameKey = String(release.game_key || release.game || '').trim();
     const setCode = String(release.set_code || release.code || '').trim();
+    const releaseKey = `${gameKey}:${setCode}`;
     const canonicalSlug = String(release.canonical_slug || '').trim();
     const canonicalReleaseKey = String(release.canonical_release_key || '').trim();
     const setDetailHref = String(release.links?.setDetail || release.cta_href || '').trim();
@@ -178,6 +182,10 @@ async function verify() {
     if (!APPROVED_MODES.has(mode)) {
       fail(`${release.game}:${release.name} has missing/invalid hero_visual_mode.`);
       continue;
+    }
+
+    if (REQUIRED_RELEASE_MODES[releaseKey] && mode !== REQUIRED_RELEASE_MODES[releaseKey]) {
+      fail(`${release.game}:${release.name} must use ${REQUIRED_RELEASE_MODES[releaseKey]} but generated ${mode}.`);
     }
 
     if (mode === 'ineligible') {

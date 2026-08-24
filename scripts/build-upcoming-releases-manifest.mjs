@@ -51,6 +51,26 @@ const RELEASE_ASSET_OVERRIDES = {
     set_image_url: 'https://media.wizards.com/2026/images/daily/VbqFabKvbr/heqm2no634.webp',
     image_large: 'https://media.wizards.com/2026/images/daily/VbqFabKvbr/wFKXx2Jn3B.webp',
     source_url: 'https://www.magic.wizards.com/en/news/feature/whats-inside-mystery-booster-commander-edition'
+  },
+  'yugioh:MAMS': {
+    hero_source_mode: 'three-card-composite',
+    hero_source_assets: [
+      {
+        kind: 'card',
+        name: 'Blue-Eyes White Dragon, the White Phantom Beast',
+        url: 'https://images.ygoprodeck.com/images/cards/30397786.jpg'
+      },
+      {
+        kind: 'card',
+        name: 'Cyber End Dragon, the Final Strike Dragon',
+        url: 'https://images.ygoprodeck.com/images/cards/30275298.jpg'
+      },
+      {
+        kind: 'card',
+        name: 'Red Nova Dragon - Burning Soul',
+        url: 'https://images.ygoprodeck.com/images/cards/65541655.jpg'
+      }
+    ]
   }
 };
 
@@ -223,6 +243,8 @@ function normalizeSet(game, set) {
     game_fallback_image_url: GAME_FALLBACK_IMAGES[game] || null,
     source_url: enrichedSet.source_url || null,
     image_large: enrichedSet.image_large || null,
+    hero_source_mode: enrichedSet.hero_source_mode || null,
+    hero_source_assets: Array.isArray(enrichedSet.hero_source_assets) ? enrichedSet.hero_source_assets : null,
     supportLine: supportLineForSet(game, enrichedSet),
     is_preorder: true,
     has_preorder_listing: false,

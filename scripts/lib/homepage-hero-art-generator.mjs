@@ -272,6 +272,24 @@ function getCardAssetsForRelease(projectRoot, release) {
   return [];
 }
 
+function getApprovedSourceAssetsForRelease(release = {}) {
+  const assets = Array.isArray(release.hero_source_assets)
+    ? release.hero_source_assets
+    : Array.isArray(release.approved_hero_source_assets)
+      ? release.approved_hero_source_assets
+      : [];
+
+  return dedupeAssets(assets.map((asset) => ({
+    kind: asset.kind || 'product',
+    name: asset.name || 'approved hero source',
+    url: asset.url || asset.image_url || asset.src
+  })));
+}
+
+function getApprovedSourceMode(release = {}) {
+  return String(release.hero_source_mode || release.approved_hero_source_mode || '').trim().toLowerCase();
+}
+
 function getBaseAssetsForRelease(release) {
   return dedupeAssets([
     { kind: 'premium', name: 'hero', url: release.hero_image_url || release.heroImageUrl },
@@ -399,6 +417,35 @@ function selectApprovedTitleGraphicSource(assets) {
   return logo
     ? { mode: 'title-graphic', assets: [logo], reason: 'branded-title-graphic' }
     : { mode: 'ineligible', assets: [], reason: 'no-approved-branded-title-source' };
+}
+
+function selectApprovedSourceComposition(assets, mode) {
+  if (mode === 'three-card-composite') {
+    const cards = assets
+      .filter((asset) => asset.kind === 'card')
+      .filter((asset) => hasStrongSourceDimensions(asset))
+      .slice(0, 3);
+
+    return cards.length >= 3
+      ? { mode: 'three-card-composite', assets: cards, reason: 'approved-source-card-composite' }
+      : { mode: 'ineligible', assets: cards, reason: 'approved-card-source-unusable' };
+  }
+
+  if (mode === 'identity-image' || mode === 'approved-identity-image') {
+    const identityAssets = selectIdentityAssets(assets);
+    return identityAssets.length > 0
+      ? { mode: 'identity-image', assets: identityAssets, reason: 'approved-identity-image' }
+      : { mode: 'ineligible', assets: [], reason: 'approved-identity-source-unusable' };
+  }
+
+  if (mode === 'wide-key-art' || mode === 'approved-wide-key-art') {
+    const wideKeyArt = selectWideKeyArtAsset(assets);
+    return wideKeyArt
+      ? { mode: 'wide-key-art', assets: [wideKeyArt], reason: 'approved-wide-key-art' }
+      : { mode: 'ineligible', assets: [], reason: 'approved-wide-source-unusable' };
+  }
+
+  return { mode: 'ineligible', assets: [], reason: 'no-approved-source-mode' };
 }
 
 function backgroundSvg(game) {
@@ -710,11 +757,23 @@ function publicUrlForGeneratedAsset(projectRoot, relativePath) {
 }
 
 async function classifyRelease(projectRoot, release) {
+  const approvedSourceMode = getApprovedSourceMode(release);
+  const approvedSourceAssets = getApprovedSourceAssetsForRelease(release);
   const baseAssets = getBaseAssetsForRelease(release);
   const cardAssets = getCardAssetsForRelease(projectRoot, release);
+  const approvedInspected = [];
   const inspected = [];
 
+  for (const asset of approvedSourceAssets.slice(0, 6)) {
+    const result = await inspectAsset(projectRoot, asset);
+    if (result) {
+      approvedInspected.push(result);
+      inspected.push(result);
+    }
+  }
+
   for (const asset of dedupeAssets([...baseAssets, ...cardAssets]).slice(0, 18)) {
+    if (approvedSourceAssets.some((approvedAsset) => approvedAsset.url === asset.url)) continue;
     const result = await inspectAsset(projectRoot, asset);
     if (result) inspected.push(result);
   }
@@ -722,6 +781,62 @@ async function classifyRelease(projectRoot, release) {
   const game = normalizeGame(release.game);
   const slug = `${game}-${slugify(releaseName(release) || release.id)}.webp`;
   const outputRelativePath = `${HERO_OUTPUT_RELATIVE_DIR}/${slug}`;
+
+  if (approvedSourceMode) {
+    const approvedSourceSelection = selectApprovedSourceComposition(approvedInspected, approvedSourceMode);
+    if (approvedSourceSelection.mode === 'three-card-composite' || approvedSourceSelection.mode === 'product-composition') {
+      const output = await composeHero(projectRoot, release, approvedSourceSelection.assets, outputRelativePath);
+      return {
+        mode: approvedSourceSelection.mode,
+        eligible: true,
+        heroImageUrl: publicUrlForGeneratedAsset(projectRoot, outputRelativePath),
+        generatedPath: outputRelativePath,
+        generatedWidth: output.width,
+        generatedHeight: output.height,
+        generatedBytes: output.bytes,
+        sourceAssets: approvedSourceSelection.assets,
+        reason: approvedSourceSelection.reason
+      };
+    }
+
+    if (approvedSourceSelection.mode === 'identity-image') {
+      const output = await composeIdentityHero(projectRoot, release, approvedSourceSelection.assets, outputRelativePath);
+      return {
+        mode: approvedSourceSelection.mode,
+        eligible: true,
+        heroImageUrl: publicUrlForGeneratedAsset(projectRoot, outputRelativePath),
+        generatedPath: outputRelativePath,
+        generatedWidth: output.width,
+        generatedHeight: output.height,
+        generatedBytes: output.bytes,
+        sourceAssets: approvedSourceSelection.assets,
+        reason: approvedSourceSelection.reason
+      };
+    }
+
+    if (approvedSourceSelection.mode === 'wide-key-art') {
+      const output = await composeWideHero(projectRoot, release, approvedSourceSelection.assets[0], outputRelativePath);
+      return {
+        mode: approvedSourceSelection.mode,
+        eligible: true,
+        heroImageUrl: publicUrlForGeneratedAsset(projectRoot, outputRelativePath),
+        generatedPath: outputRelativePath,
+        generatedWidth: output.width,
+        generatedHeight: output.height,
+        generatedBytes: output.bytes,
+        sourceAssets: approvedSourceSelection.assets,
+        reason: approvedSourceSelection.reason
+      };
+    }
+
+    return {
+      mode: 'ineligible',
+      eligible: false,
+      heroImageUrl: null,
+      sourceAssets: approvedSourceSelection.assets,
+      reason: approvedSourceSelection.reason
+    };
+  }
 
   const identityAssets = selectIdentityAssets(inspected);
   if (identityAssets.length > 0) {
