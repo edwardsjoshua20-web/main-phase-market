@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function HeroBanner({ releases = [] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -168,11 +167,11 @@ export default function HeroBanner({ releases = [] }) {
             </p>
 
             <div className="flex items-start">
-              <Link to={ctaHref} data-release-key={releaseIdentity}>
-                <Button size="sm" className="h-8 rounded-[4px] border border-white/18 bg-white/95 px-3.5 text-sm font-bold text-slate-950 shadow-[0_10px_22px_rgba(0,0,0,0.20)] hover:bg-white">
-                  {ctaLabel}
-                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                </Button>
+              <Link to={ctaHref} data-release-key={releaseIdentity} className="group">
+                <span className="inline-flex items-center text-xs font-black uppercase tracking-[0.2em] text-white/92 underline-offset-4 transition-colors hover:text-white hover:underline">
+                  VIEW SET <span aria-hidden="true" className="ml-2 text-white/70 transition-transform group-hover:translate-x-0.5">→</span>
+                  <span className="sr-only">{ctaLabel}</span>
+                </span>
               </Link>
             </div>
 
@@ -184,10 +183,10 @@ export default function HeroBanner({ releases = [] }) {
                   {String(currentIndex + 1).padStart(2, '0')} / {String(safeReleases.length).padStart(2, '0')}
                 </span>
                 <div className="flex items-center gap-1">
-                  <button type="button" onClick={goPrev} className="flex h-6 w-6 items-center justify-center border border-white/12 bg-white/[0.04] text-white/62 transition-colors hover:border-white/24 hover:bg-white/[0.08] hover:text-white">
+                  <button type="button" onClick={goPrev} aria-label="Previous hero slide" className="flex h-6 w-5 items-center justify-center text-white/56 transition-colors hover:text-white">
                     <ChevronLeft className="h-4 w-4" />
                   </button>
-                  <button type="button" onClick={goNext} className="flex h-6 w-6 items-center justify-center border border-white/12 bg-white/[0.04] text-white/62 transition-colors hover:border-white/24 hover:bg-white/[0.08] hover:text-white">
+                  <button type="button" onClick={goNext} aria-label="Next hero slide" className="flex h-6 w-5 items-center justify-center text-white/56 transition-colors hover:text-white">
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
