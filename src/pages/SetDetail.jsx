@@ -120,6 +120,12 @@ export default function SetDetail() {
   const visibleCardLimit = 60;
   const visibleCards = showAllCards ? setCards : setCards.slice(0, visibleCardLimit);
   const hiddenCardCount = Math.max(0, setCards.length - visibleCards.length);
+  const hasComposedHeroArtwork = Boolean(
+    detail.heroImageUrl
+    && detail.heroVisualMode
+    && detail.heroVisualMode !== 'ineligible'
+  );
+  const foregroundHeroImageUrl = hasComposedHeroArtwork ? null : (detail.setImageUrl || detail.heroImageUrl);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -162,11 +168,11 @@ export default function SetDetail() {
             {detail.description && <p className="mt-5 max-w-3xl text-base leading-7 text-white/78">{detail.description}</p>}
           </div>
 
-          {(detail.setImageUrl || detail.heroImageUrl) && (
+          {foregroundHeroImageUrl && (
             <div className="hidden justify-end md:flex">
               <div className="flex h-64 w-full max-w-sm items-center justify-center">
                 <img
-                  src={detail.setImageUrl || detail.heroImageUrl}
+                  src={foregroundHeroImageUrl}
                   alt={detail.name}
                   className="max-h-full max-w-full object-contain drop-shadow-[0_22px_44px_rgba(0,0,0,0.46)]"
                 />
