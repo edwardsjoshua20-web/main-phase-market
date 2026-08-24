@@ -90,16 +90,16 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
   if (!products || products.length === 0) return null;
 
   return (
-    <section className={`py-12 ${bgColor}`}>
+    <section className={`py-8 ${bgColor}`}>
       <HomepageContentShell>
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-4 flex items-end justify-between gap-3 border-b border-slate-200 pb-3">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-1">{title}</h2>
-            {subtitle && <p className="text-gray-600">{subtitle}</p>}
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{title}</h2>
+            {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
           </div>
           {viewAllLink && (
             <Link to={viewAllLink}>
-              <Button variant="ghost" className="text-gray-700 hover:text-gray-900">
+              <Button variant="ghost" className="h-8 rounded-[5px] px-2 text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 hover:bg-slate-200 hover:text-slate-950">
                 View All
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
@@ -107,7 +107,7 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {products.slice(0, 6).map((product) => (
             <div 
               key={product.id} 
@@ -117,21 +117,28 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
             >
               <Link
                 to={createPageUrl('Shop') + `?type=single_card&id=${product.id}`}
-                className="group bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-xl hover:border-slate-300 transition-all duration-200 block"
+                className="group block overflow-hidden rounded-[6px] border border-slate-200 bg-white shadow-[0_8px_20px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_28px_rgba(15,23,42,0.12)]"
               >
-                <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
                   {getCardImageUrl(product) ? (
                     <img 
                       src={getCardImageUrl(product)} 
                       alt={product.name}
-                      className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
-                      onError={(event) => handleCardImageError(event, product)}
+                      className="w-full h-full object-contain p-1.5 group-hover:scale-[1.035] transition-transform duration-200"
+                      onError={(event) => handleCardImageError(event, product, (image) => {
+                        const fallback = image.parentElement?.querySelector('[data-product-image-fallback]');
+                        fallback?.classList.remove('hidden');
+                        fallback?.classList.add('flex');
+                      })}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
                       No Image
                     </div>
                   )}
+                  <div data-product-image-fallback className="hidden absolute inset-0 items-center justify-center px-3 text-center text-xs font-medium text-slate-400">
+                    No image
+                  </div>
                 
                 {product.is_preorder && (
                   <Badge className="absolute top-2 left-2 bg-purple-600 text-white text-xs">
@@ -145,24 +152,24 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
                 )}
                 {product.quantity === 0 && (
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">SOLD OUT</span>
+                    <span className="text-white font-bold text-xs">SOLD OUT</span>
                   </div>
                 )}
                 </div>
 
-                <div className="p-3">
-                  <h3 className="font-medium text-gray-900 text-sm line-clamp-2 group-hover:text-gray-600 transition-colors min-h-[2.5rem]">
+                <div className="p-2.5">
+                  <h3 className="min-h-[2rem] text-xs font-medium leading-4 text-slate-950 line-clamp-2 transition-colors group-hover:text-slate-700">
                     {product.name}
                   </h3>
                   {product.set_name && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">{product.set_name}</p>
+                    <p className="mt-1 text-[0.7rem] text-slate-500 line-clamp-1">{product.set_name}</p>
                   )}
-                  <div className="flex items-center justify-between mt-2 mb-2">
-                    <span className="text-lg font-bold text-gray-900">
+                  <div className="my-2 flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-slate-950">
                       ${product.price?.toFixed(2)}
                     </span>
                     {product.condition && (
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                      <span className="rounded-[4px] bg-slate-100 px-1.5 py-0.5 text-[0.65rem] font-semibold text-slate-500">
                         {conditionLabels[product.condition]}
                       </span>
                     )}
@@ -175,7 +182,7 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
                       }}
                       disabled={product.quantity === 0}
                       size="sm"
-                      className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs h-8"
+                      className="h-8 flex-1 rounded-[5px] bg-slate-900 text-xs text-white hover:bg-slate-800"
                     >
                       <ShoppingCart className="w-3 h-3 mr-1" />
                       Cart
@@ -187,7 +194,7 @@ export default function ProductSection({ title, subtitle, products, viewAllLink,
                       }}
                       variant="outline"
                       size="sm"
-                      className="px-2 h-8 border-red-500 text-red-500 hover:bg-red-50"
+                      className="h-8 rounded-[5px] border-slate-300 px-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     >
                       <Heart className="w-3 h-3" />
                     </Button>

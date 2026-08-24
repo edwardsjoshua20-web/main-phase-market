@@ -95,6 +95,21 @@ export function isListingSellable(record = {}, options = {}) {
   }
 }
 
+export function isCustomerFacingListing(record = {}) {
+  if (normalizeListingStatus(record) !== LISTING_STATUS.ACTIVE) return false;
+  if (record.archived === true || record.deleted === true) return false;
+  if (record.customer_visible === false || record.storefront_visible === false) return false;
+  if (record.qa_checkout === true || record.is_qa === true || record.is_test === true || record.test_mode === true) return false;
+
+  const visibility = normalizeListingText(record.visibility || record.audience || record.channel);
+  if (['qa', 'test', 'sandbox', 'internal', 'admin'].includes(visibility)) return false;
+
+  const checkoutMode = normalizeListingText(record.checkout_mode || record.stripe_mode || record.payment_mode);
+  if (['qa', 'test', 'sandbox', 'qa_test', 'test_mode', 'stripe_test'].includes(checkoutMode)) return false;
+
+  return true;
+}
+
 export function normalizeListing(record = {}, options = {}) {
   const identity = getListingIdentity(record);
   const priced = applyPricingProjection(record);
@@ -128,6 +143,7 @@ export function normalizeListing(record = {}, options = {}) {
     listing_status: status,
     quantity: stockState.quantity,
     in_stock: stockState.inStock,
+    customer_visible: isCustomerFacingListing(record),
     is_sellable: sellable,
     can_sell: sellable && (stockState.inStock || Boolean(record.is_preorder))
   };

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { ChevronRight, Loader2, TrendingUp } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import HomepageContentShell from '@/components/layout/HomepageContentShell';
 import { inventoryOwner } from '@/services/inventory/inventoryOwner';
@@ -14,11 +14,18 @@ export default function TrendingCards() {
   const [loadingTrending, setLoadingTrending] = useState(true);
 
   const { data: inventory = [] } = useQuery({
-    queryKey: ["inventory"],
+    queryKey: ["home-available-now-listings"],
     queryFn: async () => {
       try {
-        const cards = await listingOwner.filterCardListings({ status: "active" }, "-price", 1000);
-        return cards.filter((card) => inventoryOwner.getStockState(card).inStock && getCardImageUrl(card));
+        const listings = await listingOwner.listStorefrontListings({
+          sort: "-created_date",
+          limit: 1000,
+          includeProducts: true
+        });
+        return listings.filter((listing) => {
+          const stock = inventoryOwner.getStockState(listing);
+          return listingOwner.isCustomerFacing(listing) && (stock.inStock || listing.is_preorder) && getCardImageUrl(listing);
+        });
       } catch {
         return [];
       }
@@ -30,9 +37,12 @@ export default function TrendingCards() {
       .sort((a, b) => {
         const featuredDelta = Number(Boolean(b.featured)) - Number(Boolean(a.featured));
         if (featuredDelta !== 0) return featuredDelta;
+        const leftDate = new Date(a.created_date || a.updated_date || 0).getTime();
+        const rightDate = new Date(b.created_date || b.updated_date || 0).getTime();
+        if (leftDate !== rightDate) return rightDate - leftDate;
         return Number(b.price || 0) - Number(a.price || 0);
       })
-      .slice(0, 6);
+      .slice(0, 8);
 
     setTrendingCards(curated);
     setLoadingTrending(false);
@@ -52,10 +62,18 @@ export default function TrendingCards() {
     return labels[game] || game?.toUpperCase();
   };
 
+  const listingUrl = (listing) => {
+    const type = listing.product_type || 'single_card';
+    if (type === 'single_card') {
+      return createPageUrl("Shop") + `?type=single_card&search=${encodeURIComponent(listing.name)}`;
+    }
+    return createPageUrl("Shop") + `?type=${encodeURIComponent(type)}&id=${encodeURIComponent(listing.id)}`;
+  };
+
   if (loadingTrending) {
     return (
-      <section className="py-12 bg-gradient-to-br from-slate-950 via-slate-900 to-gray-800">
-        <HomepageContentShell className="flex justify-center py-12">
+      <section className="bg-[#f4f7fb] py-8">
+        <HomepageContentShell className="flex justify-center py-8">
           <Loader2 className="w-8 h-8 animate-spin text-yellow-400" />
         </HomepageContentShell>
       </section>
@@ -63,69 +81,68 @@ export default function TrendingCards() {
   }
 
   return (
-    <section className="py-12 bg-gradient-to-br from-slate-950 via-slate-900 to-gray-800">
+    <section className="bg-[#f4f7fb] py-8">
       <HomepageContentShell>
-        <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-yellow-400/15 flex items-center justify-center border border-yellow-400/25">
-              <TrendingUp className="w-5 h-5 text-yellow-300" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-yellow-300 mb-2">Live demand</p>
-              <h2 className="text-3xl font-bold tracking-tight text-white">Trending Now</h2>
-              <p className="text-slate-300 text-sm mt-1.5">
-                Most sought-after cards across the marketplace right now
-              </p>
-            </div>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-3">
+          <div>
+            <p className="mb-1 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-slate-500">Live Inventory</p>
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Available Now</h2>
           </div>
 
           <Link to={createPageUrl("Shop") + "?type=single_card"}>
-            <Button variant="ghost" className="text-slate-300 hover:text-white hover:bg-white/10">
-              View All
-              <ChevronRight className="w-4 h-4 ml-1" />
+            <Button variant="ghost" className="h-8 rounded-[5px] px-2 text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 hover:bg-slate-200 hover:text-slate-950">
+              View Singles
+              <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </Link>
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {trendingCards.map((card, idx) => (
-            <Link
-              key={`${card.name}-${idx}`}
-              to={createPageUrl("Shop") + `?type=single_card&search=${encodeURIComponent(card.name)}`}
-              className="group bg-slate-900/70 border border-white/10 rounded-xl overflow-hidden hover:border-yellow-400/35 hover:shadow-[0_18px_38px_rgba(0,0,0,0.35)] transition-all duration-200"
-            >
-              <div className="aspect-[3/4] bg-slate-950/70">
-                {getCardImageUrl(card) ? (
+        {trendingCards.length > 0 ? (
+          <div className="grid grid-cols-4 gap-3 lg:grid-cols-8">
+            {trendingCards.map((card, idx) => (
+              <Link
+                key={`${card.id || card.name}-${idx}`}
+                to={listingUrl(card)}
+                className="group overflow-hidden rounded-[6px] border border-slate-200 bg-white shadow-[0_8px_20px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_28px_rgba(15,23,42,0.12)]"
+              >
+                <div className="relative aspect-[3/4] bg-slate-100">
                   <img
                     src={getCardImageUrl(card)}
                     alt={card.name}
                     loading="lazy"
-                    className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform"
-                    onError={(event) => handleCardImageError(event, card)}
+                    className="h-full w-full object-contain p-1.5 transition-transform duration-200 group-hover:scale-[1.035]"
+                    onError={(event) => handleCardImageError(event, card, (image) => {
+                      const fallback = image.parentElement?.querySelector('[data-card-image-fallback]');
+                      fallback?.classList.remove('hidden');
+                      fallback?.classList.add('flex');
+                    })}
                   />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">No Image</div>
-                )}
-              </div>
-
-              <div className="p-2">
-                <p className="text-white text-xs font-medium line-clamp-2">{card.name}</p>
-                <div className="flex justify-between mt-1">
-                  {typeof card.price === "number" ? (
-                    <p className="text-yellow-300 text-sm font-bold">${card.price.toFixed(2)}</p>
-                  ) : (
-                    <p className="text-yellow-300/70 text-xs">See price</p>
-                  )}
-
-                  <span className="text-slate-400 text-xs font-bold">
-                    {gameLabel(card.game)}
-                  </span>
+                  <div data-card-image-fallback className="hidden absolute inset-0 items-center justify-center px-3 text-center text-xs font-medium text-slate-400">
+                    No image
+                  </div>
                 </div>
-                <p className="text-emerald-300 text-xs mt-0.5">In Stock</p>
-              </div>
-            </Link>
-          ))}
-        </div>
+
+                <div className="p-2">
+                  <p className="min-h-[2rem] text-xs font-medium leading-4 text-slate-950 line-clamp-2">{card.name}</p>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    {typeof card.price === "number" ? (
+                      <p className="text-sm font-bold text-slate-950">${card.price.toFixed(2)}</p>
+                    ) : (
+                      <p className="text-xs font-semibold text-slate-500">See price</p>
+                    )}
+                    <span className="text-[0.65rem] font-bold text-slate-500">
+                      {gameLabel(card.game)}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-[6px] border border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
+            Fresh singles are being prepared for the storefront.
+          </div>
+        )}
       </HomepageContentShell>
     </section>
   );

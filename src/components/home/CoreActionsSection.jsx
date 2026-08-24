@@ -104,14 +104,14 @@ function ActionVisual({ action }) {
 
 export default function CoreActionsSection() {
   return (
-    <section className="hidden md:block py-8 bg-white">
+    <section className="hidden bg-white py-6 md:block">
       <HomepageContentShell>
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {actions.map((action) => (
             <Link
               key={action.title}
               to={action.to}
-              className={`group relative overflow-hidden rounded-[1.35rem] border border-slate-700/70 bg-gradient-to-br ${action.tone} shadow-[0_12px_34px_rgba(2,6,23,0.28)] hover:shadow-[0_18px_40px_rgba(2,6,23,0.34)] hover:border-slate-600 hover:-translate-y-[1px] transition-all duration-250`}
+              className={`group relative overflow-hidden rounded-[8px] border border-slate-700/70 bg-gradient-to-br ${action.tone} shadow-[0_10px_24px_rgba(2,6,23,0.22)] transition-all duration-200 hover:-translate-y-[1px] hover:border-slate-600 hover:shadow-[0_14px_30px_rgba(2,6,23,0.28)]`}
             >
               <div
                 className="absolute inset-0"
@@ -122,17 +122,14 @@ export default function CoreActionsSection() {
               <ActionVisual action={action} />
               <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.99)_0%,rgba(2,6,23,0.94)_22%,rgba(2,6,23,0.82)_40%,rgba(2,6,23,0.56)_58%,rgba(2,6,23,0.24)_76%,rgba(2,6,23,0.08)_100%)] pointer-events-none" />
 
-              <div className="relative flex min-h-[218px] flex-col justify-between px-5 py-4">
+              <div className="relative flex min-h-[138px] flex-col justify-between px-4 py-3.5">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 max-w-[60%]">
-                  <h3 className="text-[1.05rem] font-semibold tracking-tight text-slate-50 leading-tight">
+                  <div className="min-w-0 max-w-[64%]">
+                  <h3 className="text-base font-semibold leading-tight tracking-tight text-slate-50">
                     {action.title}
                   </h3>
-                  <p className="text-sm leading-5 text-slate-300 mt-2 pr-2 line-clamp-2">
-                    {action.description}
-                  </p>
                   </div>
-                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-700 bg-slate-800/90 text-slate-300 group-hover:bg-slate-700 group-hover:text-white group-hover:border-slate-600 transition-colors">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border border-slate-700 bg-slate-800/90 text-slate-300 transition-colors group-hover:border-slate-600 group-hover:bg-slate-700 group-hover:text-white">
                     <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
                   </div>
                 </div>

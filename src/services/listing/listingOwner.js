@@ -3,6 +3,7 @@ import { findInventoryMatch } from '@/services/inventory/inventoryCore';
 import {
   LISTING_PERSISTENCE_TYPES,
   getListingIdentity,
+  isCustomerFacingListing,
   isListingSellable,
   normalizeListing,
   normalizeListingStatus
@@ -38,6 +39,7 @@ export const listingOwner = {
   normalizeStatus: normalizeListingStatus,
   getIdentity: getListingIdentity,
   isSellable: isListingSellable,
+  isCustomerFacing: isCustomerFacingListing,
 
   async listCardListings(sort = '-created_date', limit) {
     return normalizeRows(inventoryOwner.listCardListings(sort, limit));
@@ -98,7 +100,7 @@ export const listingOwner = {
   },
 
   async listStorefrontListings(options = {}) {
-    return this.listListings({
+    const rows = await this.listListings({
       includeCards: true,
       includeProducts: options.includeProducts ?? true,
       sellableOnly: options.sellableOnly ?? false,
@@ -109,6 +111,7 @@ export const listingOwner = {
       productLimit: options.productLimit || 500,
       game: options.game || 'all'
     });
+    return rows.filter((row) => this.isCustomerFacing(row));
   },
 
   async findListingForCatalogCard(catalogItem = {}, options = {}) {
