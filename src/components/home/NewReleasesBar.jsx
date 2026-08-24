@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { Calendar, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import HomepageContentShell from '@/components/layout/HomepageContentShell';
 
@@ -25,53 +25,120 @@ function getGameLabel(set) {
   return { label: set.gameLabel || set.game || 'TCG', color: gameColors.other };
 }
 
-export default function NewReleasesBar({ upcomingSets = [], hasActivePreorders = false }) {
-  if (upcomingSets.length === 0) {
+export default function NewReleasesBar({ upcomingSets = [] }) {
+  const [currentIndex, setCurrentIndex] = React.useState(0);
+  const [isPaused, setIsPaused] = React.useState(false);
+  const [isTransitioning, setIsTransitioning] = React.useState(false);
+
+  const releases = React.useMemo(() => (
+    upcomingSets.filter((set) => set?.name && (set.releaseDate || set.date))
+  ), [upcomingSets]);
+
+  React.useEffect(() => {
+    if (currentIndex < releases.length) return;
+    setCurrentIndex(0);
+  }, [currentIndex, releases.length]);
+
+  const goTo = React.useCallback((nextIndex) => {
+    if (releases.length <= 1) return;
+    setIsTransitioning(true);
+    window.setTimeout(() => {
+      setCurrentIndex((nextIndex + releases.length) % releases.length);
+      window.setTimeout(() => setIsTransitioning(false), 120);
+    }, 120);
+  }, [releases.length]);
+
+  React.useEffect(() => {
+    if (releases.length <= 1 || isPaused) return undefined;
+    const interval = window.setInterval(() => {
+      goTo(currentIndex + 1);
+    }, 6000);
+    return () => window.clearInterval(interval);
+  }, [currentIndex, goTo, isPaused, releases.length]);
+
+  const goPrev = () => goTo(currentIndex - 1);
+  const goNext = () => goTo(currentIndex + 1);
+
+  if (releases.length === 0) {
     return null;
   }
 
+  const current = releases[currentIndex] || releases[0];
+  const { label, color } = getGameLabel(current);
+  const releaseHref = current.ctaHref
+    || current.links?.setDetail
+    || current.links?.shopSearch
+    || (createPageUrl('Shop') + `?search=${encodeURIComponent(current.name)}`);
+  const releaseDate = current.releaseDate || current.date;
+  const releaseDateLabel = releaseDate ? format(new Date(releaseDate), 'MMM d') : '';
+  const releaseStateLabel = current.releaseStateLabel || '';
+
   return (
-    <section className="bg-gray-100 border-y border-gray-200">
-      <HomepageContentShell className="py-4">
-        <div className="flex items-center gap-4 overflow-x-auto">
-          <div className="flex items-center gap-2 shrink-0">
-            <Calendar className="w-5 h-5 text-gray-700" />
-            <span className="font-semibold text-gray-900">Releases:</span>
+    <section
+      className="border-y border-slate-200 bg-slate-100"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      <HomepageContentShell className="py-0">
+        <div className="grid min-h-[44px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 overflow-hidden md:min-h-[46px] md:gap-4">
+          <div className="flex shrink-0 items-center gap-2 text-slate-800">
+            <Calendar className="h-4 w-4 text-slate-600" />
+            <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-900">
+              <span className="sm:hidden">Releases</span>
+              <span className="hidden sm:inline">Upcoming Releases</span>
+            </span>
           </div>
-          <div className="flex gap-4">
-            {upcomingSets.map((set, i) => {
-              const { label, color } = getGameLabel(set);
-              return <Link
-                key={set.id || i}
-                to={set.links?.setDetail || set.links?.shopSearch || (createPageUrl('Shop') + `?search=${encodeURIComponent(set.name)}`)}
-                data-release-key={set.releaseKey || set.id || ''}
-                data-release-code={set.setCode || ''}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-gray-200 hover:border-gray-400 hover:shadow-sm transition-all whitespace-nowrap"
-              >
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${color}`}>
-                  {label}
+
+          <Link
+            key={current.releaseKey || current.id || currentIndex}
+            to={releaseHref}
+            data-release-key={current.releaseKey || current.id || ''}
+            data-release-code={current.setCode || ''}
+            className={`group min-w-0 transition-all duration-200 ${isTransitioning ? 'translate-x-1 opacity-0' : 'translate-x-0 opacity-100'}`}
+          >
+            <div className="flex min-w-0 items-center gap-2 text-sm md:gap-3">
+              <span className={`shrink-0 rounded px-2 py-0.5 text-[11px] font-bold leading-4 ${color}`}>
+                {label}
+              </span>
+              <span className="min-w-0 truncate font-bold text-slate-950">
+                {current.name}
+              </span>
+              {releaseDateLabel && (
+                <span className="shrink-0 text-xs font-medium text-slate-500">
+                  {releaseDateLabel}
                 </span>
-                <span className="text-sm font-medium text-gray-900">{set.name}</span>
-                {set.releaseStateLabel && (
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-                    {set.releaseStateLabel}
-                  </span>
-                )}
-                <span className="text-xs text-gray-500">
-                  {format(new Date(set.releaseDate || set.date), 'MMM d')}
+              )}
+              {releaseStateLabel && (
+                <span className="hidden shrink-0 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:inline">
+                  {releaseStateLabel}
                 </span>
-              </Link>;
-            })}
-          </div>
-          {hasActivePreorders && (
-            <Link
-              to={createPageUrl('Shop') + '?type=all&preorder=true'}
-              className="ml-auto flex items-center text-gray-700 hover:text-gray-900 text-sm font-medium shrink-0"
+              )}
+              <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 transition-colors group-hover:text-slate-950 sm:text-[11px] sm:tracking-[0.18em]">
+                VIEW SET <span aria-hidden="true">→</span>
+              </span>
+            </div>
+          </Link>
+
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={goPrev}
+              aria-label="Previous release"
+              className="flex h-7 w-6 items-center justify-center text-slate-500 transition-colors hover:text-slate-950 disabled:text-slate-300"
+              disabled={releases.length <= 1}
             >
-              All Preorders
-              <ChevronRight className="w-4 h-4" />
-            </Link>
-          )}
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={goNext}
+              aria-label="Next release"
+              className="flex h-7 w-6 items-center justify-center text-slate-500 transition-colors hover:text-slate-950 disabled:text-slate-300"
+              disabled={releases.length <= 1}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </HomepageContentShell>
     </section>
