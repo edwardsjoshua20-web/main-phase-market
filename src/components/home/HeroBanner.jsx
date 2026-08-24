@@ -178,8 +178,8 @@ export default function HeroBanner({ releases = [] }) {
             <div aria-hidden="true" />
 
             {safeReleases.length > 1 && (
-              <div className="flex items-end gap-3 text-white/68">
-                <span className="min-w-[54px] text-[11px] font-semibold tabular-nums tracking-[0.18em]">
+              <div className="flex items-center gap-3 text-white/68">
+                <span className="inline-flex h-6 min-w-[54px] items-center text-[11px] font-semibold tabular-nums tracking-[0.18em]">
                   {String(currentIndex + 1).padStart(2, '0')} / {String(safeReleases.length).padStart(2, '0')}
                 </span>
                 <div className="flex items-center gap-1">
