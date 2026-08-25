@@ -6,28 +6,28 @@ import HomepageContentShell from '@/components/layout/HomepageContentShell';
 const actions = [
   {
     title: 'Deck Builder',
-    description: 'Build and refine lists.',
+    description: 'Refine decks. Test ideas.',
     action: 'Start Building',
     to: '/AdvancedDeckBuilder',
     Icon: Swords,
   },
   {
     title: 'Commander Hub',
-    description: 'Find commanders and staples.',
+    description: 'Commanders, themes, staples.',
     action: 'Explore Commander',
     to: '/CommanderHub',
     Icon: LibraryBig,
   },
   {
     title: 'Community Decks',
-    description: 'Browse player decklists.',
+    description: 'Real decks from real players.',
     action: 'Browse Decks',
     to: '/CommunityDecks',
     Icon: Boxes,
   },
   {
     title: 'TCG Encyclopedia',
-    description: 'Review sets and card data.',
+    description: 'Sets, releases, card data.',
     action: 'View Releases',
     to: '/set/yugioh/magnificent-monsters',
     Icon: BookOpen,
@@ -47,14 +47,16 @@ export default function CoreActionsSection() {
             <Link
               key={action.title}
               to={action.to}
-              className="group overflow-hidden rounded-[3px] border border-slate-200 bg-[#08111f] px-4 py-3 text-white shadow-[0_4px_12px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-[#0b1726]"
+              className="group relative overflow-hidden rounded-[2px] border border-slate-800 bg-[#06101d] px-4 py-3 text-white shadow-[0_7px_18px_rgba(2,8,20,0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-600 hover:bg-[#0a1726]"
             >
-              <div className="flex min-h-[92px] flex-col justify-between">
-                <Icon className="h-5 w-5 text-slate-300" strokeWidth={1.8} />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/35 to-transparent" />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.045),transparent_34%,rgba(14,165,233,0.055))]" />
+              <div className="relative flex min-h-[94px] flex-col justify-between">
+                <Icon className="h-5 w-5 text-slate-400 transition-colors duration-200 group-hover:text-slate-200" strokeWidth={1.55} />
                 <div>
                   <h3 className="text-base font-semibold leading-tight text-white">{action.title}</h3>
                   <p className="mt-1 text-sm leading-5 text-slate-300 line-clamp-1">{action.description}</p>
-                  <p className="mt-2.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-200">{action.action}</p>
+                  <p className="mt-2.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-sky-200/90">{action.action}</p>
                 </div>
               </div>
             </Link>

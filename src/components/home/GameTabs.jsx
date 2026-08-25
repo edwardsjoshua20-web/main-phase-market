@@ -25,8 +25,8 @@ const games = [
   {
     id: 'lorcana',
     title: 'Disney Lorcana',
-    logoSrc: 'https://files.elfsightcdn.com/eafe4a4d-3436-495d-b748-5bdce62d911d/95be4c15-501c-4a8f-8c58-05f4f8a87527/Disney-Lorcana_TCG_Logo-transparent-780x470.webp',
-    logoClassName: 'max-h-[46px] max-w-[150px]',
+    logoSrc: '/images/disney-lorcana-logo.png',
+    logoClassName: 'max-h-[52px] max-w-[156px]',
   },
   {
     id: 'flesh_and_blood',
@@ -37,14 +37,14 @@ const games = [
   {
     id: 'onepiece',
     title: 'One Piece',
-    logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/One_piece_logo.svg',
-    logoClassName: 'max-h-[46px] max-w-[150px]',
+    logoSrc: '/images/oplogo.webp',
+    logoClassName: 'max-h-[45px] max-w-[152px]',
   },
   {
     id: 'starwars',
     title: 'Star Wars Unlimited',
-    logoSrc: 'https://starwarsunlimited.com/_next/image?q=75&url=https%3A%2F%2Fcdn.starwarsunlimited.com%2FSWH_01_pressrelease_1920x1080_plain_27f07ee8bb.jpg&w=3840',
-    logoClassName: 'max-h-[52px] max-w-[132px]',
+    logoSrc: '/images/star-wars-unlimited-logo.png',
+    logoClassName: 'max-h-[52px] max-w-[142px]',
   }
 ];
 

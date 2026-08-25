@@ -36,8 +36,8 @@ const GAME_LINKS = [
   {
     game: 'lorcana',
     label: 'Disney Lorcana',
-    logoSrc: 'https://files.elfsightcdn.com/eafe4a4d-3436-495d-b748-5bdce62d911d/95be4c15-501c-4a8f-8c58-05f4f8a87527/Disney-Lorcana_TCG_Logo-transparent-780x470.webp',
-    logoClassName: 'max-h-[36px] max-w-[122px]',
+    logoSrc: '/images/disney-lorcana-logo.png',
+    logoClassName: 'max-h-[40px] max-w-[128px]',
   },
   {
     game: 'flesh_and_blood',
@@ -48,13 +48,13 @@ const GAME_LINKS = [
   {
     game: 'onepiece',
     label: 'One Piece',
-    logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/One_piece_logo.svg',
+    logoSrc: '/images/oplogo.webp',
     logoClassName: 'max-h-[36px] max-w-[120px]',
   },
   {
     game: 'starwars',
     label: 'Star Wars Unlimited',
-    logoSrc: 'https://starwarsunlimited.com/_next/image?q=75&url=https%3A%2F%2Fcdn.starwarsunlimited.com%2FSWH_01_pressrelease_1920x1080_plain_27f07ee8bb.jpg&w=3840',
+    logoSrc: '/images/star-wars-unlimited-logo.png',
     logoClassName: 'max-h-[40px] max-w-[108px]',
   }
 ];
@@ -233,10 +233,11 @@ export default function MobileHome() {
               <Link
                 key={title}
                 to={href}
-                className="flex items-center gap-3 rounded-[3px] border border-slate-200 bg-[#08111f] px-3 py-3 text-white active:bg-slate-900"
+                className="relative flex items-center gap-3 overflow-hidden rounded-[2px] border border-slate-800 bg-[#06101d] px-3 py-3 text-white active:bg-slate-900"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-white/15 bg-white/5">
-                  <Icon className="h-4 w-4 text-slate-300" strokeWidth={1.8} />
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/35 to-transparent" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-white/10 bg-white/[0.035]">
+                  <Icon className="h-4 w-4 text-slate-400" strokeWidth={1.55} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold">{title}</p>
