@@ -585,68 +585,36 @@ export default function Layout({ children, currentPageName }) {
       {/* Footer */}
       {(
         <footer className="border-t border-slate-800 bg-[#07111f] text-white">
-          <FooterShell className="py-6">
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-[1.4fr_1fr_1.2fr]">
-                <div className="max-w-md">
-                  <div className="mb-2 flex items-center gap-2">
-                    <img 
-                      src={brandAssets.logo} 
-                      alt="Main Phase Market" 
-                      className="h-8 w-auto"
+          <FooterShell className="py-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="max-w-sm">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={brandAssets.logo}
+                      alt="Main Phase Market"
+                      className="h-7 w-auto"
                     />
-                    <span className="text-base font-semibold tracking-wide">Main Phase Market</span>
+                    <span className="text-sm font-semibold tracking-wide">Main Phase Market</span>
                   </div>
-                  <p className="text-xs leading-5 text-slate-400">
-                    Singles, sealed product, deck tools, and player resources for the games MainPhase supports.
-                  </p>
                 </div>
-                <div>
-                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Marketplace</h4>
-                  <ul className="grid grid-cols-2 gap-x-5 gap-y-1 text-xs text-slate-400 md:grid-cols-1">
-                    <li><a href="/" className="hover:text-white transition-colors">Home</a></li>
-                    <li><a href="/Shop" className="hover:text-white transition-colors">Shop</a></li>
-                    <li><a href="/AdvancedDeckBuilder" className="hover:text-white transition-colors">Deck Builder</a></li>
-                    <li><a href="/CommanderHub" className="hover:text-white transition-colors">Commander Hub</a></li>
-                    <li><a href="/CommunityDecks" className="hover:text-white transition-colors">Community Decks</a></li>
-                    <li><a href="/Forum" className="hover:text-white transition-colors">Forum</a></li>
-                    <li><a href="/OrderStatus" className="hover:text-white transition-colors">Order Status</a></li>
-                    <li><a href="/MemberBenefits" className="hover:text-white transition-colors">Member Benefits</a></li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Games</h4>
-                  <ul className="grid grid-cols-2 gap-x-5 gap-y-1 text-xs text-slate-400">
-                    <li><a href="/Shop?game=magic" className="hover:text-white transition-colors">Magic: The Gathering</a></li>
-                    <li><a href="/Shop?game=pokemon" className="hover:text-white transition-colors">Pokémon TCG</a></li>
-                    <li><a href="/Shop?game=yugioh" className="hover:text-white transition-colors">Yu-Gi-Oh!</a></li>
-                    <li><a href="/Shop?game=onepiece" className="hover:text-white transition-colors">One Piece</a></li>
-                    <li><a href="/Shop?game=lorcana" className="hover:text-white transition-colors">Disney Lorcana</a></li>
-                    <li><a href="/Shop?game=flesh_and_blood" className="hover:text-white transition-colors">Flesh & Blood</a></li>
-                    <li><a href="/Shop?game=starwars" className="hover:text-white transition-colors">Star Wars Unlimited</a></li>
-                  </ul>
-                </div>
+
+                <nav className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-slate-300 md:justify-end">
+                  <a href="mailto:support@mainphasemarket.com" className="hover:text-white transition-colors">Contact</a>
+                  <a href="mailto:support@mainphasemarket.com?subject=Shipping%20question" className="hover:text-white transition-colors">Shipping</a>
+                  <a href="mailto:support@mainphasemarket.com?subject=Return%20question" className="hover:text-white transition-colors">Returns</a>
+                  <a href="/OrderStatus" className="hover:text-white transition-colors">Order Status</a>
+                  <a href="/MemberBenefits" className="hover:text-white transition-colors">Member Benefits</a>
+                </nav>
               </div>
 
-              <div className="mt-5 border-t border-slate-800 pt-4">
-                <div className="mb-4 grid grid-cols-1 gap-3 text-[0.7rem] leading-5 text-slate-500 md:grid-cols-2">
-                  <div>
-                    <p><strong className="text-slate-300">Magic: The Gathering</strong> and its respective properties are © Wizards of the Coast.</p>
-                    <p><strong className="text-slate-300">Yu-Gi-Oh!</strong> and its respective properties are © Studio Dice / Shueisha / TV Tokyo / Konami.</p>
-                  </div>
-                  <div>
-                    <p><strong className="text-slate-300">Pokémon</strong> and its respective properties are © Pokémon Company International.</p>
-                    <p><strong className="text-slate-300">Disney Lorcana</strong> and its respective properties are © Disney.</p>
-                    <p>All other game names, logos, and marks are property of their respective owners.</p>
-                  </div>
-                </div>
+              <div className="mt-4 border-t border-slate-800 pt-3">
+                <p className="text-[0.68rem] leading-5 text-slate-500">
+                  Magic: The Gathering and its respective properties are © Wizards of the Coast. Yu-Gi-Oh! and its respective properties are © Studio Dice / Shueisha / TV Tokyo / Konami. Pokémon and its respective properties are © Pokémon Company International. Disney Lorcana and its respective properties are © Disney. All other game names, logos, and marks are property of their respective owners.
+                </p>
 
-                <div className="flex flex-col items-start justify-between gap-2 border-t border-slate-800 pt-3 text-[0.7rem] text-slate-500 md:flex-row md:items-center">
-                  <p>
-                    © {new Date().getFullYear()} Main Phase Market. All rights reserved.
-                  </p>
-                  <p>
-                    * All cards under $1 are sold at a $1 minimum to cover packaging and handling costs.
-                  </p>
+                <div className="mt-3 flex flex-col items-start justify-between gap-1.5 border-t border-slate-800 pt-3 text-[0.68rem] text-slate-500 md:flex-row md:items-center">
+                  <p>© {new Date().getFullYear()} Main Phase Market. All rights reserved.</p>
+                  <p>* All cards under $1 are sold at a $1 minimum to cover packaging and handling costs.</p>
                 </div>
               </div>
           </FooterShell>

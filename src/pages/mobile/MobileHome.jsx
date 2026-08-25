@@ -15,13 +15,48 @@ import { useCartOwner } from '@/hooks/useCartOwner';
 import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
 const GAME_LINKS = [
-  { game: 'magic', logo: 'MAGIC', label: 'Magic: The Gathering' },
-  { game: 'pokemon', logo: 'Pokemon', label: 'Pokemon' },
-  { game: 'yugioh', logo: 'Yu-Gi-Oh!', label: 'Yu-Gi-Oh!' },
-  { game: 'lorcana', logo: 'Lorcana', label: 'Disney Lorcana' },
-  { game: 'flesh_and_blood', logo: 'Flesh and Blood', label: 'Flesh & Blood' },
-  { game: 'onepiece', logo: 'One Piece', label: 'One Piece' },
-  { game: 'starwars', logo: 'Star Wars', label: 'Star Wars Unlimited' }
+  {
+    game: 'magic',
+    label: 'Magic: The Gathering',
+    logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Magic_the_Gathering_2017.svg',
+    logoClassName: 'max-h-[34px] max-w-[126px]',
+  },
+  {
+    game: 'pokemon',
+    label: 'Pokemon',
+    logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Pok%C3%A9mon_Trading_Card_Game_logo.svg',
+    logoClassName: 'max-h-[38px] max-w-[118px]',
+  },
+  {
+    game: 'yugioh',
+    label: 'Yu-Gi-Oh!',
+    logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Yu-Gi-Oh!.png',
+    logoClassName: 'max-h-[38px] max-w-[118px]',
+  },
+  {
+    game: 'lorcana',
+    label: 'Disney Lorcana',
+    logoSrc: 'https://files.elfsightcdn.com/eafe4a4d-3436-495d-b748-5bdce62d911d/95be4c15-501c-4a8f-8c58-05f4f8a87527/Disney-Lorcana_TCG_Logo-transparent-780x470.webp',
+    logoClassName: 'max-h-[36px] max-w-[122px]',
+  },
+  {
+    game: 'flesh_and_blood',
+    label: 'Flesh & Blood',
+    logoSrc: 'https://uchroniesgames.fr/web/image/event.event/168/image_1024',
+    logoClassName: 'max-h-[34px] max-w-[124px]',
+  },
+  {
+    game: 'onepiece',
+    label: 'One Piece',
+    logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/One_piece_logo.svg',
+    logoClassName: 'max-h-[36px] max-w-[120px]',
+  },
+  {
+    game: 'starwars',
+    label: 'Star Wars Unlimited',
+    logoSrc: 'https://starwarsunlimited.com/_next/image?q=75&url=https%3A%2F%2Fcdn.starwarsunlimited.com%2FSWH_01_pressrelease_1920x1080_plain_27f07ee8bb.jpg&w=3840',
+    logoClassName: 'max-h-[40px] max-w-[108px]',
+  }
 ];
 
 const TOOL_LINKS = [
@@ -179,7 +214,6 @@ export default function MobileHome() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-1 text-sm font-semibold text-slate-900">{card.name}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{card.set_name || 'Featured inventory'}</p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-bold text-slate-950">${Number(card.price || 0).toFixed(2)}</p>
@@ -199,10 +233,10 @@ export default function MobileHome() {
               <Link
                 key={title}
                 to={href}
-                className="flex items-center gap-3 border border-slate-200 bg-slate-950 px-3 py-3 text-white active:bg-slate-900"
+                className="flex items-center gap-3 rounded-[3px] border border-slate-200 bg-[#08111f] px-3 py-3 text-white active:bg-slate-900"
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-white/15 bg-white/5">
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4 text-slate-300" strokeWidth={1.8} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold">{title}</p>
@@ -217,23 +251,22 @@ export default function MobileHome() {
         <section>
           <h2 className="mb-2 text-base font-bold text-slate-950">Shop by Game</h2>
           <div className="grid grid-cols-2 gap-2">
-            {GAME_LINKS.map(({ game, logo, label }) => (
+            {GAME_LINKS.map(({ game, logoSrc, logoClassName, label }) => (
               <Link
                 key={game}
                 to={`/MobileShop?game=${game}`}
-                className="flex min-h-[72px] flex-col items-center justify-center border border-slate-200 bg-white px-2 text-center active:bg-slate-50"
+                className="flex min-h-[72px] flex-col items-center justify-center rounded-[3px] border border-slate-200 bg-white px-2 text-center active:bg-slate-50"
               >
-                <span className="text-sm font-black uppercase tracking-[0.08em] text-slate-950">{logo}</span>
-                <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</span>
+                <img src={logoSrc} alt={label} loading="lazy" className={`h-auto w-auto object-contain ${logoClassName}`} />
               </Link>
             ))}
           </div>
         </section>
 
-        <section className="grid grid-cols-2 border border-slate-200 bg-white">
+        <section className="grid grid-cols-2 divide-x divide-y divide-slate-200 bg-white">
           {TRUST_ITEMS.map(({ title, icon: Icon }) => (
-            <div key={title} className="flex items-center gap-2 border-b border-r border-slate-200 px-3 py-3 last:border-r-0 even:border-r-0 [&:nth-last-child(-n+2)]:border-b-0">
-              <Icon className="h-4 w-4 shrink-0 text-slate-950" />
+            <div key={title} className="flex items-center gap-2 px-3 py-3">
+              <Icon className="h-4 w-4 shrink-0 text-slate-700" strokeWidth={1.8} />
               <span className="text-xs font-semibold text-slate-900">{title}</span>
             </div>
           ))}

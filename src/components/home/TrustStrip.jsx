@@ -23,13 +23,13 @@ const trustItems = [
 
 export default function TrustStrip() {
   return (
-    <section className="bg-white pb-6 pt-3">
+    <section className="bg-white pb-5 pt-2">
       <HomepageContentShell>
-        <div className="grid grid-cols-2 divide-x divide-y divide-slate-200 overflow-hidden rounded-[4px] border border-slate-200 bg-white shadow-[0_6px_16px_rgba(15,23,42,0.04)] md:grid-cols-4 md:divide-y-0">
+        <div className="grid grid-cols-2 divide-x divide-y divide-slate-200 md:grid-cols-4 md:divide-y-0">
           {trustItems.map(({ title, Icon }) => (
-            <div key={title} className="flex min-h-[62px] items-center justify-center gap-3 px-3 py-3 text-center">
-              <Icon className="h-5 w-5 shrink-0 text-slate-800" />
-              <span className="text-sm font-semibold text-slate-900">{title}</span>
+            <div key={title} className="flex min-h-[48px] items-center justify-center gap-2.5 px-3 py-2 text-center">
+              <Icon className="h-4 w-4 shrink-0 text-slate-700" strokeWidth={1.8} />
+              <span className="text-sm font-semibold text-slate-800">{title}</span>
             </div>
           ))}
         </div>

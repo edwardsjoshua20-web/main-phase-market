@@ -45,20 +45,6 @@ export default function TrendingCards() {
     setLoadingTrending(false);
   }, [inventory]);
 
-  const gameLabel = (game) => {
-    const labels = {
-      magic: "MTG",
-      pokemon: "PKM",
-      yugioh: "YGO",
-      lorcana: "LOR",
-      onepiece: "OP",
-      flesh_and_blood: "FAB",
-      starwars: "SWU",
-    };
-
-    return labels[game] || game?.toUpperCase();
-  };
-
   const cardKey = (card, idx) => `${card.id || card.listing_id || card.name}-${idx}`;
 
   const markImageFailed = (key) => {
@@ -84,9 +70,9 @@ export default function TrendingCards() {
   if (visibleCards.length === 0) return null;
 
   return (
-    <section className="bg-white py-5">
+    <section className="bg-white py-4">
       <HomepageContentShell>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-slate-950">Featured Singles</h2>
           </div>
@@ -99,7 +85,7 @@ export default function TrendingCards() {
           </Link>
         </div>
 
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10">
             {visibleCards.map((card, idx) => {
               const key = cardKey(card, idx);
               const stock = inventoryOwner.getStockState(card);
@@ -107,14 +93,14 @@ export default function TrendingCards() {
               <Link
                 key={key}
                 to={createPageUrl("Shop") + `?type=single_card&search=${encodeURIComponent(card.name)}`}
-                className="group overflow-hidden rounded-[4px] border border-slate-200 bg-white shadow-[0_6px_16px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_22px_rgba(15,23,42,0.1)]"
+                className="group overflow-hidden rounded-[3px] border border-slate-200 bg-white shadow-[0_4px_10px_rgba(15,23,42,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_8px_16px_rgba(15,23,42,0.08)]"
               >
-                <div className="aspect-[3/4] bg-slate-100">
+                <div className="h-[138px] bg-slate-100 sm:h-[146px] lg:h-[132px] xl:h-[142px]">
                   <img
                     src={getCardImageUrl(card)}
                     alt={card.name}
                     loading="lazy"
-                    className="h-full w-full object-contain p-1 transition-transform duration-200 group-hover:scale-[1.025]"
+                    className="h-full w-full object-contain p-1.5 transition-transform duration-200 group-hover:scale-[1.02]"
                     onError={(event) => {
                       handleCardImageError(event, card);
                       markImageFailed(key);
@@ -122,20 +108,16 @@ export default function TrendingCards() {
                   />
                 </div>
 
-                <div className="p-2">
-                  <p className="min-h-[2rem] text-[0.72rem] font-semibold leading-4 text-slate-950 line-clamp-2">{card.name}</p>
-                  <p className="mt-0.5 text-[0.66rem] leading-3 text-slate-500 line-clamp-1">{card.set_name}</p>
-                  <div className="mt-1.5 flex items-end justify-between gap-2">
+                <div className="p-1.5">
+                  <p className="min-h-[1.85rem] text-[0.72rem] font-semibold leading-[0.95rem] text-slate-950 line-clamp-2">{card.name}</p>
+                  <div className="mt-1 flex items-end justify-between gap-2">
                     {typeof card.price === "number" ? (
                       <p className="text-sm font-bold text-slate-950">${card.price.toFixed(2)}</p>
                     ) : (
                       <p className="text-xs font-semibold text-slate-500">See price</p>
                     )}
-                    <span className="text-[0.65rem] font-bold text-slate-500">
-                      {gameLabel(card.game)}
-                    </span>
                   </div>
-                  <p className="mt-0.5 text-[0.66rem] font-semibold text-emerald-700">
+                  <p className="mt-0.5 text-[0.66rem] font-semibold leading-3 text-emerald-700">
                     {stock.quantity > 0 ? `${stock.quantity} in stock` : 'In stock'}
                   </p>
                 </div>
