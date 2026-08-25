@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { backend } from '@/services/backend';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight } from 'lucide-react';
+import { BookOpen, ChevronRight, CreditCard, Layers3, LibraryBig, Search, ShieldCheck, Swords, UsersRound } from 'lucide-react';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
-import MobileQuickActions from '@/components/mobile/MobileQuickActions';
 import CartDrawer from '@/components/store/CartDrawer';
 import WishlistDrawer from '@/components/store/WishlistDrawer';
+import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { searchAllGamesLocal } from '@/lib/localSearch';
 import { inventoryOwner } from '@/services/inventory/inventoryOwner';
 import { listingOwner } from '@/services/listing/listingOwner';
@@ -15,13 +15,27 @@ import { useCartOwner } from '@/hooks/useCartOwner';
 import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 
 const GAME_LINKS = [
-  { game: 'magic', label: 'MTG' },
-  { game: 'pokemon', label: 'Pokemon' },
-  { game: 'yugioh', label: 'Yu-Gi-Oh!' },
-  { game: 'lorcana', label: 'Lorcana' },
-  { game: 'onepiece', label: 'One Piece' },
-  { game: 'flesh_and_blood', label: 'F&B' },
-  { game: 'starwars', label: 'Star Wars' }
+  { game: 'magic', logo: 'MAGIC', label: 'Magic: The Gathering' },
+  { game: 'pokemon', logo: 'Pokemon', label: 'Pokemon' },
+  { game: 'yugioh', logo: 'Yu-Gi-Oh!', label: 'Yu-Gi-Oh!' },
+  { game: 'lorcana', logo: 'Lorcana', label: 'Disney Lorcana' },
+  { game: 'flesh_and_blood', logo: 'Flesh and Blood', label: 'Flesh & Blood' },
+  { game: 'onepiece', logo: 'One Piece', label: 'One Piece' },
+  { game: 'starwars', logo: 'Star Wars', label: 'Star Wars Unlimited' }
+];
+
+const TOOL_LINKS = [
+  { title: 'Deck Builder', detail: 'Build and refine lists.', action: 'Start Building', href: '/AdvancedDeckBuilder', icon: Swords },
+  { title: 'Commander Hub', detail: 'Find commanders and staples.', action: 'Explore Commander', href: '/CommanderHub', icon: LibraryBig },
+  { title: 'Community Decks', detail: 'Browse player decklists.', action: 'Browse Decks', href: '/CommunityDecks', icon: UsersRound },
+  { title: 'TCG Encyclopedia', detail: 'Review sets and card data.', action: 'View Releases', href: '/set/yugioh/magnificent-monsters', icon: BookOpen }
+];
+
+const TRUST_ITEMS = [
+  { title: 'Secure Checkout', icon: CreditCard },
+  { title: 'Catalog-Wide Search', icon: Search },
+  { title: 'Multi-TCG Support', icon: Layers3 },
+  { title: 'Deck & Player Tools', icon: ShieldCheck }
 ];
 
 export default function MobileHome() {
@@ -34,6 +48,7 @@ export default function MobileHome() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [failedImageKeys, setFailedImageKeys] = useState(() => new Set());
   const searchTimeoutRef = React.useRef(null);
   const cart = useCartOwner(user);
   const wishlist = useWishlistOwner(user);
@@ -48,10 +63,26 @@ export default function MobileHome() {
   const wishlistItems = wishlist.items;
 
   const { data: featuredCards = [] } = useQuery({
-    queryKey: ['mobile-featured'],
+    queryKey: ['mobile-featured-singles'],
     queryFn: async () => {
-      const cards = await listingOwner.filterCardListings({ status: 'active' }, '-price', 12);
-      return cards.filter((card) => inventoryOwner.getStockState(card).inStock).slice(0, 6);
+      const cards = await listingOwner.filterCardListings({ status: 'active' }, '-created_date', 1000);
+      return cards
+        .filter((card) => (
+          listingOwner.isCustomerFacing(card)
+          && inventoryOwner.getStockState(card).inStock
+          && getCardImageUrl(card)
+        ))
+        .sort((a, b) => {
+          const featuredDelta = Number(Boolean(b.featured)) - Number(Boolean(a.featured));
+          if (featuredDelta) return featuredDelta;
+
+          const bTime = new Date(b.created_date || b.updated_date || 0).getTime();
+          const aTime = new Date(a.created_date || a.updated_date || 0).getTime();
+          if (bTime !== aTime) return bTime - aTime;
+
+          return Number(b.price || 0) - Number(a.price || 0);
+        })
+        .slice(0, 8);
     }
   });
 
@@ -89,7 +120,17 @@ export default function MobileHome() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cart'] })
   });
 
-  const featuredItems = featuredCards.slice(0, 6);
+  const markImageFailed = (key) => {
+    setFailedImageKeys((current) => {
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+  };
+
+  const featuredItems = featuredCards
+    .filter((card) => !failedImageKeys.has(card.id || card.card_id || card.name))
+    .slice(0, 6);
 
   return (
     <div className="min-h-screen bg-white flex flex-col pb-16">
@@ -109,48 +150,40 @@ export default function MobileHome() {
       />
 
       <main className="flex-1 px-4 py-3 space-y-5">
-        <section>
-          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Browse Games</div>
-          <div className="overflow-hidden border-y border-slate-200 bg-white">
-            {GAME_LINKS.map(({ game, label }) => (
-              <Link
-                key={game}
-                to={`/MobileShop?game=${game}`}
-                className="flex items-center justify-between border-b border-slate-200 py-3 text-sm font-semibold text-slate-900 last:border-b-0 active:bg-slate-50"
-              >
-                <span>{label}</span>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
-              </Link>
-            ))}
-          </div>
-        </section>
-
         {featuredItems.length > 0 && (
           <section>
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-base font-bold text-slate-950">Hot Right Now</h2>
-              <Link to="/MobileShop?game=magic" className="flex items-center gap-1 text-sm font-medium text-blue-600">
-                Browse singles <ChevronRight className="w-4 h-4" />
+              <h2 className="text-base font-bold text-slate-950">Featured Singles</h2>
+              <Link to="/MobileShop?type=single_card" className="flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700">
+                View all <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
             <div className="overflow-hidden border-y border-slate-200 bg-white">
               {featuredItems.map((card) => (
                 <Link
                   key={card.id}
-                  to={`/MobileShop?search=${encodeURIComponent(card.name)}`}
+                  to={`/MobileShop?type=single_card&search=${encodeURIComponent(card.name)}`}
                   className="flex items-center gap-3 border-b border-slate-200 py-3 last:border-b-0 active:bg-slate-50"
                 >
                   <div className="h-16 w-12 shrink-0 bg-slate-100">
-                    {card.image_url
-                      ? <img src={card.image_url} alt={card.name} className="h-full w-full object-contain p-1" />
-                      : <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">No Image</div>}
+                    <img
+                      src={getCardImageUrl(card)}
+                      alt={card.name}
+                      className="h-full w-full object-contain p-1"
+                      data-image-candidate-index="0"
+                      onError={(event) => {
+                        handleCardImageError(event, card);
+                        markImageFailed(card.id || card.card_id || card.name);
+                      }}
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-1 text-sm font-semibold text-slate-900">{card.name}</p>
                     <p className="mt-0.5 text-xs text-slate-500">{card.set_name || 'Featured inventory'}</p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold text-blue-600">${card.price?.toFixed(2)}</p>
+                    <p className="text-sm font-bold text-slate-950">${Number(card.price || 0).toFixed(2)}</p>
+                    <p className="text-[11px] font-semibold text-emerald-700">{inventoryOwner.getStockState(card).quantity} in stock</p>
                     <ChevronRight className="ml-auto mt-1 h-4 w-4 text-slate-300" />
                   </div>
                 </Link>
@@ -159,7 +192,52 @@ export default function MobileHome() {
           </section>
         )}
 
-        <MobileQuickActions />
+        <section>
+          <h2 className="mb-2 text-base font-bold text-slate-950">Main Phase Tools</h2>
+          <div className="grid grid-cols-1 gap-2">
+            {TOOL_LINKS.map(({ title, detail, action, href, icon: Icon }) => (
+              <Link
+                key={title}
+                to={href}
+                className="flex items-center gap-3 border border-slate-200 bg-slate-950 px-3 py-3 text-white active:bg-slate-900"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-white/15 bg-white/5">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">{title}</p>
+                  <p className="text-xs text-slate-300">{detail}</p>
+                </div>
+                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-300">{action}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="mb-2 text-base font-bold text-slate-950">Shop by Game</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {GAME_LINKS.map(({ game, logo, label }) => (
+              <Link
+                key={game}
+                to={`/MobileShop?game=${game}`}
+                className="flex min-h-[72px] flex-col items-center justify-center border border-slate-200 bg-white px-2 text-center active:bg-slate-50"
+              >
+                <span className="text-sm font-black uppercase tracking-[0.08em] text-slate-950">{logo}</span>
+                <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid grid-cols-2 border border-slate-200 bg-white">
+          {TRUST_ITEMS.map(({ title, icon: Icon }) => (
+            <div key={title} className="flex items-center gap-2 border-b border-r border-slate-200 px-3 py-3 last:border-r-0 even:border-r-0 [&:nth-last-child(-n+2)]:border-b-0">
+              <Icon className="h-4 w-4 shrink-0 text-slate-950" />
+              <span className="text-xs font-semibold text-slate-900">{title}</span>
+            </div>
+          ))}
+        </section>
       </main>
 
       <footer className="bg-slate-900 px-4 py-4 text-white">

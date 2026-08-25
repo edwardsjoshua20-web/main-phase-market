@@ -7,86 +7,80 @@ const games = [
   {
     id: 'magic',
     title: 'Magic: The Gathering',
-    image: '/images/game-mtg.png',
-    position: 'center 34%'
+    mark: 'MAGIC',
+    submark: 'The Gathering',
+    accent: 'text-orange-600',
   },
   {
     id: 'pokemon',
     title: 'Pokemon',
-    image: '/images/game-pokemon.webp',
-    position: 'center 24%'
+    mark: 'Pokemon',
+    submark: 'Trading Card Game',
+    accent: 'text-blue-600',
   },
   {
     id: 'yugioh',
     title: 'Yu-Gi-Oh!',
-    image: '/images/game-yugioh.jpg',
-    position: 'center center'
-  },
-  {
-    id: 'onepiece',
-    title: 'One Piece',
-    image: '/images/game-onepiece.png',
-    position: 'center center'
+    mark: 'Yu-Gi-Oh!',
+    submark: 'Trading Card Game',
+    accent: 'text-red-700',
   },
   {
     id: 'lorcana',
     title: 'Disney Lorcana',
-    image: '/images/game-lorcana.png',
-    position: 'center 18%'
+    mark: 'Lorcana',
+    submark: 'Disney Trading Card Game',
+    accent: 'text-indigo-700',
   },
   {
     id: 'flesh_and_blood',
     title: 'Flesh & Blood',
-    image: '/images/game-fab.jpg',
-    position: 'center center'
+    mark: 'Flesh and Blood',
+    submark: 'TCG',
+    accent: 'text-rose-800',
+  },
+  {
+    id: 'onepiece',
+    title: 'One Piece',
+    mark: 'One Piece',
+    submark: 'Card Game',
+    accent: 'text-slate-950',
   },
   {
     id: 'starwars',
     title: 'Star Wars Unlimited',
-    image: null,
-    position: 'center center',
-    initials: 'SWU'
+    mark: 'Star Wars',
+    submark: 'Unlimited',
+    accent: 'text-slate-950',
   }
 ];
 
 export default function GameTabs() {
   return (
-    <section className="bg-white py-8">
+    <section className="bg-white py-5">
       <HomepageContentShell>
-        <div className="mb-4 flex items-end justify-between border-b border-slate-200 pb-3">
+        <div className="mb-3 flex items-center justify-between">
           <div>
-            <p className="mb-1 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-slate-500">Catalog</p>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Shop by Game</h2>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-950">Shop by Game</h2>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 lg:grid-cols-7">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
           {games.map((game) => (
             <Link
               key={game.id}
               to={createPageUrl('Shop') + `?game=${game.id}`}
-              className="group relative overflow-hidden rounded-[7px] border border-slate-200 bg-slate-950 shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_28px_rgba(15,23,42,0.14)]"
+              className="group flex h-[82px] items-center justify-center rounded-[4px] border border-slate-200 bg-white px-3 text-center shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-500 hover:shadow-[0_8px_18px_rgba(15,23,42,0.09)]"
             >
-              {game.image ? (
-                <div
-                  className="absolute inset-0 bg-cover bg-no-repeat opacity-80 transition-transform duration-300 group-hover:scale-[1.03]"
-                  style={{ backgroundImage: `url(${game.image})`, backgroundPosition: game.position }}
-                />
-              ) : (
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(14,165,233,0.24),transparent_34%),linear-gradient(135deg,#020814,#102338)]" />
-              )}
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.18)_0%,rgba(2,6,23,0.48)_52%,rgba(2,6,23,0.88)_100%)]" />
-
-              <div className="relative flex h-[104px] items-end p-3">
-                <div className="min-w-0">
-                  {game.initials && (
-                    <p className="mb-1 text-[0.68rem] font-black uppercase tracking-[0.2em] text-sky-200">{game.initials}</p>
-                  )}
-                  <h3 className="text-sm font-semibold leading-tight text-white drop-shadow-[0_8px_16px_rgba(0,0,0,0.55)] line-clamp-2">
-                    {game.title}
-                  </h3>
-                </div>
+              <div className="min-w-0">
+                <p className={`text-[1.18rem] font-black leading-none tracking-tight ${game.accent}`}>
+                  {game.mark}
+                </p>
+                <p className="mt-1 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  {game.submark}
+                </p>
               </div>
+              <span className="sr-only">{game.title}</span>
             </Link>
           ))}
         </div>
