@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { backend } from '@/services/backend';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, ChevronRight, CreditCard, Layers3, LibraryBig, Search, ShieldCheck, Swords, UsersRound } from 'lucide-react';
+import { ChevronRight, CreditCard, Layers3, Search, ShieldCheck } from 'lucide-react';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import CartDrawer from '@/components/store/CartDrawer';
@@ -60,10 +60,10 @@ const GAME_LINKS = [
 ];
 
 const TOOL_LINKS = [
-  { title: 'Deck Builder', detail: 'Build and refine lists.', action: 'Start Building', href: '/AdvancedDeckBuilder', icon: Swords },
-  { title: 'Commander Hub', detail: 'Find commanders and staples.', action: 'Explore Commander', href: '/CommanderHub', icon: LibraryBig },
-  { title: 'Community Decks', detail: 'Browse player decklists.', action: 'Browse Decks', href: '/CommunityDecks', icon: UsersRound },
-  { title: 'TCG Encyclopedia', detail: 'Review sets and card data.', action: 'View Releases', href: '/set/yugioh/magnificent-monsters', icon: BookOpen }
+  { title: 'Deck Builder', action: 'BUILD DECKS →', href: '/AdvancedDeckBuilder' },
+  { title: 'Commander Hub', action: 'EXPLORE COMMANDERS →', href: '/CommanderHub' },
+  { title: 'Community Decks', action: 'BROWSE DECKS →', href: '/CommunityDecks' },
+  { title: 'TCG Encyclopedia', action: 'EXPLORE SETS →', href: '/set/yugioh/magnificent-monsters' }
 ];
 
 const TRUST_ITEMS = [
@@ -229,21 +229,15 @@ export default function MobileHome() {
         <section>
           <h2 className="mb-2 text-base font-bold text-slate-950">Main Phase Tools</h2>
           <div className="grid grid-cols-1 gap-2">
-            {TOOL_LINKS.map(({ title, detail, action, href, icon: Icon }) => (
+            {TOOL_LINKS.map(({ title, action, href }) => (
               <Link
                 key={title}
                 to={href}
-                className="relative flex items-center gap-3 overflow-hidden rounded-[2px] border border-slate-800 bg-[#06101d] px-3 py-3 text-white active:bg-slate-900"
+                className="relative flex items-center justify-between gap-3 overflow-hidden rounded-[2px] bg-[#07111f] px-3.5 py-3 text-white shadow-[0_5px_14px_rgba(2,8,20,0.10)] ring-1 ring-slate-800/80 active:bg-slate-900"
               >
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/35 to-transparent" />
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-white/10 bg-white/[0.035]">
-                  <Icon className="h-4 w-4 text-slate-400" strokeWidth={1.55} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">{title}</p>
-                  <p className="text-xs text-slate-300">{detail}</p>
-                </div>
-                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-300">{action}</span>
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/25 to-transparent" />
+                <p className="min-w-0 truncate text-sm font-semibold">{title}</p>
+                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/90">{action}</span>
               </Link>
             ))}
           </div>
