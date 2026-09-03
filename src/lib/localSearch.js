@@ -5,12 +5,12 @@
  */
 import { searchOwner } from '@/services/search/searchOwner';
 
-export async function searchGameLocal(query, game, limit = 40) {
-  return searchOwner.searchByGame(query, game, limit);
+export async function searchGameLocal(query, game, limit = 40, options = {}) {
+  return searchOwner.searchByGame(query, game, limit, options);
 }
 
-export async function searchAllGamesLocal(query, limit = 10) {
-  return searchOwner.searchAcrossGames(query, limit);
+export async function searchAllGamesLocal(query, limit = 10, options = {}) {
+  return searchOwner.searchAcrossGames(query, limit, options);
 }
 
 

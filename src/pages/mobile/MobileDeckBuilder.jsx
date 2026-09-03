@@ -389,6 +389,8 @@ export default function MobileDeckBuilder() {
 
   const searchRef = useRef(null);
   const headerSearchRef = useRef(null);
+  const searchRunRef = useRef(0);
+  const headerSearchRunRef = useRef(0);
   const videoRef = useRef(null);
   const cameraStreamRef = useRef(null);
 
@@ -442,15 +444,21 @@ export default function MobileDeckBuilder() {
   const handleSearch = async (value) => {
     setSearchQuery(value);
     if (!value.trim()) {
+      searchRunRef.current += 1;
       setSearchResults([]);
+      setSearching(false);
       return;
     }
     if (searchRef.current) clearTimeout(searchRef.current);
     searchRef.current = setTimeout(async () => {
+      const runId = searchRunRef.current + 1;
+      searchRunRef.current = runId;
       setSearching(true);
-      const results = await searchGameLocal(value, selectedGame, 20);
-      setSearchResults(results);
-      setSearching(false);
+      const results = await searchGameLocal(value, selectedGame, 20, { includeInventory: false });
+      if (searchRunRef.current === runId) {
+        setSearchResults(results);
+        setSearching(false);
+      }
     }, 350);
   };
 
@@ -458,15 +466,21 @@ export default function MobileDeckBuilder() {
     const value = event.target.value;
     setHeaderSearchQuery(value);
     if (!value.trim()) {
+      headerSearchRunRef.current += 1;
       setHeaderSearchResults([]);
+      setHeaderSearching(false);
       return;
     }
     if (headerSearchRef.current) clearTimeout(headerSearchRef.current);
     headerSearchRef.current = setTimeout(async () => {
+      const runId = headerSearchRunRef.current + 1;
+      headerSearchRunRef.current = runId;
       setHeaderSearching(true);
-      const results = await searchAllGamesLocal(value, 8);
-      setHeaderSearchResults(results);
-      setHeaderSearching(false);
+      const results = await searchAllGamesLocal(value, 8, { includeInventory: false });
+      if (headerSearchRunRef.current === runId) {
+        setHeaderSearchResults(results);
+        setHeaderSearching(false);
+      }
     }, 350);
   };
 

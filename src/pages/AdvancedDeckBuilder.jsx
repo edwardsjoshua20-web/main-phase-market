@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { backend } from '@/services/backend';
 import { listingOwner } from '@/services/listing/listingOwner';
 import { useSearchParams } from 'react-router-dom';
@@ -203,6 +203,8 @@ export default function AdvancedDeckBuilder() {
   const [selectedQuickCard, setSelectedQuickCard] = useState(null);
   const [showQuickAddDropdown, setShowQuickAddDropdown] = useState(false);
   const [isCompactLayout, setIsCompactLayout] = useState(() => window.innerWidth < 768);
+  const cardSearchRunRef = useRef(0);
+  const quickAddSearchRunRef = useRef(0);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -444,11 +446,24 @@ export default function AdvancedDeckBuilder() {
 
 
   const searchQuickAddCards = async (query) => {
+    const trimmedQuery = String(query || '').trim();
+    if (trimmedQuery.length < 2) {
+      quickAddSearchRunRef.current += 1;
+      setQuickAddSuggestions([]);
+      setShowQuickAddDropdown(false);
+      setSearching(false);
+      return;
+    }
+
+    const runId = quickAddSearchRunRef.current + 1;
+    quickAddSearchRunRef.current = runId;
     setSearching(true);
-    const results = await searchCards(query, selectedGame, 15);
-    setQuickAddSuggestions(results);
-    setShowQuickAddDropdown(results.length > 0);
-    setSearching(false);
+    const results = await searchCards(trimmedQuery, selectedGame, 15, 0, { includeInventory: false });
+    if (quickAddSearchRunRef.current === runId) {
+      setQuickAddSuggestions(results);
+      setShowQuickAddDropdown(results.length > 0);
+      setSearching(false);
+    }
   };
 
   const handleQuickAddChange = (e) => {
@@ -552,15 +567,20 @@ export default function AdvancedDeckBuilder() {
   const handleSearchCards = async (query) => {
     const trimmedQuery = String(query || '').trim();
     if (trimmedQuery.length < 2) {
+      cardSearchRunRef.current += 1;
       setSearchResults([]);
       setSearching(false);
       return;
     }
 
     setSearching(true);
-    const results = await searchCards(trimmedQuery, selectedGame, 18);
-    setSearchResults(results);
-    setSearching(false);
+    const runId = cardSearchRunRef.current + 1;
+    cardSearchRunRef.current = runId;
+    const results = await searchCards(trimmedQuery, selectedGame, 18, 0, { includeInventory: false });
+    if (cardSearchRunRef.current === runId) {
+      setSearchResults(results);
+      setSearching(false);
+    }
   };
 
   const exportDeck = () => {

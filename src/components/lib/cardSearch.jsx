@@ -26,11 +26,11 @@ export const sortCardsByRelevance = (cards, query) => {
   });
 };
 
-export const searchCards = async (query, game, limit = 50, skip = 0) => {
+export const searchCards = async (query, game, limit = 50, skip = 0, options = {}) => {
   if (!query || query.length < 2) return [];
 
   try {
-    return searchOwner.searchByGame(query, game, limit + skip).then((results) => results.slice(skip));
+    return searchOwner.searchByGame(query, game, limit + skip, options).then((results) => results.slice(skip));
   } catch (error) {
     console.error('Card search failed:', error);
     return [];
