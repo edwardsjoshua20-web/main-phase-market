@@ -127,8 +127,8 @@ assert(mobileShop.includes('searchGameLocal(trimmedQuery, game'), 'Mobile typed 
 assert(!mobileShop.includes('stockCard: card,'), 'Mobile browse must not re-wrap every catalog result as an in-stock listing');
 
 const deckBuilder = read('src/pages/AdvancedDeckBuilder.jsx');
-assert(deckBuilder.includes("searchCards(query, selectedGame, 15)"), 'Deck Builder quick search must use canonical searchCards wrapper');
-assert(deckBuilder.includes("searchCards(trimmedQuery, selectedGame, 18)"), 'Deck Builder normal search must use canonical searchCards wrapper');
+assert(/searchCards\(\s*trimmedQuery,\s*selectedGame,\s*15,\s*0,\s*\{[^}]*includeInventory:\s*false[^}]*preview:\s*true[^}]*\}/s.test(deckBuilder), 'Deck Builder quick search must use canonical preview-quality searchCards wrapper');
+assert(/searchCards\(\s*trimmedQuery,\s*selectedGame,\s*18,\s*0,\s*\{[^}]*includeInventory:\s*false[^}]*preview:\s*true[^}]*\}/s.test(deckBuilder), 'Deck Builder normal search must use canonical preview-quality searchCards wrapper');
 
 const commanderHub = read('src/pages/CommanderHub.jsx');
 const commanderData = read('src/hooks/useCommanderHubData.js');
