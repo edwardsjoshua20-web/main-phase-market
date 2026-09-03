@@ -7,21 +7,25 @@ const actions = [
     title: 'Deck Builder',
     action: 'BUILD DECKS →',
     to: '/AdvancedDeckBuilder',
+    visual: 'radial-gradient(circle at 82% 28%, rgba(56,189,248,0.18), transparent 34%), radial-gradient(circle at 8% 96%, rgba(14,165,233,0.10), transparent 35%), linear-gradient(135deg, rgba(255,255,255,0.065), transparent 44%, rgba(15,23,42,0.22))',
   },
   {
     title: 'Commander Hub',
     action: 'EXPLORE COMMANDERS →',
     to: '/CommanderHub',
+    visual: 'radial-gradient(circle at 76% 20%, rgba(168,85,247,0.16), transparent 32%), radial-gradient(circle at 16% 92%, rgba(45,212,191,0.09), transparent 38%), linear-gradient(135deg, rgba(255,255,255,0.055), transparent 46%, rgba(15,23,42,0.24))',
   },
   {
     title: 'Community Decks',
     action: 'BROWSE DECKS →',
     to: '/CommunityDecks',
+    visual: 'radial-gradient(circle at 84% 18%, rgba(34,197,94,0.13), transparent 34%), radial-gradient(circle at 10% 100%, rgba(56,189,248,0.09), transparent 40%), linear-gradient(135deg, rgba(255,255,255,0.058), transparent 44%, rgba(15,23,42,0.24))',
   },
   {
     title: 'TCG Encyclopedia',
     action: 'EXPLORE SETS →',
     to: '/set/yugioh/magnificent-monsters',
+    visual: 'radial-gradient(circle at 78% 24%, rgba(250,204,21,0.13), transparent 31%), radial-gradient(circle at 12% 98%, rgba(125,211,252,0.08), transparent 38%), linear-gradient(135deg, rgba(255,255,255,0.052), transparent 45%, rgba(15,23,42,0.25))',
   },
 ];
 
@@ -41,7 +45,12 @@ export default function CoreActionsSection() {
               className="group relative overflow-hidden rounded-[2px] bg-[#07111f] px-4 py-3 text-white shadow-[0_6px_16px_rgba(2,8,20,0.10)] ring-1 ring-slate-800/80 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#0a1726] hover:ring-slate-600"
             >
               <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/25 to-transparent" />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.04),transparent_42%,rgba(14,165,233,0.035))]" />
+              <div
+                className="pointer-events-none absolute inset-0 opacity-90 transition-opacity duration-200 group-hover:opacity-100"
+                style={{ background: action.visual }}
+              />
+              <div className="pointer-events-none absolute inset-0 opacity-[0.13] [background-image:linear-gradient(115deg,transparent_0,transparent_33%,rgba(255,255,255,0.22)_33%,rgba(255,255,255,0.22)_34%,transparent_34%,transparent_55%,rgba(255,255,255,0.16)_55%,rgba(255,255,255,0.16)_56%,transparent_56%)]" />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.40),rgba(2,6,23,0.10)_52%,rgba(2,6,23,0.24))]" />
               <div className="relative flex min-h-[58px] flex-col justify-between">
                 <h3 className="truncate text-[0.98rem] font-semibold leading-tight text-white">{action.title}</h3>
                 <p className="mt-2 text-[0.68rem] font-semibold uppercase tracking-[0.13em] text-sky-200/90 transition-colors duration-200 group-hover:text-sky-100">{action.action}</p>
