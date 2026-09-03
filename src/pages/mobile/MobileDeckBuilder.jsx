@@ -454,7 +454,7 @@ export default function MobileDeckBuilder() {
       const runId = searchRunRef.current + 1;
       searchRunRef.current = runId;
       setSearching(true);
-      const results = await searchGameLocal(value, selectedGame, 20, { includeInventory: false });
+      const results = await searchGameLocal(value, selectedGame, 20, { includeInventory: false, preview: true });
       if (searchRunRef.current === runId) {
         setSearchResults(results);
         setSearching(false);
@@ -476,7 +476,7 @@ export default function MobileDeckBuilder() {
       const runId = headerSearchRunRef.current + 1;
       headerSearchRunRef.current = runId;
       setHeaderSearching(true);
-      const results = await searchAllGamesLocal(value, 8, { includeInventory: false });
+      const results = await searchAllGamesLocal(value, 8, { includeInventory: false, preview: true });
       if (headerSearchRunRef.current === runId) {
         setHeaderSearchResults(results);
         setHeaderSearching(false);

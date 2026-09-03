@@ -30,7 +30,13 @@ export const searchCards = async (query, game, limit = 50, skip = 0, options = {
   if (!query || query.length < 2) return [];
 
   try {
-    return searchOwner.searchByGame(query, game, limit + skip, options).then((results) => results.slice(skip));
+    const { preview = false, ...searchOptions } = options || {};
+    const searchLimit = limit + skip;
+    const search = preview
+      ? searchOwner.searchPreviewByGame(query, game, searchLimit, searchOptions)
+      : searchOwner.searchByGame(query, game, searchLimit, searchOptions);
+
+    return search.then((results) => results.slice(skip));
   } catch (error) {
     console.error('Card search failed:', error);
     return [];

@@ -6,11 +6,17 @@
 import { searchOwner } from '@/services/search/searchOwner';
 
 export async function searchGameLocal(query, game, limit = 40, options = {}) {
-  return searchOwner.searchByGame(query, game, limit, options);
+  const { preview = false, ...searchOptions } = options || {};
+  return preview
+    ? searchOwner.searchPreviewByGame(query, game, limit, searchOptions)
+    : searchOwner.searchByGame(query, game, limit, searchOptions);
 }
 
 export async function searchAllGamesLocal(query, limit = 10, options = {}) {
-  return searchOwner.searchAcrossGames(query, limit, options);
+  const { preview = false, perGameLimit = 2, ...searchOptions } = options || {};
+  return preview
+    ? searchOwner.searchPreviewAcrossGames(query, perGameLimit, limit, searchOptions)
+    : searchOwner.searchAcrossGames(query, limit, searchOptions);
 }
 
 

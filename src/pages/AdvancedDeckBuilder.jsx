@@ -458,7 +458,7 @@ export default function AdvancedDeckBuilder() {
     const runId = quickAddSearchRunRef.current + 1;
     quickAddSearchRunRef.current = runId;
     setSearching(true);
-    const results = await searchCards(trimmedQuery, selectedGame, 15, 0, { includeInventory: false });
+    const results = await searchCards(trimmedQuery, selectedGame, 15, 0, { includeInventory: false, preview: true });
     if (quickAddSearchRunRef.current === runId) {
       setQuickAddSuggestions(results);
       setShowQuickAddDropdown(results.length > 0);
@@ -576,7 +576,7 @@ export default function AdvancedDeckBuilder() {
     setSearching(true);
     const runId = cardSearchRunRef.current + 1;
     cardSearchRunRef.current = runId;
-    const results = await searchCards(trimmedQuery, selectedGame, 18, 0, { includeInventory: false });
+    const results = await searchCards(trimmedQuery, selectedGame, 18, 0, { includeInventory: false, preview: true });
     if (cardSearchRunRef.current === runId) {
       setSearchResults(results);
       setSearching(false);
