@@ -21,7 +21,7 @@ function PriceBar({ item, storeProducts }) {
   return (
     <div style={{
       width: CARD_WIDTH,
-      marginTop: 6,
+        marginTop: 4,
       background: 'rgba(17,24,39,0.85)',
       borderRadius: 6,
       padding: '5px 8px',
@@ -55,7 +55,7 @@ export default function CardStack({ type, cards, onChangeQty, onRemove, onChange
   const closeTimerRef = useRef(null);
 
   const totalQty = cards.reduce((s, c) => s + (c.quantity || 1), 0);
-  const stackHeight = CARD_HEIGHT + (cards.length - 1) * PEEK + 8;
+  const stackHeight = CARD_HEIGHT + (cards.length - 1) * PEEK + 4;
 
   const open = (idx) => {
     clearTimeout(closeTimerRef.current);
@@ -74,7 +74,7 @@ export default function CardStack({ type, cards, onChangeQty, onRemove, onChange
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: stackWidth, transition: 'width 0.22s ease', flexShrink: 0 }}>
-      <div style={{ marginBottom: 8 }}>
+      <div style={{ marginBottom: 5 }}>
         <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{type}</span>
         <span style={{ color: '#9ca3af', fontSize: 11, marginLeft: 8 }}>({totalQty})</span>
       </div>

@@ -899,16 +899,16 @@ export default function AdvancedDeckBuilder() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Top Bar */}
       <div className="bg-gray-800 border-b border-gray-700 sticky top-0 z-40">
-        <div className="max-w-full px-4 py-3">
-          <div className="flex items-center justify-between mb-3">
+        <div className="max-w-full px-3 py-2">
+          <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Swords className="w-6 h-6 text-blue-400" />
               <div>
-                <h1 className="text-xl font-bold text-white">
+                <h1 className="text-lg font-bold leading-tight text-white">
                   {activeDeck ? `${activeDeck.name} - ${getDeckFormatConfig(activeDeck.deck_format || getDefaultDeckFormat(deckGame), deckGame).name}` : 'Advanced Deck Builder'}
                 </h1>
                 {activeDeck && (
-                  <p className="text-xs text-gray-400">{totalCards} cards | {activeDeck.items?.length || 0} unique</p>
+                  <p className="text-[11px] leading-tight text-gray-400">{totalCards} cards | {activeDeck.items?.length || 0} unique</p>
                 )}
               </div>
             </div>
@@ -981,11 +981,11 @@ export default function AdvancedDeckBuilder() {
           </div>
 
           {/* Search and Controls */}
-          <div className={`flex gap-3 ${isCompactLayout ? 'flex-col items-stretch' : 'items-center'}`}>
+          <div className={`flex gap-2 ${isCompactLayout ? 'flex-col items-stretch' : 'items-center'}`}>
             {activeDeck && (() => {
               const validation = validateDeckLegality(activeDeck);
               return (
-                <div className={`bg-gray-700 rounded-lg py-2 px-3 border border-blue-500 border-dashed ${isCompactLayout ? 'space-y-2' : 'flex items-center gap-3'}`}>
+                <div className={`rounded-lg border border-dashed border-blue-500 bg-gray-700 px-2 py-1 ${isCompactLayout ? 'space-y-2' : 'flex items-center gap-2'}`}>
                   <div className="flex items-center gap-2 flex-1">
                     <span className="text-xs text-gray-400">Format:</span>
                     <button

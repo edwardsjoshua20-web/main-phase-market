@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import CardStack from './CardStack';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { buildPackedColumns } from '@/lib/deckColumnLayout';
 import { getDeckSectionOrder, groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
 
+function getFittedColumnCount(width) {
+  return Math.max(1, Math.min(5, Math.floor((Math.max(0, width) + 16) / 276)));
+}
+
 function CommanderStack({ commanderItem, onChangeSet }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-      <div style={{ marginBottom: 8 }}>
+      <div style={{ marginBottom: 5 }}>
         <span style={{ color: '#fbbf24', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Commander</span>
       </div>
       {commanderItem ? (
@@ -66,10 +70,10 @@ function estimateSectionHeight(section, groupedCards) {
   }
 
   const cards = groupedCards[section.label] || [];
-  const stackHeight = 311 + Math.max(cards.length - 1, 0) * 42;
-  const priceBarAllowance = cards.length > 0 ? 36 : 0;
-  const headerAllowance = 36;
-  const sectionGapAllowance = 24;
+  const stackHeight = 315 + Math.max(cards.length - 1, 0) * 42;
+  const priceBarAllowance = cards.length > 0 ? 34 : 0;
+  const headerAllowance = 22;
+  const sectionGapAllowance = 12;
 
   return stackHeight + priceBarAllowance + headerAllowance + sectionGapAllowance;
 }
@@ -84,6 +88,20 @@ export default function DeckStackView({
   onSetCommander,
   storeProducts
 }) {
+  const canvasRef = useRef(null);
+  const [targetColumnCount, setTargetColumnCount] = useState(() => getFittedColumnCount(window.innerWidth - 176));
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+
+    const updateColumnCount = (width) => setTargetColumnCount(getFittedColumnCount(width));
+    const observer = new ResizeObserver((entries) => updateColumnCount(entries[0]?.contentRect?.width || 0));
+    updateColumnCount(canvas.getBoundingClientRect().width);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
+
   const commanderItem = isCommanderFormat ? deck?.items?.find(i => i.is_commander) : null;
   const nonCommanderItems = isCommanderFormat
     ? (deck?.items || []).filter(i => !i.is_commander)
@@ -117,7 +135,7 @@ export default function DeckStackView({
         .filter((type) => !usedLabels.has(type))
         .map((type) => ({ type: 'stack', label: type }));
 
-      return buildPackedColumns([...orderedSections, ...remainingStacks], stackSectionHeight, 5);
+      return buildPackedColumns([...orderedSections, ...remainingStacks], stackSectionHeight, targetColumnCount);
     }
 
     const primaryTypes = orderedTypes.slice(0, 3);
@@ -132,14 +150,17 @@ export default function DeckStackView({
       .filter((type) => !usedLabels.has(type))
       .map((type) => ({ type: 'stack', label: type }));
 
-    return buildPackedColumns([...orderedSections, ...remainingStacks], stackSectionHeight, 4);
+    return buildPackedColumns([...orderedSections, ...remainingStacks], stackSectionHeight, Math.min(4, targetColumnCount));
   })();
 
   return (
-    <div className="flex-1 px-6 py-6 overflow-auto">
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,300px))] items-start gap-5">
+    <div ref={canvasRef} className="flex-1 overflow-auto px-4 py-3">
+      <div
+        className="grid items-start gap-4"
+        style={{ gridTemplateColumns: `repeat(${stackColumns.length}, minmax(260px, 300px))` }}
+      >
         {stackColumns.map((column, columnIndex) => (
-          <div key={columnIndex} className="flex min-w-0 flex-col gap-6">
+          <div key={columnIndex} className="flex min-w-0 flex-col gap-3">
             {column.map((section) => {
               if (section.type === 'commander') {
                 return <CommanderStack key="commander" commanderItem={commanderItem} onChangeSet={onChangeSet} />;

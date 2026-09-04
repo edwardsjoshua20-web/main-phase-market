@@ -13,21 +13,21 @@ export default function DeckListSidebar({
   onCancelCreate
 }) {
   return (
-    <div className="sticky top-24 h-[calc(100vh-120px)] w-44 flex-shrink-0 self-start overflow-y-auto border-r border-gray-700 bg-gray-800 p-3">
-      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">My Decks</h3>
-      <div className="space-y-1.5">
+    <div className="sticky top-24 h-[calc(100vh-120px)] w-44 flex-shrink-0 self-start overflow-y-auto border-r border-gray-700 bg-gray-800 p-2">
+      <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">My Decks</h3>
+      <div className="space-y-1">
         {decks.map(deck => (
           <button
             key={deck.id}
             onClick={() => onSelectDeck(deck)}
-            className={`w-full text-left p-2 rounded-lg border text-xs transition-all ${
+            className={`w-full rounded-md border p-1.5 text-left text-xs transition-all ${
               activeDeck?.id === deck.id
                 ? 'border-blue-400 bg-blue-900 text-white'
                 : 'border-gray-700 hover:border-blue-400 hover:bg-gray-700 text-gray-300'
             }`}
           >
             <p className="font-semibold truncate">{deck.name}</p>
-            <p className="text-gray-400 mt-0.5">{deck.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 0} cards</p>
+            <p className="text-[11px] leading-tight text-gray-400">{deck.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 0} cards</p>
           </button>
         ))}
       </div>
@@ -35,7 +35,7 @@ export default function DeckListSidebar({
       {!creatingDeck ? (
         <button
           onClick={onCreateNew}
-          className="w-full mt-2 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="mt-1.5 w-full rounded-md bg-blue-600 py-1.5 text-xs text-white transition-colors hover:bg-blue-700"
         >
           + New Deck
         </button>
