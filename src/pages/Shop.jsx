@@ -118,8 +118,27 @@ function FilterSection({ title, children, defaultOpen = false }) {
         <span>{title}</span>
         <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-open:rotate-180" />
       </summary>
-      <div className="mt-1.5 max-h-44 overflow-y-auto pr-1">{children}</div>
+      <div className="mt-1.5">{children}</div>
     </details>
+  );
+}
+
+function SetFilterChoices({ options, selected, onSelect, initialCount = 12 }) {
+  const [showAll, setShowAll] = useState(false);
+  const visibleOptions = showAll ? options : options.slice(0, initialCount);
+  const selectedIsHidden = selected !== 'all' && !visibleOptions.includes(selected);
+
+  return (
+    <>
+      <FilterChoice active={selected === 'all'} onClick={() => onSelect('all')}>All Sets</FilterChoice>
+      {visibleOptions.map((set) => <FilterChoice key={set} active={selected === set} onClick={() => onSelect(set)}>{set}</FilterChoice>)}
+      {selectedIsHidden && <FilterChoice active onClick={() => onSelect(selected)}>{selected}</FilterChoice>}
+      {options.length > initialCount && (
+        <button type="button" onClick={() => setShowAll((current) => !current)} className="mt-1 px-1 text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-200">
+          {showAll ? 'Show less' : `Show more (${options.length - initialCount})`}
+        </button>
+      )}
+    </>
   );
 }
 
@@ -1104,8 +1123,7 @@ export default function Shop() {
               </div>
 
               {showCardFilters && uniqueSets.length > 0 && <FilterSection title="Set">
-                <FilterChoice active={filters.set === 'all'} onClick={() => updateFilters({ ...filters, set: 'all' })}>All Sets</FilterChoice>
-                {uniqueSets.map((set) => <FilterChoice key={set} active={filters.set === set} onClick={() => updateFilters({ ...filters, set })}>{set}</FilterChoice>)}
+                <SetFilterChoices options={uniqueSets} selected={filters.set} onSelect={(set) => updateFilters({ ...filters, set })} />
               </FilterSection>}
 
               {showCardFilters && uniqueRarities.length > 0 && <FilterSection title="Rarity">
@@ -1114,8 +1132,7 @@ export default function Shop() {
               </FilterSection>}
 
               {filters.type === 'booster_box' && filters.game === 'magic' && sealedSetOptions.length > 0 && <FilterSection title="Set">
-                <FilterChoice active={filters.set === 'all'} onClick={() => updateFilters({ ...filters, set: 'all' })}>All Sets</FilterChoice>
-                {sealedSetOptions.map((set) => <FilterChoice key={set} active={filters.set === set} onClick={() => updateFilters({ ...filters, set })}>{set}</FilterChoice>)}
+                <SetFilterChoices options={sealedSetOptions} selected={filters.set} onSelect={(set) => updateFilters({ ...filters, set })} />
               </FilterSection>}
 
               {filters.type === 'booster_box' && filters.game === 'magic' && sealedReleaseYears.length > 0 && <FilterSection title="Release Date">
