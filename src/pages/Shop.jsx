@@ -967,14 +967,14 @@ export default function Shop() {
                 <Select value={filters.game} onValueChange={(game) => updateFilters({ ...filters, game, set: 'all' })}>
                   <SelectTrigger className="h-10 w-full rounded-[2px] border-slate-600 bg-[#151f2e] px-2.5 text-sm text-white">
                     <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-                      <span className="grid h-6 w-7 shrink-0 place-items-center bg-white/95 p-1">
+                      <span className="grid h-6 w-9 shrink-0 place-items-center bg-white/95 p-0.5">
                         <img src={SHOP_GAME_LOGOS[selectedGameOption.value]} alt="" aria-hidden="true" className="max-h-full max-w-full object-contain" />
                       </span>
                       <span className="truncate">{selectedGameOption.label}</span>
                     </div>
                   </SelectTrigger>
                   <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100">
-                    {GAME_OPTIONS.map((game) => <SelectItem key={game.value} value={game.value}><span className="flex items-center gap-2"><span className="grid h-5 w-6 place-items-center bg-white/95 p-0.5"><img src={SHOP_GAME_LOGOS[game.value]} alt="" aria-hidden="true" className="max-h-full max-w-full object-contain" /></span><span>{game.label}</span></span></SelectItem>)}
+                    {GAME_OPTIONS.map((game) => <SelectItem key={game.value} value={game.value}><span className="flex items-center gap-2"><span className="grid h-5 w-8 place-items-center bg-white/95 p-0.5"><img src={SHOP_GAME_LOGOS[game.value]} alt="" aria-hidden="true" className="max-h-full max-w-full object-contain" /></span><span>{game.label}</span></span></SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
