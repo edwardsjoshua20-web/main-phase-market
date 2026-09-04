@@ -146,6 +146,13 @@ function MarketplaceListingResult({ item, resultsView, onAdd, onWishlist, onQuic
   const stockState = inventoryOwner.getStockState(item);
   const price = Number(item.price || 0);
   const detail = [item.condition, item.finish, item.language || item.lang].filter(Boolean).join(' / ');
+  const language = String(item.language || item.lang || '').trim();
+  const showGridLanguage = language && !['en', 'eng', 'english', 'en-us'].includes(language.toLowerCase());
+  const gridDetail = [
+    item.condition && formatFilterLabel(item.condition),
+    item.finish && formatFilterLabel(item.finish),
+    showGridLanguage && formatFilterLabel(language)
+  ].filter(Boolean).join(' \u00b7 ');
   const image = item.image_url;
 
   if (resultsView === 'list') {
@@ -177,11 +184,11 @@ function MarketplaceListingResult({ item, resultsView, onAdd, onWishlist, onQuic
         {image ? <img src={image} alt={item.name} className="h-full w-full object-contain p-2 transition-transform duration-200 group-hover:scale-[1.025]" /> : <div className="flex h-full w-full items-center justify-center text-xs text-slate-600">No Image</div>}
         {onQuickView && <button type="button" onClick={onQuickView} aria-label={`Quick view ${item.name}`} className="absolute right-2 top-2 grid h-7 w-7 place-items-center bg-slate-950/80 text-slate-400 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"><Search className="h-3.5 w-3.5" /></button>}
       </div>
-      <div className="p-2.5">
-        <h3 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-[18px] text-white">{item.name}</h3>
-        {item.set_name && <p className="mt-0.5 truncate text-[11px] text-slate-500">{item.set_name}</p>}
-        {detail && <p className="mt-0.5 truncate text-[10px] text-slate-500">{detail}</p>}
-        <div className="mb-2 mt-1.5 flex items-end justify-between gap-2">
+      <div className="p-2">
+        <h3 className="line-clamp-2 min-h-8 text-[13px] font-semibold leading-4 text-white">{item.name}</h3>
+        {item.set_name && <p className="truncate text-[11px] leading-4 text-slate-500">{item.set_name}</p>}
+        {gridDetail && <p className="truncate text-[10px] leading-4 text-slate-500">{gridDetail}</p>}
+        <div className="mb-1.5 mt-1 flex items-end justify-between gap-2">
           <span className="text-base font-bold text-white">${price.toFixed(2)}</span>
           <span className="text-[10px] text-slate-500">{stockState.quantity} in stock</span>
         </div>
