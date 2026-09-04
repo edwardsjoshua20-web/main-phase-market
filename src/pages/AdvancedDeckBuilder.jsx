@@ -13,6 +13,7 @@ import DeckListSidebar from '@/components/deckbuilder/DeckListSidebar';
 import DeckStackView from '@/components/deckbuilder/DeckStackView';
 import AISimulationResults from '@/components/deckbuilder/AISimulationResults';
 import CardImage from '@/components/cards/CardImage';
+import { CardHoverPreview, cardTileSurfaceClassName, useCardHoverPreview } from '@/components/cards/CardPresentation';
 import { simulateMtgCommanderDeck } from '@/lib/mtgCommanderCatalog';
 import { groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
 import { getCardImageUrl } from '@/lib/cardImages';
@@ -174,6 +175,7 @@ function estimateCompactSectionHeight(section) {
 }
 
 export default function AdvancedDeckBuilder() {
+  const cardPreview = useCardHoverPreview();
   const [searchParams, setSearchParams] = useSearchParams();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1076,6 +1078,8 @@ export default function AdvancedDeckBuilder() {
                                 card={card}
                                 alt={card.name}
                                 className="w-full h-full object-cover"
+                                onMouseEnter={() => cardPreview.showPreview(card)}
+                                onMouseLeave={cardPreview.hidePreview}
                                 renderFallback={() => (
                                   <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 px-1 text-center">
                                     {card.name}
@@ -1099,7 +1103,7 @@ export default function AdvancedDeckBuilder() {
                         ) : (
                           <div
                             key={card.id}
-                            className="relative group rounded overflow-hidden border border-gray-700 hover:border-blue-400 cursor-pointer transition-all"
+                            className={`relative group cursor-pointer ${cardTileSurfaceClassName()}`}
                             onClick={() => addCardToDeck(card)}
                             title={card.name}
                           >
@@ -1107,6 +1111,8 @@ export default function AdvancedDeckBuilder() {
                               card={card}
                               alt={card.name}
                               className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity"
+                              onMouseEnter={() => cardPreview.showPreview(card)}
+                              onMouseLeave={cardPreview.hidePreview}
                               renderFallback={() => (
                                 <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
                                   {card.name}
@@ -1512,13 +1518,15 @@ export default function AdvancedDeckBuilder() {
                             return (
                               <div 
                                 key={card.id} 
-                                className="relative group rounded overflow-hidden border border-gray-700 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer bg-gray-800"
+                                className={`relative group cursor-pointer ${cardTileSurfaceClassName()}`}
                                 onClick={() => addCardToDeck(card)}
                               >
                                 <CardImage
                                   card={card}
                                   alt={card.name}
                                   className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity"
+                                  onMouseEnter={() => cardPreview.showPreview(card)}
+                                  onMouseLeave={cardPreview.hidePreview}
                                   renderFallback={() => (
                                     <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
                                       {card.name}
@@ -1659,6 +1667,7 @@ export default function AdvancedDeckBuilder() {
           </div>
         </div>
       )}
+      <CardHoverPreview card={cardPreview.card} showMetadata={false} />
     </div>
   );
 }

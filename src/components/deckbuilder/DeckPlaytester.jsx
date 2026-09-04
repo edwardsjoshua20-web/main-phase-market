@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, RefreshCw, RotateCcw, Trash2, ArrowUp } from 'lucide-react';
 import useGameState from '@/components/hooks/useGameState';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { CardHoverPreview } from '@/components/cards/CardPresentation';
 
 const CARD_W = 100;
 const CARD_H = 140;
@@ -35,25 +36,6 @@ function CardImage({ card, className = '', style = {}, onClick, onContextMenu, o
           </div>
         )
       }
-    </div>
-  );
-}
-
-// ── Hover preview ─────────────────────────────────────────────────────────────
-function HoverPreview({ card, x, y }) {
-  if (!card) return null;
-  return (
-    <div className="fixed z-[200] pointer-events-none" style={{ left: x, top: y }}>
-      <div className="rounded-xl border-2 border-cyan-400 overflow-hidden shadow-2xl" style={{ width: 240, height: 336 }}>
-        {getCardImageUrl(card)
-          ? <img src={getCardImageUrl(card)} alt={card.product_name} className="w-full h-full object-cover" onError={(event) => handleCardImageError(event, card)} />
-          : (
-            <div className="w-full h-full bg-slate-800 flex items-center justify-center p-4 text-center">
-              <span className="text-white text-base font-medium">{card.product_name}</span>
-            </div>
-          )
-        }
-      </div>
     </div>
   );
 }
@@ -254,8 +236,8 @@ export default function DeckPlaytester({ deck, onClose }) {
 
   const handleHover = (e, card) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const previewW = 240;
-    const previewH = 336;
+    const previewW = 256;
+    const previewH = 350;
     const left = rect.right + 12 + previewW < window.innerWidth
       ? rect.right + 12
       : rect.left - previewW - 12;
@@ -551,7 +533,7 @@ export default function DeckPlaytester({ deck, onClose }) {
         />
       )}
 
-      {hover && <HoverPreview card={hover.card} x={hover.x} y={hover.y} />}
+      {hover && <CardHoverPreview card={hover.card} position={{ x: hover.x, y: hover.y }} showMetadata={false} />}
     </div>
   );
 }

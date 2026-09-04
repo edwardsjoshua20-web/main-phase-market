@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ShoppingCart, Trash2, Heart, List, Plus, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
-import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import CardImage from '@/components/cards/CardImage';
+import { CardHoverPreview, useCardHoverPreview } from '@/components/cards/CardPresentation';
 
 export default function WishlistDrawer({ open, onClose, items, onAddToCart, onRemove, user }) {
   const [view, setView] = useState('main'); // 'main' | 'list-detail'
@@ -16,6 +17,7 @@ export default function WishlistDrawer({ open, onClose, items, onAddToCart, onRe
   const [newListName, setNewListName] = useState('');
   const [newListDesc, setNewListDesc] = useState('');
   const queryClient = useQueryClient();
+  const cardPreview = useCardHoverPreview();
 
   const { data: cardLists = [] } = useQuery({
     queryKey: ['cardlists', user?.email],
@@ -91,7 +93,8 @@ export default function WishlistDrawer({ open, onClose, items, onAddToCart, onRe
   }, [cardLists]);
 
   return (
-    <Sheet open={open} onOpenChange={onClose}>
+    <>
+    <Sheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) cardPreview.clearPreview(); onClose(nextOpen); }}>
       <SheetContent className="bg-white w-full sm:max-w-lg flex flex-col">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
@@ -126,12 +129,8 @@ export default function WishlistDrawer({ open, onClose, items, onAddToCart, onRe
                 <div className="space-y-3 pr-2">
                   {items.map((item) => (
                     <div key={item.id} className="flex gap-3 p-3 border rounded-lg">
-                      <div className="w-16 h-16 bg-gray-100 rounded flex-shrink-0 overflow-hidden">
-                        {getCardImageUrl(item) ? (
-                          <img src={getCardImageUrl(item)} alt={item.product_name} className="w-full h-full object-contain" onError={(event) => handleCardImageError(event, item)} />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Image</div>
-                        )}
+                      <div className="w-16 h-16 bg-gray-100 rounded flex-shrink-0 overflow-hidden" onMouseEnter={() => cardPreview.showPreview(item)} onMouseLeave={cardPreview.hidePreview}>
+                        <CardImage card={item} alt={item.product_name} className="w-full h-full object-contain" fallbackClassName="flex h-full w-full items-center justify-center text-xs text-gray-400" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-medium text-gray-900 text-sm line-clamp-2">{item.product_name}</h4>
@@ -250,12 +249,8 @@ export default function WishlistDrawer({ open, onClose, items, onAddToCart, onRe
                 <div className="space-y-3 pr-2">
                   {selectedList.items.map((item) => (
                     <div key={item.product_id} className="flex gap-3 p-3 border rounded-lg">
-                      <div className="w-16 h-16 bg-gray-100 rounded flex-shrink-0 overflow-hidden">
-                        {getCardImageUrl(item) ? (
-                          <img src={getCardImageUrl(item)} alt={item.product_name} className="w-full h-full object-contain" onError={(event) => handleCardImageError(event, item)} />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Image</div>
-                        )}
+                      <div className="w-16 h-16 bg-gray-100 rounded flex-shrink-0 overflow-hidden" onMouseEnter={() => cardPreview.showPreview(item)} onMouseLeave={cardPreview.hidePreview}>
+                        <CardImage card={item} alt={item.product_name} className="w-full h-full object-contain" fallbackClassName="flex h-full w-full items-center justify-center text-xs text-gray-400" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-medium text-gray-900 text-sm line-clamp-2">{item.product_name}</h4>
@@ -288,6 +283,8 @@ export default function WishlistDrawer({ open, onClose, items, onAddToCart, onRe
         )}
       </SheetContent>
     </Sheet>
+    <CardHoverPreview card={cardPreview.card} name={cardPreview.card?.product_name} price={cardPreview.card?.price} />
+    </>
   );
 }
 

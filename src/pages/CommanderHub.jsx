@@ -4,16 +4,18 @@ import { Loader2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import ColorIdentity from '@/components/commander/ColorIdentity';
 import CardImage from '@/components/cards/CardImage';
+import { CardHoverPreview, CardTileSurface, useCardHoverPreview } from '@/components/cards/CardPresentation';
 import { useCommanderHubData } from '@/hooks/useCommanderHubData';
 
-function CommanderSummaryCard({ commander, onOpen }) {
+function CommanderSummaryCard({ commander, onOpen, onPreviewEnter, onPreviewLeave }) {
   return (
-    <button
+    <CardTileSurface
+      as="button"
       type="button"
       onClick={onOpen}
-      className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-left transition-all hover:-translate-y-0.5 hover:border-orange-400/25 hover:bg-white/[0.05]"
+      className="group text-left"
     >
-      <div className="relative aspect-[5/7] overflow-hidden bg-slate-950">
+      <div className="relative aspect-[5/7] overflow-hidden bg-slate-950" onMouseEnter={() => onPreviewEnter(commander)} onMouseLeave={onPreviewLeave}>
         <CardImage
           card={commander}
           alt={commander.name}
@@ -38,18 +40,19 @@ function CommanderSummaryCard({ commander, onOpen }) {
           </p>
         </div>
       </div>
-    </button>
+    </CardTileSurface>
   );
 }
 
-function BrowseCommanderCard({ commander, onOpen }) {
+function BrowseCommanderCard({ commander, onOpen, onPreviewEnter, onPreviewLeave }) {
   return (
-    <button
+    <CardTileSurface
+      as="button"
       type="button"
       onClick={onOpen}
-      className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-left transition-all hover:-translate-y-0.5 hover:border-orange-400/30 hover:bg-white/[0.05]"
+      className="group text-left"
     >
-      <div className="aspect-[5/7] overflow-hidden bg-slate-900">
+      <div className="aspect-[5/7] overflow-hidden bg-slate-900" onMouseEnter={() => onPreviewEnter(commander)} onMouseLeave={onPreviewLeave}>
         <CardImage
           card={commander}
           alt={commander.name}
@@ -68,12 +71,13 @@ function BrowseCommanderCard({ commander, onOpen }) {
           {commander.deck_count || 0} decks
         </p>
       </div>
-    </button>
+    </CardTileSurface>
   );
 }
 
 export default function CommanderHub() {
   const navigate = useNavigate();
+  const cardPreview = useCardHoverPreview();
   const {
     browseLoading,
     browseResults,
@@ -137,6 +141,8 @@ export default function CommanderHub() {
                   key={commander.oracle_id}
                   commander={commander}
                   onOpen={() => openCommander(commander.oracle_id)}
+                  onPreviewEnter={cardPreview.showPreview}
+                  onPreviewLeave={cardPreview.hidePreview}
                 />
               ))}
             </div>
@@ -170,12 +176,15 @@ export default function CommanderHub() {
                   key={commander.oracle_id}
                   commander={commander}
                   onOpen={() => openCommander(commander.oracle_id)}
+                  onPreviewEnter={cardPreview.showPreview}
+                  onPreviewLeave={cardPreview.hidePreview}
                 />
               ))}
             </div>
           )}
         </section>
       </div>
+      <CardHoverPreview card={cardPreview.card} showMetadata={false} />
     </div>
   );
 }

@@ -25,6 +25,7 @@ import { Search, X, Package, Loader2, ChevronDown, ChevronRight, Mail, Box, Hear
 import QuickViewDialog from '@/components/store/QuickViewDialog';
 import AdvancedSearch from '@/components/store/AdvancedSearch';
 import CardImage from '@/components/cards/CardImage';
+import { CardHoverPreview, CardTileSurface, cardTileSurfaceClassName, formatCardMetadataLabel } from '@/components/cards/CardPresentation';
 import { toast } from 'sonner';
 import {
   GAME_OPTIONS,
@@ -65,36 +66,8 @@ function resolveReleaseYear(value) {
 }
 
 const STANDARD_CARD_CONDITIONS = ['near_mint', 'lightly_played', 'moderately_played', 'heavily_played', 'damaged'];
-const FILTER_LABELS = Object.freeze({
-  near_mint: 'Near Mint',
-  lightly_played: 'Lightly Played',
-  moderately_played: 'Moderately Played',
-  heavily_played: 'Heavily Played',
-  damaged: 'Damaged',
-  nonfoil: 'Non-Foil',
-  foil: 'Foil',
-  etched: 'Etched Foil',
-  en: 'English',
-  es: 'Spanish',
-  fr: 'French',
-  de: 'German',
-  it: 'Italian',
-  pt: 'Portuguese',
-  ja: 'Japanese',
-  ko: 'Korean',
-  ru: 'Russian',
-  zhs: 'Simplified Chinese',
-  zht: 'Traditional Chinese'
-});
-
 function formatFilterLabel(value) {
-  const raw = String(value || '').trim();
-  const normalized = raw.toLowerCase();
-  if (FILTER_LABELS[normalized]) return FILTER_LABELS[normalized];
-  const words = raw
-    .replace(/[_-]+/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2');
-  return words.split(' ').map((word) => word ? word[0].toUpperCase() + word.slice(1) : '').join(' ');
+  return formatCardMetadataLabel(value);
 }
 
 function filterValueMatches(left, right) {
@@ -145,7 +118,7 @@ function SetFilterChoices({ options, selected, onSelect, initialCount = 12 }) {
 function MarketplaceListingResult({ item, resultsView, onAdd, onWishlist, onQuickView, onMouseEnter, onMouseLeave }) {
   const stockState = inventoryOwner.getStockState(item);
   const price = Number(item.price || 0);
-  const detail = [item.condition, item.finish, item.language || item.lang].filter(Boolean).join(' / ');
+  const detail = [item.condition, item.finish, item.language || item.lang].filter(Boolean).map(formatCardMetadataLabel).join(' / ');
   const language = String(item.language || item.lang || '').trim();
   const showGridLanguage = language && !['en', 'eng', 'english', 'en-us'].includes(language.toLowerCase());
   const gridDetail = [
@@ -153,13 +126,11 @@ function MarketplaceListingResult({ item, resultsView, onAdd, onWishlist, onQuic
     item.finish && formatFilterLabel(item.finish),
     showGridLanguage && formatFilterLabel(language)
   ].filter(Boolean).join(' \u00b7 ');
-  const image = item.image_url;
-
   if (resultsView === 'list') {
     return (
       <article onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} className="group grid min-w-0 grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-700/45 px-1 py-2 transition-colors hover:bg-slate-800/35">
         <div className="grid h-16 w-[52px] place-items-center overflow-hidden bg-[#0b121c]">
-          {image ? <img src={image} alt={item.name} className="h-full w-full object-contain p-1" /> : <span className="text-[10px] text-slate-600">No image</span>}
+          <CardImage card={item} alt={item.name} className="h-full w-full object-contain p-1" fallbackClassName="flex h-full w-full items-center justify-center text-[10px] text-slate-600" />
         </div>
         <div className="min-w-0">
           <h3 className="truncate text-sm font-semibold text-white">{item.name}</h3>
@@ -179,9 +150,9 @@ function MarketplaceListingResult({ item, resultsView, onAdd, onWishlist, onQuic
   }
 
   return (
-    <article className="group relative overflow-hidden rounded-[2px] border border-transparent bg-[#0c141e] transition-colors hover:border-slate-700/60 hover:bg-[#101a26]">
+    <CardTileSurface as="article" className="group relative">
       <div className="relative aspect-square overflow-hidden bg-[#0a111b]" onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
-        {image ? <img src={image} alt={item.name} className="h-full w-full object-contain p-2 transition-transform duration-200 group-hover:scale-[1.025]" /> : <div className="flex h-full w-full items-center justify-center text-xs text-slate-600">No Image</div>}
+        <CardImage card={item} alt={item.name} className="h-full w-full object-contain p-2 transition-transform duration-200 group-hover:scale-[1.025]" fallbackClassName="flex h-full w-full items-center justify-center text-xs text-slate-600" />
         {onQuickView && <button type="button" onClick={onQuickView} aria-label={`Quick view ${item.name}`} className="absolute right-2 top-2 grid h-7 w-7 place-items-center bg-slate-950/80 text-slate-400 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"><Search className="h-3.5 w-3.5" /></button>}
       </div>
       <div className="p-2">
@@ -197,7 +168,7 @@ function MarketplaceListingResult({ item, resultsView, onAdd, onWishlist, onQuic
           <Button onClick={onWishlist} variant="ghost" size="icon" aria-label={`Add ${item.name} to wishlist`} className="h-7 w-7 text-slate-500 hover:bg-slate-800 hover:text-rose-300"><Heart className="h-3.5 w-3.5" /></Button>
         </div>
       </div>
-    </article>
+    </CardTileSurface>
   );
 }
 
@@ -1452,7 +1423,7 @@ export default function Shop() {
                 openStarWarsCardDetail(result);
               }
             }}
-            className={`group overflow-hidden transition-colors ${resultsView === 'list' ? 'flex min-h-0 items-center border-b border-slate-700/45 bg-transparent px-1 py-2 hover:bg-slate-800/35' : 'rounded-[2px] border border-transparent bg-[#0c141e] hover:border-slate-700/60 hover:bg-[#101a26]'} ${(groupedMagicSearchResults.length > 0 && result.oracle_id) || ((result.game === 'pokemon' || result.game === 'yugioh' || result.game === 'lorcana' || result.game === 'onepiece' || result.game === 'flesh_and_blood' || result.game === 'starwars') && result.id) ? 'cursor-pointer' : ''}`}>
+            className={`group transition-colors ${resultsView === 'list' ? 'flex min-h-0 items-center overflow-hidden border-b border-slate-700/45 bg-transparent px-1 py-2 hover:bg-slate-800/35' : cardTileSurfaceClassName()} ${(groupedMagicSearchResults.length > 0 && result.oracle_id) || ((result.game === 'pokemon' || result.game === 'yugioh' || result.game === 'lorcana' || result.game === 'onepiece' || result.game === 'flesh_and_blood' || result.game === 'starwars') && result.id) ? 'cursor-pointer' : ''}`}>
 
                 <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'h-16 w-[52px]' : 'aspect-square w-full'}`}>
                     {gridImageUrl ?
@@ -1604,24 +1575,10 @@ export default function Shop() {
         }
 
       {/* Hover Card Preview */}
-      {hoveredCardImage &&
-      <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="pointer-events-none w-64 max-w-[calc(100vw-2rem)] rounded-[2px] border border-slate-600/35 bg-[#0d1621] p-2 shadow-[0_18px_45px_rgba(0,0,0,0.38)]">
-              <CardImage
-              card={hoveredCardImage}
-              alt={hoveredCardImage.name || 'Card preview'}
-              className="aspect-[63/88] max-h-[calc(100vh-10rem)] w-full rounded-[2px] object-contain"
-              fallbackClassName="flex aspect-[63/88] max-h-[calc(100vh-10rem)] w-full items-center justify-center bg-[#09111b] text-sm text-slate-500"
-              loading="eager" />
-              <div className="px-1 pb-0.5 pt-2">
-                <h3 className="truncate text-sm font-semibold text-slate-100">{hoveredCardImage.name}</h3>
-                {hoveredCardImage.set_name && <p className="mt-0.5 truncate text-[11px] text-slate-400">{hoveredCardImage.set_name}</p>}
-                {(resolveResultSellPrice(hoveredCardImage) ?? resolveMarketPrice(hoveredCardImage)) != null &&
-                <p className="mt-1 text-base font-bold text-slate-100">${(resolveResultSellPrice(hoveredCardImage) ?? resolveMarketPrice(hoveredCardImage)).toFixed(2)}</p>}
-              </div>
-            </div>
-          </div>
-        }
+      <CardHoverPreview
+        card={hoveredCardImage}
+        price={hoveredCardImage ? resolveResultSellPrice(hoveredCardImage) ?? resolveMarketPrice(hoveredCardImage) : null}
+      />
 
         {/* Booster Box Search Section */}
         {showBoxSearch &&
@@ -2051,25 +2008,7 @@ export default function Shop() {
       </Dialog>
 
       {/* Hover Card Preview */}
-      {hoveredCard && getCardImageUrl(hoveredCard) &&
-      <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="pointer-events-none w-64 max-w-[calc(100vw-2rem)] rounded-[2px] border border-slate-600/35 bg-[#0d1621] p-2 shadow-[0_18px_45px_rgba(0,0,0,0.38)]">
-            <img
-            src={getCardImageUrl(hoveredCard)}
-            alt={hoveredCard.name}
-            onError={(event) => handleCardImageError(event, hoveredCard)}
-            className="aspect-[63/88] max-h-[calc(100vh-10rem)] w-full rounded-[2px] object-contain" />
-
-            <div className="px-1 pb-0.5 pt-2">
-              <h3 className="truncate text-sm font-semibold text-slate-100">{hoveredCard.name}</h3>
-              {hoveredCard.set_name && <p className="mt-0.5 truncate text-[11px] text-slate-400">{hoveredCard.set_name}</p>}
-              <p className="mt-1 text-base font-bold text-slate-100">
-                ${hoveredCard.price?.toFixed(2)}
-              </p>
-            </div>
-          </div>
-        </div>
-      }
+      <CardHoverPreview card={getCardImageUrl(hoveredCard) ? hoveredCard : null} price={hoveredCard?.price} />
 
       {/* Quick View Dialog */}
       <QuickViewDialog

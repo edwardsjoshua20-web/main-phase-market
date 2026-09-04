@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Search, Plus, Trash2, TrendingUp, TrendingDown, BookOpen, Loader2, LogIn } from 'lucide-react';
 import { toast } from 'sonner';
 import { searchOwner } from '@/services/search/searchOwner';
+import CardImage from '@/components/cards/CardImage';
+import { CardHoverPreview, CardTileSurface, formatCardMetadataLabel, useCardHoverPreview } from '@/components/cards/CardPresentation';
 
 const GAMES = [
   { value: 'magic', label: 'Magic: The Gathering' },
@@ -37,6 +39,7 @@ export default function CollectionTracker() {
   const [searchPage, setSearchPage] = useState(0);
   const SEARCH_PER_PAGE = 20;
   const queryClient = useQueryClient();
+  const cardPreview = useCardHoverPreview();
 
 
 
@@ -180,15 +183,15 @@ export default function CollectionTracker() {
             {filtered.map(card => {
               const gain = card.current_market_price && card.purchase_price ? card.current_market_price - card.purchase_price : null;
               return (
-                <div key={card.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="aspect-square bg-gray-100 relative">
-                    {card.image_url ? <img src={card.image_url} alt={card.card_name} className="w-full h-full object-contain p-2" /> : <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">No Image</div>}
+                <CardTileSurface key={card.id} tone="light">
+                  <div className="aspect-square bg-gray-100 relative" onMouseEnter={() => cardPreview.showPreview(card)} onMouseLeave={cardPreview.hidePreview}>
+                    <CardImage card={card} alt={card.card_name} className="w-full h-full object-contain p-2" fallbackClassName="flex h-full w-full items-center justify-center text-xs text-gray-400" />
                     {card.quantity > 1 && <Badge className="absolute top-1 right-1 bg-gray-800 text-white text-xs">x{card.quantity}</Badge>}
                   </div>
                   <div className="p-3">
                     <p className="font-semibold text-gray-900 text-sm line-clamp-1">{card.card_name}</p>
                     <p className="text-xs text-gray-500 line-clamp-1">{card.set_name}</p>
-                    <p className="text-xs text-gray-400 capitalize mt-0.5">{card.condition?.replace('_', ' ')}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{formatCardMetadataLabel(card.condition)}</p>
                     {card.purchase_price && <p className="text-xs text-gray-500 mt-1">Paid: <span className="font-medium">${card.purchase_price.toFixed(2)}</span></p>}
                     {card.current_market_price && <p className="text-xs mt-0.5">Market: <span className="font-medium text-blue-600">${card.current_market_price.toFixed(2)}</span></p>}
                     {gain !== null && (
@@ -201,7 +204,7 @@ export default function CollectionTracker() {
                       <Trash2 className="w-3 h-3 mr-1" /> Remove
                     </Button>
                   </div>
-                </div>
+                </CardTileSurface>
               );
             })}
           </div>
@@ -293,6 +296,7 @@ export default function CollectionTracker() {
           </div>
         </DialogContent>
       </Dialog>
+      <CardHoverPreview card={cardPreview.card} name={cardPreview.card?.card_name} price={cardPreview.card?.current_market_price} />
     </div>
   );
 }

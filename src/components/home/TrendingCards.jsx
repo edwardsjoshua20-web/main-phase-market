@@ -7,12 +7,15 @@ import { Button } from "@/components/ui/button";
 import HomepageContentShell from '@/components/layout/HomepageContentShell';
 import { inventoryOwner } from '@/services/inventory/inventoryOwner';
 import { listingOwner } from '@/services/listing/listingOwner';
-import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
+import { getCardImageUrl } from '@/lib/cardImages';
+import CardImage from '@/components/cards/CardImage';
+import { CardHoverPreview, CardTileSurface, useCardHoverPreview } from '@/components/cards/CardPresentation';
 
 export default function TrendingCards() {
   const [trendingCards, setTrendingCards] = useState([]);
   const [failedImageKeys, setFailedImageKeys] = useState(() => new Set());
   const [loadingTrending, setLoadingTrending] = useState(true);
+  const cardPreview = useCardHoverPreview();
 
   const { data: inventory = [] } = useQuery({
     queryKey: ["home-featured-singles"],
@@ -90,21 +93,20 @@ export default function TrendingCards() {
               const key = cardKey(card, idx);
               const stock = inventoryOwner.getStockState(card);
               return (
-              <Link
+              <CardTileSurface
+                as={Link}
                 key={key}
                 to={createPageUrl("Shop") + `?type=single_card&search=${encodeURIComponent(card.name)}`}
-                className="group overflow-hidden rounded-[3px] border border-slate-200 bg-white shadow-[0_4px_10px_rgba(15,23,42,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_8px_16px_rgba(15,23,42,0.08)]"
+                tone="light"
+                className="group rounded-[3px]"
               >
-                <div className="h-[138px] bg-slate-100 sm:h-[146px] lg:h-[132px] xl:h-[142px]">
-                  <img
-                    src={getCardImageUrl(card)}
+                <div className="h-[138px] bg-slate-100 sm:h-[146px] lg:h-[132px] xl:h-[142px]" onMouseEnter={() => cardPreview.showPreview(card)} onMouseLeave={cardPreview.hidePreview}>
+                  <CardImage
+                    card={card}
                     alt={card.name}
                     loading="lazy"
                     className="h-full w-full object-contain p-1.5 transition-transform duration-200 group-hover:scale-[1.02]"
-                    onError={(event) => {
-                      handleCardImageError(event, card);
-                      markImageFailed(key);
-                    }}
+                    onExhausted={() => markImageFailed(key)}
                   />
                 </div>
 
@@ -121,11 +123,12 @@ export default function TrendingCards() {
                     {stock.quantity > 0 ? `${stock.quantity} in stock` : 'In stock'}
                   </p>
                 </div>
-              </Link>
+              </CardTileSurface>
             );
             })}
           </div>
       </HomepageContentShell>
+      <CardHoverPreview card={cardPreview.card} price={cardPreview.card?.price} />
     </section>
   );
 }

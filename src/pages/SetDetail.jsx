@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import CardImage from '@/components/cards/CardImage';
+import { CardHoverPreview, CardTileSurface, formatCardMetadataLabel, useCardHoverPreview } from '@/components/cards/CardPresentation';
 import { resolveSetDetail } from '@/services/catalog/setDetailService';
 import { createPageUrl } from '@/utils';
 
@@ -50,15 +51,15 @@ function FeaturedImage({ asset }) {
   );
 }
 
-function CardListTile({ card }) {
+function CardListTile({ card, onPreviewEnter, onPreviewLeave }) {
   const price = card.listingSellPrice ? Number(card.listingSellPrice).toFixed(2) : '';
   const rarityLabel = Array.isArray(card.rarities) && card.rarities.length > 1
     ? `${card.rarities.length} rarities`
-    : card.rarity || card.rarities?.[0] || '';
+    : formatCardMetadataLabel(card.rarity || card.rarities?.[0] || '');
 
   return (
-    <div className="min-w-0 border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="aspect-[63/88] overflow-hidden rounded-md border border-slate-200 bg-slate-100">
+    <CardTileSurface tone="light" className="min-w-0 p-3">
+      <div className="aspect-[63/88] overflow-hidden rounded-[2px] bg-slate-100" onMouseEnter={() => onPreviewEnter(card)} onMouseLeave={onPreviewLeave}>
         <CardImage
           card={card}
           alt={card.name}
@@ -75,7 +76,7 @@ function CardListTile({ card }) {
           {card.inStock ? `In stock${price ? ` • $${price}` : ''}` : 'Catalog card'}
         </p>
       </div>
-    </div>
+    </CardTileSurface>
   );
 }
 
@@ -87,6 +88,7 @@ export default function SetDetail() {
     staleTime: 60_000
   });
   const [showAllCards, setShowAllCards] = React.useState(false);
+  const cardPreview = useCardHoverPreview();
 
   if (isLoading) {
     return (
@@ -246,7 +248,12 @@ export default function SetDetail() {
               <>
                 <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                   {visibleCards.map((card) => (
-                    <CardListTile key={card.searchIdentity || card.id} card={card} />
+                    <CardListTile
+                      key={card.searchIdentity || card.id}
+                      card={card}
+                      onPreviewEnter={cardPreview.showPreview}
+                      onPreviewLeave={cardPreview.hidePreview}
+                    />
                   ))}
                 </div>
                 {hiddenCardCount > 0 && (
@@ -315,6 +322,7 @@ export default function SetDetail() {
           )}
         </aside>
       </section>
+      <CardHoverPreview card={cardPreview.card} price={cardPreview.card?.listingSellPrice} />
     </main>
   );
 }
