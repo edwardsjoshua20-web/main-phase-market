@@ -179,8 +179,8 @@ function MarketplaceListingResult({ item, resultsView, onAdd, onWishlist, onQuic
   }
 
   return (
-    <article onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} className="group relative overflow-hidden rounded-[2px] border border-slate-800 bg-[#0f1824] transition-colors hover:border-slate-600 hover:bg-[#121d2b]">
-      <div className="relative aspect-square overflow-hidden bg-[#0a111b]">
+    <article className="group relative overflow-hidden rounded-[2px] border border-transparent bg-[#0c141e] transition-colors hover:border-slate-700/60 hover:bg-[#101a26]">
+      <div className="relative aspect-square overflow-hidden bg-[#0a111b]" onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
         {image ? <img src={image} alt={item.name} className="h-full w-full object-contain p-2 transition-transform duration-200 group-hover:scale-[1.025]" /> : <div className="flex h-full w-full items-center justify-center text-xs text-slate-600">No Image</div>}
         {onQuickView && <button type="button" onClick={onQuickView} aria-label={`Quick view ${item.name}`} className="absolute right-2 top-2 grid h-7 w-7 place-items-center bg-slate-950/80 text-slate-400 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"><Search className="h-3.5 w-3.5" /></button>}
       </div>
@@ -1452,7 +1452,7 @@ export default function Shop() {
                 openStarWarsCardDetail(result);
               }
             }}
-            className={`group overflow-hidden transition-colors ${resultsView === 'list' ? 'flex min-h-0 items-center border-b border-slate-700/45 bg-transparent px-1 py-2 hover:bg-slate-800/35' : 'rounded-[2px] border border-slate-800 bg-[#0f1824] hover:border-slate-600 hover:bg-[#121d2b]'} ${(groupedMagicSearchResults.length > 0 && result.oracle_id) || ((result.game === 'pokemon' || result.game === 'yugioh' || result.game === 'lorcana' || result.game === 'onepiece' || result.game === 'flesh_and_blood' || result.game === 'starwars') && result.id) ? 'cursor-pointer' : ''}`}>
+            className={`group overflow-hidden transition-colors ${resultsView === 'list' ? 'flex min-h-0 items-center border-b border-slate-700/45 bg-transparent px-1 py-2 hover:bg-slate-800/35' : 'rounded-[2px] border border-transparent bg-[#0c141e] hover:border-slate-700/60 hover:bg-[#101a26]'} ${(groupedMagicSearchResults.length > 0 && result.oracle_id) || ((result.game === 'pokemon' || result.game === 'yugioh' || result.game === 'lorcana' || result.game === 'onepiece' || result.game === 'flesh_and_blood' || result.game === 'starwars') && result.id) ? 'cursor-pointer' : ''}`}>
 
                 <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'h-16 w-[52px]' : 'aspect-square w-full'}`}>
                     {gridImageUrl ?
@@ -1605,15 +1605,20 @@ export default function Shop() {
 
       {/* Hover Card Preview */}
       {hoveredCardImage &&
-      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-            <div className="bg-white rounded-lg shadow-2xl p-3 w-72 pointer-events-none border-4 border-blue-500">
+      <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="pointer-events-none w-64 max-w-[calc(100vw-2rem)] rounded-[2px] border border-slate-600/35 bg-[#0d1621] p-2 shadow-[0_18px_45px_rgba(0,0,0,0.38)]">
               <CardImage
               card={hoveredCardImage}
               alt={hoveredCardImage.name || 'Card preview'}
-              className="aspect-[3/4] w-full rounded-lg object-contain"
-              fallbackClassName="flex aspect-[3/4] w-full items-center justify-center rounded-lg bg-gray-100 text-sm text-gray-400"
+              className="aspect-[63/88] max-h-[calc(100vh-10rem)] w-full rounded-[2px] object-contain"
+              fallbackClassName="flex aspect-[63/88] max-h-[calc(100vh-10rem)] w-full items-center justify-center bg-[#09111b] text-sm text-slate-500"
               loading="eager" />
-
+              <div className="px-1 pb-0.5 pt-2">
+                <h3 className="truncate text-sm font-semibold text-slate-100">{hoveredCardImage.name}</h3>
+                {hoveredCardImage.set_name && <p className="mt-0.5 truncate text-[11px] text-slate-400">{hoveredCardImage.set_name}</p>}
+                {(resolveResultSellPrice(hoveredCardImage) ?? resolveMarketPrice(hoveredCardImage)) != null &&
+                <p className="mt-1 text-base font-bold text-slate-100">${(resolveResultSellPrice(hoveredCardImage) ?? resolveMarketPrice(hoveredCardImage)).toFixed(2)}</p>}
+              </div>
             </div>
           </div>
         }
@@ -2047,27 +2052,20 @@ export default function Shop() {
 
       {/* Hover Card Preview */}
       {hoveredCard && getCardImageUrl(hoveredCard) &&
-      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-lg shadow-2xl p-3 w-72 pointer-events-none border-4 border-blue-500">
+      <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="pointer-events-none w-64 max-w-[calc(100vw-2rem)] rounded-[2px] border border-slate-600/35 bg-[#0d1621] p-2 shadow-[0_18px_45px_rgba(0,0,0,0.38)]">
             <img
             src={getCardImageUrl(hoveredCard)}
             alt={hoveredCard.name}
             onError={(event) => handleCardImageError(event, hoveredCard)}
-            className="aspect-[3/4] w-full rounded-lg object-contain mb-2" />
+            className="aspect-[63/88] max-h-[calc(100vh-10rem)] w-full rounded-[2px] object-contain" />
 
-            <h3 className="font-bold text-sm text-gray-900 mb-1">{hoveredCard.name}</h3>
-            {hoveredCard.set_name &&
-          <p className="text-xs text-gray-600 mb-2">{hoveredCard.set_name}</p>
-          }
-            <div className="flex items-center justify-between">
-              <span className="text-lg font-bold text-blue-600">
+            <div className="px-1 pb-0.5 pt-2">
+              <h3 className="truncate text-sm font-semibold text-slate-100">{hoveredCard.name}</h3>
+              {hoveredCard.set_name && <p className="mt-0.5 truncate text-[11px] text-slate-400">{hoveredCard.set_name}</p>}
+              <p className="mt-1 text-base font-bold text-slate-100">
                 ${hoveredCard.price?.toFixed(2)}
-              </span>
-              {hoveredCard.condition &&
-            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                  {hoveredCard.condition}
-                </span>
-            }
+              </p>
             </div>
           </div>
         </div>
