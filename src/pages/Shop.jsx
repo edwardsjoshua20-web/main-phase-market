@@ -42,6 +42,18 @@ import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 import { createPageUrl } from '@/utils';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
+const SHOP_GAME_LOGOS = {
+  all: '/logo-mark.png',
+  magic: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Magic_the_Gathering_2017.svg',
+  pokemon: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Pok%C3%A9mon_Trading_Card_Game_logo.svg',
+  yugioh: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Yu-Gi-Oh!.png',
+  lorcana: '/images/disney-lorcana-logo.png',
+  flesh_and_blood: 'https://uchroniesgames.fr/web/image/event.event/168/image_1024',
+  onepiece: '/images/oplogo.webp',
+  starwars: '/images/star-wars-unlimited-logo.png',
+  other: '/logo-mark.png'
+};
+
 function resolveListingSellPrice(listing = {}) {
   const safeListing = listing || {};
   const value = Number(safeListing.sell_price ?? safeListing.price ?? safeListing.display_price ?? 0);
@@ -936,6 +948,7 @@ export default function Shop() {
       ? filteredSearchResults.length
       : ((filters.type === 'all' || filters.type === 'single_card') ? filteredCards.length : filteredProducts.length));
   const pagedMarketplaceCards = filteredCards.slice(gameBrowsePage * GAME_BROWSE_PER_PAGE, (gameBrowsePage + 1) * GAME_BROWSE_PER_PAGE);
+  const selectedGameOption = GAME_OPTIONS.find((game) => game.value === filters.game) || GAME_OPTIONS[0];
 
   return (
     <div className="min-h-screen bg-[#090f18] text-slate-100">
@@ -946,22 +959,27 @@ export default function Shop() {
       </section>
 
       <div className="w-full px-3 py-4 sm:px-4 lg:px-6">
-        <div className="grid min-w-0 gap-5 md:grid-cols-[220px_minmax(0,1fr)] lg:grid-cols-[236px_minmax(0,1fr)]">
-          <aside className="hidden min-w-0 border-r border-slate-700/70 pr-5 md:block">
-            <div className="sticky top-24 space-y-0">
-              <div className="border-b border-slate-700/70 pb-5">
+        <div className="grid min-w-0 gap-6 md:grid-cols-[228px_minmax(0,1fr)] lg:grid-cols-[244px_minmax(0,1fr)]">
+          <aside className="hidden min-w-0 md:block">
+            <div className="sticky top-24 rounded-[3px] border border-slate-700/80 bg-[#0e1723] px-4 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
+              <div className="border-b border-slate-700/70 py-4">
                 <label className="mb-2 block text-[11px] font-semibold uppercase text-slate-400">Game</label>
                 <Select value={filters.game} onValueChange={(game) => updateFilters({ ...filters, game, set: 'all' })}>
-                  <SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-sm text-white">
-                    <SelectValue />
+                  <SelectTrigger className="h-10 w-full rounded-[2px] border-slate-600 bg-[#151f2e] px-2.5 text-sm text-white">
+                    <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+                      <span className="grid h-6 w-7 shrink-0 place-items-center bg-white/95 p-1">
+                        <img src={SHOP_GAME_LOGOS[selectedGameOption.value]} alt="" aria-hidden="true" className="max-h-full max-w-full object-contain" />
+                      </span>
+                      <span className="truncate">{selectedGameOption.label}</span>
+                    </div>
                   </SelectTrigger>
                   <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100">
-                    {GAME_OPTIONS.map((game) => <SelectItem key={game.value} value={game.value}>{game.label}</SelectItem>)}
+                    {GAME_OPTIONS.map((game) => <SelectItem key={game.value} value={game.value}><span className="flex items-center gap-2"><span className="grid h-5 w-6 place-items-center bg-white/95 p-0.5"><img src={SHOP_GAME_LOGOS[game.value]} alt="" aria-hidden="true" className="max-h-full max-w-full object-contain" /></span><span>{game.label}</span></span></SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="border-b border-slate-700/70 py-5">
+              <div className="border-b border-slate-700/70 py-4">
                 <div className="mb-2 text-[11px] font-semibold uppercase text-slate-400">Product Type</div>
                 <div className="space-y-0.5">
                   {[
@@ -971,27 +989,16 @@ export default function Shop() {
                     ['starter_deck', 'Starter Decks'],
                     ['dice', 'Accessories']
                   ].map(([value, label]) => (
-                    <button key={value} type="button" onClick={() => updateFilters({ ...filters, type: value, search: '' })} className={`block w-full border-l-2 px-3 py-1.5 text-left text-sm transition-colors ${filters.type === value ? 'border-cyan-400 bg-slate-800/70 font-semibold text-white' : 'border-transparent text-slate-300 hover:bg-slate-800/40 hover:text-white'}`}>
-                      {label}
+                    <button key={value} type="button" onClick={() => updateFilters({ ...filters, type: value, search: '' })} className={`flex w-full items-center gap-2.5 px-1 py-1.5 text-left text-sm transition-colors ${filters.type === value ? 'font-semibold text-white' : 'text-slate-300 hover:text-white'}`}>
+                      <span className={`h-3.5 w-3.5 shrink-0 border ${filters.type === value ? 'border-cyan-400 bg-cyan-400 shadow-[inset_0_0_0_3px_#0e1723]' : 'border-slate-500 bg-transparent'}`} />
+                      <span>{label}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="border-b border-slate-700/70 py-5">
-                <div className="mb-3 text-[11px] font-semibold uppercase text-slate-400">Availability</div>
-                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
-                  <input type="checkbox" checked={filters.inStock} onChange={(event) => updateFilters({ ...filters, inStock: event.target.checked })} className="h-4 w-4 rounded-sm border-slate-500 bg-slate-900 accent-cyan-500" />
-                  In stock only
-                </label>
-                <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-300">
-                  <input type="checkbox" checked={filters.preorder} onChange={(event) => updateFilters({ ...filters, preorder: event.target.checked })} className="h-4 w-4 rounded-sm border-slate-500 bg-slate-900 accent-cyan-500" />
-                  Preorders
-                </label>
-              </div>
-
-              <div className="border-b border-slate-700/70 py-5 space-y-3">
-                <div className="text-[11px] font-semibold uppercase text-slate-400">Catalog</div>
+              <div className="border-b border-slate-700/70 py-4 space-y-3">
+                <div className="text-[11px] font-semibold uppercase text-slate-400">Set</div>
                 {uniqueSets.length > 0 && <Select value={filters.set} onValueChange={(set) => updateFilters({ ...filters, set })}>
                   <SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Set" /></SelectTrigger>
                   <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Sets</SelectItem>{uniqueSets.map((set) => <SelectItem key={set} value={set}>{set}</SelectItem>)}</SelectContent>
@@ -1002,7 +1009,7 @@ export default function Shop() {
                 </Select>}
               </div>
 
-              <div className="border-b border-slate-700/70 py-5">
+              <div className="border-b border-slate-700/70 py-4">
                 <div className="mb-3 text-[11px] font-semibold uppercase text-slate-400">Price</div>
                 <div className="grid grid-cols-2 gap-2">
                   <Input inputMode="decimal" value={filters.priceMin} onChange={(event) => updateFilters({ ...filters, priceMin: event.target.value })} placeholder="Min" className="h-9 rounded border-slate-600 bg-[#111b29] text-sm text-white placeholder:text-slate-500" />
@@ -1010,13 +1017,13 @@ export default function Shop() {
                 </div>
               </div>
 
-              {(uniqueConditions.length > 0 || uniqueFinishes.length > 0 || uniqueLanguages.length > 0) && <div className="border-b border-slate-700/70 py-5 space-y-3">
+              {(uniqueConditions.length > 0 || uniqueFinishes.length > 0 || uniqueLanguages.length > 0) && <div className="border-b border-slate-700/70 py-4 space-y-3">
                 {uniqueConditions.length > 0 && <Select value={filters.condition} onValueChange={(condition) => updateFilters({ ...filters, condition })}><SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Condition" /></SelectTrigger><SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Conditions</SelectItem>{uniqueConditions.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}
                 {uniqueFinishes.length > 0 && <Select value={filters.finish} onValueChange={(finish) => updateFilters({ ...filters, finish })}><SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Finish" /></SelectTrigger><SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Finishes</SelectItem>{uniqueFinishes.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}
                 {uniqueLanguages.length > 0 && <Select value={filters.language} onValueChange={(language) => updateFilters({ ...filters, language })}><SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Language" /></SelectTrigger><SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Languages</SelectItem>{uniqueLanguages.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}
               </div>}
 
-              {showClearFilters && <button type="button" onClick={clearFilters} className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-300 hover:text-white"><X className="h-3.5 w-3.5" /> Reset filters</button>}
+              {showClearFilters && <button type="button" onClick={clearFilters} className="my-3 inline-flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-300 hover:text-white"><X className="h-3.5 w-3.5" /> Reset filters</button>}
             </div>
           </aside>
 
