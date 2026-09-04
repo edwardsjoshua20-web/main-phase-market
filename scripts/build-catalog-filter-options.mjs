@@ -4,6 +4,7 @@ import path from 'node:path';
 const PUBLIC_DATA_ROOT = path.resolve(process.cwd(), 'public', 'data');
 const GAME_FOLDERS = ['mtg', 'pokemon', 'yugioh', 'lorcana', 'fab', 'onepiece', 'starwars'];
 const FAB_RARITIES = { B: 'Basic', C: 'Common', F: 'Fabled', L: 'Legendary', M: 'Majestic', P: 'Promo', R: 'Rare', S: 'Super Rare', T: 'Token', V: 'Marvel' };
+const RARITY_CORRECTIONS = { 'platinum secret rare': 'Platinum Secret Rare' };
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -12,6 +13,11 @@ function readJson(filePath) {
 function addValue(target, value) {
   const normalized = String(value ?? '').trim();
   if (normalized) target.add(normalized);
+}
+
+function addRarity(target, value) {
+  const normalized = String(value ?? '').trim();
+  if (normalized) target.add(RARITY_CORRECTIONS[normalized.toLowerCase()] || normalized);
 }
 
 function sorted(values) {
@@ -50,17 +56,17 @@ function collectOptions(folder) {
   for (const card of cards) {
     if (folder === 'yugioh') {
       for (const set of card.card_sets || []) {
-        if (isYugiohRarity(set)) addValue(rarities, set.set_rarity);
+        if (isYugiohRarity(set)) addRarity(rarities, set.set_rarity);
       }
     } else if (folder === 'fab') {
       for (const printing of card.printings || []) {
-        addValue(rarities, FAB_RARITIES[String(printing.rarity || '').toUpperCase()] || printing.rarity);
+        addRarity(rarities, FAB_RARITIES[String(printing.rarity || '').toUpperCase()] || printing.rarity);
         const foiling = String(printing.foiling || '').toUpperCase();
         if (foiling === 'S') finishes.add('nonfoil');
         if (foiling && foiling !== 'S') finishes.add('foil');
       }
     } else {
-      addValue(rarities, card.rarity);
+      addRarity(rarities, card.rarity);
     }
 
     if (folder === 'mtg') {

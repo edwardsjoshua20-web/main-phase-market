@@ -91,10 +91,10 @@ function formatFilterLabel(value) {
   const raw = String(value || '').trim();
   const normalized = raw.toLowerCase();
   if (FILTER_LABELS[normalized]) return FILTER_LABELS[normalized];
-  return raw
+  const words = raw
     .replace(/[_-]+/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    .replace(/([a-z])([A-Z])/g, '$1 $2');
+  return words.split(' ').map((word) => word ? word[0].toUpperCase() + word.slice(1) : '').join(' ');
 }
 
 function filterValueMatches(left, right) {
