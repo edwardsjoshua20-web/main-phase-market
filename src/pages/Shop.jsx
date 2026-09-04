@@ -1172,16 +1172,16 @@ export default function Shop() {
             <form onSubmit={(event) => { event.preventDefault(); if (showBoxSearch) searchBoosterBoxes(boxSearchQuery); else submitSinglesSearch(); }} className="mb-3 flex min-w-0 flex-col gap-2 border-b border-slate-700/60 pb-3 sm:flex-row sm:items-center">
               <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input value={showBoxSearch ? boxSearchQuery : singlesSearchDraft} onChange={showBoxSearch ? handleBoxSearchChange : (event) => setSinglesSearchDraft(event.target.value)} placeholder={showBoxSearch ? 'Search sealed sets...' : 'Search the marketplace...'} className="h-10 rounded border-slate-600 bg-[#111b29] pl-9 pr-10 text-sm text-white placeholder:text-slate-500" />
+                <Input value={showBoxSearch ? boxSearchQuery : singlesSearchDraft} onChange={showBoxSearch ? handleBoxSearchChange : (event) => setSinglesSearchDraft(event.target.value)} placeholder={showBoxSearch ? 'Search sealed sets...' : 'Search the marketplace...'} className="h-10 rounded border-slate-700/35 bg-[#101924] pl-9 pr-10 text-sm text-white placeholder:text-slate-500 focus-visible:border-slate-500/70" />
                 <button type="submit" aria-label="Search" className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center text-slate-300 hover:text-white"><Search className="h-4 w-4" /></button>
               </div>
               <Select value={filters.sort} onValueChange={(sort) => updateFilters({ ...filters, sort })}>
-                <SelectTrigger className="h-10 w-full rounded border-slate-600 bg-[#111b29] text-sm text-white sm:w-[170px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10 w-full rounded border-slate-700/35 bg-[#101924] text-sm text-white focus:border-slate-500/70 sm:w-[170px]"><SelectValue /></SelectTrigger>
                 <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="newest">Newest</SelectItem><SelectItem value="price-low">Price: Low to High</SelectItem><SelectItem value="price-high">Price: High to Low</SelectItem><SelectItem value="name">Name (A-Z)</SelectItem></SelectContent>
               </Select>
-              <div className="flex h-10 shrink-0 items-center border border-slate-600 bg-[#111b29] p-0.5" aria-label="Results view">
-                <button type="button" onClick={() => setResultsView('grid')} aria-label="Grid view" className={`grid h-8 w-9 place-items-center ${resultsView === 'grid' ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'}`}><Grid2X2 className="h-4 w-4" /></button>
-                <button type="button" onClick={() => setResultsView('list')} aria-label="List view" className={`grid h-8 w-9 place-items-center ${resultsView === 'list' ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'}`}><List className="h-4 w-4" /></button>
+              <div className="flex h-10 shrink-0 items-center gap-0.5" aria-label="Results view">
+                <button type="button" onClick={() => setResultsView('grid')} aria-label="Grid view" className={`grid h-8 w-9 place-items-center transition-colors ${resultsView === 'grid' ? 'bg-slate-700/55 text-slate-100' : 'text-slate-600 hover:bg-slate-800/40 hover:text-slate-300'}`}><Grid2X2 className="h-4 w-4" /></button>
+                <button type="button" onClick={() => setResultsView('list')} aria-label="List view" className={`grid h-8 w-9 place-items-center transition-colors ${resultsView === 'list' ? 'bg-slate-700/55 text-slate-100' : 'text-slate-600 hover:bg-slate-800/40 hover:text-slate-300'}`}><List className="h-4 w-4" /></button>
               </div>
             </form>
 
