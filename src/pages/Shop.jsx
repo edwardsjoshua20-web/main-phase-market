@@ -42,18 +42,6 @@ import { useWishlistOwner } from '@/hooks/useWishlistOwner';
 import { createPageUrl } from '@/utils';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 
-const SHOP_GAME_LOGOS = {
-  all: '/logo-mark.png',
-  magic: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Magic_the_Gathering_2017.svg',
-  pokemon: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Pok%C3%A9mon_Trading_Card_Game_logo.svg',
-  yugioh: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Yu-Gi-Oh!.png',
-  lorcana: '/images/disney-lorcana-logo.png',
-  flesh_and_blood: 'https://uchroniesgames.fr/web/image/event.event/168/image_1024',
-  onepiece: '/images/oplogo.webp',
-  starwars: '/images/star-wars-unlimited-logo.png',
-  other: '/logo-mark.png'
-};
-
 function resolveListingSellPrice(listing = {}) {
   const safeListing = listing || {};
   const value = Number(safeListing.sell_price ?? safeListing.price ?? safeListing.display_price ?? 0);
@@ -69,6 +57,85 @@ function resolveResultSellPrice(result = {}) {
 function resolveMarketPrice(result = {}) {
   const value = Number(result.marketPrice ?? result.market_price ?? result.price ?? 0);
   return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function resolveReleaseYear(value) {
+  const date = new Date(value || '');
+  return Number.isNaN(date.getTime()) ? '' : String(date.getFullYear());
+}
+
+function FilterChoice({ active, children, onClick }) {
+  return (
+    <button type="button" onClick={onClick} className={`flex w-full items-center gap-2.5 px-1 py-1 text-left text-[13px] transition-colors ${active ? 'font-semibold text-white' : 'text-slate-400 hover:text-slate-100'}`}>
+      <span className={`h-3 w-3 shrink-0 border ${active ? 'border-cyan-400 bg-cyan-400 shadow-[inset_0_0_0_2px_#0e1723]' : 'border-slate-600 bg-transparent'}`} />
+      <span className="truncate">{children}</span>
+    </button>
+  );
+}
+
+function FilterSection({ title, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <details className="group border-b border-slate-700/45 py-2.5" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary className="flex cursor-pointer list-none items-center justify-between py-0.5 text-[11px] font-semibold uppercase text-slate-300 marker:content-none">
+        <span>{title}</span>
+        <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="mt-2 max-h-44 space-y-0.5 overflow-y-auto pr-1">{children}</div>
+    </details>
+  );
+}
+
+function MarketplaceListingResult({ item, resultsView, onAdd, onWishlist, onQuickView, onMouseEnter, onMouseLeave }) {
+  const stockState = inventoryOwner.getStockState(item);
+  const price = Number(item.price || 0);
+  const detail = [item.condition, item.finish, item.language || item.lang].filter(Boolean).join(' / ');
+  const image = item.image_url;
+
+  if (resultsView === 'list') {
+    return (
+      <article onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} className="group grid min-w-0 grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-700/45 px-1 py-2 transition-colors hover:bg-slate-800/35">
+        <div className="grid h-16 w-[52px] place-items-center overflow-hidden bg-[#0b121c]">
+          {image ? <img src={image} alt={item.name} className="h-full w-full object-contain p-1" /> : <span className="text-[10px] text-slate-600">No image</span>}
+        </div>
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold text-white">{item.name}</h3>
+          {item.set_name && <p className="mt-0.5 truncate text-xs text-slate-400">{item.set_name}</p>}
+          {detail && <p className="mt-0.5 truncate text-[11px] text-slate-500">{detail}</p>}
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="min-w-20 text-right">
+            <div className="text-base font-bold text-white">${price.toFixed(2)}</div>
+            <div className="text-[11px] text-slate-500">{stockState.quantity} in stock</div>
+          </div>
+          <Button onClick={onAdd} disabled={!stockState.inStock} size="sm" className="h-8 rounded-[2px] bg-cyan-600 px-3 text-xs text-white hover:bg-cyan-500"><ShoppingCart className="mr-1 h-3 w-3" /> Cart</Button>
+          <Button onClick={onWishlist} variant="ghost" size="icon" aria-label={`Add ${item.name} to wishlist`} className="h-8 w-8 text-slate-500 hover:bg-slate-800 hover:text-rose-300"><Heart className="h-3.5 w-3.5" /></Button>
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <article onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} className="group relative overflow-hidden rounded-[2px] border border-slate-800 bg-[#0f1824] transition-colors hover:border-slate-600 hover:bg-[#121d2b]">
+      <div className="relative aspect-square overflow-hidden bg-[#0a111b]">
+        {image ? <img src={image} alt={item.name} className="h-full w-full object-contain p-2 transition-transform duration-200 group-hover:scale-[1.025]" /> : <div className="flex h-full w-full items-center justify-center text-xs text-slate-600">No Image</div>}
+        {onQuickView && <button type="button" onClick={onQuickView} aria-label={`Quick view ${item.name}`} className="absolute right-2 top-2 grid h-7 w-7 place-items-center bg-slate-950/80 text-slate-400 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"><Search className="h-3.5 w-3.5" /></button>}
+      </div>
+      <div className="p-2.5">
+        <h3 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-[18px] text-white">{item.name}</h3>
+        {item.set_name && <p className="mt-0.5 truncate text-[11px] text-slate-500">{item.set_name}</p>}
+        {detail && <p className="mt-0.5 truncate text-[10px] text-slate-500">{detail}</p>}
+        <div className="mb-2 mt-1.5 flex items-end justify-between gap-2">
+          <span className="text-base font-bold text-white">${price.toFixed(2)}</span>
+          <span className="text-[10px] text-slate-500">{stockState.quantity} in stock</span>
+        </div>
+        <div className="flex gap-1">
+          <Button onClick={onAdd} disabled={!stockState.inStock} size="sm" className="h-7 flex-1 rounded-[2px] bg-cyan-600 text-[11px] text-white hover:bg-cyan-500"><ShoppingCart className="mr-1 h-3 w-3" /> Cart</Button>
+          <Button onClick={onWishlist} variant="ghost" size="icon" aria-label={`Add ${item.name} to wishlist`} className="h-7 w-7 text-slate-500 hover:bg-slate-800 hover:text-rose-300"><Heart className="h-3.5 w-3.5" /></Button>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export default function Shop() {
@@ -883,6 +950,13 @@ export default function Shop() {
   const uniqueConditions = [...new Set(cards.map((c) => c.condition).filter(Boolean))].sort();
   const uniqueFinishes = [...new Set(cards.map((c) => c.finish).filter(Boolean))].sort();
   const uniqueLanguages = [...new Set(cards.map((c) => c.language || c.lang).filter(Boolean))].sort();
+  const sealedSetOptions = [...new Set(allMTGSets.map((set) => set.name).filter(Boolean))].sort();
+  const sealedReleaseYears = [...new Set(allMTGSets.map((set) => resolveReleaseYear(set.release_date)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+  const filteredMTGSets = allMTGSets.filter((set) => {
+    if (filters.set !== 'all' && set.name !== filters.set) return false;
+    if (filters.setType !== 'all' && resolveReleaseYear(set.release_date) !== filters.setType) return false;
+    return true;
+  });
   const filteredCards = useMemo(() => {
     return cards.filter((c) => {
       if (filters.inStock && !inventoryOwner.getStockState(c).inStock) return false;
@@ -943,12 +1017,12 @@ export default function Shop() {
     return true;
   });
   const marketplaceResultCount = showBoxSearch
-    ? (filters.game === 'magic' ? allMTGSets.length : boxSearchResults.length)
+    ? (filters.game === 'magic' ? filteredMTGSets.length : boxSearchResults.length)
     : (showCardSearch && showCardResults
       ? filteredSearchResults.length
       : ((filters.type === 'all' || filters.type === 'single_card') ? filteredCards.length : filteredProducts.length));
   const pagedMarketplaceCards = filteredCards.slice(gameBrowsePage * GAME_BROWSE_PER_PAGE, (gameBrowsePage + 1) * GAME_BROWSE_PER_PAGE);
-  const selectedGameOption = GAME_OPTIONS.find((game) => game.value === filters.game) || GAME_OPTIONS[0];
+  const showCardFilters = filters.type === 'all' || filters.type === 'single_card';
 
   return (
     <div className="min-h-screen bg-[#090f18] text-slate-100">
@@ -961,26 +1035,24 @@ export default function Shop() {
       <div className="w-full px-3 py-4 sm:px-4 lg:px-6">
         <div className="grid min-w-0 gap-6 md:grid-cols-[228px_minmax(0,1fr)] lg:grid-cols-[244px_minmax(0,1fr)]">
           <aside className="hidden min-w-0 md:block">
-            <div className="sticky top-24 rounded-[3px] border border-slate-700/80 bg-[#0e1723] px-4 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
-              <div className="border-b border-slate-700/70 py-4">
-                <label className="mb-2 block text-[11px] font-semibold uppercase text-slate-400">Game</label>
-                <Select value={filters.game} onValueChange={(game) => updateFilters({ ...filters, game, set: 'all' })}>
-                  <SelectTrigger className="h-10 w-full rounded-[2px] border-slate-600 bg-[#151f2e] px-2.5 text-sm text-white">
-                    <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-                      <span className="grid h-6 w-9 shrink-0 place-items-center bg-white/95 p-0.5">
-                        <img src={SHOP_GAME_LOGOS[selectedGameOption.value]} alt="" aria-hidden="true" className="max-h-full max-w-full object-contain" />
-                      </span>
-                      <span className="truncate">{selectedGameOption.label}</span>
-                    </div>
-                  </SelectTrigger>
+            <div className="sticky top-24 rounded-[2px] border border-slate-700/40 bg-[#0e1723] px-4">
+              <div className="flex items-center justify-between border-b border-slate-700/45 py-3">
+                <h2 className="text-xs font-semibold uppercase text-slate-200">Filters</h2>
+                <button type="button" onClick={clearFilters} disabled={!showClearFilters} className="text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-200 disabled:cursor-default disabled:opacity-35">Reset</button>
+              </div>
+
+              <div className="border-b border-slate-700/45 py-3">
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase text-slate-400">Game</label>
+                <Select value={filters.game} onValueChange={(game) => updateFilters({ ...filters, game, set: 'all', setType: 'all' })}>
+                  <SelectTrigger className="h-9 w-full rounded-[2px] border-slate-700/60 bg-slate-950/20 px-2.5 text-sm text-white"><SelectValue /></SelectTrigger>
                   <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100">
-                    {GAME_OPTIONS.map((game) => <SelectItem key={game.value} value={game.value}><span className="flex items-center gap-2"><span className="grid h-5 w-8 place-items-center bg-white/95 p-0.5"><img src={SHOP_GAME_LOGOS[game.value]} alt="" aria-hidden="true" className="max-h-full max-w-full object-contain" /></span><span>{game.label}</span></span></SelectItem>)}
+                    {GAME_OPTIONS.map((game) => <SelectItem key={game.value} value={game.value}>{game.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="border-b border-slate-700/70 py-4">
-                <div className="mb-2 text-[11px] font-semibold uppercase text-slate-400">Product Type</div>
+              <div className="border-b border-slate-700/45 py-3">
+                <div className="mb-1.5 text-[11px] font-semibold uppercase text-slate-400">Product Type</div>
                 <div className="space-y-0.5">
                   {[
                     ['all', 'All Products'],
@@ -989,41 +1061,47 @@ export default function Shop() {
                     ['starter_deck', 'Starter Decks'],
                     ['dice', 'Accessories']
                   ].map(([value, label]) => (
-                    <button key={value} type="button" onClick={() => updateFilters({ ...filters, type: value, search: '' })} className={`flex w-full items-center gap-2.5 px-1 py-1.5 text-left text-sm transition-colors ${filters.type === value ? 'font-semibold text-white' : 'text-slate-300 hover:text-white'}`}>
-                      <span className={`h-3.5 w-3.5 shrink-0 border ${filters.type === value ? 'border-cyan-400 bg-cyan-400 shadow-[inset_0_0_0_3px_#0e1723]' : 'border-slate-500 bg-transparent'}`} />
-                      <span>{label}</span>
-                    </button>
+                    <FilterChoice key={value} active={filters.type === value} onClick={() => updateFilters({ ...filters, type: value, search: '', set: 'all', setType: 'all', rarity: 'all', condition: 'all', finish: 'all', language: 'all' })}>{label}</FilterChoice>
                   ))}
                 </div>
               </div>
 
-              <div className="border-b border-slate-700/70 py-4 space-y-3">
-                <div className="text-[11px] font-semibold uppercase text-slate-400">Set</div>
-                {uniqueSets.length > 0 && <Select value={filters.set} onValueChange={(set) => updateFilters({ ...filters, set })}>
-                  <SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Set" /></SelectTrigger>
-                  <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Sets</SelectItem>{uniqueSets.map((set) => <SelectItem key={set} value={set}>{set}</SelectItem>)}</SelectContent>
-                </Select>}
-                {uniqueRarities.length > 0 && <Select value={filters.rarity} onValueChange={(rarity) => updateFilters({ ...filters, rarity })}>
-                  <SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Rarity" /></SelectTrigger>
-                  <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Rarities</SelectItem>{uniqueRarities.map((rarity) => <SelectItem key={rarity} value={rarity}>{rarity}</SelectItem>)}</SelectContent>
-                </Select>}
-              </div>
+              {showCardFilters && uniqueSets.length > 0 && <FilterSection title="Set">
+                <FilterChoice active={filters.set === 'all'} onClick={() => updateFilters({ ...filters, set: 'all' })}>All Sets</FilterChoice>
+                {uniqueSets.map((set) => <FilterChoice key={set} active={filters.set === set} onClick={() => updateFilters({ ...filters, set })}>{set}</FilterChoice>)}
+              </FilterSection>}
 
-              <div className="border-b border-slate-700/70 py-4">
-                <div className="mb-3 text-[11px] font-semibold uppercase text-slate-400">Price</div>
+              {showCardFilters && uniqueRarities.length > 0 && <FilterSection title="Rarity">
+                <FilterChoice active={filters.rarity === 'all'} onClick={() => updateFilters({ ...filters, rarity: 'all' })}>All Rarities</FilterChoice>
+                {uniqueRarities.map((rarity) => <FilterChoice key={rarity} active={filters.rarity === rarity} onClick={() => updateFilters({ ...filters, rarity })}>{rarity}</FilterChoice>)}
+              </FilterSection>}
+
+              {filters.type === 'booster_box' && filters.game === 'magic' && sealedSetOptions.length > 0 && <FilterSection title="Set">
+                <FilterChoice active={filters.set === 'all'} onClick={() => updateFilters({ ...filters, set: 'all' })}>All Sets</FilterChoice>
+                {sealedSetOptions.map((set) => <FilterChoice key={set} active={filters.set === set} onClick={() => updateFilters({ ...filters, set })}>{set}</FilterChoice>)}
+              </FilterSection>}
+
+              {filters.type === 'booster_box' && filters.game === 'magic' && sealedReleaseYears.length > 0 && <FilterSection title="Release Date">
+                <FilterChoice active={filters.setType === 'all'} onClick={() => updateFilters({ ...filters, setType: 'all' })}>All Years</FilterChoice>
+                {sealedReleaseYears.map((year) => <FilterChoice key={year} active={filters.setType === year} onClick={() => updateFilters({ ...filters, setType: year })}>{year}</FilterChoice>)}
+              </FilterSection>}
+
+              <FilterSection title="Price" defaultOpen>
                 <div className="grid grid-cols-2 gap-2">
-                  <Input inputMode="decimal" value={filters.priceMin} onChange={(event) => updateFilters({ ...filters, priceMin: event.target.value })} placeholder="Min" className="h-9 rounded border-slate-600 bg-[#111b29] text-sm text-white placeholder:text-slate-500" />
-                  <Input inputMode="decimal" value={filters.priceMax} onChange={(event) => updateFilters({ ...filters, priceMax: event.target.value })} placeholder="Max" className="h-9 rounded border-slate-600 bg-[#111b29] text-sm text-white placeholder:text-slate-500" />
+                  <Input inputMode="decimal" value={filters.priceMin} onChange={(event) => updateFilters({ ...filters, priceMin: event.target.value })} placeholder="Min" className="h-8 rounded-[2px] border-slate-700/60 bg-slate-950/20 px-2 text-xs text-white placeholder:text-slate-600" />
+                  <Input inputMode="decimal" value={filters.priceMax} onChange={(event) => updateFilters({ ...filters, priceMax: event.target.value })} placeholder="Max" className="h-8 rounded-[2px] border-slate-700/60 bg-slate-950/20 px-2 text-xs text-white placeholder:text-slate-600" />
                 </div>
-              </div>
+              </FilterSection>
 
-              {(uniqueConditions.length > 0 || uniqueFinishes.length > 0 || uniqueLanguages.length > 0) && <div className="border-b border-slate-700/70 py-4 space-y-3">
-                {uniqueConditions.length > 0 && <Select value={filters.condition} onValueChange={(condition) => updateFilters({ ...filters, condition })}><SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Condition" /></SelectTrigger><SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Conditions</SelectItem>{uniqueConditions.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}
-                {uniqueFinishes.length > 0 && <Select value={filters.finish} onValueChange={(finish) => updateFilters({ ...filters, finish })}><SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Finish" /></SelectTrigger><SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Finishes</SelectItem>{uniqueFinishes.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}
-                {uniqueLanguages.length > 0 && <Select value={filters.language} onValueChange={(language) => updateFilters({ ...filters, language })}><SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Language" /></SelectTrigger><SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Languages</SelectItem>{uniqueLanguages.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}
-              </div>}
+              {showCardFilters && uniqueConditions.length > 0 && <FilterSection title="Condition">
+                <FilterChoice active={filters.condition === 'all'} onClick={() => updateFilters({ ...filters, condition: 'all' })}>All Conditions</FilterChoice>
+                {uniqueConditions.map((value) => <FilterChoice key={value} active={filters.condition === value} onClick={() => updateFilters({ ...filters, condition: value })}>{value}</FilterChoice>)}
+              </FilterSection>}
 
-              {showClearFilters && <button type="button" onClick={clearFilters} className="my-3 inline-flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-300 hover:text-white"><X className="h-3.5 w-3.5" /> Reset filters</button>}
+              {showCardFilters && (uniqueFinishes.length > 0 || uniqueLanguages.length > 0) && <FilterSection title="Finish / Language">
+                {uniqueFinishes.length > 0 && <div className="pb-1.5"><div className="mb-1 px-1 text-[10px] uppercase text-slate-600">Finish</div><FilterChoice active={filters.finish === 'all'} onClick={() => updateFilters({ ...filters, finish: 'all' })}>All Finishes</FilterChoice>{uniqueFinishes.map((value) => <FilterChoice key={value} active={filters.finish === value} onClick={() => updateFilters({ ...filters, finish: value })}>{value}</FilterChoice>)}</div>}
+                {uniqueLanguages.length > 0 && <div><div className="mb-1 px-1 text-[10px] uppercase text-slate-600">Language</div><FilterChoice active={filters.language === 'all'} onClick={() => updateFilters({ ...filters, language: 'all' })}>All Languages</FilterChoice>{uniqueLanguages.map((value) => <FilterChoice key={value} active={filters.language === value} onClick={() => updateFilters({ ...filters, language: value })}>{value}</FilterChoice>)}</div>}
+              </FilterSection>}
             </div>
           </aside>
 
@@ -1037,7 +1115,7 @@ export default function Shop() {
               </div>
             </details>
 
-            <form onSubmit={(event) => { event.preventDefault(); if (showBoxSearch) searchBoosterBoxes(boxSearchQuery); else submitSinglesSearch(); }} className="mb-4 flex min-w-0 flex-col gap-2 border-b border-slate-700/70 pb-4 sm:flex-row sm:items-center">
+            <form onSubmit={(event) => { event.preventDefault(); if (showBoxSearch) searchBoosterBoxes(boxSearchQuery); else submitSinglesSearch(); }} className="mb-3 flex min-w-0 flex-col gap-2 border-b border-slate-700/60 pb-3 sm:flex-row sm:items-center">
               <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input value={showBoxSearch ? boxSearchQuery : singlesSearchDraft} onChange={showBoxSearch ? handleBoxSearchChange : (event) => setSinglesSearchDraft(event.target.value)} placeholder={showBoxSearch ? 'Search sealed sets...' : 'Search the marketplace...'} className="h-10 rounded border-slate-600 bg-[#111b29] pl-9 pr-10 text-sm text-white placeholder:text-slate-500" />
@@ -1234,9 +1312,8 @@ export default function Shop() {
              </div>
           }
 
-        <div className="mb-3 flex items-center justify-between text-xs text-slate-400">
+        <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
           <span>{marketplaceResultCount.toLocaleString()} result{marketplaceResultCount === 1 ? '' : 's'}</span>
-          {showClearFilters && <button type="button" onClick={clearFilters} className="hidden items-center gap-1 text-slate-300 hover:text-white md:inline-flex"><X className="h-3 w-3" /> Reset</button>}
         </div>
 
         {/* Card Search Results Grid */}
@@ -1247,7 +1324,7 @@ export default function Shop() {
           filteredResults :
           filteredResults.slice(cardSearchPage * CARDS_PER_PAGE, (cardSearchPage + 1) * CARDS_PER_PAGE);
           return (
-        <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid grid-cols-1 gap-2'}>
+        <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid grid-cols-1'}>
             {pagedResults.map((result, idx) => {
               const gridImageUrl = getResultGridImageUrl(result);
               const listingSellPrice = resolveResultSellPrice(result);
@@ -1314,9 +1391,9 @@ export default function Shop() {
                 openStarWarsCardDetail(result);
               }
             }}
-            className={`group overflow-hidden rounded border border-slate-700/80 bg-[#111a27] transition-colors hover:border-cyan-500/60 ${resultsView === 'list' ? 'flex min-h-32' : ''} ${(groupedMagicSearchResults.length > 0 && result.oracle_id) || ((result.game === 'pokemon' || result.game === 'yugioh' || result.game === 'lorcana' || result.game === 'onepiece' || result.game === 'flesh_and_blood' || result.game === 'starwars') && result.id) ? 'cursor-pointer' : ''}`}>
+            className={`group overflow-hidden transition-colors ${resultsView === 'list' ? 'flex min-h-0 items-center border-b border-slate-700/45 bg-transparent px-1 py-2 hover:bg-slate-800/35' : 'rounded-[2px] border border-slate-800 bg-[#0f1824] hover:border-slate-600 hover:bg-[#121d2b]'} ${(groupedMagicSearchResults.length > 0 && result.oracle_id) || ((result.game === 'pokemon' || result.game === 'yugioh' || result.game === 'lorcana' || result.game === 'onepiece' || result.game === 'flesh_and_blood' || result.game === 'starwars') && result.id) ? 'cursor-pointer' : ''}`}>
 
-                <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'w-24 sm:w-28' : 'aspect-square w-full'}`}>
+                <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'h-16 w-[52px]' : 'aspect-square w-full'}`}>
                     {gridImageUrl ?
                 <img
                   src={gridImageUrl}
@@ -1335,9 +1412,9 @@ export default function Shop() {
                     onMouseLeave={handleCardImagePreviewLeave} />
                   }
                   {result.inStock && <Badge className="absolute right-2 top-2 rounded-sm bg-emerald-600 text-[10px] text-white">In Stock</Badge>}
-                  <button type="button" aria-label={`Add ${result.name} to wishlist`} onClick={(event) => { event.stopPropagation(); addToWishlistMutation.mutate(result.stockCard || result); }} className="absolute left-2 top-2 grid h-7 w-7 place-items-center border border-slate-600 bg-slate-950/85 text-slate-300 hover:border-rose-400 hover:text-rose-300"><Heart className="h-3.5 w-3.5" /></button>
+                  <button type="button" aria-label={`Add ${result.name} to wishlist`} onClick={(event) => { event.stopPropagation(); addToWishlistMutation.mutate(result.stockCard || result); }} className="absolute left-2 top-2 grid h-7 w-7 place-items-center bg-slate-950/85 text-slate-400 hover:text-rose-300"><Heart className="h-3.5 w-3.5" /></button>
                 </div>
-                <div className="min-w-0 flex-1 p-3">
+                <div className={`min-w-0 flex-1 ${resultsView === 'list' ? 'px-3 py-0' : 'p-2.5'}`}>
                   <h3 className="line-clamp-2 text-sm font-semibold text-white">{result.name}</h3>
                   {result.set_name && <p className="mt-1 line-clamp-1 text-xs text-slate-400">{result.set_name}</p>}
                   {Array.isArray(result.languageCodes) && result.languageCodes.length > 0 &&
@@ -1485,10 +1562,10 @@ export default function Shop() {
         <div className="mb-6">
             
             {filters.game === 'magic' &&
-            <div className={resultsView === 'grid' ? 'mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'mb-5 grid grid-cols-1 gap-2'}>
-                {allMTGSets.map((set) =>
-            <div key={set.id} className={`group overflow-hidden rounded border border-slate-700/80 bg-[#111a27] transition-colors hover:border-cyan-500/60 ${resultsView === 'list' ? 'flex min-h-32' : ''}`}>
-                    <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'w-28' : 'aspect-square w-full'}`}>
+            <div className={resultsView === 'grid' ? 'mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'mb-5 grid grid-cols-1'}>
+                {filteredMTGSets.map((set) =>
+            <div key={set.id} className={`group overflow-hidden transition-colors ${resultsView === 'list' ? 'flex min-h-0 items-center border-b border-slate-700/45 bg-transparent px-1 py-2 hover:bg-slate-800/35' : 'rounded-[2px] border border-slate-800 bg-[#0f1824] hover:border-slate-600 hover:bg-[#121d2b]'}`}>
+                    <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'h-16 w-[52px]' : 'aspect-square w-full'}`}>
                       <img
                   src={set.image_url}
                   alt={`${set.name} Booster Box`}
@@ -1506,7 +1583,7 @@ export default function Shop() {
                         <p className="text-center text-xs font-semibold text-slate-700">Booster Box</p>
                       </div>
                     </div>
-                    <div className="min-w-0 flex-1 p-3">
+                    <div className={`min-w-0 flex-1 ${resultsView === 'list' ? 'px-3 py-0' : 'p-2.5'}`}>
                       <h4 className="line-clamp-2 text-sm font-semibold text-white">{set.name}</h4>
                       <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
                         <span className="rounded bg-slate-100 px-2 py-0.5 font-medium text-slate-700">{set.set_code}</span>
@@ -1782,169 +1859,43 @@ export default function Shop() {
             )}
                </div> :
           filters.type === 'single_card' && !filters.search ?
-          <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid grid-cols-1 gap-2'}>
+          <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'divide-y-0'}>
                  {pagedMarketplaceCards.map((card) =>
-            <div
+            <MarketplaceListingResult
               key={card.id}
+              item={card}
+              resultsView={resultsView}
               onMouseEnter={() => handleCardPreviewEnter(card)}
               onMouseLeave={handleCardPreviewLeave}
-              className={`group relative overflow-hidden rounded border border-slate-700/80 bg-[#111a27] transition-colors hover:border-cyan-500/60 ${resultsView === 'list' ? 'flex min-h-32' : ''}`}>
-
-                      <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'w-24 sm:w-28' : 'aspect-square w-full'}`}>
-                        {card.image_url ?
-                <img
-                  src={card.image_url}
-                  alt={card.name}
-                  className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300" /> :
-
-
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                            No Image
-                          </div>
-                }
-                      </div>
-
-                      <div className="min-w-0 flex-1 p-3">
-                        <h3 className="line-clamp-2 text-sm font-semibold text-white">
-                          {card.name}
-                        </h3>
-                        {card.set_name &&
-                <p className="mt-1 line-clamp-1 text-xs text-slate-400">{card.set_name}</p>
-                }
-                        <div className="flex items-center justify-between mt-2 mb-2">
-                          <span className="text-lg font-bold text-white">
-                            ${card.price?.toFixed(2)}
-                          </span>
-                          <span className="text-xs text-slate-400">
-                            {card.quantity} in stock
-                          </span>
-                        </div>
-                        <div className="flex gap-1">
-                        <Button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      addToCartMutation.mutate(card);
-                    }}
-                    disabled={!inventoryOwner.getStockState(card).inStock}
-                    size="sm"
-                    className="h-8 flex-1 rounded-sm bg-cyan-600 text-xs text-white hover:bg-cyan-500">
-
-                            <ShoppingCart className="w-3 h-3 mr-1" />
-                            Cart
-                          </Button>
-                          <Button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      addToWishlistMutation.mutate(card);
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="h-8 rounded-sm border-slate-600 bg-transparent px-2 text-slate-300 hover:border-rose-400 hover:bg-slate-800 hover:text-rose-300">
-
-                            <Heart className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
+              onAdd={(event) => { event.preventDefault(); addToCartMutation.mutate(card); }}
+              onWishlist={(event) => { event.preventDefault(); addToWishlistMutation.mutate(card); }} />
             )}
               </div> :
           (filters.type === 'all' || filters.type === 'single_card') && filteredCards.length > 0 ?
-          <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid grid-cols-1 gap-2'}>
+          <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'divide-y-0'}>
                 {/* Show Cards when game is filtered */}
                 {pagedMarketplaceCards.map((card) =>
-            <div
+            <MarketplaceListingResult
               key={card.id}
-              className={`group relative overflow-hidden rounded border border-slate-700/80 bg-[#111a27] transition-colors hover:border-cyan-500/60 ${resultsView === 'list' ? 'flex min-h-32' : ''}`}>
-
-                    <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'w-24 sm:w-28' : 'aspect-square w-full'}`}>
-                      {card.image_url ?
-                <img
-                  src={card.image_url}
-                  alt={card.name}
-                  className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300" /> :
-
-
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          No Image
-                        </div>
-                }
-                    </div>
-
-                    <div className="min-w-0 flex-1 p-3">
-                      <h3 className="line-clamp-2 text-sm font-semibold text-white">
-                        {card.name}
-                      </h3>
-                      {card.set_name &&
-                <p className="mt-1 line-clamp-1 text-xs text-slate-400">{card.set_name}</p>
-                }
-                      <div className="flex items-center justify-between mt-2 mb-2">
-                        <span className="text-lg font-bold text-white">
-                          ${card.price?.toFixed(2)}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          {card.quantity} in stock
-                        </span>
-                      </div>
-                      <div className="flex gap-1">
-                          <Button
-                    onClick={(event) => handleAddCardToCart(card, event)}
-                    disabled={!inventoryOwner.getStockState(card).inStock}
-                    size="sm"
-                    className="h-8 flex-1 rounded-sm bg-cyan-600 text-xs text-white hover:bg-cyan-500">
-
-                          <ShoppingCart className="w-3 h-3 mr-1" />
-                          Cart
-                        </Button>
-                        <Button onClick={(event) => { event.preventDefault(); addToWishlistMutation.mutate(card); }} variant="outline" size="sm" aria-label={`Add ${card.name} to wishlist`} className="h-8 rounded-sm border-slate-600 bg-transparent px-2 text-slate-300 hover:border-rose-400 hover:bg-slate-800 hover:text-rose-300">
-                          <Heart className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+              item={card}
+              resultsView={resultsView}
+              onMouseEnter={() => handleCardPreviewEnter(card)}
+              onMouseLeave={handleCardPreviewLeave}
+              onAdd={(event) => handleAddCardToCart(card, event)}
+              onWishlist={(event) => { event.preventDefault(); addToWishlistMutation.mutate(card); }} />
             )}
               </div> :
           filteredProducts.length > 0 ?
-          <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid grid-cols-1 gap-2'}>
+          <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'divide-y-0'}>
                 {/* Show Products */}
                 {filteredProducts.map((product) =>
-            <div key={product.id} className={`group relative overflow-hidden rounded border border-slate-700/80 bg-[#111a27] transition-colors hover:border-cyan-500/60 ${resultsView === 'list' ? 'flex min-h-32' : ''}`}>
-                    <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'w-24 sm:w-28' : 'aspect-square w-full'}`}>
-                      {product.image_url ?
-                <img
-                  src={product.image_url}
-                  alt={product.name}
-                  className="w-full h-full object-cover p-2 group-hover:scale-105 transition-transform duration-300" /> :
-
-
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          No Image
-                        </div>
-                }
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                        <Button size="icon" variant="secondary" className="h-8 w-8 bg-white" onClick={() => setQuickViewItem(product)}>
-                          <ShoppingCart className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="min-w-0 flex-1 p-3">
-                      <h3 className="line-clamp-2 text-sm font-semibold text-white">
-                        {product.name}
-                      </h3>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-lg font-bold text-white">
-                          ${product.price?.toFixed(2)}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          {product.quantity} in stock
-                        </span>
-                      </div>
-                      <div className="mt-2 flex gap-1">
-                        <Button onClick={(event) => handleAddCardToCart(product, event)} disabled={!inventoryOwner.getStockState(product).inStock} size="sm" className="h-8 flex-1 rounded-sm bg-cyan-600 text-xs text-white hover:bg-cyan-500"><ShoppingCart className="mr-1 h-3 w-3" /> Add to Cart</Button>
-                        <Button onClick={(event) => { event.preventDefault(); addToWishlistMutation.mutate(product); }} variant="outline" size="sm" aria-label={`Add ${product.name} to wishlist`} className="h-8 rounded-sm border-slate-600 bg-transparent px-2 text-slate-300 hover:border-rose-400 hover:bg-slate-800 hover:text-rose-300"><Heart className="h-3 w-3" /></Button>
-                      </div>
-                    </div>
-                  </div>
+            <MarketplaceListingResult
+              key={product.id}
+              item={product}
+              resultsView={resultsView}
+              onAdd={(event) => handleAddCardToCart(product, event)}
+              onWishlist={(event) => { event.preventDefault(); addToWishlistMutation.mutate(product); }}
+              onQuickView={() => setQuickViewItem(product)} />
             )}
               </div> :
 
