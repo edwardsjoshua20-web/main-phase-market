@@ -1,5 +1,6 @@
 import {
   dedupeCanonicalCardResults,
+  getCardNameAliases,
   getCanonicalCardName,
   getCanonicalCardNameKey,
   isCanonicalCardNameMatch,
@@ -12,6 +13,7 @@ import {
 
 export {
   dedupeCanonicalCardResults,
+  getCardNameAliases,
   getCanonicalCardName,
   getCanonicalCardNameKey,
   isCanonicalCardNameMatch,
@@ -116,13 +118,13 @@ export function scoreCatalogCard(card, query) {
   const rawName = String(card.name || card.product_name || '');
   const name = normalizeSearchText(rawName);
   const printedName = normalizeSearchText(card.printed_name);
-  const faceNames = rawName.split(/\s*\/\/\s*/).map((faceName) => normalizeSearchText(faceName));
+  const nameAliases = getCardNameAliases(card).map((alias) => normalizeSearchText(alias));
   const setCode = normalizeSearchText(card.set_code || card.set_id);
   const collectorNumber = normalizeSearchText(card.collector_number || card.card_number || card.number);
   const haystack = normalizeSearchText(textFields(card).filter(Boolean).join(' '));
 
   if (searchTextEquals(name, normalizedQuery) || searchTextEquals(printedName, normalizedQuery)) return 1000;
-  if (faceNames.some((faceName) => faceName === normalizedQuery)) return 980;
+  if (nameAliases.some((alias) => searchTextEquals(alias, normalizedQuery))) return 980;
   if (searchTextStartsWith(name, normalizedQuery) || searchTextStartsWith(printedName, normalizedQuery)) return 850;
   if (searchTextIncludes(name, normalizedQuery) || searchTextIncludes(printedName, normalizedQuery)) return 700;
   if (searchTextFuzzyEquals(name, normalizedQuery) || searchTextFuzzyEquals(printedName, normalizedQuery)) return 650;

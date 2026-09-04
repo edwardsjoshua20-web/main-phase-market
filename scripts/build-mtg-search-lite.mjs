@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getCardNameAliases, getCanonicalCardNameKey } from '../src/services/search/searchIdentity.js';
 
 const PROJECT_ROOT = process.cwd();
 const MTG_ROOT = path.join(PROJECT_ROOT, 'public', 'data', 'mtg');
 const SEARCH_ROOT = path.join(MTG_ROOT, 'search');
 const OUTPUT_ROOT = path.join(MTG_ROOT, 'search-lite');
+const ALIAS_OUTPUT_ROOT = path.join(MTG_ROOT, 'search-alias');
 const MANIFEST_PATH = path.join(MTG_ROOT, 'manifest.json');
 
 function readJson(filePath) {
@@ -22,6 +24,8 @@ function pickSearchFields(row = {}) {
     oracle_id: row.oracle_id,
     name: row.name,
     name_normalized: row.name_normalized,
+    face_names: row.face_names,
+    alternate_names: row.alternate_names,
     lang: row.lang,
     set_name: row.set_name,
     set_code: row.set_code,
@@ -57,6 +61,25 @@ function normalizeName(row = {}) {
   return String(row.name_normalized || row.name || '').trim().toLowerCase();
 }
 
+function canonicalName(row = {}) {
+  const rawName = String(row.name || '').trim();
+  const parts = rawName.split(/\s*\/\/\s*/).filter(Boolean);
+  if (parts.length < 2) return rawName;
+  const firstKey = getCanonicalCardNameKey(parts[0]);
+  return firstKey && parts.every((part) => getCanonicalCardNameKey(part) === firstKey)
+    ? parts[0]
+    : rawName;
+}
+
+function bucketForName(value) {
+  const normalized = getCanonicalCardNameKey(value);
+  const first = normalized[0];
+  if (!first) return 'other';
+  if (/[a-z]/.test(first)) return first;
+  if (/[0-9]/.test(first)) return '0-9';
+  return 'other';
+}
+
 function compareRepresentativeRows(a = {}, b = {}) {
   if (isEnglish(a) !== isEnglish(b)) return isEnglish(a) ? -1 : 1;
   if (Boolean(a.image_normal || a.image_small) !== Boolean(b.image_normal || b.image_small)) {
@@ -78,7 +101,24 @@ function dedupeRepresentativeRows(rows = []) {
   }
 
   return [...grouped.values()]
-    .map((variants) => variants.sort(compareRepresentativeRows)[0])
+    .map((variants) => {
+      const representative = variants.sort(compareRepresentativeRows)[0];
+      const faceNames = new Set();
+      const alternateNames = new Set();
+      for (const variant of variants) {
+        for (const faceName of variant.face_names || []) {
+          if (faceName) faceNames.add(faceName);
+        }
+        for (const alternateName of variant.alternate_names || []) {
+          if (alternateName) alternateNames.add(alternateName);
+        }
+      }
+      return {
+        ...representative,
+        face_names: [...faceNames],
+        alternate_names: [...alternateNames]
+      };
+    })
     .sort((a, b) => normalizeName(a).localeCompare(normalizeName(b)));
 }
 
@@ -94,7 +134,11 @@ function main() {
   };
 
   fs.rmSync(OUTPUT_ROOT, { recursive: true, force: true });
+  fs.rmSync(ALIAS_OUTPUT_ROOT, { recursive: true, force: true });
   fs.mkdirSync(OUTPUT_ROOT, { recursive: true });
+  fs.mkdirSync(ALIAS_OUTPUT_ROOT, { recursive: true });
+
+  const aliasesByBucket = new Map();
 
   for (const [bucketName, bucketInfo] of Object.entries(buckets)) {
     const sourceFile = bucketInfo.file;
@@ -114,7 +158,34 @@ function main() {
       count: rows.length
     };
 
+    for (const row of rows) {
+      const resolvedCanonicalName = canonicalName(row);
+      const canonicalKey = getCanonicalCardNameKey(resolvedCanonicalName);
+      for (const alias of getCardNameAliases(row)) {
+        const aliasKey = getCanonicalCardNameKey(alias);
+        if (!aliasKey || aliasKey === canonicalKey) continue;
+        const aliasBucket = bucketForName(aliasKey);
+        if (!aliasesByBucket.has(aliasBucket)) aliasesByBucket.set(aliasBucket, new Map());
+        const routeKey = `${aliasKey}\u0000${canonicalKey}`;
+        aliasesByBucket.get(aliasBucket).set(routeKey, {
+          alias: aliasKey,
+          canonical_name: resolvedCanonicalName,
+          canonical_bucket: bucketName
+        });
+      }
+    }
+
     console.log(`${bucketName}: ${rows.length} cards -> ${outputRelativePath}`);
+  }
+
+  liteManifest.alias_buckets = {};
+  for (const [bucketName, routes] of [...aliasesByBucket].sort(([left], [right]) => left.localeCompare(right))) {
+    const outputRelativePath = `search-alias/${bucketName}.json`;
+    const entries = [...routes.values()].sort((a, b) => (
+      a.alias.localeCompare(b.alias) || a.canonical_name.localeCompare(b.canonical_name)
+    ));
+    writeJson(path.join(MTG_ROOT, outputRelativePath), entries);
+    liteManifest.alias_buckets[bucketName] = { file: outputRelativePath, count: entries.length };
   }
 
   writeJson(path.join(MTG_ROOT, 'search-lite-manifest.json'), liteManifest);

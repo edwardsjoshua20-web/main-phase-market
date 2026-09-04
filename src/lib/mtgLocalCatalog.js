@@ -1,6 +1,6 @@
 import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 import { getLocalJsonIfAvailable, postLocalJsonIfAvailable } from '@/lib/catalogApi';
-import { normalizeSearchText as normalizeText, searchTextEquals, searchTextFuzzyEquals, searchTextIncludes, searchTextStartsWith } from '@/services/search/searchIdentity';
+import { getCardNameAliases, isCanonicalCardNameMatch, normalizeSearchText as normalizeText, searchTextEquals, searchTextFuzzyEquals, searchTextIncludes, searchTextStartsWith } from '@/services/search/searchIdentity';
 
 const manifestUrl = getCatalogAssetUrl('mtg', 'manifest.json');
 const liteManifestUrl = getCatalogAssetUrl('mtg', 'search-lite-manifest.json');
@@ -22,6 +22,7 @@ const printingManifestCache = {
 
 const bucketCache = new Map();
 const liteBucketCache = new Map();
+const aliasBucketCache = new Map();
 const printingShardCache = new Map();
 const allBucketsCache = {
   promise: null,
@@ -220,6 +221,34 @@ async function loadLiteBucket(bucket) {
   return promise;
 }
 
+async function loadAliasBucket(bucket) {
+  if (aliasBucketCache.has(bucket)) return aliasBucketCache.get(bucket);
+
+  const promise = loadLiteManifest().then(async (manifest) => {
+    const bucketFile = manifest?.alias_buckets?.[bucket]?.file;
+    if (!bucketFile) return [];
+    const response = await fetch(getCatalogAssetUrl('mtg', bucketFile));
+    if (!response.ok) return [];
+    return response.json();
+  });
+  aliasBucketCache.set(bucket, promise);
+  return promise;
+}
+
+async function loadLiteRowsForQuery(normalizedQuery) {
+  const queryBucket = bucketForQuery(normalizedQuery);
+  const aliasRoutes = await loadAliasBucket(queryBucket);
+  const targetBuckets = new Set([queryBucket]);
+
+  for (const route of aliasRoutes) {
+    if (searchTextStartsWith(route?.alias, normalizedQuery) || searchTextFuzzyEquals(route?.alias, normalizedQuery)) {
+      targetBuckets.add(route.canonical_bucket);
+    }
+  }
+
+  return (await Promise.all([...targetBuckets].map(loadLiteBucket))).flat();
+}
+
 async function loadAllLiteBuckets() {
   if (allLiteBucketsCache.value) return allLiteBucketsCache.value;
 
@@ -349,9 +378,12 @@ async function loadRowsForOracleIds(oracleIds) {
 function scoreRow(row, normalizedQuery) {
   const name = getCanonicalNormalizedName(row);
   const searchText = row.search_text || '';
+  const aliases = getCardNameAliases(row).map(normalizeText);
 
   if (searchTextEquals(name, normalizedQuery)) return 1000;
+  if (aliases.some((alias) => searchTextEquals(alias, normalizedQuery))) return 950;
   if (searchTextStartsWith(name, normalizedQuery)) return 750;
+  if (aliases.some((alias) => searchTextStartsWith(alias, normalizedQuery))) return 700;
   if (name.split(' ').some((part) => part.startsWith(normalizedQuery))) return 500;
   if (searchTextFuzzyEquals(name, normalizedQuery)) return 300;
   if (searchTextIncludes(searchText, normalizedQuery)) return 250;
@@ -723,6 +755,8 @@ function formatResult(row, englishImageIndexes = null) {
     oracle_id: row.oracle_id,
     name: canonicalName,
     raw_name: row.name,
+    face_names: row.face_names || [],
+    alternate_names: row.alternate_names || [],
     lang: row.lang || 'unknown',
     set_name: row.set_name || 'Unknown Set',
     set_code: row.set_code || 'UNK',
@@ -776,8 +810,7 @@ export async function searchMtgCatalog(query, limit = 50) {
     // Fall through to local file scan.
   }
 
-  const bucket = bucketForQuery(normalizedQuery);
-  const rows = await loadLiteBucket(bucket);
+  const rows = await loadLiteRowsForQuery(normalizedQuery);
   const englishImageIndexes = buildEnglishImageIndexes(rows);
   const rankedRows = rows
     .map((row) => ({ row, score: scoreRow(row, normalizedQuery) }))
@@ -786,7 +819,7 @@ export async function searchMtgCatalog(query, limit = 50) {
 
   const exactMatches = rankedRows
     .map(({ row }) => row)
-    .filter((row) => searchTextEquals(getCanonicalNormalizedName(row), normalizedQuery))
+    .filter((row) => isCanonicalCardNameMatch(row, normalizedQuery))
     .sort(compareExactPrintings);
 
   const exactMatchOracleIds = new Set(
@@ -890,8 +923,7 @@ export async function searchMtgCatalogSuggestions(query, limit = 10) {
     return [];
   }
 
-  const bucket = bucketForQuery(normalizedQuery);
-  const rows = await loadLiteBucket(bucket);
+  const rows = await loadLiteRowsForQuery(normalizedQuery);
   const englishImageIndexes = buildEnglishImageIndexes(rows);
 
   return dedupeByName(

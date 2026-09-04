@@ -3,7 +3,7 @@ import path from 'node:path';
 import { db } from './db.mjs';
 
 const mtgSearchDir = path.join(process.cwd(), 'public', 'data', 'mtg', 'search');
-const INDEX_VERSION = 1;
+const INDEX_VERSION = 2;
 
 const COLOR_BITS = {
   W: 1,
@@ -23,6 +23,16 @@ function normalizeText(value) {
     .replace(/['’]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+function getNameAliases(row = {}) {
+  return [
+    row.name,
+    row.printed_name,
+    ...(Array.isArray(row.face_names) ? row.face_names : []),
+    ...(Array.isArray(row.alternate_names) ? row.alternate_names : []),
+    ...String(row.name || '').split(/\s*\/\/\s*/)
+  ].map(normalizeText).filter(Boolean);
 }
 
 function getCanonicalName(row) {
@@ -117,7 +127,10 @@ function buildGroupRows(rows) {
       name: canonicalName,
       raw_name: primary.name || canonicalName,
       name_normalized: normalizeText(canonicalName),
-      search_text: normalizeText(primary.search_text || canonicalName),
+      search_text: [...new Set(sortedVariants.flatMap(getNameAliases).concat(
+        sortedVariants.map((variant) => normalizeText(variant.search_text || ''))
+      ))].filter(Boolean).join(' '),
+      aliases_json: JSON.stringify([...new Set(sortedVariants.flatMap(getNameAliases))]),
       oracle_text: primary.oracle_text || '',
       oracle_text_normalized: normalizeText(primary.oracle_text || ''),
       type_line: primary.type_line || '',
@@ -220,6 +233,8 @@ function mapRow(row) {
     oracle_id: row.oracle_id,
     name: row.name,
     raw_name: row.raw_name,
+    face_names: JSON.parse(row.aliases_json || '[]'),
+    alternate_names: JSON.parse(row.aliases_json || '[]'),
     lang: row.lang || 'en',
     set_name: row.set_name,
     set_code: row.set_code,
@@ -272,6 +287,7 @@ function ensureSearchTables() {
       raw_name TEXT,
       name_normalized TEXT NOT NULL,
       search_text TEXT NOT NULL,
+      aliases_json TEXT NOT NULL DEFAULT '[]',
       oracle_text TEXT,
       oracle_text_normalized TEXT,
       type_line TEXT,
@@ -311,6 +327,7 @@ function ensureSearchTables() {
   `);
 
   ensureColumn('mtg_search_printings', 'has_english_variant', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('mtg_search_printings', 'aliases_json', "TEXT NOT NULL DEFAULT '[]'");
 }
 
 ensureSearchTables();
@@ -326,13 +343,13 @@ const truncateSearchStmt = db.prepare(`DELETE FROM mtg_search_printings`);
 const insertSearchStmt = db.prepare(`
   INSERT INTO mtg_search_printings (
     group_key, oracle_id, set_code, set_name, collector_number, name, raw_name,
-    name_normalized, search_text, oracle_text, oracle_text_normalized, type_line,
+    name_normalized, search_text, aliases_json, oracle_text, oracle_text_normalized, type_line,
     type_line_normalized, set_search, rarity, released_at, mana_cost, cmc, power,
     toughness, power_num, toughness_num, color_mask, color_count, colors_json,
     image_url, image_small, language_codes_json, variant_count, has_english_variant, lang, price, has_image
   ) VALUES (
     @group_key, @oracle_id, @set_code, @set_name, @collector_number, @name, @raw_name,
-    @name_normalized, @search_text, @oracle_text, @oracle_text_normalized, @type_line,
+    @name_normalized, @search_text, @aliases_json, @oracle_text, @oracle_text_normalized, @type_line,
     @type_line_normalized, @set_search, @rarity, @released_at, @mana_cost, @cmc, @power,
     @toughness, @power_num, @toughness_num, @color_mask, @color_count, @colors_json,
     @image_url, @image_small, @language_codes_json, @variant_count, @has_english_variant, @lang, @price, @has_image
@@ -390,7 +407,9 @@ export function searchMtgIndex(query, limit = 100) {
     SELECT *
     FROM mtg_search_printings
     WHERE has_image = 1
-      AND name_normalized = @exact
+      AND (name_normalized = @exact OR EXISTS (
+        SELECT 1 FROM json_each(aliases_json) WHERE value = @exact
+      ))
     ORDER BY
       CASE WHEN lang = 'en' THEN 0 ELSE 1 END,
       released_at DESC,
@@ -416,12 +435,13 @@ export function searchMtgIndex(query, limit = 100) {
     WHERE has_image = 1
       AND (
         name_normalized LIKE @contains
+        OR EXISTS (SELECT 1 FROM json_each(aliases_json) WHERE value LIKE @contains)
         OR search_text LIKE @contains
         OR oracle_text_normalized LIKE @contains
       )
     ORDER BY
       CASE
-        WHEN name_normalized = @exact THEN 0
+        WHEN name_normalized = @exact OR EXISTS (SELECT 1 FROM json_each(aliases_json) WHERE value = @exact) THEN 0
         WHEN name_normalized LIKE @startsWith THEN 1
         WHEN search_text LIKE @startsWith THEN 2
         WHEN search_text LIKE @contains THEN 3

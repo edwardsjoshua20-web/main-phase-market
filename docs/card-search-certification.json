@@ -1,7 +1,7 @@
 {
   "certification": "PASS",
-  "generatedAt": "2026-09-04T01:17:45.851Z",
-  "durationMs": 6607,
+  "generatedAt": "2026-09-04T04:40:21.321Z",
+  "durationMs": 31531,
   "normalizationContract": "case-insensitive, diacritic-insensitive, whitespace-normalized, punctuation-tolerant with compact fallback",
   "games": [
     {
@@ -323,5 +323,33 @@
     "identityPrintingCountMismatches": 0,
     "failureSamples": []
   },
+  "multiFaceAliasCertification": {
+    "applicableCanonicalIdentities": 904,
+    "aliasesTested": 13016,
+    "aliasFailures": 0,
+    "failureSamples": []
+  },
+  "requiredMultiFaceAliasExamples": [
+    {
+      "alias": "Valakut Awakening",
+      "canonicalName": "Valakut Awakening // Valakut Stoneforge",
+      "passed": true
+    },
+    {
+      "alias": "Valakut Stoneforge",
+      "canonicalName": "Valakut Awakening // Valakut Stoneforge",
+      "passed": true
+    },
+    {
+      "alias": "Valakut Awakening // Valakut Stoneforge",
+      "canonicalName": "Valakut Awakening // Valakut Stoneforge",
+      "passed": true
+    },
+    {
+      "alias": "Ice",
+      "canonicalName": "Fire // Ice",
+      "passed": true
+    }
+  ],
   "totalFailures": 0
 }

@@ -3,7 +3,9 @@ import path from 'node:path';
 import process from 'node:process';
 import {
   dedupeCanonicalCardResults,
+  getCardNameAliases,
   getCanonicalCardNameKey,
+  isCanonicalCardNameMatch,
   normalizeSearchText,
   searchTextEquals,
   searchTextFuzzyEquals
@@ -48,12 +50,18 @@ function printingCount(game, row) {
   return 1;
 }
 
-function addRow(families, game, row, getName = (card) => card.name) {
+function addRow(families, game, row, getName = (card) => card.name, collectAliases = false) {
   const name = String(getName(row) || '').trim();
   const key = getCanonicalCardNameKey(name);
   if (!key) return;
-  const family = families.get(key) || { key, name, printingCount: 0 };
+  const family = families.get(key) || { key, name, printingCount: 0, aliases: new Map(), multiFace: false };
   family.printingCount += printingCount(game, row);
+  if (collectAliases) {
+    family.multiFace = family.multiFace || (Array.isArray(row.face_names) && row.face_names.length > 1) || name.includes('//');
+    for (const alias of getCardNameAliases(row)) {
+      family.aliases.set(getCanonicalCardNameKey(alias), alias);
+    }
+  }
   families.set(key, family);
 }
 
@@ -65,7 +73,7 @@ function loadFamilies(game) {
       const files = Array.isArray(bucket.files) && bucket.files.length > 0 ? bucket.files : [bucket.file].filter(Boolean);
       for (const file of files) {
         const rows = readJson(`public/data/mtg/${file}`);
-        for (const row of rows) addRow(families, game.key, row, canonicalMtgName);
+        for (const row of rows) addRow(families, game.key, row, canonicalMtgName, true);
       }
     }
     return families;
@@ -74,6 +82,57 @@ function loadFamilies(game) {
   const rows = readJson(`public/data/${game.source}/cards.json`);
   for (const row of rows) addRow(families, game.key, row);
   return families;
+}
+
+function loadMtgLiteAliasIndex() {
+  const manifest = readJson('public/data/mtg/search-lite-manifest.json');
+  const aliasIndex = new Map();
+
+  for (const [bucketName, bucket] of Object.entries(manifest.alias_buckets || {})) {
+    const routes = readJson(`public/data/mtg/${bucket.file}`);
+    for (const route of routes) {
+      const aliasKey = getCanonicalCardNameKey(route.alias);
+      const canonicalKey = getCanonicalCardNameKey(route.canonical_name);
+      if (!aliasIndex.has(aliasKey)) aliasIndex.set(aliasKey, new Set());
+      aliasIndex.get(aliasKey).add(`${bucketName}::${route.canonical_bucket}::${canonicalKey}`);
+    }
+  }
+
+  return aliasIndex;
+}
+
+function certifyMtgMultiFaceAliases(sourceFamilies, liteAliasIndex) {
+  const applicableFamilies = [...sourceFamilies.values()].filter((family) => family.multiFace);
+  const failures = [];
+  let aliasesTested = 0;
+  let aliasFailures = 0;
+
+  for (const family of applicableFamilies) {
+    for (const [aliasKey, alias] of family.aliases) {
+      if (aliasKey === family.key) continue;
+      aliasesTested += 1;
+      const indexedTargets = liteAliasIndex.get(aliasKey);
+      const queryBucket = /^[a-z]/.test(aliasKey[0]) ? aliasKey[0] : /^[0-9]/.test(aliasKey[0]) ? '0-9' : 'other';
+      const canonicalBucket = /^[a-z]/.test(family.key[0]) ? family.key[0] : /^[0-9]/.test(family.key[0]) ? '0-9' : 'other';
+      const contractMatches = isCanonicalCardNameMatch({
+        name: family.name,
+        face_names: [...family.aliases.values()]
+      }, alias);
+      if (!contractMatches || !indexedTargets?.has(`${queryBucket}::${canonicalBucket}::${family.key}`)) {
+        aliasFailures += 1;
+        if (failures.length < failureSampleLimit) {
+          failures.push({ canonicalName: family.name, alias });
+        }
+      }
+    }
+  }
+
+  return {
+    applicableCanonicalIdentities: applicableFamilies.length,
+    aliasesTested,
+    aliasFailures,
+    failureSamples: failures
+  };
 }
 
 function loadMtgPrintingIndexFamilies() {
@@ -227,6 +286,21 @@ const gameReports = games.map((game) => certifyGame(game, familyMaps.get(game.ke
 const consumerContract = verifyConsumerContract();
 const mtgPrintingIndex = loadMtgPrintingIndexFamilies();
 const mtgPrintingIndexContract = certifyMtgPrintingIndex(familyMaps.get('magic'), mtgPrintingIndex.families);
+const multiFaceAliasCertification = certifyMtgMultiFaceAliases(familyMaps.get('magic'), loadMtgLiteAliasIndex());
+const mtgAliasIndex = loadMtgLiteAliasIndex();
+const requiredMultiFaceAliasExamples = [
+  ['Valakut Awakening', 'Valakut Awakening // Valakut Stoneforge'],
+  ['Valakut Stoneforge', 'Valakut Awakening // Valakut Stoneforge'],
+  ['Valakut Awakening // Valakut Stoneforge', 'Valakut Awakening // Valakut Stoneforge'],
+  ['Ice', 'Fire // Ice']
+].map(([alias, canonicalName]) => {
+  const aliasKey = getCanonicalCardNameKey(alias);
+  const canonicalKey = getCanonicalCardNameKey(canonicalName);
+  const passed = aliasKey === canonicalKey
+    ? Boolean(familyMaps.get('magic').has(canonicalKey))
+    : [...(mtgAliasIndex.get(aliasKey) || [])].some((route) => route.endsWith(`::${canonicalKey}`));
+  return { alias, canonicalName, passed };
+});
 const totalFailures = gameReports.reduce((total, game) => total
   + game.canonicalNameFailures
   + game.lowercaseFailures
@@ -238,7 +312,9 @@ const totalFailures = gameReports.reduce((total, game) => total
   + game.autocompleteDuplicateFailures
   + game.importFailures, 0)
   + consumerContract.filter((check) => !check.passed).length
-  + mtgPrintingIndexContract.identityPrintingCountMismatches;
+  + mtgPrintingIndexContract.identityPrintingCountMismatches
+  + multiFaceAliasCertification.aliasFailures
+  + requiredMultiFaceAliasExamples.filter((example) => !example.passed).length;
 
 const requiredExamples = [
   'Sol Ring', 'Temple of the False God', 'Seething Song', 'Thrill of Possibility', 'Seize the Spoils',
@@ -263,6 +339,8 @@ const report = {
   requiredExamples: exampleResults,
   consumerContract,
   mtgPrintingIndexContract,
+  multiFaceAliasCertification,
+  requiredMultiFaceAliasExamples,
   totalFailures: totalFailures + exampleFailures
 };
 
@@ -271,7 +349,7 @@ fs.writeFileSync(reportJsonPath, `${JSON.stringify(report, null, 2)}\n`);
 const tableRows = gameReports.map((game) =>
   `| ${game.game} | ${game.totalUniqueCanonicalCardIdentities} | ${game.identitiesTested} | ${game.canonicalNameFailures} | ${game.lowercaseFailures} | ${game.uppercaseFailures} | ${game.whitespaceNormalizedFailures} | ${game.punctuationApostropheCommaFailures} | ${game.selectedCardResultPageFailures} | ${game.printingResolutionFailures} | ${game.autocompleteDuplicateFailures} | ${game.importFailures} |`
 );
-const markdown = `# Card Search Certification\n\nStatus: **${report.certification}**  \nGenerated: ${report.generatedAt}  \nDuration: ${report.durationMs} ms  \nTotal failures: ${report.totalFailures}\n\n| Game | Canonical identities | Tested | Canonical | Lowercase | Uppercase | Whitespace | Punctuation | Result page | Printings | Autocomplete duplicates | Import |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n${tableRows.join('\n')}\n\n## Consumer Contract\n\n${consumerContract.map((check) => `- ${check.passed ? 'PASS' : 'FAIL'}: ${check.consumer} (${check.file})`).join('\n')}\n\n## MTG Hosted Printing Index\n\n- Source identities: ${mtgPrintingIndexContract.sourceIdentityCount}\n- Indexed identities: ${mtgPrintingIndexContract.indexedIdentityCount}\n- Source printings: ${mtgPrintingIndexContract.sourcePrintingCount}\n- Indexed printings: ${mtgPrintingIndexContract.indexedPrintingCount}\n- Identity printing-count mismatches: ${mtgPrintingIndexContract.identityPrintingCountMismatches}\n\n## Required Examples\n\n${exampleResults.map((result) => `- ${result.passed ? 'PASS' : 'FAIL'}: ${result.name}`).join('\n')}\n`;
+const markdown = `# Card Search Certification\n\nStatus: **${report.certification}**\n\nGenerated: ${report.generatedAt}\n\nDuration: ${report.durationMs} ms\n\nTotal failures: ${report.totalFailures}\n\n| Game | Canonical identities | Tested | Canonical | Lowercase | Uppercase | Whitespace | Punctuation | Result page | Printings | Autocomplete duplicates | Import |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n${tableRows.join('\n')}\n\n## Consumer Contract\n\n${consumerContract.map((check) => `- ${check.passed ? 'PASS' : 'FAIL'}: ${check.consumer} (${check.file})`).join('\n')}\n\n## MTG Hosted Printing Index\n\n- Source identities: ${mtgPrintingIndexContract.sourceIdentityCount}\n- Indexed identities: ${mtgPrintingIndexContract.indexedIdentityCount}\n- Source printings: ${mtgPrintingIndexContract.sourcePrintingCount}\n- Indexed printings: ${mtgPrintingIndexContract.indexedPrintingCount}\n- Identity printing-count mismatches: ${mtgPrintingIndexContract.identityPrintingCountMismatches}\n\n## MTG Multi-Face Aliases\n\n- Applicable canonical identities: ${multiFaceAliasCertification.applicableCanonicalIdentities}\n- Face-name aliases tested: ${multiFaceAliasCertification.aliasesTested}\n- Alias failures: ${multiFaceAliasCertification.aliasFailures}\n${requiredMultiFaceAliasExamples.map((example) => `- ${example.passed ? 'PASS' : 'FAIL'}: ${example.alias} -> ${example.canonicalName}`).join('\n')}\n\n## Required Examples\n\n${exampleResults.map((result) => `- ${result.passed ? 'PASS' : 'FAIL'}: ${result.name}`).join('\n')}\n`;
 fs.writeFileSync(reportMarkdownPath, markdown);
 
 console.log(JSON.stringify(report, null, 2));

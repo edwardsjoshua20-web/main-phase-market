@@ -1,8 +1,11 @@
 # Card Search Certification
 
-Status: **PASS**  
-Generated: 2026-09-04T01:17:45.851Z  
-Duration: 6607 ms  
+Status: **PASS**
+
+Generated: 2026-09-04T04:40:21.321Z
+
+Duration: 31531 ms
+
 Total failures: 0
 
 | Game | Canonical identities | Tested | Canonical | Lowercase | Uppercase | Whitespace | Punctuation | Result page | Printings | Autocomplete duplicates | Import |
@@ -34,6 +37,16 @@ Total failures: 0
 - Source printings: 518231
 - Indexed printings: 518231
 - Identity printing-count mismatches: 0
+
+## MTG Multi-Face Aliases
+
+- Applicable canonical identities: 904
+- Face-name aliases tested: 13016
+- Alias failures: 0
+- PASS: Valakut Awakening -> Valakut Awakening // Valakut Stoneforge
+- PASS: Valakut Stoneforge -> Valakut Awakening // Valakut Stoneforge
+- PASS: Valakut Awakening // Valakut Stoneforge -> Valakut Awakening // Valakut Stoneforge
+- PASS: Ice -> Fire // Ice
 
 ## Required Examples
 

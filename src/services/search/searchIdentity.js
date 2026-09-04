@@ -73,16 +73,35 @@ export function getCanonicalCardName(card = {}) {
   return String(card.name || card.product_name || '').trim();
 }
 
+export function getCardNameAliases(cardOrName = '') {
+  const card = typeof cardOrName === 'string' ? { name: cardOrName } : (cardOrName || {});
+  const canonicalName = getCanonicalCardName(card);
+  const aliases = [
+    canonicalName,
+    card.printed_name,
+    ...(Array.isArray(card.face_names) ? card.face_names : []),
+    ...(Array.isArray(card.alternate_names) ? card.alternate_names : []),
+    ...canonicalName.split(/\s*\/\/\s*/)
+  ];
+  const seen = new Set();
+
+  return aliases
+    .map((alias) => String(alias || '').trim())
+    .filter((alias) => {
+      const key = normalizeSearchText(alias);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
 export function getCanonicalCardNameKey(cardOrName = '') {
   const name = typeof cardOrName === 'string' ? cardOrName : getCanonicalCardName(cardOrName);
   return normalizeSearchText(name);
 }
 
 export function isCanonicalCardNameMatch(cardOrName, query) {
-  return searchTextEquals(
-    typeof cardOrName === 'string' ? cardOrName : getCanonicalCardName(cardOrName),
-    query
-  );
+  return getCardNameAliases(cardOrName).some((alias) => searchTextEquals(alias, query));
 }
 
 export function dedupeCanonicalCardResults(results = [], limit = Infinity) {
