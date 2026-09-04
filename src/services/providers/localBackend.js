@@ -370,8 +370,20 @@ function commanderNameFromItems(items = []) {
   return items.find((item) => item?.is_commander)?.product_name || null;
 }
 
+function restoreCommanderFlag(items = [], commanderName = '') {
+  const normalizedName = String(commanderName || '').trim().toLowerCase();
+  if (!normalizedName || items.some((item) => item?.is_commander)) return items;
+  return items.map((item) => ({
+    ...item,
+    is_commander: String(item?.product_name || '').trim().toLowerCase() === normalizedName,
+  }));
+}
+
 function normalizeHostedDeck(row) {
   const payload = row?.deck_payload && typeof row.deck_payload === 'object' ? row.deck_payload : {};
+  const commanderName = String(row?.commander_name || payload.commander_name || '').trim();
+  const sourceItems = Array.isArray(payload.items) ? payload.items : [];
+  const items = restoreCommanderFlag(sourceItems, commanderName);
   return {
     id: row.id,
     user_email: row.owner_email || payload.user_email || '',
@@ -379,7 +391,8 @@ function normalizeHostedDeck(row) {
     description: payload.description || '',
     deck_format: row.format || payload.deck_format || 'casual',
     estimated_cost: payload.estimated_cost || 0,
-    items: Array.isArray(payload.items) ? payload.items : [],
+    items,
+    commander_name: commanderName,
     game: row.game || payload.game || 'mtg',
     source: row.source || payload.source || 'supabase-browser',
     tags: Array.isArray(row.tags) ? row.tags : [],
@@ -403,6 +416,10 @@ function buildHostedDeckRecord(payload, existing = null) {
     description: payload.description ?? basePayload.description ?? '',
     user_email: ownerEmail
   };
+  mergedPayload.items = restoreCommanderFlag(
+    mergedPayload.items,
+    existing?.commander_name || basePayload.commander_name || ''
+  );
 
   return {
     user_id: existing?.user_id || sessionUser.id || null,

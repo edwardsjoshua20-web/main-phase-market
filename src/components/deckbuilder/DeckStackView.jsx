@@ -4,7 +4,7 @@ import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { buildPackedColumns } from '@/lib/deckColumnLayout';
 import { getDeckSectionOrder, groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
 
-function CommanderStack({ commanderItem }) {
+function CommanderStack({ commanderItem, onChangeSet }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
       <div style={{ marginBottom: 8 }}>
@@ -20,6 +20,26 @@ function CommanderStack({ commanderItem }) {
                 </div>
             }
           </div>
+          {onChangeSet && (
+            <button
+              type="button"
+              onClick={() => onChangeSet(commanderItem)}
+              style={{
+                width: 223,
+                marginTop: 6,
+                padding: '6px 10px',
+                border: '1px solid #4b5563',
+                borderRadius: 6,
+                background: 'rgba(17,24,39,0.9)',
+                color: '#ddd6fe',
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              Change Printing / Art
+            </button>
+          )}
         </div>
       ) : (
         <div style={{
@@ -122,7 +142,7 @@ export default function DeckStackView({
           <div key={columnIndex} className="flex min-w-0 flex-col gap-6">
             {column.map((section) => {
               if (section.type === 'commander') {
-                return <CommanderStack key="commander" commanderItem={commanderItem} />;
+                return <CommanderStack key="commander" commanderItem={commanderItem} onChangeSet={onChangeSet} />;
               }
 
               return (

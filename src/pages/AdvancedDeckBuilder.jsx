@@ -189,7 +189,6 @@ export default function AdvancedDeckBuilder() {
   const [_groupByType, _setGroupByType] = useState(true);
   const [deckFormat, setDeckFormat] = useState('casual');
   const [_showFormatModal, _setShowFormatModal] = useState(false);
-  const [quickAddText, setQuickAddText] = useState('');
   const [cardDisplayMode, setCardDisplayMode] = useState('grid'); // 'grid' or 'text'
   const [showSetModal, setShowSetModal] = useState(null); // { productId, productName }
   const [setVariants, setSetVariants] = useState([]);
@@ -201,13 +200,32 @@ export default function AdvancedDeckBuilder() {
   const [showFormatChangeModal, setShowFormatChangeModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [newFormat, setNewFormat] = useState(deckFormat);
-  const [quickAddSuggestions, setQuickAddSuggestions] = useState([]);
-  const [selectedQuickCard, setSelectedQuickCard] = useState(null);
-  const [showQuickAddDropdown, setShowQuickAddDropdown] = useState(false);
+  const [clearingDeck, setClearingDeck] = useState(false);
   const [isCompactLayout, setIsCompactLayout] = useState(() => window.innerWidth < 768);
   const cardSearchRunRef = useRef(0);
-  const quickAddSearchRunRef = useRef(0);
+  const activeDeckRef = useRef(null);
+  const deckMutationQueueRef = useRef(Promise.resolve());
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    activeDeckRef.current = activeDeck;
+  }, [activeDeck]);
+
+  const commitSavedDeck = (savedDeck) => {
+    activeDeckRef.current = savedDeck;
+    setActiveDeck(savedDeck);
+    queryClient.setQueryData(['cardlists', user?.email], (current = []) =>
+      current.map((deck) => deck.id === savedDeck.id ? savedDeck : deck)
+    );
+  };
+
+  const queueDeckMutation = (mutation) => {
+    const queued = deckMutationQueueRef.current
+      .catch(() => undefined)
+      .then(mutation);
+    deckMutationQueueRef.current = queued.catch(() => undefined);
+    return queued;
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -300,21 +318,26 @@ export default function AdvancedDeckBuilder() {
       );
 
       const fixMap = Object.fromEntries(results.map(r => [r.product_id, r]));
-      const updatedItems = activeDeck.items.map(i => {
-        const fix = fixMap[i.product_id];
-        if (!fix) return i;
-        return {
-          ...i,
-          type: fix.type || i.type,
-          type_line: fix.type_line || i.type_line || i.type,
-          oracle_id: fix.oracle_id || i.oracle_id,
-          set_code: fix.set_code || i.set_code,
-          product_image: fix.image || i.product_image
-        };
-      });
+      await queueDeckMutation(async () => {
+        const currentDeck = activeDeckRef.current;
+        if (!currentDeck || currentDeck.id !== activeDeck.id) return;
 
-      await backend.data.CardList.update(activeDeck.id, { items: updatedItems });
-      setActiveDeck(prev => ({ ...prev, items: updatedItems }));
+        const updatedItems = currentDeck.items.map(i => {
+          const fix = fixMap[i.product_id];
+          if (!fix) return i;
+          return {
+            ...i,
+            type: fix.type || i.type,
+            type_line: fix.type_line || i.type_line || i.type,
+            oracle_id: fix.oracle_id || i.oracle_id,
+            set_code: fix.set_code || i.set_code,
+            product_image: fix.image || i.product_image
+          };
+        });
+
+        const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: updatedItems });
+        commitSavedDeck(savedDeck);
+      });
     };
 
     backfillTypes();
@@ -398,96 +421,44 @@ export default function AdvancedDeckBuilder() {
     }
   });
 
-  const addCardToDeck = async (card, qty = 1) => {
-    if (!activeDeck) { toast.error('Select a deck first'); return; }
-    
-    // Commander rules: max 1 of each card (except basic lands), max 1 commander
-    if (normalizeDeckFormatKey(activeDeck.deck_format) === 'commander') {
+  const addCardToDeck = (card, qty = 1) => queueDeckMutation(async () => {
+    const currentDeck = activeDeckRef.current;
+    if (!currentDeck) { toast.error('Select a deck first'); return; }
+
+    if (normalizeDeckFormatKey(currentDeck.deck_format) === 'commander') {
       const isBasicLand = card.type?.toLowerCase().includes('basic');
-      const existing = activeDeck.items?.find(i => i.product_id === card.id);
-      
-      if (existing && !isBasicLand && !allowsAnyNumberOfCopies(card)) {
+      const currentItem = currentDeck.items?.find(i => i.product_id === card.id);
+      if (currentItem && !isBasicLand && !allowsAnyNumberOfCopies(card)) {
         toast.error('Commander: Only 1 of each non-land card allowed');
         return;
       }
     }
-    
-    const existing = activeDeck.items?.find(i => i.product_id === card.id);
-    let updatedItems;
-    if (existing) {
-      updatedItems = activeDeck.items.map(i =>
-        i.product_id === card.id ? { ...i, quantity: (i.quantity || 1) + qty } : i
-      );
-    } else {
-      updatedItems = [...(activeDeck.items || []), {
-        product_id: card.id,
-        product_name: card.name,
-        product_image: getCardImageUrl(card),
-        image_url: card.image_url || null,
-        english_image_url: card.english_image_url || null,
-        image_small: card.image_small || null,
-        fallback_image_url: card.fallback_image_url || null,
-        price: card.price || 0,
-        product_type: selectedGame,
-        type: card.type,
-        quantity: qty,
-        mana_cost: card.mana_cost || '',
-        cmc: card.cmc ?? 0,
-        oracle_text: card.oracle_text || '',
-      }];
-    }
-    
+
+    const existing = currentDeck.items?.find(i => i.product_id === card.id);
+    const updatedItems = existing
+      ? currentDeck.items.map(i => i.product_id === card.id ? { ...i, quantity: (i.quantity || 1) + qty } : i)
+      : [...(currentDeck.items || []), {
+          product_id: card.id,
+          product_name: card.name,
+          product_image: getCardImageUrl(card),
+          image_url: card.image_url || null,
+          english_image_url: card.english_image_url || null,
+          image_small: card.image_small || null,
+          fallback_image_url: card.fallback_image_url || null,
+          price: card.price || 0,
+          product_type: selectedGame,
+          type: card.type,
+          quantity: qty,
+          mana_cost: card.mana_cost || '',
+          cmc: card.cmc ?? 0,
+          oracle_text: card.oracle_text || '',
+        }];
+
     const newCost = calculateDeckValue(updatedItems);
-    await backend.data.CardList.update(activeDeck.id, { items: updatedItems, estimated_cost: newCost });
-    const updatedDeck = { ...activeDeck, items: updatedItems, estimated_cost: newCost };
-    setActiveDeck(updatedDeck);
-    queryClient.invalidateQueries(['cardlists']);
+    const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: updatedItems, estimated_cost: newCost });
+    commitSavedDeck(savedDeck);
     toast.success(existing ? `${card.name} +${qty}` : `Added ${card.name}`);
-  };
-
-
-
-  const searchQuickAddCards = async (query) => {
-    const trimmedQuery = String(query || '').trim();
-    if (!searchOwner.normalizeQuery(trimmedQuery)) {
-      quickAddSearchRunRef.current += 1;
-      setQuickAddSuggestions([]);
-      setShowQuickAddDropdown(false);
-      setSearching(false);
-      return;
-    }
-
-    const runId = quickAddSearchRunRef.current + 1;
-    quickAddSearchRunRef.current = runId;
-    setSearching(true);
-    const results = await searchCards(trimmedQuery, selectedGame, 15, 0, { includeInventory: false, preview: true });
-    if (quickAddSearchRunRef.current === runId) {
-      setQuickAddSuggestions(results);
-      setShowQuickAddDropdown(results.length > 0);
-      setSearching(false);
-    }
-  };
-
-  const handleQuickAddChange = (e) => {
-    const val = e.target.value;
-    setQuickAddText(val);
-    clearTimeout(window._quickAddTimeout);
-    window._quickAddTimeout = setTimeout(() => searchQuickAddCards(val), 300);
-  };
-
-  const addSelectedCard = async (card) => {
-    await addCardToDeck(card, 1);
-    setQuickAddText('');
-    setQuickAddSuggestions([]);
-    setShowQuickAddDropdown(false);
-    setSelectedQuickCard(null);
-  };
-
-  const handleQuickAdd = async () => {
-    if (selectedQuickCard) {
-      await addSelectedCard(selectedQuickCard);
-    }
-  };
+  });
 
   const fetchCardVariants = async (cardName) => {
     setLoadingVariants(true);
@@ -509,18 +480,29 @@ export default function AdvancedDeckBuilder() {
     }
   };
 
-  const updateCardVariant = async (item, newVariant) => {
-    const updatedItems = activeDeck.items.map(i =>
+  const updateCardVariant = (item, newVariant) => queueDeckMutation(async () => {
+    const currentDeck = activeDeckRef.current;
+    if (!currentDeck) return;
+    const updatedItems = currentDeck.items.map(i =>
       i.product_id === item.product_id 
-        ? { ...i, product_id: newVariant.id, product_image: newVariant.image_url, market_price: newVariant.market_price || i.market_price }
+        ? {
+            ...i,
+            product_id: newVariant.id,
+            product_name: newVariant.name || i.product_name,
+            product_image: newVariant.image_url,
+            image_url: newVariant.image_url,
+            set_name: newVariant.set_name,
+            set_code: newVariant.set_code,
+            market_price: newVariant.market_price || i.market_price,
+          }
         : i
     );
     const newCost = calculateDeckValue(updatedItems);
-    await backend.data.CardList.update(activeDeck.id, { items: updatedItems, estimated_cost: newCost });
-    setActiveDeck({ ...activeDeck, items: updatedItems, estimated_cost: newCost });
+    const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: updatedItems, estimated_cost: newCost });
+    commitSavedDeck(savedDeck);
     setShowSetModal(null);
     toast.success('Card variant changed');
-  };
+  });
 
   const removeCardFromDeck = async (productId) => {
     const updatedItems = activeDeck.items.filter(i => i.product_id !== productId);
@@ -543,27 +525,31 @@ export default function AdvancedDeckBuilder() {
   };
 
   const clearDeckCards = async () => {
-    if (!activeDeck?.items?.length) {
+    if (clearingDeck) return;
+    if (!activeDeckRef.current?.items?.length) {
       toast.error('This deck is already empty');
       return;
     }
 
-    if (!confirm(`Remove all cards from "${activeDeck.name}"?`)) {
+    if (!confirm(`Remove all cards from "${activeDeckRef.current.name}"?`)) {
       return;
     }
 
-    await backend.data.CardList.update(activeDeck.id, {
-      items: [],
-      estimated_cost: 0,
-    });
-
-    setActiveDeck({
-      ...activeDeck,
-      items: [],
-      estimated_cost: 0,
-    });
-    queryClient.invalidateQueries(['cardlists']);
-    toast.success('All cards removed from deck');
+    setClearingDeck(true);
+    try {
+      await queueDeckMutation(async () => {
+        const currentDeck = activeDeckRef.current;
+        if (!currentDeck) return;
+        const savedDeck = await backend.data.CardList.update(currentDeck.id, {
+          items: [],
+          estimated_cost: 0,
+        });
+        commitSavedDeck(savedDeck);
+        toast.success('All cards removed from deck');
+      });
+    } finally {
+      setClearingDeck(false);
+    }
   };
 
   const handleSearchCards = async (query) => {
@@ -583,6 +569,14 @@ export default function AdvancedDeckBuilder() {
       setSearchResults(results);
       setSearching(false);
     }
+  };
+
+  const closeSearchResults = () => {
+    cardSearchRunRef.current += 1;
+    setSearchResults([]);
+    setSearchQuery('');
+    setSearching(false);
+    cardPreview.clearPreview();
   };
 
   const exportDeck = () => {
@@ -870,16 +864,17 @@ export default function AdvancedDeckBuilder() {
     );
   };
 
-  const setAsCommander = async (item) => {
-    // Clear old commander, set new one
-    const updatedItems = activeDeck.items.map(i => ({
+  const setAsCommander = (item) => queueDeckMutation(async () => {
+    const currentDeck = activeDeckRef.current;
+    if (!currentDeck) return;
+    const updatedItems = currentDeck.items.map(i => ({
       ...i,
       is_commander: i.product_id === item.product_id
     }));
-    await backend.data.CardList.update(activeDeck.id, { items: updatedItems });
-    setActiveDeck({ ...activeDeck, items: updatedItems });
+    const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: updatedItems });
+    commitSavedDeck(savedDeck);
     toast.success(`${item.product_name} set as Commander`);
-  };
+  });
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -954,8 +949,10 @@ export default function AdvancedDeckBuilder() {
                     variant="outline"
                     className="h-8 text-xs bg-amber-900 border-amber-700 text-amber-100 hover:bg-amber-800"
                     onClick={clearDeckCards}
+                    disabled={clearingDeck}
                   >
-                    <RotateCcw className="w-3 h-3 mr-1" />Clear Cards
+                    {clearingDeck ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RotateCcw className="mr-1 h-3 w-3" />}
+                    Clear Cards
                   </Button>
                   <Button
                     size="sm" 
@@ -1012,35 +1009,7 @@ export default function AdvancedDeckBuilder() {
                 </div>
               );
             })()}
-            <div className={`relative flex-1 ${isCompactLayout ? 'w-full' : 'max-w-xs'}`}>
-              <Input
-                value={quickAddText}
-                onChange={handleQuickAddChange}
-                onKeyPress={e => e.key === 'Enter' && handleQuickAdd()}
-                onFocus={() => showQuickAddDropdown && setShowQuickAddDropdown(true)}
-                placeholder="Quick search..."
-                className="h-8 text-sm border-gray-600 bg-gray-700 text-white placeholder:text-gray-400"
-              />
-              {showQuickAddDropdown && quickAddSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-gray-700 border border-gray-600 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                  {quickAddSuggestions.map(card => (
-                    <button
-                      key={card.id}
-                      onClick={() => { setSelectedQuickCard(card); setShowQuickAddDropdown(false); setQuickAddText(card.name); }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-200 hover:bg-gray-600 border-b border-gray-600 last:border-b-0 transition-colors"
-                    >
-                      <p className="font-medium">{card.name}</p>
-                      <p className="text-gray-400 text-xs">{card.set_name}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <Button size="sm" variant="outline" className="h-8 text-xs bg-blue-600 border-blue-500 text-white hover:bg-blue-700 disabled:opacity-50" onClick={handleQuickAdd} disabled={!selectedQuickCard || searching}>
-              {searching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3 mr-1" />}
-              Add
-            </Button>
-            <div className={`relative flex-1 ${isCompactLayout ? 'w-full' : 'max-w-xs'}`}>
+            <div className={`relative flex-1 ${isCompactLayout ? 'w-full' : 'max-w-md'}`}>
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 value={searchQuery}
@@ -1050,90 +1019,6 @@ export default function AdvancedDeckBuilder() {
                 className="pl-9 h-8 text-sm border-gray-600 bg-gray-700 text-white placeholder:text-gray-400"
               />
               {searching && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-blue-400" />}
-              {/* Photo search results - floating overlay */}
-              {(searchResults.length > 0 || (searching && searchQuery.length >= 2)) && (
-                <div className={`absolute top-full left-0 mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-[70vh] overflow-y-auto ${isCompactLayout ? 'right-0 w-full' : 'w-[600px]'}`}>
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
-                    <span className="text-xs font-semibold text-gray-300">Results for "{searchQuery}" - click to add</span>
-                    <button onClick={() => { setSearchResults([]); setSearchQuery(''); }} className="text-gray-400 hover:text-white">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  {searching ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
-                    </div>
-                  ) : (
-                    <div className={isCompactLayout ? 'divide-y divide-gray-700' : 'grid grid-cols-3 gap-3 p-3'}>
-                      {searchResults.map(card => {
-                        const inDeck = activeDeck?.items?.find(i => i.product_id === card.id);
-                        return isCompactLayout ? (
-                          <button
-                            key={card.id}
-                            onClick={() => addCardToDeck(card)}
-                            className="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-gray-700 transition-colors"
-                          >
-                            <div className="w-12 h-16 rounded overflow-hidden bg-gray-700 shrink-0">
-                              <CardImage
-                                card={card}
-                                alt={card.name}
-                                className="w-full h-full object-cover"
-                                onMouseEnter={() => cardPreview.showPreview(card)}
-                                onMouseLeave={cardPreview.hidePreview}
-                                renderFallback={() => (
-                                  <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 px-1 text-center">
-                                    {card.name}
-                                  </div>
-                                )}
-                              />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-white truncate">{card.name}</p>
-                              <p className="text-xs text-gray-400 truncate">{card.set_name || 'Unknown set'}</p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {inDeck && (
-                                <span className="bg-green-600 text-white font-bold text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                                  {inDeck.quantity || 1}
-                                </span>
-                              )}
-                              <Plus className="w-4 h-4 text-blue-300" />
-                            </div>
-                          </button>
-                        ) : (
-                          <div
-                            key={card.id}
-                            className={`relative group cursor-pointer ${cardTileSurfaceClassName()}`}
-                            onClick={() => addCardToDeck(card)}
-                            title={card.name}
-                          >
-                            <CardImage
-                              card={card}
-                              alt={card.name}
-                              className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity"
-                              onMouseEnter={() => cardPreview.showPreview(card)}
-                              onMouseLeave={cardPreview.hidePreview}
-                              renderFallback={() => (
-                                <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
-                                  {card.name}
-                                </div>
-                              )}
-                            />
-                            <div className="pointer-events-none absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
-                              <Plus className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                            {inDeck && (
-                              <div className="absolute top-1 left-1 bg-green-600 text-white font-bold text-xs w-5 h-5 rounded-full flex items-center justify-center shadow">
-                                {inDeck.quantity || 1}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -1258,13 +1143,20 @@ export default function AdvancedDeckBuilder() {
                             </div>
                             <div className="overflow-hidden rounded-lg border border-amber-500/40 bg-gray-900/70">
                               {commanderDeckItem ? (
-                                <div className="grid grid-cols-[3rem_minmax(0,1fr)_5.5rem] items-center gap-3 border-b border-gray-700/60 px-4 py-3 last:border-b-0">
+                                <div className="grid grid-cols-[3rem_minmax(0,1fr)_8rem] items-center gap-3 border-b border-gray-700/60 px-4 py-3 last:border-b-0">
                                   <div className="text-sm font-semibold text-amber-200">{commanderDeckItem.quantity || 1}x</div>
                                   <div className="min-w-0">
                                     <p className="truncate text-sm font-semibold text-white">{commanderDeckItem.product_name}</p>
                                     <p className="truncate text-xs text-gray-400">{commanderDeckItem.type || commanderDeckItem.type_line || 'Card'}</p>
                                   </div>
                                   <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      onClick={() => { setShowSetModal(commanderDeckItem); fetchCardVariants(commanderDeckItem.product_name); }}
+                                      className="h-7 rounded bg-purple-700 px-2 text-[10px] font-semibold text-white hover:bg-purple-600"
+                                      title="Change printing, set, or art"
+                                    >
+                                      Printing
+                                    </button>
                                     <button
                                       onClick={() => changeQty(commanderDeckItem.product_id, (commanderDeckItem.quantity || 1) - 1)}
                                       className="flex h-7 w-7 items-center justify-center rounded bg-gray-700 text-white hover:bg-gray-600"
@@ -1509,44 +1401,6 @@ export default function AdvancedDeckBuilder() {
                         </div>
                       </div>
                     )}
-                    {searchResults.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-300 mb-3">Search Results</h3>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
-                          {searchResults.map(card => {
-                            const inDeck = activeDeck?.items?.find(i => i.product_id === card.id);
-                            return (
-                              <div 
-                                key={card.id} 
-                                className={`relative group cursor-pointer ${cardTileSurfaceClassName()}`}
-                                onClick={() => addCardToDeck(card)}
-                              >
-                                <CardImage
-                                  card={card}
-                                  alt={card.name}
-                                  className="w-full aspect-[2/3] object-cover group-hover:opacity-75 transition-opacity"
-                                  onMouseEnter={() => cardPreview.showPreview(card)}
-                                  onMouseLeave={cardPreview.hidePreview}
-                                  renderFallback={() => (
-                                    <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-400 text-center px-1">
-                                      {card.name}
-                                    </div>
-                                  )}
-                                />
-                                <div className="pointer-events-none absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
-                                  <Plus className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </div>
-                                {inDeck && (
-                                  <div className="absolute top-1 right-1 bg-green-600 text-white font-bold text-xs w-6 h-6 rounded-full flex items-center justify-center shadow-lg">
-                                    {inDeck.quantity || 1}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1555,6 +1409,88 @@ export default function AdvancedDeckBuilder() {
         </div>
         )}
       </div>
+
+      {(searchResults.length > 0 || (searching && searchQuery.length >= 2)) && (
+        <div
+          className="fixed inset-0 z-[45] flex items-center justify-center bg-black/55 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Card search results for ${searchQuery}`}
+          onClick={closeSearchResults}
+        >
+          <div
+            className="flex max-h-[calc(100vh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-gray-600 bg-gray-800 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-700 px-4 py-3">
+              <span className="min-w-0 truncate text-sm font-semibold text-gray-200">
+                Results for "{searchQuery}" - select cards to add
+              </span>
+              <button
+                type="button"
+                onClick={closeSearchResults}
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded border border-gray-600 px-3 text-xs font-semibold text-gray-200 hover:border-gray-500 hover:bg-gray-700"
+              >
+                <X className="h-4 w-4" /> Close
+              </button>
+            </div>
+            {searching ? (
+              <div className="flex min-h-48 items-center justify-center">
+                <Loader2 className="h-7 w-7 animate-spin text-blue-400" />
+              </div>
+            ) : (
+              <div className={isCompactLayout ? 'min-h-0 overflow-y-auto divide-y divide-gray-700' : 'grid min-h-0 grid-cols-3 gap-3 overflow-y-auto p-4 sm:grid-cols-4 md:grid-cols-6'}>
+                {searchResults.map((card) => {
+                  const inDeck = activeDeck?.items?.find((item) => item.product_id === card.id);
+                  return isCompactLayout ? (
+                    <button
+                      key={card.id}
+                      type="button"
+                      onClick={() => addCardToDeck(card)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-700"
+                    >
+                      <div className="h-16 w-12 shrink-0 overflow-hidden rounded bg-gray-700">
+                        <CardImage
+                          card={card}
+                          alt={card.name}
+                          className="h-full w-full object-cover"
+                          renderFallback={() => <div className="flex h-full w-full items-center justify-center px-1 text-center text-[10px] text-gray-400">{card.name}</div>}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-white">{card.name}</p>
+                        <p className="truncate text-xs text-gray-400">{card.set_name || 'Unknown set'}</p>
+                      </div>
+                      {inDeck && <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-600 text-xs font-bold text-white">{inDeck.quantity || 1}</span>}
+                      <Plus className="h-4 w-4 shrink-0 text-blue-300" />
+                    </button>
+                  ) : (
+                    <div
+                      key={card.id}
+                      className={`relative group cursor-pointer ${cardTileSurfaceClassName()}`}
+                      onClick={() => addCardToDeck(card)}
+                      title={card.name}
+                    >
+                      <CardImage
+                        card={card}
+                        alt={card.name}
+                        className="aspect-[2/3] w-full object-cover transition-opacity group-hover:opacity-75"
+                        onMouseEnter={() => cardPreview.showPreview(card)}
+                        onMouseLeave={cardPreview.hidePreview}
+                        renderFallback={() => <div className="flex aspect-[2/3] w-full items-center justify-center bg-gray-700 px-1 text-center text-xs text-gray-400">{card.name}</div>}
+                      />
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 transition-all group-hover:bg-opacity-40">
+                        <Plus className="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100" />
+                      </div>
+                      {inDeck && <div className="absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-green-600 text-xs font-bold text-white shadow">{inDeck.quantity || 1}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
 
 
@@ -1589,7 +1525,7 @@ export default function AdvancedDeckBuilder() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4" onClick={() => setShowSetModal(null)}>
           <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-white">Change Card Set: {showSetModal.product_name}</h2>
+              <h2 className="text-lg font-bold text-white">Change Printing / Set / Art: {showSetModal.product_name}</h2>
               <button
                 onClick={() => setShowSetModal(null)}
                 className="text-gray-400 hover:text-white transition-colors"
