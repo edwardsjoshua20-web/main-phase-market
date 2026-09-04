@@ -78,6 +78,7 @@ export default function MobileShop() {
   const advancedSearchParam = searchParams.get('advancedSearch') === '1';
   const advancedApiQuery = searchParams.get('aq');
   const inStockOnly = searchParams.get('inStock') === 'true';
+  const canonicalSelection = searchParams.get('canonical') === '1';
 
   const [user, setUser] = useState(null);
   const [cartOpen, setCartOpen] = useState(false);
@@ -139,7 +140,7 @@ export default function MobileShop() {
     }
 
     setCardResults([]);
-  }, [searchParam, gameParam, advancedSearchParam, advancedApiQuery, inventory, pokemonInventory, inStockOnly]);
+  }, [searchParam, gameParam, advancedSearchParam, advancedApiQuery, canonicalSelection, inventory, pokemonInventory, inStockOnly]);
 
   const applySearchParams = (params) => {
     const next = {};
@@ -148,6 +149,7 @@ export default function MobileShop() {
     if (params.inStock) next.inStock = 'true';
     if (params.advancedSearch) next.advancedSearch = '1';
     if (params.aq) next.aq = params.aq;
+    if (params.canonical) next.canonical = '1';
     setSearchParams(next);
   };
 
@@ -159,8 +161,10 @@ export default function MobileShop() {
       let results = [];
       const trimmedQuery = String(query || '').trim();
 
-      if (trimmedQuery.length >= 2) {
-        results = game === 'all'
+      if (searchOwner.normalizeQuery(trimmedQuery)) {
+        results = canonicalSelection && game !== 'all'
+          ? await searchOwner.searchCanonicalPrintings(trimmedQuery, game, { includeInventory: false })
+          : game === 'all'
           ? await searchAllGamesLocal(trimmedQuery, 40)
           : await searchGameLocal(trimmedQuery, game, 40);
       } else if (game !== 'all') {

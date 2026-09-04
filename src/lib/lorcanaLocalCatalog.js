@@ -1,21 +1,12 @@
 import { getCatalogAssetUrl, hasExternalCatalogAssetBase } from '@/config/publicAssetUrls';
 import { postLocalJsonIfAvailable } from '@/lib/catalogApi';
+import { normalizeSearchText as normalizeText, searchTextEquals, searchTextFuzzyEquals, searchTextIncludes, searchTextStartsWith } from '@/services/search/searchIdentity';
 
 const cardsUrl = getCatalogAssetUrl('lorcana', 'cards.json');
 const setsUrl = getCatalogAssetUrl('lorcana', 'sets.json');
 
 const cardsCache = { promise: null, value: null };
 const setsCache = { promise: null, value: null };
-
-function normalizeText(value) {
-  return String(value || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/['’]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
 
 function pathExtension(pathname) {
   const match = String(pathname || '').match(/(\.[a-z0-9]+)$/i);
@@ -139,11 +130,12 @@ function scoreLorcanaCard(card, normalizedQuery) {
   const version = normalizeText(card.version || '');
   const setName = normalizeText(card?.set?.name || '');
 
-  if (name === normalizedQuery) return 1000;
-  if (`${name} ${version}`.trim() === normalizedQuery) return 900;
-  if (name.startsWith(normalizedQuery)) return 750;
-  if (name.includes(normalizedQuery)) return 350;
-  if (setName.includes(normalizedQuery)) return 200;
+  if (searchTextEquals(name, normalizedQuery)) return 1000;
+  if (searchTextEquals(`${name} ${version}`.trim(), normalizedQuery)) return 900;
+  if (searchTextStartsWith(name, normalizedQuery)) return 750;
+  if (searchTextIncludes(name, normalizedQuery)) return 350;
+  if (searchTextFuzzyEquals(name, normalizedQuery)) return 300;
+  if (searchTextIncludes(setName, normalizedQuery)) return 200;
   return 0;
 }
 
@@ -155,7 +147,7 @@ function compareLorcanaCards(a, b) {
 
 function matchesTextFilter(value, query) {
   if (!query) return true;
-  return normalizeText(value).includes(normalizeText(query));
+  return searchTextIncludes(value, query);
 }
 
 function compareNumeric(actualValue, op, expectedValue) {
@@ -187,7 +179,7 @@ function matchesAdvancedFilters(card, filters = {}) {
 
 export async function searchLorcanaCatalog(query, limit = 50) {
   const normalizedQuery = normalizeText(query);
-  if (!normalizedQuery || normalizedQuery.length < 2) return [];
+  if (!normalizedQuery) return [];
 
   try {
     const payload = await postLocalJsonIfAvailable('/api/local/lorcana/search', { query, limit });

@@ -179,7 +179,7 @@ export default function MobileHome() {
         onLogin={() => backend.auth.redirectToLogin(window.location.href)}
         onLogout={() => backend.auth.logout()}
         searchResults={searchResults}
-        onResultClick={(result) => { setSearchQuery(''); setSearchResults([]); navigate(`/MobileShop?search=${encodeURIComponent(result.name)}&game=${result.game}`); }}
+        onResultClick={(result) => { setSearchQuery(''); setSearchResults([]); navigate(`/MobileShop?search=${encodeURIComponent(result.name)}&game=${result.game}&canonical=1`); }}
         onClearSearch={() => { setSearchQuery(''); setSearchResults([]); }}
         searching={searching}
       />

@@ -27,7 +27,7 @@ export const sortCardsByRelevance = (cards, query) => {
 };
 
 export const searchCards = async (query, game, limit = 50, skip = 0, options = {}) => {
-  if (!query || query.length < 2) return [];
+  if (!searchOwner.normalizeQuery(query)) return [];
 
   try {
     const { preview = false, ...searchOptions } = options || {};

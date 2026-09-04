@@ -447,7 +447,7 @@ export default function AdvancedDeckBuilder() {
 
   const searchQuickAddCards = async (query) => {
     const trimmedQuery = String(query || '').trim();
-    if (trimmedQuery.length < 2) {
+    if (!searchOwner.normalizeQuery(trimmedQuery)) {
       quickAddSearchRunRef.current += 1;
       setQuickAddSuggestions([]);
       setShowQuickAddDropdown(false);
@@ -490,7 +490,7 @@ export default function AdvancedDeckBuilder() {
   const fetchCardVariants = async (cardName) => {
     setLoadingVariants(true);
     try {
-      const variants = (await searchOwner.searchByGame(cardName, selectedGame, 100, { includeInventory: false }))
+      const variants = (await searchOwner.searchCanonicalPrintings(cardName, selectedGame, { includeInventory: false }))
         .map(c => ({
           id: c.id,
           name: c.name,
@@ -566,7 +566,7 @@ export default function AdvancedDeckBuilder() {
 
   const handleSearchCards = async (query) => {
     const trimmedQuery = String(query || '').trim();
-    if (trimmedQuery.length < 2) {
+    if (!searchOwner.normalizeQuery(trimmedQuery)) {
       cardSearchRunRef.current += 1;
       setSearchResults([]);
       setSearching(false);

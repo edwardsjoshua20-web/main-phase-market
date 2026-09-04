@@ -209,7 +209,7 @@ export default function AdvancedDeckBuilderBackup() {
 
   const searchQuickAddCards = async (query) => {
     setSearching(true);
-    const results = await searchCards(query, selectedGame, 15);
+    const results = await searchCards(query, selectedGame, 15, 0, { includeInventory: false, preview: true });
     setQuickAddSuggestions(results);
     setShowQuickAddDropdown(results.length > 0);
     setSearching(false);
@@ -239,7 +239,7 @@ export default function AdvancedDeckBuilderBackup() {
   const fetchCardVariants = async (cardName) => {
     setLoadingVariants(true);
     try {
-      const variants = (await searchOwner.searchByGame(cardName, selectedGame, 100, { includeInventory: false }))
+      const variants = (await searchOwner.searchCanonicalPrintings(cardName, selectedGame, { includeInventory: false }))
         .map(c => ({
           id: c.id,
           name: c.name,
@@ -291,7 +291,7 @@ export default function AdvancedDeckBuilderBackup() {
 
   const handleSearchCards = async (query) => {
     setSearching(true);
-    const results = await searchCards(query, selectedGame, 50);
+    const results = await searchCards(query, selectedGame, 50, 0, { includeInventory: false, preview: true });
     setSearchResults(results);
     setSearching(false);
   };

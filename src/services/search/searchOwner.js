@@ -11,7 +11,9 @@ import { listingOwner } from '@/services/listing/listingOwner';
 import {
   SUPPORTED_SEARCH_GAMES,
   canonicalGame,
+  dedupeCanonicalCardResults,
   enrichCatalogResultsWithInventory,
+  isCanonicalCardNameMatch,
   normalizeSearchText,
   paginateSearchResults,
   rankCatalogResults
@@ -237,7 +239,10 @@ export const searchOwner = {
   async searchPreviewByGame(query, game, limit = 5, options = {}) {
     const inventoryListings = await loadInventoryListings(options);
     const catalogResults = await catalogSuggestionsByGame(query, game, limit * 3);
-    return normalizeOwnerResults(catalogResults, query, { inventoryListings }).slice(0, limit);
+    return dedupeCanonicalCardResults(
+      normalizeOwnerResults(catalogResults, query, { inventoryListings }),
+      limit
+    );
   },
 
   async searchPreviewAcrossGames(query, perGameLimit = 2, totalLimit = 10, options = {}) {
@@ -249,7 +254,23 @@ export const searchOwner = {
       SUPPORTED_SEARCH_GAMES.map((game) => catalogSuggestionsByGame(normalizedQuery, game, perGameLimit * 3))
     );
     const flat = settled.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
-    return normalizeOwnerResults(flat, normalizedQuery, { inventoryListings }).slice(0, totalLimit);
+    return dedupeCanonicalCardResults(
+      normalizeOwnerResults(flat, normalizedQuery, { inventoryListings }),
+      totalLimit
+    );
+  },
+
+  async resolveCanonicalCard(query, game, options = {}) {
+    const results = await this.searchCanonicalPrintings(query, game, options);
+    return results[0] || null;
+  },
+
+  async searchCanonicalPrintings(query, game, options = {}) {
+    const inventoryListings = await loadInventoryListings(options);
+    const limit = Math.max(1, Number(options.limit) || 5000);
+    const catalogResults = await catalogSearchByGame(query, game, limit);
+    const exactPrintings = catalogResults.filter((card) => isCanonicalCardNameMatch(card, query));
+    return normalizeOwnerResults(exactPrintings, query, { inventoryListings });
   },
 
   async browseByGame(game, limit = 100, options = {}) {
@@ -258,8 +279,8 @@ export const searchOwner = {
     return normalizeOwnerResults(catalogResults, '', { inventoryListings }).slice(0, limit);
   },
 
-  async searchShopCards({ query, game, apiQuery = null, page = 0, limit = 36, inventoryListings = null } = {}) {
-    if (!apiQuery && (!query || query.length < 2)) {
+  async searchShopCards({ query, game, apiQuery = null, canonical = false, page = 0, limit = 36, inventoryListings = null } = {}) {
+    if (!apiQuery && !normalizeSearchText(query)) {
       return { results: [], meta: emptyMeta(limit) };
     }
 
@@ -272,8 +293,13 @@ export const searchOwner = {
       return { results: normalized, meta: buildMeta(response, { page, limit }) };
     }
 
-    const catalogResults = await catalogSearchByGame(query, searchGame, CATALOG_DEFAULT_LIMIT);
-    const ranked = normalizeOwnerResults(catalogResults, query, { inventoryListings: listings });
+    const ranked = canonical
+      ? await this.searchCanonicalPrintings(query, searchGame, { inventoryListings: listings, limit: 5000 })
+      : normalizeOwnerResults(
+          await catalogSearchByGame(query, searchGame, CATALOG_DEFAULT_LIMIT),
+          query,
+          { inventoryListings: listings }
+        );
     const pageResult = paginateSearchResults(ranked, page, limit);
     return { results: pageResult.results, meta: pageResult.meta };
   },

@@ -2,10 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import {
+  dedupeCanonicalCardResults,
   enrichCatalogResultsWithInventory,
   normalizeSearchText,
   paginateSearchResults,
-  rankCatalogResults
+  rankCatalogResults,
+  searchTextEquals,
+  searchTextFuzzyEquals
 } from '../src/services/search/searchCore.js';
 
 const repoRoot = process.cwd();
@@ -92,6 +95,10 @@ const setNameOnlyListingEnriched = enrichCatalogResultsWithInventory(
 )[0];
 
 assert(normalizeSearchText('  Fóg--Bank ') === 'fog bank', 'query normalization should lowercase, trim, and normalize punctuation/diacritics');
+assert(searchTextEquals("Seer's Lantern", 'seers lantern'), 'apostrophe omission must preserve canonical identity matching');
+assert(searchTextEquals('Torbran, Thane of Red Fell', 'torbran thane of red fell'), 'comma omission must preserve canonical identity matching');
+assert(searchTextFuzzyEquals('Mogg Salvage', 'Mog Salvage'), 'one-edit fallback must resolve close canonical names without aliases');
+assert(dedupeCanonicalCardResults(ranked.filter((card) => card.name === 'Fog')).length === 1, 'autocomplete must collapse repeated printings to one canonical identity');
 assert(ranked.some((card) => card.id === 'fog-empty'), 'out-of-stock exact catalog card must remain searchable');
 assert(ranked.some((card) => card.id === 'fog-stocked'), 'in-stock exact catalog card must remain searchable');
 assert(ranked[0].id === 'fog-stocked', 'in-stock exact match should rank before equivalent out-of-stock exact match');

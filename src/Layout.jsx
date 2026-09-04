@@ -220,7 +220,7 @@ export default function Layout({ children, currentPageName }) {
           searchResults={searchResults}
           onResultClick={(result) => {
             const game = result.game || 'pokemon';
-            navigate(createPageUrl('Shop') + `?type=single_card&search=${encodeURIComponent(result.name)}&game=${game}`);
+            navigate(createPageUrl('Shop') + `?type=single_card&search=${encodeURIComponent(result.name)}&game=${game}&canonical=1`);
           }}
           onClearSearch={resetSearch}
           searching={searching}
@@ -413,7 +413,7 @@ export default function Layout({ children, currentPageName }) {
                           {searchResults.map((result, idx) => (
                             <button
                               key={`${result.id}-${result.set_code}-${idx}`}
-                              onClick={() => { resetSearch(); navigate(`/Shop?type=single_card&search=${encodeURIComponent(result.name)}&game=${selectedGame}`); }}
+                              onClick={() => { resetSearch(); navigate(`/Shop?type=single_card&search=${encodeURIComponent(result.name)}&game=${selectedGame}&canonical=1`); }}
                               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 border-b last:border-b-0 transition-colors text-left"
                             >
                               <div className="w-12 h-16 shrink-0 rounded border border-gray-200 bg-gray-100 overflow-hidden">

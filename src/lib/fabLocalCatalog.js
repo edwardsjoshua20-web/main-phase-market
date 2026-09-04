@@ -1,5 +1,6 @@
 import { getCatalogAssetUrl, hasExternalCatalogAssetBase } from '@/config/publicAssetUrls';
 import { postLocalJsonIfAvailable } from '@/lib/catalogApi';
+import { normalizeSearchText as normalizeText, searchTextEquals, searchTextFuzzyEquals, searchTextIncludes, searchTextStartsWith } from '@/services/search/searchIdentity';
 
 const cardsUrl = getCatalogAssetUrl('fab', 'cards.json');
 const setsUrl = getCatalogAssetUrl('fab', 'sets.json');
@@ -18,16 +19,6 @@ const FAB_RARITY_MAP = {
   T: 'Token'
 };
 
-function normalizeText(value) {
-  return String(value || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/['’]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
 function pathExtension(pathname) {
   const match = String(pathname || '').match(/(\.[a-z0-9]+)$/i);
   return match ? match[1] : '';
@@ -41,8 +32,8 @@ function getFabRarityLabel(rarityCode) {
   return FAB_RARITY_MAP[String(rarityCode || '').toUpperCase()] || String(rarityCode || '');
 }
 
-function getLocalFabImageUrl(card) {
-  const primaryPrinting = getPrimaryPrinting(card);
+function getLocalFabImageUrl(card, selectedPrinting = null) {
+  const primaryPrinting = selectedPrinting || getPrimaryPrinting(card);
   const sourceUrl = primaryPrinting?.image_url;
   if (!sourceUrl) return null;
 
@@ -94,15 +85,15 @@ async function loadSets() {
   return setsCache.promise;
 }
 
-function getSetMeta(card, setsByCode) {
-  const primaryPrinting = getPrimaryPrinting(card);
+function getSetMeta(card, setsByCode, selectedPrinting = null) {
+  const primaryPrinting = selectedPrinting || getPrimaryPrinting(card);
   const setCode = String(primaryPrinting?.set_id || '');
   return setsByCode.get(setCode) || { code: setCode, name: setCode };
 }
 
-function formatFabResult(card, setsByCode) {
-  const primaryPrinting = getPrimaryPrinting(card);
-  const setMeta = getSetMeta(card, setsByCode);
+function formatFabResult(card, setsByCode, selectedPrinting = null) {
+  const primaryPrinting = selectedPrinting || getPrimaryPrinting(card);
+  const setMeta = getSetMeta(card, setsByCode, primaryPrinting);
   return {
     id: card.unique_id,
     api_id: card.unique_id,
@@ -111,7 +102,7 @@ function formatFabResult(card, setsByCode) {
     set_code: setMeta?.code || primaryPrinting?.set_id || 'FAB',
     card_number: primaryPrinting?.id || card.unique_id || '',
     rarity: getFabRarityLabel(primaryPrinting?.rarity),
-    image_url: getLocalFabImageUrl(card),
+    image_url: getLocalFabImageUrl(card, primaryPrinting),
     price: null,
     type: card.type_text || (Array.isArray(card.types) ? card.types.join(' • ') : ''),
     game: 'flesh_and_blood',
@@ -161,11 +152,12 @@ function scoreFabCard(card, normalizedQuery) {
   const name = normalizeText(card.name || '');
   const typeText = normalizeText(card.type_text || '');
   const rulesText = normalizeText(card.functional_text_plain || card.functional_text || '');
-  if (name === normalizedQuery) return 1000;
-  if (name.startsWith(normalizedQuery)) return 750;
-  if (name.includes(normalizedQuery)) return 350;
-  if (typeText.includes(normalizedQuery)) return 220;
-  if (rulesText.includes(normalizedQuery)) return 180;
+  if (searchTextEquals(name, normalizedQuery)) return 1000;
+  if (searchTextStartsWith(name, normalizedQuery)) return 750;
+  if (searchTextIncludes(name, normalizedQuery)) return 350;
+  if (searchTextFuzzyEquals(name, normalizedQuery)) return 300;
+  if (searchTextIncludes(typeText, normalizedQuery)) return 220;
+  if (searchTextIncludes(rulesText, normalizedQuery)) return 180;
   return 0;
 }
 
@@ -179,7 +171,7 @@ function compareFabCards(a, b) {
 
 function matchesTextFilter(value, query) {
   if (!query) return true;
-  return normalizeText(value).includes(normalizeText(query));
+  return searchTextIncludes(value, query);
 }
 
 function compareNumeric(actualValue, op, expectedValue) {
@@ -217,7 +209,7 @@ function matchesAdvancedFilters(card, filters = {}) {
 
 export async function searchFabCatalog(query, limit = 50) {
   const normalizedQuery = normalizeText(query);
-  if (!normalizedQuery || normalizedQuery.length < 2) return [];
+  if (!normalizedQuery) return [];
 
   try {
     const payload = await postLocalJsonIfAvailable('/api/local/fab/search', { query, limit });
@@ -225,15 +217,27 @@ export async function searchFabCatalog(query, limit = 50) {
   } catch {}
 
   const [cards, setsByCode] = await Promise.all([loadCards(), loadSets()]);
-  return cards
+  const ranked = cards
     .map((card) => ({ card, score: scoreFabCard(card, normalizedQuery) }))
     .filter((item) => item.score > 0)
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return compareFabCards(a.card, b.card);
     })
-    .slice(0, limit)
-    .map(({ card }) => formatFabResult(card, setsByCode));
+    .slice(0, limit);
+
+  const hasExactMatch = ranked.some(({ score }) => score === 1000);
+  if (!hasExactMatch) {
+    return ranked.map(({ card }) => formatFabResult(card, setsByCode));
+  }
+
+  return ranked
+    .filter(({ score }) => score === 1000)
+    .flatMap(({ card }) => {
+      const printings = Array.isArray(card.printings) && card.printings.length > 0 ? card.printings : [null];
+      return printings.map((printing) => formatFabResult(card, setsByCode, printing));
+    })
+    .slice(0, limit);
 }
 
 export async function searchFabCatalogAdvanced(filters, options = {}) {

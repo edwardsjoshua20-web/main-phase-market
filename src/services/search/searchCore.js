@@ -1,3 +1,27 @@
+import {
+  dedupeCanonicalCardResults,
+  getCanonicalCardName,
+  getCanonicalCardNameKey,
+  isCanonicalCardNameMatch,
+  normalizeSearchText,
+  searchTextEquals,
+  searchTextFuzzyEquals,
+  searchTextIncludes,
+  searchTextStartsWith
+} from './searchIdentity.js';
+
+export {
+  dedupeCanonicalCardResults,
+  getCanonicalCardName,
+  getCanonicalCardNameKey,
+  isCanonicalCardNameMatch,
+  normalizeSearchText,
+  searchTextEquals,
+  searchTextFuzzyEquals,
+  searchTextIncludes,
+  searchTextStartsWith
+};
+
 export const SUPPORTED_SEARCH_GAMES = [
   'pokemon',
   'magic',
@@ -7,16 +31,6 @@ export const SUPPORTED_SEARCH_GAMES = [
   'flesh_and_blood',
   'starwars'
 ];
-
-export function normalizeSearchText(value) {
-  return String(value || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/gi, ' ')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-}
 
 export function canonicalGame(value) {
   const normalized = normalizeSearchText(value);
@@ -107,12 +121,13 @@ export function scoreCatalogCard(card, query) {
   const collectorNumber = normalizeSearchText(card.collector_number || card.card_number || card.number);
   const haystack = normalizeSearchText(textFields(card).filter(Boolean).join(' '));
 
-  if (name === normalizedQuery || printedName === normalizedQuery) return 1000;
+  if (searchTextEquals(name, normalizedQuery) || searchTextEquals(printedName, normalizedQuery)) return 1000;
   if (faceNames.some((faceName) => faceName === normalizedQuery)) return 980;
-  if (name.startsWith(normalizedQuery) || printedName.startsWith(normalizedQuery)) return 850;
-  if (name.includes(normalizedQuery) || printedName.includes(normalizedQuery)) return 700;
+  if (searchTextStartsWith(name, normalizedQuery) || searchTextStartsWith(printedName, normalizedQuery)) return 850;
+  if (searchTextIncludes(name, normalizedQuery) || searchTextIncludes(printedName, normalizedQuery)) return 700;
+  if (searchTextFuzzyEquals(name, normalizedQuery) || searchTextFuzzyEquals(printedName, normalizedQuery)) return 650;
   if (setCode === normalizedQuery || collectorNumber === normalizedQuery) return 625;
-  if (haystack.includes(normalizedQuery)) return 350;
+  if (searchTextIncludes(haystack, normalizedQuery)) return 350;
   return 0;
 }
 

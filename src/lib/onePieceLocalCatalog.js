@@ -1,5 +1,6 @@
 import { getCatalogAssetUrl, hasExternalCatalogAssetBase } from '@/config/publicAssetUrls';
 import { postLocalJsonIfAvailable } from '@/lib/catalogApi';
+import { normalizeSearchText as normalizeText, searchTextEquals, searchTextFuzzyEquals, searchTextIncludes, searchTextStartsWith } from '@/services/search/searchIdentity';
 
 const cardsUrl = getCatalogAssetUrl('onepiece', 'cards.json');
 const setsUrl = getCatalogAssetUrl('onepiece', 'sets.json');
@@ -7,16 +8,6 @@ const ONE_PIECE_IMAGE_VERSION = 'clean-20260408';
 
 const cardsCache = { promise: null, value: null };
 const setsCache = { promise: null, value: null };
-
-function normalizeText(value) {
-  return String(value || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/['’]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
 
 function pathExtension(pathname) {
   const match = String(pathname || '').match(/(\.[a-z0-9]+)$/i);
@@ -127,10 +118,11 @@ function formatOnePieceDetail(card, setsByCode) {
 function scoreOnePieceCard(card, normalizedQuery) {
   const name = normalizeText(card.name || '');
   const effect = normalizeText(card.effect || '');
-  if (name === normalizedQuery) return 1000;
-  if (name.startsWith(normalizedQuery)) return 750;
-  if (name.includes(normalizedQuery)) return 350;
-  if (effect.includes(normalizedQuery)) return 200;
+  if (searchTextEquals(name, normalizedQuery)) return 1000;
+  if (searchTextStartsWith(name, normalizedQuery)) return 750;
+  if (searchTextIncludes(name, normalizedQuery)) return 350;
+  if (searchTextFuzzyEquals(name, normalizedQuery)) return 300;
+  if (searchTextIncludes(effect, normalizedQuery)) return 200;
   return 0;
 }
 
@@ -142,7 +134,7 @@ function compareOnePieceCards(a, b) {
 
 function matchesTextFilter(value, query) {
   if (!query) return true;
-  return normalizeText(value).includes(normalizeText(query));
+  return searchTextIncludes(value, query);
 }
 
 function compareNumeric(actualValue, op, expectedValue) {
@@ -173,7 +165,7 @@ function matchesAdvancedFilters(card, filters = {}) {
 
 export async function searchOnePieceCatalog(query, limit = 50) {
   const normalizedQuery = normalizeText(query);
-  if (!normalizedQuery || normalizedQuery.length < 2) return [];
+  if (!normalizedQuery) return [];
 
   try {
     const payload = await postLocalJsonIfAvailable('/api/local/onepiece/search', { query, limit });

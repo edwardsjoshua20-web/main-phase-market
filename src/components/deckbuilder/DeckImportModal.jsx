@@ -19,12 +19,7 @@ function cleanCardName(raw) {
 }
 
 function normalizeCardKey(value) {
-  return String(value || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/gi, ' ')
-    .trim()
-    .toLowerCase();
+  return searchOwner.normalizeQuery(value);
 }
 
 function isSectionHeader(line) {
@@ -123,14 +118,8 @@ function parseCsv(text) {
   }).filter(Boolean);
 }
 
-async function fetchMagicCard(name) {
-  const results = await searchOwner.searchByGame(name, 'magic', 8, { includeInventory: false });
-  const targetKey = normalizeCardKey(name);
-  const bestLocal = Array.isArray(results) ?
-    results.find((result) => normalizeCardKey(result.name) === targetKey) ||
-    results.find((result) => normalizeCardKey(result.name).startsWith(targetKey)) ||
-    results[0] :
-    null;
+async function fetchCatalogCard(name, game) {
+  const bestLocal = await searchOwner.resolveCanonicalCard(name, game, { includeInventory: false });
 
   if (bestLocal) {
     return {
@@ -140,7 +129,9 @@ async function fetchMagicCard(name) {
       image_url: bestLocal.image_url || bestLocal.image_small || null,
       market_price: bestLocal.price || 0,
       type: bestLocal.type || bestLocal.type_line || '',
-      product_type: 'magic',
+      product_type: bestLocal.game,
+      oracle_id: bestLocal.oracle_id || '',
+      set_code: bestLocal.set_code || '',
       mana_cost: bestLocal.mana_cost || '',
       cmc: bestLocal.cmc ?? 0,
     };
@@ -190,10 +181,7 @@ export default function DeckImportModal({ game, onImport, onClose }) {
     for (let i = 0; i < parsed.length; i++) {
       const { qty, name } = parsed[i];
       try {
-        let card = null;
-        if (game === 'magic') {
-          card = await fetchMagicCard(name);
-        }
+        const card = await fetchCatalogCard(name, game);
         resolved.push({ qty, name, card, error: card ? null : 'Not found' });
       } catch (e) {
         resolved.push({ qty, name, card: null, error: 'Lookup failed' });

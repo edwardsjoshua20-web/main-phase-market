@@ -629,7 +629,7 @@ export default function MobileDeckBuilder() {
         onResultClick={(result) => {
           setHeaderSearchResults([]);
           setHeaderSearchQuery('');
-          navigate(`/MobileShop?search=${encodeURIComponent(result.name)}&game=${result.game}`);
+          navigate(`/MobileShop?search=${encodeURIComponent(result.name)}&game=${result.game}&canonical=1`);
         }}
         onClearSearch={() => {
           setHeaderSearchResults([]);

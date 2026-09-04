@@ -99,7 +99,7 @@ export default function MobileBrowse() {
         onLogin={() => backend.auth.redirectToLogin(window.location.href)}
         onLogout={() => backend.auth.logout()}
         searchResults={searchResults}
-        onResultClick={(r) => { setSearchQuery(''); setSearchResults([]); navigate(`/MobileShop?search=${encodeURIComponent(r.name)}&game=${r.game}`); }}
+        onResultClick={(r) => { setSearchQuery(''); setSearchResults([]); navigate(`/MobileShop?search=${encodeURIComponent(r.name)}&game=${r.game}&canonical=1`); }}
         onClearSearch={() => { setSearchQuery(''); setSearchResults([]); }}
         searching={searching}
       />

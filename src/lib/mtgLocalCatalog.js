@@ -1,5 +1,6 @@
 import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 import { getLocalJsonIfAvailable, postLocalJsonIfAvailable } from '@/lib/catalogApi';
+import { normalizeSearchText as normalizeText, searchTextEquals, searchTextFuzzyEquals, searchTextIncludes, searchTextStartsWith } from '@/services/search/searchIdentity';
 
 const manifestUrl = getCatalogAssetUrl('mtg', 'manifest.json');
 const liteManifestUrl = getCatalogAssetUrl('mtg', 'search-lite-manifest.json');
@@ -24,16 +25,6 @@ const oracleBucketIndexCache = {
   promise: null,
   value: null
 };
-
-function normalizeText(value) {
-  return String(value || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/['’]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
 
 function getCanonicalName(row) {
   const rawName = String(row?.name || '').trim();
@@ -269,10 +260,11 @@ function scoreRow(row, normalizedQuery) {
   const name = getCanonicalNormalizedName(row);
   const searchText = row.search_text || '';
 
-  if (name === normalizedQuery) return 1000;
-  if (name.startsWith(normalizedQuery)) return 750;
+  if (searchTextEquals(name, normalizedQuery)) return 1000;
+  if (searchTextStartsWith(name, normalizedQuery)) return 750;
   if (name.split(' ').some((part) => part.startsWith(normalizedQuery))) return 500;
-  if (searchText.includes(normalizedQuery)) return 250;
+  if (searchTextFuzzyEquals(name, normalizedQuery)) return 300;
+  if (searchTextIncludes(searchText, normalizedQuery)) return 250;
   return 0;
 }
 
@@ -671,7 +663,7 @@ function formatResult(row, englishImageIndexes = null) {
 
 export async function searchMtgCatalog(query, limit = 50) {
   const normalizedQuery = normalizeText(query);
-  if (!normalizedQuery || normalizedQuery.length < 2) {
+  if (!normalizedQuery) {
     return [];
   }
 
@@ -694,7 +686,7 @@ export async function searchMtgCatalog(query, limit = 50) {
 
   const exactMatches = rankedRows
     .map(({ row }) => row)
-    .filter((row) => getCanonicalNormalizedName(row) === normalizedQuery)
+    .filter((row) => searchTextEquals(getCanonicalNormalizedName(row), normalizedQuery))
     .sort(compareExactPrintings);
 
   const exactMatchOracleIds = new Set(
@@ -712,8 +704,13 @@ export async function searchMtgCatalog(query, limit = 50) {
       .sort(compareExactPrintings) :
     [];
 
-  const finalRows = (exactPrintingFamily.length > 0 ? exactPrintingFamily : exactMatches.length > 0 ? exactMatches : rankedRows.map(({ row }) => row))
-    .filter((row) => hasDisplayableImage(row, allEnglishImageIndexes))
+  const selectedRows = exactPrintingFamily.length > 0
+    ? exactPrintingFamily
+    : exactMatches.length > 0
+      ? exactMatches
+      : rankedRows.map(({ row }) => row).filter((row) => hasDisplayableImage(row, allEnglishImageIndexes));
+
+  const finalRows = selectedRows
     .slice(0, limit)
     .map((row) => formatResult(row, allEnglishImageIndexes));
 
@@ -784,7 +781,7 @@ export async function searchMtgCatalogAdvanced(filters, options = {}) {
 
 export async function searchMtgCatalogSuggestions(query, limit = 10) {
   const normalizedQuery = normalizeText(query);
-  if (!normalizedQuery || normalizedQuery.length < 2) {
+  if (!normalizedQuery) {
     return [];
   }
 

@@ -178,14 +178,14 @@ export default function DeckBuilder() {
 
   const handleSearchCards = async (query, game) => {
     const trimmedQuery = String(query || '').trim();
-    if (trimmedQuery.length < 2) {
+    if (!trimmedQuery) {
       setSearchResults([]);
       setSearching(false);
       return;
     }
 
     setSearching(true);
-    const results = await searchGameLocal(trimmedQuery, game, 24);
+    const results = await searchGameLocal(trimmedQuery, game, 24, { includeInventory: false, preview: true });
     setSearchResults(results);
     setSearching(false);
   };

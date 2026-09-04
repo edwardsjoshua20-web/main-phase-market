@@ -1,0 +1,319 @@
+{
+  "certification": "PASS",
+  "generatedAt": "2026-09-04T00:53:51.657Z",
+  "durationMs": 6525,
+  "normalizationContract": "case-insensitive, diacritic-insensitive, whitespace-normalized, punctuation-tolerant with compact fallback",
+  "games": [
+    {
+      "game": "Magic: The Gathering",
+      "gameKey": "magic",
+      "totalUniqueCanonicalCardIdentities": 31970,
+      "identitiesTested": 31970,
+      "canonicalNameFailures": 0,
+      "lowercaseFailures": 0,
+      "uppercaseFailures": 0,
+      "whitespaceNormalizedFailures": 0,
+      "punctuationApostropheCommaFailures": 0,
+      "selectedCardResultPageFailures": 0,
+      "printingResolutionFailures": 0,
+      "autocompleteDuplicateFailures": 0,
+      "importFailures": 0,
+      "totalKnownPrintings": 518231,
+      "failureSamples": {
+        "canonical": [],
+        "lowercase": [],
+        "uppercase": [],
+        "whitespace": [],
+        "punctuation": [],
+        "selected": [],
+        "printings": [],
+        "autocomplete": [],
+        "import": []
+      }
+    },
+    {
+      "game": "Pokemon",
+      "gameKey": "pokemon",
+      "totalUniqueCanonicalCardIdentities": 4277,
+      "identitiesTested": 4277,
+      "canonicalNameFailures": 0,
+      "lowercaseFailures": 0,
+      "uppercaseFailures": 0,
+      "whitespaceNormalizedFailures": 0,
+      "punctuationApostropheCommaFailures": 0,
+      "selectedCardResultPageFailures": 0,
+      "printingResolutionFailures": 0,
+      "autocompleteDuplicateFailures": 0,
+      "importFailures": 0,
+      "totalKnownPrintings": 20078,
+      "failureSamples": {
+        "canonical": [],
+        "lowercase": [],
+        "uppercase": [],
+        "whitespace": [],
+        "punctuation": [],
+        "selected": [],
+        "printings": [],
+        "autocomplete": [],
+        "import": []
+      }
+    },
+    {
+      "game": "Yu-Gi-Oh!",
+      "gameKey": "yugioh",
+      "totalUniqueCanonicalCardIdentities": 14515,
+      "identitiesTested": 14515,
+      "canonicalNameFailures": 0,
+      "lowercaseFailures": 0,
+      "uppercaseFailures": 0,
+      "whitespaceNormalizedFailures": 0,
+      "punctuationApostropheCommaFailures": 0,
+      "selectedCardResultPageFailures": 0,
+      "printingResolutionFailures": 0,
+      "autocompleteDuplicateFailures": 0,
+      "importFailures": 0,
+      "totalKnownPrintings": 44813,
+      "failureSamples": {
+        "canonical": [],
+        "lowercase": [],
+        "uppercase": [],
+        "whitespace": [],
+        "punctuation": [],
+        "selected": [],
+        "printings": [],
+        "autocomplete": [],
+        "import": []
+      }
+    },
+    {
+      "game": "Disney Lorcana",
+      "gameKey": "lorcana",
+      "totalUniqueCanonicalCardIdentities": 1270,
+      "identitiesTested": 1270,
+      "canonicalNameFailures": 0,
+      "lowercaseFailures": 0,
+      "uppercaseFailures": 0,
+      "whitespaceNormalizedFailures": 0,
+      "punctuationApostropheCommaFailures": 0,
+      "selectedCardResultPageFailures": 0,
+      "printingResolutionFailures": 0,
+      "autocompleteDuplicateFailures": 0,
+      "importFailures": 0,
+      "totalKnownPrintings": 3192,
+      "failureSamples": {
+        "canonical": [],
+        "lowercase": [],
+        "uppercase": [],
+        "whitespace": [],
+        "punctuation": [],
+        "selected": [],
+        "printings": [],
+        "autocomplete": [],
+        "import": []
+      }
+    },
+    {
+      "game": "Flesh and Blood",
+      "gameKey": "flesh_and_blood",
+      "totalUniqueCanonicalCardIdentities": 3165,
+      "identitiesTested": 3165,
+      "canonicalNameFailures": 0,
+      "lowercaseFailures": 0,
+      "uppercaseFailures": 0,
+      "whitespaceNormalizedFailures": 0,
+      "punctuationApostropheCommaFailures": 0,
+      "selectedCardResultPageFailures": 0,
+      "printingResolutionFailures": 0,
+      "autocompleteDuplicateFailures": 0,
+      "importFailures": 0,
+      "totalKnownPrintings": 16680,
+      "failureSamples": {
+        "canonical": [],
+        "lowercase": [],
+        "uppercase": [],
+        "whitespace": [],
+        "punctuation": [],
+        "selected": [],
+        "printings": [],
+        "autocomplete": [],
+        "import": []
+      }
+    },
+    {
+      "game": "One Piece",
+      "gameKey": "onepiece",
+      "totalUniqueCanonicalCardIdentities": 998,
+      "identitiesTested": 998,
+      "canonicalNameFailures": 0,
+      "lowercaseFailures": 0,
+      "uppercaseFailures": 0,
+      "whitespaceNormalizedFailures": 0,
+      "punctuationApostropheCommaFailures": 0,
+      "selectedCardResultPageFailures": 0,
+      "printingResolutionFailures": 0,
+      "autocompleteDuplicateFailures": 0,
+      "importFailures": 0,
+      "totalKnownPrintings": 1996,
+      "failureSamples": {
+        "canonical": [],
+        "lowercase": [],
+        "uppercase": [],
+        "whitespace": [],
+        "punctuation": [],
+        "selected": [],
+        "printings": [],
+        "autocomplete": [],
+        "import": []
+      }
+    },
+    {
+      "game": "Star Wars Unlimited",
+      "gameKey": "starwars",
+      "totalUniqueCanonicalCardIdentities": 1843,
+      "identitiesTested": 1843,
+      "canonicalNameFailures": 0,
+      "lowercaseFailures": 0,
+      "uppercaseFailures": 0,
+      "whitespaceNormalizedFailures": 0,
+      "punctuationApostropheCommaFailures": 0,
+      "selectedCardResultPageFailures": 0,
+      "printingResolutionFailures": 0,
+      "autocompleteDuplicateFailures": 0,
+      "importFailures": 0,
+      "totalKnownPrintings": 9185,
+      "failureSamples": {
+        "canonical": [],
+        "lowercase": [],
+        "uppercase": [],
+        "whitespace": [],
+        "punctuation": [],
+        "selected": [],
+        "printings": [],
+        "autocomplete": [],
+        "import": []
+      }
+    }
+  ],
+  "requiredExamples": [
+    {
+      "name": "Sol Ring",
+      "passed": true
+    },
+    {
+      "name": "Temple of the False God",
+      "passed": true
+    },
+    {
+      "name": "Seething Song",
+      "passed": true
+    },
+    {
+      "name": "Thrill of Possibility",
+      "passed": true
+    },
+    {
+      "name": "Seize the Spoils",
+      "passed": true
+    },
+    {
+      "name": "Skirk Prospector",
+      "passed": true
+    },
+    {
+      "name": "Cast into the Fire",
+      "passed": true
+    },
+    {
+      "name": "Subterranean Scout",
+      "passed": true
+    },
+    {
+      "name": "Torbran, Thane of Red Fell",
+      "passed": true
+    },
+    {
+      "name": "Squee, the Immortal",
+      "passed": true
+    },
+    {
+      "name": "Mask of Memory",
+      "passed": true
+    },
+    {
+      "name": "Shivan Harvest",
+      "passed": true
+    },
+    {
+      "name": "Conspicuous Snoop",
+      "passed": true
+    },
+    {
+      "name": "Castle Embereth",
+      "passed": true
+    },
+    {
+      "name": "Seer's Lantern",
+      "passed": true
+    },
+    {
+      "name": "Mog Salvage",
+      "passed": true
+    },
+    {
+      "name": "Mirror March",
+      "passed": true
+    },
+    {
+      "name": "Mithril Coat",
+      "passed": true
+    }
+  ],
+  "consumerContract": [
+    {
+      "consumer": "Desktop header autocomplete",
+      "file": "src/Layout.jsx",
+      "passed": true
+    },
+    {
+      "consumer": "Mobile header autocomplete",
+      "file": "src/pages/mobile/MobileHome.jsx",
+      "passed": true
+    },
+    {
+      "consumer": "Mobile browse autocomplete",
+      "file": "src/pages/mobile/MobileBrowse.jsx",
+      "passed": true
+    },
+    {
+      "consumer": "Shop results",
+      "file": "src/pages/Shop.jsx",
+      "passed": true
+    },
+    {
+      "consumer": "Mobile Shop results",
+      "file": "src/pages/mobile/MobileShop.jsx",
+      "passed": true
+    },
+    {
+      "consumer": "Advanced Search",
+      "file": "src/services/search/searchOwner.js",
+      "passed": true
+    },
+    {
+      "consumer": "Deck Builder",
+      "file": "src/pages/AdvancedDeckBuilder.jsx",
+      "passed": true
+    },
+    {
+      "consumer": "Mobile Deck Builder",
+      "file": "src/pages/mobile/MobileDeckBuilder.jsx",
+      "passed": true
+    },
+    {
+      "consumer": "Deck import",
+      "file": "src/components/deckbuilder/DeckImportModal.jsx",
+      "passed": true
+    }
+  ],
+  "totalFailures": 0
+}

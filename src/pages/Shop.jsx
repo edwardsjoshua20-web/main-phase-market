@@ -105,15 +105,16 @@ export default function Shop() {
   // Auto-trigger search when Shop loads with search param
   const advancedSearchOpen = searchParams.get('advancedSearch') === '1';
   const advancedApiQuery = searchParams.get('aq');
+  const canonicalSelection = searchParams.get('canonical') === '1';
 
   useEffect(() => {
     if (!advancedSearchOpen && filters.type === 'single_card' && filters.search) {
       setCardSearchQuery(filters.search);
       setCardSearchPage(0);
       const game = filters.game === 'all' ? 'magic' : filters.game;
-      triggerSearch(filters.search, game);
+      triggerSearch(filters.search, game, null, { canonical: canonicalSelection });
     }
-  }, [advancedSearchOpen, filters.search, filters.type, filters.game]);
+  }, [advancedSearchOpen, canonicalSelection, filters.search, filters.type, filters.game]);
 
   // Auto-set type=single_card when advancedSearch=1
   useEffect(() => {
@@ -427,7 +428,7 @@ export default function Shop() {
   });
 
   const triggerSearch = async (query, game, apiQuery = null, options = {}) => {
-    if (!apiQuery && (!query || query.length < 2)) return;
+    if (!apiQuery && !searchOwner.normalizeQuery(query)) return;
     setSearchingCards(true);
     setShowCardResults(true);
     try {
@@ -436,8 +437,9 @@ export default function Shop() {
         query,
         game: searchGame,
         apiQuery,
+        canonical: Boolean(options.canonical),
         page: options.page || 0,
-        limit: 36
+        limit: options.canonical ? 5000 : 36
       });
 
       const formattedResults = enrichSearchResultsWithInventory(results, cards, pokemonCards);

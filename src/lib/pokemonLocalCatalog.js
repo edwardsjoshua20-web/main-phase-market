@@ -1,5 +1,6 @@
 import { getCatalogAssetUrl, hasExternalCatalogAssetBase } from '@/config/publicAssetUrls';
 import { postLocalJsonIfAvailable } from '@/lib/catalogApi';
+import { normalizeSearchText as normalizeText, searchTextEquals, searchTextFuzzyEquals, searchTextIncludes, searchTextStartsWith } from '@/services/search/searchIdentity';
 
 const cardsUrl = getCatalogAssetUrl('pokemon', 'cards.json');
 const setsUrl = getCatalogAssetUrl('pokemon', 'sets.json');
@@ -13,16 +14,6 @@ const setsCache = {
   promise: null,
   value: null
 };
-
-function normalizeText(value) {
-  return String(value || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/['’]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
 
 function getSetId(card) {
   if (card?.set?.id) return String(card.set.id);
@@ -104,11 +95,12 @@ function scorePokemonCard(card, setsById, normalizedQuery) {
   const name = normalizeText(card.name || '');
   const setName = normalizeText(getSetMeta(card, setsById)?.name || '');
 
-  if (name === normalizedQuery) return 1000;
-  if (name.startsWith(normalizedQuery)) return 750;
+  if (searchTextEquals(name, normalizedQuery)) return 1000;
+  if (searchTextStartsWith(name, normalizedQuery)) return 750;
   if (name.split(' ').some((part) => part.startsWith(normalizedQuery))) return 500;
-  if (name.includes(normalizedQuery)) return 350;
-  if (setName.includes(normalizedQuery)) return 200;
+  if (searchTextIncludes(name, normalizedQuery)) return 350;
+  if (searchTextFuzzyEquals(name, normalizedQuery)) return 300;
+  if (searchTextIncludes(setName, normalizedQuery)) return 200;
   return 0;
 }
 
@@ -193,7 +185,7 @@ function formatPokemonDetail(card, setsById) {
 
 function matchesTextFilter(value, query) {
   if (!query) return true;
-  return normalizeText(value).includes(normalizeText(query));
+  return searchTextIncludes(value, query);
 }
 
 function matchesPokemonAdvancedFilters(card, setsById, filters) {
@@ -210,7 +202,7 @@ function matchesPokemonAdvancedFilters(card, setsById, filters) {
 
 export async function searchPokemonCatalog(query, limit = 50) {
   const normalizedQuery = normalizeText(query);
-  if (!normalizedQuery || normalizedQuery.length < 2) {
+  if (!normalizedQuery) {
     return [];
   }
 

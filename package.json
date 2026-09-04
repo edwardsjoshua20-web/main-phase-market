@@ -86,6 +86,7 @@
     "pricing:verify": "node scripts/verify-pricing-owner.mjs",
     "search:verify": "node scripts/verify-search-owner.mjs",
     "search:runtime:verify": "node scripts/verify-search-runtime.mjs",
+    "search:certify": "node scripts/certify-card-search.mjs",
     "listing:verify": "node scripts/verify-listing-owner.mjs"
   },
   "dependencies": {
