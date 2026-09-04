@@ -30,6 +30,17 @@
       "enabled": true
     },
     {
+      "id": "mtg-printing-index",
+      "label": "Build MTG canonical printing index",
+      "command": "npm",
+      "args": ["run", "mtg:build:printing-index"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/mtg/manifest.json", "label": "MTG catalog manifest" },
+        { "type": "file-exists", "path": "public/data/mtg/search", "label": "MTG search buckets" }
+      ],
+      "enabled": true
+    },
+    {
       "id": "fab-sets",
       "label": "Extract FAB sets",
       "command": "npm",

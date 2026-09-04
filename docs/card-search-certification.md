@@ -1,8 +1,8 @@
 # Card Search Certification
 
 Status: **PASS**  
-Generated: 2026-09-04T00:53:51.657Z  
-Duration: 6525 ms  
+Generated: 2026-09-04T01:17:45.851Z  
+Duration: 6607 ms  
 Total failures: 0
 
 | Game | Canonical identities | Tested | Canonical | Lowercase | Uppercase | Whitespace | Punctuation | Result page | Printings | Autocomplete duplicates | Import |
@@ -26,6 +26,14 @@ Total failures: 0
 - PASS: Deck Builder (src/pages/AdvancedDeckBuilder.jsx)
 - PASS: Mobile Deck Builder (src/pages/mobile/MobileDeckBuilder.jsx)
 - PASS: Deck import (src/components/deckbuilder/DeckImportModal.jsx)
+
+## MTG Hosted Printing Index
+
+- Source identities: 31970
+- Indexed identities: 31970
+- Source printings: 518231
+- Indexed printings: 518231
+- Identity printing-count mismatches: 0
 
 ## Required Examples
 

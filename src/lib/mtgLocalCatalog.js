@@ -4,6 +4,7 @@ import { normalizeSearchText as normalizeText, searchTextEquals, searchTextFuzzy
 
 const manifestUrl = getCatalogAssetUrl('mtg', 'manifest.json');
 const liteManifestUrl = getCatalogAssetUrl('mtg', 'search-lite-manifest.json');
+const printingManifestUrl = getCatalogAssetUrl('mtg', 'printing-index-manifest.json');
 
 const manifestCache = {
   promise: null,
@@ -14,10 +15,19 @@ const liteManifestCache = {
   value: null,
   failed: false
 };
+const printingManifestCache = {
+  promise: null,
+  value: null
+};
 
 const bucketCache = new Map();
 const liteBucketCache = new Map();
+const printingShardCache = new Map();
 const allBucketsCache = {
+  promise: null,
+  value: null
+};
+const allLiteBucketsCache = {
   promise: null,
   value: null
 };
@@ -134,6 +144,23 @@ async function loadLiteManifest() {
   return liteManifestCache.promise;
 }
 
+async function loadPrintingManifest() {
+  if (printingManifestCache.value) return printingManifestCache.value;
+
+  if (!printingManifestCache.promise) {
+    printingManifestCache.promise = fetch(printingManifestUrl).then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to load MTG printing manifest: ${response.status}`);
+      }
+      const manifest = await response.json();
+      printingManifestCache.value = manifest;
+      return manifest;
+    });
+  }
+
+  return printingManifestCache.promise;
+}
+
 async function loadBucket(bucket) {
   if (bucketCache.has(bucket)) {
     return bucketCache.get(bucket);
@@ -191,6 +218,69 @@ async function loadLiteBucket(bucket) {
 
   liteBucketCache.set(bucket, promise);
   return promise;
+}
+
+async function loadAllLiteBuckets() {
+  if (allLiteBucketsCache.value) return allLiteBucketsCache.value;
+
+  if (!allLiteBucketsCache.promise) {
+    allLiteBucketsCache.promise = loadLiteManifest().then(async (manifest) => {
+      const bucketNames = Object.keys(manifest?.buckets || {});
+      const rows = (await Promise.all(bucketNames.map((bucket) => loadLiteBucket(bucket)))).flat();
+      allLiteBucketsCache.value = rows;
+      return rows;
+    });
+  }
+
+  return allLiteBucketsCache.promise;
+}
+
+function printingShardForOracleId(oracleId) {
+  const prefix = String(oracleId || '').replace(/[^a-f0-9]/gi, '').slice(0, 2).toLowerCase();
+  return /^[a-f0-9]{2}$/.test(prefix) ? prefix : 'other';
+}
+
+function expandCompactPrinting(row, fields) {
+  const expanded = Object.fromEntries(fields.map((field, index) => [field, row[index]]));
+  expanded.prices = {
+    usd: expanded.usd ?? null,
+    usd_foil: expanded.usd_foil ?? null,
+    usd_etched: expanded.usd_etched ?? null
+  };
+  delete expanded.usd;
+  delete expanded.usd_foil;
+  delete expanded.usd_etched;
+  return expanded;
+}
+
+async function loadPrintingShard(shard) {
+  if (printingShardCache.has(shard)) return printingShardCache.get(shard);
+
+  const promise = loadPrintingManifest().then(async (manifest) => {
+    const file = manifest?.shards?.[shard]?.file;
+    if (!file) return [];
+    const response = await fetch(getCatalogAssetUrl('mtg', file));
+    if (!response.ok) {
+      throw new Error(`Failed to load MTG printing shard ${shard}: ${response.status}`);
+    }
+    const rows = await response.json();
+    return rows.map((row) => expandCompactPrinting(row, manifest.fields || []));
+  });
+
+  printingShardCache.set(shard, promise);
+  return promise;
+}
+
+async function loadIndexedPrintingsForExactMatches(exactMatches) {
+  if (!exactMatches?.length) return [];
+  const oracleIds = new Set(exactMatches.map((row) => row.oracle_id).filter(Boolean));
+  const canonicalNames = new Set(exactMatches.map(getCanonicalNormalizedName).filter(Boolean));
+  const shards = [...new Set([...oracleIds].map(printingShardForOracleId).concat('other'))];
+  const rows = (await Promise.all(shards.map(loadPrintingShard))).flat();
+  return rows.filter((row) => (
+    (row.oracle_id && oracleIds.has(row.oracle_id)) ||
+    (!row.oracle_id && canonicalNames.has(getCanonicalNormalizedName(row)))
+  ));
 }
 
 async function loadAllBuckets() {
@@ -612,6 +702,16 @@ function mergePrintingCollections(primaryRows = [], fallbackRows = []) {
   return [...rowsById.values()];
 }
 
+function mergePrintingDetailsWithRepresentatives(printingRows = [], representativeRows = []) {
+  const representativeByOracleId = new Map(
+    representativeRows
+      .filter((row) => row?.oracle_id)
+      .map((row) => [row.oracle_id, row])
+  );
+
+  return printingRows.map((row) => mergeMtgPrintingRows(row, representativeByOracleId.get(row.oracle_id) || {}));
+}
+
 function formatResult(row, englishImageIndexes = null) {
   const directImageUrl = getBestMtgImage(row);
   const englishFallbackImage = !isEnglish(row) ? getEnglishFallbackImage(row, englishImageIndexes) : null;
@@ -677,7 +777,7 @@ export async function searchMtgCatalog(query, limit = 50) {
   }
 
   const bucket = bucketForQuery(normalizedQuery);
-  const rows = await loadBucket(bucket);
+  const rows = await loadLiteBucket(bucket);
   const englishImageIndexes = buildEnglishImageIndexes(rows);
   const rankedRows = rows
     .map((row) => ({ row, score: scoreRow(row, normalizedQuery) }))
@@ -695,7 +795,12 @@ export async function searchMtgCatalog(query, limit = 50) {
       .filter(Boolean)
   );
 
-  const allRows = exactMatchOracleIds.size > 0 ? await loadRowsForOracleIds(exactMatchOracleIds) : rows;
+  const indexedRows = exactMatches.length > 0
+    ? await loadIndexedPrintingsForExactMatches(exactMatches)
+    : [];
+  const allRows = indexedRows.length > 0
+    ? mergePrintingDetailsWithRepresentatives(indexedRows, exactMatches)
+    : rows;
   const allEnglishImageIndexes = allRows === rows ? englishImageIndexes : buildEnglishImageIndexes(allRows);
 
   const exactPrintingFamily = exactMatchOracleIds.size > 0 ?
@@ -744,7 +849,7 @@ export async function searchMtgCatalogAdvanced(filters, options = {}) {
         return payload;
       }
 
-      const englishImageIndexes = buildEnglishImageIndexes(await loadAllBuckets());
+      const englishImageIndexes = buildEnglishImageIndexes(await loadAllLiteBuckets());
       return normalizeAdvancedPayload(payload, englishImageIndexes, filters, page, limit);
     }
   } catch {
@@ -752,7 +857,7 @@ export async function searchMtgCatalogAdvanced(filters, options = {}) {
   }
 
   try {
-    const rows = await loadAllBuckets();
+    const rows = await loadAllLiteBuckets();
     const englishImageIndexes = buildEnglishImageIndexes(rows);
     const matchedRows = rows
       .filter((row) => hasDisplayableImage(row, englishImageIndexes))
@@ -803,7 +908,7 @@ export async function browseMtgCatalog(limit = 100) {
   const safeLimit = Math.max(1, Math.min(Number(limit) || 100, 500));
 
   try {
-    const rows = await loadAllBuckets();
+    const rows = await loadAllLiteBuckets();
     const englishImageIndexes = buildEnglishImageIndexes(rows);
     return rows
       .filter((row) => hasDisplayableImage(row, englishImageIndexes))
@@ -821,7 +926,11 @@ export async function getMtgPrintingsByOracleId(oracleId) {
   }
 
   const oracleIds = new Set([oracleId]);
-  const staticRowsPromise = loadRowsForOracleIds(oracleIds).catch(() => []);
+  const representativeRowsPromise = loadAllLiteBuckets()
+    .then((rows) => rows.filter((row) => oracleIds.has(row.oracle_id)))
+    .catch(() => []);
+  const representativeRows = await representativeRowsPromise;
+  const staticRowsPromise = loadIndexedPrintingsForExactMatches(representativeRows).catch(() => []);
   let apiRows = [];
 
   try {
@@ -834,7 +943,8 @@ export async function getMtgPrintingsByOracleId(oracleId) {
   }
 
   const staticRows = await staticRowsPromise;
-  const rows = mergePrintingCollections(apiRows, staticRows);
+  const indexedRows = mergePrintingDetailsWithRepresentatives(staticRows, representativeRows);
+  const rows = mergePrintingCollections(apiRows, indexedRows);
   const englishImageIndexes = buildEnglishImageIndexes(rows);
 
   return rows

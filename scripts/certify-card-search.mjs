@@ -76,6 +76,43 @@ function loadFamilies(game) {
   return families;
 }
 
+function loadMtgPrintingIndexFamilies() {
+  const manifest = readJson('public/data/mtg/printing-index-manifest.json');
+  const fieldIndex = Object.fromEntries((manifest.fields || []).map((field, index) => [field, index]));
+  const families = new Map();
+
+  for (const shard of Object.values(manifest.shards || {})) {
+    const rows = readJson(`public/data/mtg/${shard.file}`);
+    for (const compactRow of rows) {
+      addRow(families, 'magic', {
+        name: compactRow[fieldIndex.name],
+        oracle_id: compactRow[fieldIndex.oracle_id]
+      }, canonicalMtgName);
+    }
+  }
+
+  return { manifest, families };
+}
+
+function certifyMtgPrintingIndex(sourceFamilies, indexedFamilies) {
+  const mismatches = [...sourceFamilies].filter(([key, sourceFamily]) => (
+    indexedFamilies.get(key)?.printingCount !== sourceFamily.printingCount
+  ));
+
+  return {
+    sourceIdentityCount: sourceFamilies.size,
+    indexedIdentityCount: indexedFamilies.size,
+    sourcePrintingCount: [...sourceFamilies.values()].reduce((sum, family) => sum + family.printingCount, 0),
+    indexedPrintingCount: [...indexedFamilies.values()].reduce((sum, family) => sum + family.printingCount, 0),
+    identityPrintingCountMismatches: mismatches.length,
+    failureSamples: mismatches.slice(0, failureSampleLimit).map(([key, sourceFamily]) => ({
+      name: sourceFamily.name,
+      expected: sourceFamily.printingCount,
+      actual: indexedFamilies.get(key)?.printingCount || 0
+    }))
+  };
+}
+
 function whitespaceVariant(name) {
   return `  ${String(name).trim().replace(/\s+/g, '   ')}  `;
 }
@@ -188,6 +225,8 @@ const startedAt = new Date();
 const familyMaps = new Map(games.map((game) => [game.key, loadFamilies(game)]));
 const gameReports = games.map((game) => certifyGame(game, familyMaps.get(game.key)));
 const consumerContract = verifyConsumerContract();
+const mtgPrintingIndex = loadMtgPrintingIndexFamilies();
+const mtgPrintingIndexContract = certifyMtgPrintingIndex(familyMaps.get('magic'), mtgPrintingIndex.families);
 const totalFailures = gameReports.reduce((total, game) => total
   + game.canonicalNameFailures
   + game.lowercaseFailures
@@ -198,7 +237,8 @@ const totalFailures = gameReports.reduce((total, game) => total
   + game.printingResolutionFailures
   + game.autocompleteDuplicateFailures
   + game.importFailures, 0)
-  + consumerContract.filter((check) => !check.passed).length;
+  + consumerContract.filter((check) => !check.passed).length
+  + mtgPrintingIndexContract.identityPrintingCountMismatches;
 
 const requiredExamples = [
   'Sol Ring', 'Temple of the False God', 'Seething Song', 'Thrill of Possibility', 'Seize the Spoils',
@@ -222,6 +262,7 @@ const report = {
   games: gameReports,
   requiredExamples: exampleResults,
   consumerContract,
+  mtgPrintingIndexContract,
   totalFailures: totalFailures + exampleFailures
 };
 
@@ -230,7 +271,7 @@ fs.writeFileSync(reportJsonPath, `${JSON.stringify(report, null, 2)}\n`);
 const tableRows = gameReports.map((game) =>
   `| ${game.game} | ${game.totalUniqueCanonicalCardIdentities} | ${game.identitiesTested} | ${game.canonicalNameFailures} | ${game.lowercaseFailures} | ${game.uppercaseFailures} | ${game.whitespaceNormalizedFailures} | ${game.punctuationApostropheCommaFailures} | ${game.selectedCardResultPageFailures} | ${game.printingResolutionFailures} | ${game.autocompleteDuplicateFailures} | ${game.importFailures} |`
 );
-const markdown = `# Card Search Certification\n\nStatus: **${report.certification}**  \nGenerated: ${report.generatedAt}  \nDuration: ${report.durationMs} ms  \nTotal failures: ${report.totalFailures}\n\n| Game | Canonical identities | Tested | Canonical | Lowercase | Uppercase | Whitespace | Punctuation | Result page | Printings | Autocomplete duplicates | Import |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n${tableRows.join('\n')}\n\n## Consumer Contract\n\n${consumerContract.map((check) => `- ${check.passed ? 'PASS' : 'FAIL'}: ${check.consumer} (${check.file})`).join('\n')}\n\n## Required Examples\n\n${exampleResults.map((result) => `- ${result.passed ? 'PASS' : 'FAIL'}: ${result.name}`).join('\n')}\n`;
+const markdown = `# Card Search Certification\n\nStatus: **${report.certification}**  \nGenerated: ${report.generatedAt}  \nDuration: ${report.durationMs} ms  \nTotal failures: ${report.totalFailures}\n\n| Game | Canonical identities | Tested | Canonical | Lowercase | Uppercase | Whitespace | Punctuation | Result page | Printings | Autocomplete duplicates | Import |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n${tableRows.join('\n')}\n\n## Consumer Contract\n\n${consumerContract.map((check) => `- ${check.passed ? 'PASS' : 'FAIL'}: ${check.consumer} (${check.file})`).join('\n')}\n\n## MTG Hosted Printing Index\n\n- Source identities: ${mtgPrintingIndexContract.sourceIdentityCount}\n- Indexed identities: ${mtgPrintingIndexContract.indexedIdentityCount}\n- Source printings: ${mtgPrintingIndexContract.sourcePrintingCount}\n- Indexed printings: ${mtgPrintingIndexContract.indexedPrintingCount}\n- Identity printing-count mismatches: ${mtgPrintingIndexContract.identityPrintingCountMismatches}\n\n## Required Examples\n\n${exampleResults.map((result) => `- ${result.passed ? 'PASS' : 'FAIL'}: ${result.name}`).join('\n')}\n`;
 fs.writeFileSync(reportMarkdownPath, markdown);
 
 console.log(JSON.stringify(report, null, 2));

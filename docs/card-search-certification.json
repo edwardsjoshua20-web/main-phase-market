@@ -1,7 +1,7 @@
 {
   "certification": "PASS",
-  "generatedAt": "2026-09-04T00:53:51.657Z",
-  "durationMs": 6525,
+  "generatedAt": "2026-09-04T01:17:45.851Z",
+  "durationMs": 6607,
   "normalizationContract": "case-insensitive, diacritic-insensitive, whitespace-normalized, punctuation-tolerant with compact fallback",
   "games": [
     {
@@ -315,5 +315,13 @@
       "passed": true
     }
   ],
+  "mtgPrintingIndexContract": {
+    "sourceIdentityCount": 31970,
+    "indexedIdentityCount": 31970,
+    "sourcePrintingCount": 518231,
+    "indexedPrintingCount": 518231,
+    "identityPrintingCountMismatches": 0,
+    "failureSamples": []
+  },
   "totalFailures": 0
 }

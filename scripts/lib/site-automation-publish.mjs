@@ -46,7 +46,9 @@ function buildPublishSelection(pipelineId) {
           `data/${game}/sets.json`
           ]),
           'data/mtg/search-lite',
-          'data/mtg/search-lite-manifest.json'
+          'data/mtg/search-lite-manifest.json',
+          'data/mtg/printing-index',
+          'data/mtg/printing-index-manifest.json'
         ]
       };
     case 'images':

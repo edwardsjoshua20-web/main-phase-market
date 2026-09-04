@@ -15,6 +15,7 @@
     "mtg:refresh:source": "node scripts/refresh-mtg-source.mjs",
     "mtg:build": "node scripts/build-mtg-catalog.mjs",
     "mtg:build:search-lite": "node scripts/build-mtg-search-lite.mjs",
+    "mtg:build:printing-index": "node scripts/build-mtg-printing-index.mjs",
     "mtg:mirror:images": "node scripts/mirror-mtg-images.mjs",
     "mtg:mirror:symbols": "node scripts/mirror-mtg-symbols.mjs",
     "pokemon:backfill:cards": "node scripts/backfill-pokemon-cards.mjs",
