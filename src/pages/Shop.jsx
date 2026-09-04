@@ -940,8 +940,8 @@ export default function Shop() {
   return (
     <div className="min-h-screen bg-[#090f18] text-slate-100">
       <section className="relative isolate w-full overflow-hidden border-b border-slate-700/70 bg-[#07111f] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_78%_35%,rgba(29,78,216,0.22),transparent_34%),linear-gradient(105deg,rgba(2,6,23,0.98),rgba(15,32,54,0.92))]" />
-        <div className="absolute inset-y-0 right-[12%] -z-10 w-px bg-cyan-400/20 shadow-[80px_0_0_rgba(56,189,248,0.08),160px_0_0_rgba(56,189,248,0.05)]" />
+        <img src="/images/shop-marketplace-banner.png" alt="" aria-hidden="true" className="absolute inset-0 -z-20 h-full w-full object-cover object-center" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#030812]/95 via-[#030812]/55 to-transparent" />
         <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">The Marketplace</h1>
       </section>
 
