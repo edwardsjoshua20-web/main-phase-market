@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle } from
 "@/components/ui/dialog";
-import { Search, X, Package, Loader2, ChevronDown, ChevronRight, Mail, Layers, Box, Dice1, Heart, ShoppingCart } from 'lucide-react';
+import { Search, X, Package, Loader2, ChevronDown, ChevronRight, Mail, Box, Heart, ShoppingCart, Grid2X2, List, SlidersHorizontal } from 'lucide-react';
 import QuickViewDialog from '@/components/store/QuickViewDialog';
 import AdvancedSearch from '@/components/store/AdvancedSearch';
 import CardImage from '@/components/cards/CardImage';
@@ -78,7 +78,10 @@ export default function Shop() {
     priceMax: searchParams.get('priceMax') || '',
     inStock: searchParams.get('inStock') === 'true',
     setType: searchParams.get('setType') || 'all',
-    preorder: searchParams.get('preorder') === 'true'
+    preorder: searchParams.get('preorder') === 'true',
+    condition: searchParams.get('condition') || 'all',
+    finish: searchParams.get('finish') || 'all',
+    language: searchParams.get('language') || 'all'
   };
 
   const [quickViewItem, setQuickViewItem] = useState(null);
@@ -133,21 +136,6 @@ export default function Shop() {
   }, [advancedSearchOpen]);
 
   useEffect(() => {
-    if (!searchParams.get('type') && !advancedSearchOpen && !filters.preorder) {
-      setSearchParams((prev) => {
-        /** @type {Record<string, string>} */
-        const p = {};
-        prev.forEach((value, key) => {
-          p[key] = value;
-        });
-        p.type = 'single_card';
-        if (!p.game) p.game = 'magic';
-        return p;
-      });
-    }
-  }, [advancedSearchOpen, filters.preorder, searchParams, setSearchParams]);
-
-  useEffect(() => {
     return () => {
       if (boxSearchTimeoutRef.current) {
         clearTimeout(boxSearchTimeoutRef.current);
@@ -169,6 +157,7 @@ export default function Shop() {
   const [advancedSearchCollapsed, setAdvancedSearchCollapsed] = useState(false);
   const [hoveredCardImage, setHoveredCardImage] = useState(null);
   const [singlesSearchDraft, setSinglesSearchDraft] = useState(filters.search || '');
+  const [resultsView, setResultsView] = useState('grid');
 
   // Booster Box Search State
   const [boxSearchQuery, setBoxSearchQuery] = useState('');
@@ -340,11 +329,11 @@ export default function Shop() {
     navigate(detailUrl);
   };
 
-  // Reset game browse page when game filter changes
+  // Reset marketplace pagination when a filter changes.
   useEffect(() => {
     setGameBrowsePage(0);
     setGameBrowseSearch('');
-  }, [filters.game]);
+  }, [filters.game, filters.type, filters.rarity, filters.set, filters.priceMin, filters.priceMax, filters.inStock, filters.preorder, filters.condition, filters.finish, filters.language]);
 
   // Fetch inventory
   const { data: cards = [], isLoading: cardsLoading } = useQuery({
@@ -412,7 +401,7 @@ export default function Shop() {
       product_name: card.name,
       product_image: card.image_url,
       price: card.price,
-      product_type: 'card',
+      product_type: card.product_type ? 'product' : 'card',
       game: card.game,
       set_code: card.set_code,
       set_name: card.set_name,
@@ -601,27 +590,21 @@ export default function Shop() {
           priceMax: '',
           inStock: false,
           sort: 'newest',
-          preorder: false
+          preorder: false,
+          condition: 'all',
+          finish: 'all',
+          language: 'all'
         }),
         advancedSearch: '1'
       });
       return;
     }
 
-    setSearchParams(buildFilterParams({
-      ...filters,
-      type: 'single_card',
-      game: filters.game === 'all' ? 'magic' : filters.game,
-      search: '',
-      rarity: 'all',
-      set: 'all',
-      priceMin: '',
-      priceMax: '',
-      inStock: false,
-      sort: 'newest',
-      setType: 'all',
-      preorder: false
-    }));
+    setCardSearchResults([]);
+    setShowCardResults(false);
+    setCardSearchPage(0);
+    setSinglesSearchDraft('');
+    setSearchParams({});
   };
 
   const totalAdvancedPages = Math.max(1, Math.ceil((advancedSearchMeta.total || 0) / (advancedSearchMeta.limit || 36)));
@@ -885,11 +868,17 @@ export default function Shop() {
   const uniqueRarities = filters.search && activeCardSearchResults.length > 0 ?
   [...new Set(activeCardSearchResults.map((c) => c.rarity))].filter(Boolean).sort() :
   [...new Set(cards.map((c) => c.rarity))].filter(Boolean).sort();
+  const uniqueConditions = [...new Set(cards.map((c) => c.condition).filter(Boolean))].sort();
+  const uniqueFinishes = [...new Set(cards.map((c) => c.finish).filter(Boolean))].sort();
+  const uniqueLanguages = [...new Set(cards.map((c) => c.language || c.lang).filter(Boolean))].sort();
   const filteredCards = useMemo(() => {
     return cards.filter((c) => {
       if (filters.inStock && !inventoryOwner.getStockState(c).inStock) return false;
       if (filters.rarity !== 'all' && c.rarity !== filters.rarity) return false;
       if (filters.set !== 'all' && c.set_name !== filters.set) return false;
+      if (filters.condition !== 'all' && c.condition !== filters.condition) return false;
+      if (filters.finish !== 'all' && c.finish !== filters.finish) return false;
+      if (filters.language !== 'all' && (c.language || c.lang) !== filters.language) return false;
       if (filters.search && !c.name?.toLowerCase().includes(filters.search.toLowerCase())) return false;
 
       const price = c.price || 0;
@@ -922,105 +911,140 @@ export default function Shop() {
       }
       if (filters.search && !p.name?.toLowerCase().includes(filters.search.toLowerCase())) return false;
       if (filters.preorder && !p.is_preorder) return false;
+      const price = Number(p.price || 0);
+      if (filters.priceMin && price < Number(filters.priceMin)) return false;
+      if (filters.priceMax && price > Number(filters.priceMax)) return false;
       return true;
     });
   }, [products, filters]);
 
+  const filteredSearchResults = activeCardSearchResults.filter((card) => {
+    if (filters.set !== 'all' && card.set_name !== filters.set) return false;
+    if (filters.rarity !== 'all' && card.rarity !== filters.rarity) return false;
+    if (filters.condition !== 'all' && card.condition !== filters.condition) return false;
+    if (filters.finish !== 'all' && card.finish !== filters.finish) return false;
+    if (filters.language !== 'all' && (card.language || card.lang) !== filters.language) return false;
+    if (filters.inStock && !card.inStock) return false;
+    const resultPrice = resolveResultSellPrice(card) ?? resolveMarketPrice(card) ?? 0;
+    if (filters.priceMin && resultPrice < Number(filters.priceMin)) return false;
+    if (filters.priceMax && resultPrice > Number(filters.priceMax)) return false;
+    return true;
+  });
+  const marketplaceResultCount = showBoxSearch
+    ? (filters.game === 'magic' ? allMTGSets.length : boxSearchResults.length)
+    : (showCardSearch && showCardResults
+      ? filteredSearchResults.length
+      : ((filters.type === 'all' || filters.type === 'single_card') ? filteredCards.length : filteredProducts.length));
+  const pagedMarketplaceCards = filteredCards.slice(gameBrowsePage * GAME_BROWSE_PER_PAGE, (gameBrowsePage + 1) * GAME_BROWSE_PER_PAGE);
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="w-full px-4 py-8">
-        <div className="mb-5 rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Main Phase Market Shop</p>
-              <div>
-                <h1 className="text-3xl font-black tracking-tight text-slate-950">Shop singles, sealed, and table gear.</h1>
-                <p className="mt-1 text-sm text-slate-600">Use the top search for exact cards, or pick a lane below.</p>
-              </div>
-            </div>
+    <div className="min-h-screen bg-[#090f18] text-slate-100">
+      <section className="relative isolate w-full overflow-hidden border-b border-slate-700/70 bg-[#07111f] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_78%_35%,rgba(29,78,216,0.22),transparent_34%),linear-gradient(105deg,rgba(2,6,23,0.98),rgba(15,32,54,0.92))]" />
+        <div className="absolute inset-y-0 right-[12%] -z-10 w-px bg-cyan-400/20 shadow-[80px_0_0_rgba(56,189,248,0.08),160px_0_0_rgba(56,189,248,0.05)]" />
+        <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">The Marketplace</h1>
+      </section>
 
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant={filters.type === 'single_card' ? 'default' : 'outline'}
-                className={filters.type === 'single_card' ? 'bg-slate-950 text-white hover:bg-slate-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'}
-                onClick={() => updateFilters({ ...filters, type: 'single_card', search: filters.search, game: filters.game === 'all' ? 'magic' : filters.game })}
-              >
-                <Layers className="mr-2 h-4 w-4" />
-                Singles
-              </Button>
-              <Button
-                type="button"
-                variant={filters.type === 'booster_box' ? 'default' : 'outline'}
-                className={filters.type === 'booster_box' ? 'bg-slate-950 text-white hover:bg-slate-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'}
-                onClick={() => updateFilters({ ...filters, type: 'booster_box', search: '', game: filters.game === 'all' ? 'magic' : filters.game })}
-              >
-                <Box className="mr-2 h-4 w-4" />
-                Sealed
-              </Button>
-              <Button
-                type="button"
-                variant={filters.type === 'starter_deck' ? 'default' : 'outline'}
-                className={filters.type === 'starter_deck' ? 'bg-slate-950 text-white hover:bg-slate-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'}
-                onClick={() => updateFilters({ ...filters, type: 'starter_deck', search: '' })}
-              >
-                <Package className="mr-2 h-4 w-4" />
-                Starter Decks
-              </Button>
-              <Button
-                type="button"
-                variant={filters.type === 'dice' ? 'default' : 'outline'}
-                className={filters.type === 'dice' ? 'bg-slate-950 text-white hover:bg-slate-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'}
-                onClick={() => updateFilters({ ...filters, type: 'dice', search: '' })}
-              >
-                <Dice1 className="mr-2 h-4 w-4" />
-                Accessories
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {filters.type === 'single_card' && !advancedSearchOpen &&
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            submitSinglesSearch();
-          }}
-          className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                <Input
-                value={singlesSearchDraft}
-                onChange={(event) => setSinglesSearchDraft(event.target.value)}
-                placeholder="Search singles by card name..."
-                className="h-12 pl-11 text-base" />
+      <div className="w-full px-3 py-4 sm:px-4 lg:px-6">
+        <div className="grid min-w-0 gap-5 md:grid-cols-[220px_minmax(0,1fr)] lg:grid-cols-[236px_minmax(0,1fr)]">
+          <aside className="hidden min-w-0 border-r border-slate-700/70 pr-5 md:block">
+            <div className="sticky top-24 space-y-0">
+              <div className="border-b border-slate-700/70 pb-5">
+                <label className="mb-2 block text-[11px] font-semibold uppercase text-slate-400">Game</label>
+                <Select value={filters.game} onValueChange={(game) => updateFilters({ ...filters, game, set: 'all' })}>
+                  <SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-sm text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100">
+                    {GAME_OPTIONS.map((game) => <SelectItem key={game.value} value={game.value}>{game.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-              <Button type="submit" className="h-12 bg-slate-950 px-6 text-white hover:bg-slate-800">
-                Search Singles
-              </Button>
-              <Button
-              type="button"
-              variant="outline"
-              className="h-12 border-slate-300 px-6"
-              onClick={() => {
-                setSearchParams({
-                  ...buildFilterParams({
-                    ...filters,
-                    type: 'single_card',
-                    game: filters.game === 'all' ? 'magic' : filters.game,
-                    search: '',
-                    set: 'all',
-                    rarity: 'all'
-                  }),
-                  advancedSearch: '1'
-                });
-              }}>
-                Advanced Search
-              </Button>
+
+              <div className="border-b border-slate-700/70 py-5">
+                <div className="mb-2 text-[11px] font-semibold uppercase text-slate-400">Product Type</div>
+                <div className="space-y-0.5">
+                  {[
+                    ['all', 'All Products'],
+                    ['single_card', 'Single Cards'],
+                    ['booster_box', 'Sealed Product'],
+                    ['starter_deck', 'Starter Decks'],
+                    ['dice', 'Accessories']
+                  ].map(([value, label]) => (
+                    <button key={value} type="button" onClick={() => updateFilters({ ...filters, type: value, search: '' })} className={`block w-full border-l-2 px-3 py-1.5 text-left text-sm transition-colors ${filters.type === value ? 'border-cyan-400 bg-slate-800/70 font-semibold text-white' : 'border-transparent text-slate-300 hover:bg-slate-800/40 hover:text-white'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-b border-slate-700/70 py-5">
+                <div className="mb-3 text-[11px] font-semibold uppercase text-slate-400">Availability</div>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+                  <input type="checkbox" checked={filters.inStock} onChange={(event) => updateFilters({ ...filters, inStock: event.target.checked })} className="h-4 w-4 rounded-sm border-slate-500 bg-slate-900 accent-cyan-500" />
+                  In stock only
+                </label>
+                <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+                  <input type="checkbox" checked={filters.preorder} onChange={(event) => updateFilters({ ...filters, preorder: event.target.checked })} className="h-4 w-4 rounded-sm border-slate-500 bg-slate-900 accent-cyan-500" />
+                  Preorders
+                </label>
+              </div>
+
+              <div className="border-b border-slate-700/70 py-5 space-y-3">
+                <div className="text-[11px] font-semibold uppercase text-slate-400">Catalog</div>
+                {uniqueSets.length > 0 && <Select value={filters.set} onValueChange={(set) => updateFilters({ ...filters, set })}>
+                  <SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Set" /></SelectTrigger>
+                  <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Sets</SelectItem>{uniqueSets.map((set) => <SelectItem key={set} value={set}>{set}</SelectItem>)}</SelectContent>
+                </Select>}
+                {uniqueRarities.length > 0 && <Select value={filters.rarity} onValueChange={(rarity) => updateFilters({ ...filters, rarity })}>
+                  <SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Rarity" /></SelectTrigger>
+                  <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Rarities</SelectItem>{uniqueRarities.map((rarity) => <SelectItem key={rarity} value={rarity}>{rarity}</SelectItem>)}</SelectContent>
+                </Select>}
+              </div>
+
+              <div className="border-b border-slate-700/70 py-5">
+                <div className="mb-3 text-[11px] font-semibold uppercase text-slate-400">Price</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input inputMode="decimal" value={filters.priceMin} onChange={(event) => updateFilters({ ...filters, priceMin: event.target.value })} placeholder="Min" className="h-9 rounded border-slate-600 bg-[#111b29] text-sm text-white placeholder:text-slate-500" />
+                  <Input inputMode="decimal" value={filters.priceMax} onChange={(event) => updateFilters({ ...filters, priceMax: event.target.value })} placeholder="Max" className="h-9 rounded border-slate-600 bg-[#111b29] text-sm text-white placeholder:text-slate-500" />
+                </div>
+              </div>
+
+              {(uniqueConditions.length > 0 || uniqueFinishes.length > 0 || uniqueLanguages.length > 0) && <div className="border-b border-slate-700/70 py-5 space-y-3">
+                {uniqueConditions.length > 0 && <Select value={filters.condition} onValueChange={(condition) => updateFilters({ ...filters, condition })}><SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Condition" /></SelectTrigger><SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Conditions</SelectItem>{uniqueConditions.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}
+                {uniqueFinishes.length > 0 && <Select value={filters.finish} onValueChange={(finish) => updateFilters({ ...filters, finish })}><SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Finish" /></SelectTrigger><SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Finishes</SelectItem>{uniqueFinishes.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}
+                {uniqueLanguages.length > 0 && <Select value={filters.language} onValueChange={(language) => updateFilters({ ...filters, language })}><SelectTrigger className="h-9 w-full rounded border-slate-600 bg-[#111b29] text-xs text-white"><SelectValue placeholder="Language" /></SelectTrigger><SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="all">All Languages</SelectItem>{uniqueLanguages.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}
+              </div>}
+
+              {showClearFilters && <button type="button" onClick={clearFilters} className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-300 hover:text-white"><X className="h-3.5 w-3.5" /> Reset filters</button>}
             </div>
-          </form>
-        }
+          </aside>
+
+          <main className="min-w-0">
+            <details className="mb-3 border-y border-slate-700/70 py-2 md:hidden">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-white"><SlidersHorizontal className="h-4 w-4" /> Filters</summary>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <Select value={filters.game} onValueChange={(game) => updateFilters({ ...filters, game, set: 'all' })}><SelectTrigger className="h-10 rounded border-slate-600 bg-[#111b29] text-white"><SelectValue /></SelectTrigger><SelectContent>{GAME_OPTIONS.map((game) => <SelectItem key={game.value} value={game.value}>{game.label}</SelectItem>)}</SelectContent></Select>
+                <Select value={filters.type} onValueChange={(type) => updateFilters({ ...filters, type, search: '' })}><SelectTrigger className="h-10 rounded border-slate-600 bg-[#111b29] text-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Products</SelectItem><SelectItem value="single_card">Single Cards</SelectItem><SelectItem value="booster_box">Sealed Product</SelectItem><SelectItem value="starter_deck">Starter Decks</SelectItem><SelectItem value="dice">Accessories</SelectItem></SelectContent></Select>
+                {showClearFilters && <button type="button" onClick={clearFilters} className="text-left text-xs font-semibold uppercase text-slate-300">Reset filters</button>}
+              </div>
+            </details>
+
+            <form onSubmit={(event) => { event.preventDefault(); if (showBoxSearch) searchBoosterBoxes(boxSearchQuery); else submitSinglesSearch(); }} className="mb-4 flex min-w-0 flex-col gap-2 border-b border-slate-700/70 pb-4 sm:flex-row sm:items-center">
+              <div className="relative min-w-0 flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input value={showBoxSearch ? boxSearchQuery : singlesSearchDraft} onChange={showBoxSearch ? handleBoxSearchChange : (event) => setSinglesSearchDraft(event.target.value)} placeholder={showBoxSearch ? 'Search sealed sets...' : 'Search the marketplace...'} className="h-10 rounded border-slate-600 bg-[#111b29] pl-9 pr-10 text-sm text-white placeholder:text-slate-500" />
+                <button type="submit" aria-label="Search" className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center text-slate-300 hover:text-white"><Search className="h-4 w-4" /></button>
+              </div>
+              <Select value={filters.sort} onValueChange={(sort) => updateFilters({ ...filters, sort })}>
+                <SelectTrigger className="h-10 w-full rounded border-slate-600 bg-[#111b29] text-sm text-white sm:w-[170px]"><SelectValue /></SelectTrigger>
+                <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100"><SelectItem value="newest">Newest</SelectItem><SelectItem value="price-low">Price: Low to High</SelectItem><SelectItem value="price-high">Price: High to Low</SelectItem><SelectItem value="name">Name (A-Z)</SelectItem></SelectContent>
+              </Select>
+              <div className="flex h-10 shrink-0 items-center border border-slate-600 bg-[#111b29] p-0.5" aria-label="Results view">
+                <button type="button" onClick={() => setResultsView('grid')} aria-label="Grid view" className={`grid h-8 w-9 place-items-center ${resultsView === 'grid' ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'}`}><Grid2X2 className="h-4 w-4" /></button>
+                <button type="button" onClick={() => setResultsView('list')} aria-label="List view" className={`grid h-8 w-9 place-items-center ${resultsView === 'list' ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'}`}><List className="h-4 w-4" /></button>
+              </div>
+            </form>
 
         {/* Advanced Search Panel */}
         {filters.type === 'single_card' && advancedSearchOpen &&
@@ -1081,7 +1105,7 @@ export default function Shop() {
           </div>
         }
 
-        {filters.type === 'starter_deck' &&
+        {false && filters.type === 'starter_deck' &&
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="grid gap-5 lg:grid-cols-[1.25fr_0.9fr]">
               <div>
@@ -1116,7 +1140,7 @@ export default function Shop() {
           </div>
         }
 
-        {filters.type === 'dice' &&
+        {false && filters.type === 'dice' &&
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="grid gap-5 lg:grid-cols-[1.2fr_0.9fr]">
               <div>
@@ -1149,7 +1173,7 @@ export default function Shop() {
         }
 
         {/* Top Filter Bar - Desktop only, full filters */}
-        {filters.type === 'single_card' &&
+        {false && filters.type === 'single_card' &&
         <div className="bg-gray-700 border border-gray-600 rounded-lg sticky top-16 z-40 py-2 mb-6 hidden md:block">
              <div className="px-4 flex items-center gap-2">
                <span className="text-xs font-semibold text-white px-2 uppercase tracking-wide">
@@ -1203,15 +1227,20 @@ export default function Shop() {
              </div>
           }
 
+        <div className="mb-3 flex items-center justify-between text-xs text-slate-400">
+          <span>{marketplaceResultCount.toLocaleString()} result{marketplaceResultCount === 1 ? '' : 's'}</span>
+          {showClearFilters && <button type="button" onClick={clearFilters} className="hidden items-center gap-1 text-slate-300 hover:text-white md:inline-flex"><X className="h-3 w-3" /> Reset</button>}
+        </div>
+
         {/* Card Search Results Grid */}
         {filters.type === 'single_card' && activeCardSearchResults.length > 0 &&
         (() => {
-          const filteredResults = activeCardSearchResults.filter((card) => filters.set === 'all' || card.set_name === filters.set);
+          const filteredResults = filteredSearchResults;
           const pagedResults = advancedSearchOpen && advancedApiQuery ?
           filteredResults :
           filteredResults.slice(cardSearchPage * CARDS_PER_PAGE, (cardSearchPage + 1) * CARDS_PER_PAGE);
           return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+        <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid grid-cols-1 gap-2'}>
             {pagedResults.map((result, idx) => {
               const gridImageUrl = getResultGridImageUrl(result);
               const listingSellPrice = resolveResultSellPrice(result);
@@ -1278,9 +1307,9 @@ export default function Shop() {
                 openStarWarsCardDetail(result);
               }
             }}
-            className={`group bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all duration-200 ${(groupedMagicSearchResults.length > 0 && result.oracle_id) || ((result.game === 'pokemon' || result.game === 'yugioh' || result.game === 'lorcana' || result.game === 'onepiece' || result.game === 'flesh_and_blood' || result.game === 'starwars') && result.id) ? 'cursor-pointer' : ''}`}>
+            className={`group overflow-hidden rounded border border-slate-700/80 bg-[#111a27] transition-colors hover:border-cyan-500/60 ${resultsView === 'list' ? 'flex min-h-32' : ''} ${(groupedMagicSearchResults.length > 0 && result.oracle_id) || ((result.game === 'pokemon' || result.game === 'yugioh' || result.game === 'lorcana' || result.game === 'onepiece' || result.game === 'flesh_and_blood' || result.game === 'starwars') && result.id) ? 'cursor-pointer' : ''}`}>
 
-                <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'w-24 sm:w-28' : 'aspect-square w-full'}`}>
                     {gridImageUrl ?
                 <img
                   src={gridImageUrl}
@@ -1290,7 +1319,7 @@ export default function Shop() {
                   decoding="async"
                   onError={(e) => handleResultImageError(e, result, gridImageUrl)} /> : null}
 
-              <div data-image-fallback className={`${gridImageUrl ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-gray-400`}>No Image</div>
+              <div data-image-fallback className={`${gridImageUrl ? 'hidden' : 'flex'} h-full w-full items-center justify-center text-xs text-slate-500`}>No Image</div>
                   {gridImageUrl &&
                   <div
                     aria-hidden="true"
@@ -1298,11 +1327,12 @@ export default function Shop() {
                     onMouseEnter={() => handleCardImagePreviewEnter(result)}
                     onMouseLeave={handleCardImagePreviewLeave} />
                   }
-                  {result.inStock && <Badge className="absolute top-2 right-2 bg-green-600 text-white">In Stock</Badge>}
+                  {result.inStock && <Badge className="absolute right-2 top-2 rounded-sm bg-emerald-600 text-[10px] text-white">In Stock</Badge>}
+                  <button type="button" aria-label={`Add ${result.name} to wishlist`} onClick={(event) => { event.stopPropagation(); addToWishlistMutation.mutate(result.stockCard || result); }} className="absolute left-2 top-2 grid h-7 w-7 place-items-center border border-slate-600 bg-slate-950/85 text-slate-300 hover:border-rose-400 hover:text-rose-300"><Heart className="h-3.5 w-3.5" /></button>
                 </div>
-                <div className="p-3">
-                  <h3 className="font-medium text-gray-900 text-sm line-clamp-2">{result.name}</h3>
-                  {result.set_name && <p className="text-xs text-gray-500 mt-1">{result.set_name}</p>}
+                <div className="min-w-0 flex-1 p-3">
+                  <h3 className="line-clamp-2 text-sm font-semibold text-white">{result.name}</h3>
+                  {result.set_name && <p className="mt-1 line-clamp-1 text-xs text-slate-400">{result.set_name}</p>}
                   {Array.isArray(result.languageCodes) && result.languageCodes.length > 0 &&
                   <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -1316,22 +1346,22 @@ export default function Shop() {
                     </div>
                   }
                   {result.variantCount > 1 &&
-                  <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="mt-1 text-[11px] text-slate-500">
                     {result.variantCount} language variants
                   </p>
                   }
-                  {result.rarity && <p className="text-xs text-gray-400 mt-0.5">{result.rarity}</p>}
+                  {result.rarity && <p className="mt-0.5 text-xs text-slate-500">{result.rarity}</p>}
                   <div className="mt-3">
                     {result.stockCard || hasActiveListingPrice ?
                 <>
                         {listingSellPrice != null &&
-                    <p className="text-lg font-bold text-blue-600">${listingSellPrice.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-white">${listingSellPrice.toFixed(2)}</p>
                     }
                         {result.stockCard &&
                         <Button
                     onClick={(event) => handleAddCardToCart(result.stockCard, event)}
                     size="sm"
-                    className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white text-xs h-8">
+                    className="mt-2 h-8 w-full rounded-sm bg-cyan-600 text-xs text-white hover:bg-cyan-500">
 
                           <ShoppingCart className="w-3 h-3 mr-1" />
                           Add to Cart
@@ -1341,7 +1371,7 @@ export default function Shop() {
 
                 <>
                         {marketPrice != null &&
-                  <p className="text-sm text-gray-500 mb-1">Market: <span className="font-semibold text-gray-700">${marketPrice.toFixed(2)}</span></p>
+                  <p className="mb-1 text-sm text-slate-500">Market: <span className="font-semibold text-slate-300">${marketPrice.toFixed(2)}</span></p>
                   }
                       </>
                 }
@@ -1355,9 +1385,9 @@ export default function Shop() {
         }
 
         {filters.type === 'single_card' && showCardResults && !_searchingCards && activeCardSearchResults.length === 0 &&
-        <div className="mt-6 p-8 text-center border rounded-lg bg-white">
-            <p className="text-gray-700 font-medium">No cards matched your current search.</p>
-            <p className="text-sm text-gray-500 mt-1">Try removing a filter or broadening the search.</p>
+        <div className="mt-6 border border-slate-700 bg-[#111a27] p-8 text-center">
+            <p className="font-medium text-slate-200">No cards matched your current search.</p>
+            <p className="mt-1 text-sm text-slate-500">Try removing a filter or broadening the search.</p>
           </div>
         }
 
@@ -1393,7 +1423,7 @@ export default function Shop() {
             null;
           }
 
-          const filteredResults = activeCardSearchResults.filter((card) => filters.set === 'all' || card.set_name === filters.set);
+          const filteredResults = filteredSearchResults;
           return filteredResults.length > CARDS_PER_PAGE ?
           <div className="flex items-center justify-center gap-1 mt-8 pt-6 border-t flex-wrap">
                 <Button
@@ -1445,17 +1475,13 @@ export default function Shop() {
 
         {/* Booster Box Search Section */}
         {showBoxSearch &&
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Browse sealed product</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              Search sets from {filters.game === 'pokemon' ? 'Pokémon TCG' : filters.game === 'yugioh' ? 'Yu-Gi-Oh!' : filters.game === 'lorcana' ? 'Disney Lorcana' : filters.game === 'onepiece' ? 'One Piece TCG' : filters.game === 'flesh_and_blood' ? 'Flesh & Blood' : filters.game === 'starwars' ? 'Star Wars Unlimited' : 'available games'} to see availability
-            </p>
+        <div className="mb-6">
             
             {filters.game === 'magic' &&
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 mb-5">
+            <div className={resultsView === 'grid' ? 'mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'mb-5 grid grid-cols-1 gap-2'}>
                 {allMTGSets.map((set) =>
-            <div key={set.id} className="group overflow-hidden rounded-xl border border-slate-200 bg-white transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg">
-                    <div className="relative aspect-square overflow-hidden bg-slate-100">
+            <div key={set.id} className={`group overflow-hidden rounded border border-slate-700/80 bg-[#111a27] transition-colors hover:border-cyan-500/60 ${resultsView === 'list' ? 'flex min-h-32' : ''}`}>
+                    <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'w-28' : 'aspect-square w-full'}`}>
                       <img
                   src={set.image_url}
                   alt={`${set.name} Booster Box`}
@@ -1473,18 +1499,18 @@ export default function Shop() {
                         <p className="text-center text-xs font-semibold text-slate-700">Booster Box</p>
                       </div>
                     </div>
-                    <div className="p-4">
-                      <h4 className="line-clamp-2 text-sm font-semibold text-slate-950">{set.name}</h4>
+                    <div className="min-w-0 flex-1 p-3">
+                      <h4 className="line-clamp-2 text-sm font-semibold text-white">{set.name}</h4>
                       <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
                         <span className="rounded bg-slate-100 px-2 py-0.5 font-medium text-slate-700">{set.set_code}</span>
                         {set.release_date && <span>{new Date(set.release_date).getFullYear()}</span>}
                       </div>
                       <div className="mt-4 flex items-end justify-between gap-3">
                         <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <p className="text-[11px] font-semibold uppercase text-slate-500">
                             {set.stockProduct?.price != null ? 'Price' : 'Status'}
                           </p>
-                          <p className={`text-lg font-bold ${set.stockProduct?.price != null ? 'text-slate-950' : 'text-slate-500'}`}>
+                          <p className={`text-lg font-bold ${set.stockProduct?.price != null ? 'text-white' : 'text-slate-500'}`}>
                             {set.stockProduct?.price != null ? `$${set.stockProduct.price.toFixed(2)}` : 'Not in stock'}
                           </p>
                         </div>
@@ -1498,7 +1524,7 @@ export default function Shop() {
               </div>
             }
 
-            {filters.game !== 'magic' &&
+            {false && filters.game !== 'magic' &&
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <Input
@@ -1628,7 +1654,7 @@ export default function Shop() {
 
 
         {/* Game Browse Grid - when a game is selected with no specific product type filter */}
-        {filters.game !== 'all' && filters.game !== 'magic' && filters.type === 'all' &&
+        {false && filters.game !== 'all' && filters.game !== 'magic' && filters.type === 'all' &&
         <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
             <div className="flex flex-col items-center gap-3 mb-6">
               <div className="text-center">
@@ -1733,12 +1759,12 @@ export default function Shop() {
         }
 
         {/* Products Grid - For non-booster items - hide when card search results are showing, game browse is active, or advanced search is open */}
-         {!showBoxSearch && !(showCardSearch && showCardResults && enrichedCardSearchResults.length > 0) && !(filters.game !== 'all' && filters.type === 'all') && !advancedSearchOpen &&
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+         {!showBoxSearch && !(showCardSearch && showCardResults && enrichedCardSearchResults.length > 0) && !advancedSearchOpen &&
+        <div>
              {cardsLoading || productsLoading ?
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid grid-cols-1 gap-2'}>
                  {[...Array(10)].map((_, i) =>
-            <div key={i} className="bg-white rounded-lg overflow-hidden border border-gray-200">
+            <div key={i} className="overflow-hidden rounded border border-slate-700 bg-[#111a27]">
                      <Skeleton className="aspect-square bg-gray-100" />
                      <div className="p-3 space-y-2">
                        <Skeleton className="h-4 bg-gray-100 w-3/4" />
@@ -1749,19 +1775,15 @@ export default function Shop() {
             )}
                </div> :
           filters.type === 'single_card' && !filters.search ?
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                 {/* Show in-stock singles instead of turning the shop into a price flex. */}
-                 {cards.
-             filter((c) => c.status === 'active' && inventoryOwner.getStockState(c).inStock && (filters.game === 'all' || c.game === filters.game)).
-            slice(0, 20).
-            map((card) =>
+          <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid grid-cols-1 gap-2'}>
+                 {pagedMarketplaceCards.map((card) =>
             <div
               key={card.id}
               onMouseEnter={() => handleCardPreviewEnter(card)}
               onMouseLeave={handleCardPreviewLeave}
-              className="group bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all duration-200 relative">
+              className={`group relative overflow-hidden rounded border border-slate-700/80 bg-[#111a27] transition-colors hover:border-cyan-500/60 ${resultsView === 'list' ? 'flex min-h-32' : ''}`}>
 
-                      <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                      <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'w-24 sm:w-28' : 'aspect-square w-full'}`}>
                         {card.image_url ?
                 <img
                   src={card.image_url}
@@ -1775,30 +1797,30 @@ export default function Shop() {
                 }
                       </div>
 
-                      <div className="p-3">
-                        <h3 className="font-medium text-gray-900 text-sm line-clamp-2">
+                      <div className="min-w-0 flex-1 p-3">
+                        <h3 className="line-clamp-2 text-sm font-semibold text-white">
                           {card.name}
                         </h3>
                         {card.set_name &&
-                <p className="text-xs text-gray-500 mt-1 line-clamp-1">{card.set_name}</p>
+                <p className="mt-1 line-clamp-1 text-xs text-slate-400">{card.set_name}</p>
                 }
                         <div className="flex items-center justify-between mt-2 mb-2">
-                          <span className="text-lg font-bold text-blue-600">
+                          <span className="text-lg font-bold text-white">
                             ${card.price?.toFixed(2)}
                           </span>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-slate-400">
                             {card.quantity} in stock
                           </span>
                         </div>
                         <div className="flex gap-1">
-                          <Button
+                        <Button
                     onClick={(e) => {
                       e.preventDefault();
                       addToCartMutation.mutate(card);
                     }}
                     disabled={!inventoryOwner.getStockState(card).inStock}
                     size="sm"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs h-8">
+                    className="h-8 flex-1 rounded-sm bg-cyan-600 text-xs text-white hover:bg-cyan-500">
 
                             <ShoppingCart className="w-3 h-3 mr-1" />
                             Cart
@@ -1810,7 +1832,7 @@ export default function Shop() {
                     }}
                     variant="outline"
                     size="sm"
-                    className="px-2 h-8 border-red-500 text-red-500 hover:bg-red-50">
+                    className="h-8 rounded-sm border-slate-600 bg-transparent px-2 text-slate-300 hover:border-rose-400 hover:bg-slate-800 hover:text-rose-300">
 
                             <Heart className="w-3 h-3" />
                           </Button>
@@ -1819,15 +1841,15 @@ export default function Shop() {
                     </div>
             )}
               </div> :
-          filteredCards.length > 0 ?
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          (filters.type === 'all' || filters.type === 'single_card') && filteredCards.length > 0 ?
+          <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid grid-cols-1 gap-2'}>
                 {/* Show Cards when game is filtered */}
-                {filteredCards.map((card) =>
+                {pagedMarketplaceCards.map((card) =>
             <div
               key={card.id}
-              className="group bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all duration-200 relative">
+              className={`group relative overflow-hidden rounded border border-slate-700/80 bg-[#111a27] transition-colors hover:border-cyan-500/60 ${resultsView === 'list' ? 'flex min-h-32' : ''}`}>
 
-                    <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                    <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'w-24 sm:w-28' : 'aspect-square w-full'}`}>
                       {card.image_url ?
                 <img
                   src={card.image_url}
@@ -1841,18 +1863,18 @@ export default function Shop() {
                 }
                     </div>
 
-                    <div className="p-3">
-                      <h3 className="font-medium text-gray-900 text-sm line-clamp-2">
+                    <div className="min-w-0 flex-1 p-3">
+                      <h3 className="line-clamp-2 text-sm font-semibold text-white">
                         {card.name}
                       </h3>
                       {card.set_name &&
-                <p className="text-xs text-gray-500 mt-1 line-clamp-1">{card.set_name}</p>
+                <p className="mt-1 line-clamp-1 text-xs text-slate-400">{card.set_name}</p>
                 }
                       <div className="flex items-center justify-between mt-2 mb-2">
-                        <span className="text-lg font-bold text-blue-600">
+                        <span className="text-lg font-bold text-white">
                           ${card.price?.toFixed(2)}
                         </span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-slate-400">
                           {card.quantity} in stock
                         </span>
                       </div>
@@ -1861,10 +1883,13 @@ export default function Shop() {
                     onClick={(event) => handleAddCardToCart(card, event)}
                     disabled={!inventoryOwner.getStockState(card).inStock}
                     size="sm"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs h-8">
+                    className="h-8 flex-1 rounded-sm bg-cyan-600 text-xs text-white hover:bg-cyan-500">
 
                           <ShoppingCart className="w-3 h-3 mr-1" />
                           Cart
+                        </Button>
+                        <Button onClick={(event) => { event.preventDefault(); addToWishlistMutation.mutate(card); }} variant="outline" size="sm" aria-label={`Add ${card.name} to wishlist`} className="h-8 rounded-sm border-slate-600 bg-transparent px-2 text-slate-300 hover:border-rose-400 hover:bg-slate-800 hover:text-rose-300">
+                          <Heart className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
@@ -1872,11 +1897,11 @@ export default function Shop() {
             )}
               </div> :
           filteredProducts.length > 0 ?
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className={resultsView === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'grid grid-cols-1 gap-2'}>
                 {/* Show Products */}
                 {filteredProducts.map((product) =>
-            <div key={product.id} className="group bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all duration-200 relative">
-                    <div className="aspect-square bg-gray-100 relative overflow-hidden">
+            <div key={product.id} className={`group relative overflow-hidden rounded border border-slate-700/80 bg-[#111a27] transition-colors hover:border-cyan-500/60 ${resultsView === 'list' ? 'flex min-h-32' : ''}`}>
+                    <div className={`relative shrink-0 overflow-hidden bg-[#0a111b] ${resultsView === 'list' ? 'w-24 sm:w-28' : 'aspect-square w-full'}`}>
                       {product.image_url ?
                 <img
                   src={product.image_url}
@@ -1895,20 +1920,21 @@ export default function Shop() {
                       </div>
                     </div>
 
-                    <div className="p-3">
-                      <h3 className="font-medium text-gray-900 text-sm line-clamp-2">
+                    <div className="min-w-0 flex-1 p-3">
+                      <h3 className="line-clamp-2 text-sm font-semibold text-white">
                         {product.name}
                       </h3>
-                      {product.description &&
-                <p className="text-xs text-gray-500 mt-1 line-clamp-1">{product.description}</p>
-                }
                       <div className="flex items-center justify-between mt-2">
-                        <span className="text-lg font-bold text-blue-600">
+                        <span className="text-lg font-bold text-white">
                           ${product.price?.toFixed(2)}
                         </span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-slate-400">
                           {product.quantity} in stock
                         </span>
+                      </div>
+                      <div className="mt-2 flex gap-1">
+                        <Button onClick={(event) => handleAddCardToCart(product, event)} disabled={!inventoryOwner.getStockState(product).inStock} size="sm" className="h-8 flex-1 rounded-sm bg-cyan-600 text-xs text-white hover:bg-cyan-500"><ShoppingCart className="mr-1 h-3 w-3" /> Add to Cart</Button>
+                        <Button onClick={(event) => { event.preventDefault(); addToWishlistMutation.mutate(product); }} variant="outline" size="sm" aria-label={`Add ${product.name} to wishlist`} className="h-8 rounded-sm border-slate-600 bg-transparent px-2 text-slate-300 hover:border-rose-400 hover:bg-slate-800 hover:text-rose-300"><Heart className="h-3 w-3" /></Button>
                       </div>
                     </div>
                   </div>
@@ -1916,24 +1942,32 @@ export default function Shop() {
               </div> :
 
           !filters.search &&
-          <div className="text-center py-12">
-                  <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-500">
+          <div className="border border-slate-700 bg-[#111a27] py-12 text-center">
+                  <Package className="mx-auto mb-3 h-9 w-9 text-slate-500" />
+                  <p className="text-slate-400">
                     {filters.type === 'starter_deck' ? 'No starter decks are live in inventory yet' :
                     filters.type === 'dice' ? 'No accessories are live in inventory yet' :
                     'No products currently in stock'}
-                  </p>
-                  <p className="text-sm text-gray-400 mt-1">
-                    {filters.type === 'single_card' ? 'Use the search above to find specific cards' :
-                    filters.type === 'starter_deck' ? 'Use the custom deck section above while we build out the live shelf.' :
-                    filters.type === 'dice' ? 'Use this lane as the future home for mats, sleeves, dice, and table gear.' :
-                    'Check back soon for new inventory!'}
                   </p>
                 </div>
 
           }
           </div>
         }
+        {!showBoxSearch && !(showCardSearch && showCardResults) && !advancedSearchOpen && filteredCards.length > GAME_BROWSE_PER_PAGE &&
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-1 border-t border-slate-700/70 pt-4">
+          <Button type="button" variant="ghost" size="sm" className="text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => { window.scrollTo(0, 0); setGameBrowsePage((page) => Math.max(0, page - 1)); }} disabled={gameBrowsePage === 0}>Previous</Button>
+          {renderPageNumberButtons({
+            currentPage: gameBrowsePage,
+            totalPages: Math.ceil(filteredCards.length / GAME_BROWSE_PER_PAGE),
+            onPageChange: setGameBrowsePage,
+            activeClassName: 'h-8 min-w-8 rounded-sm bg-cyan-600 text-white hover:bg-cyan-500',
+            idleClassName: 'h-8 min-w-8 rounded-sm text-slate-300 hover:bg-slate-800 hover:text-white'
+          })}
+          <Button type="button" variant="ghost" size="sm" className="text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => { window.scrollTo(0, 0); setGameBrowsePage((page) => page + 1); }} disabled={(gameBrowsePage + 1) * GAME_BROWSE_PER_PAGE >= filteredCards.length}>Next</Button>
+        </div>}
+          </main>
+        </div>
       </div>
 
       {/* Contact Request Dialog - Booster Boxes */}

@@ -61,6 +61,9 @@ export function buildFilterParams(newFilters) {
   if (newFilters.inStock) params.inStock = 'true';
   if (newFilters.setType !== 'all') params.setType = newFilters.setType;
   if (newFilters.preorder) params.preorder = 'true';
+  if (newFilters.condition && newFilters.condition !== 'all') params.condition = newFilters.condition;
+  if (newFilters.finish && newFilters.finish !== 'all') params.finish = newFilters.finish;
+  if (newFilters.language && newFilters.language !== 'all') params.language = newFilters.language;
 
   return params;
 }
@@ -77,7 +80,10 @@ export function hasActiveFilters(filters) {
     filters.priceMin ||
     filters.priceMax ||
     filters.sort !== 'newest' ||
-    filters.setType !== 'all'
+    filters.setType !== 'all' ||
+    filters.condition !== 'all' ||
+    filters.finish !== 'all' ||
+    filters.language !== 'all'
   );
 }
 
