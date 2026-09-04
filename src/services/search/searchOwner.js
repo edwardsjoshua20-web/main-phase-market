@@ -20,6 +20,7 @@ import {
 } from './searchCore';
 
 const CATALOG_DEFAULT_LIMIT = 500;
+const CATALOG_ASSET_GAME = Object.freeze({ magic: 'mtg', flesh_and_blood: 'fab' });
 
 function emptyMeta(limit = 36) {
   return { total: 0, page: 0, limit, hasMore: false };
@@ -181,13 +182,40 @@ async function advancedCatalogSearch({ game, apiQuery = null, page = 0, limit = 
 
 async function readCatalogSets(game) {
   try {
-    const response = await fetch(getCatalogAssetUrl(game, 'sets.json'));
+    const response = await fetch(getCatalogAssetUrl(CATALOG_ASSET_GAME[game] || game, 'sets.json'));
     if (!response.ok) return [];
     const data = await response.json();
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
   }
+}
+
+async function readCatalogFilterOptions(game) {
+  try {
+    const response = await fetch(getCatalogAssetUrl(CATALOG_ASSET_GAME[game] || game, 'filter-options.json'));
+    if (!response.ok) return { sets: [], rarities: [], finishes: [], languages: [] };
+    const data = await response.json();
+    return {
+      sets: Array.isArray(data?.sets) ? data.sets : [],
+      rarities: Array.isArray(data?.rarities) ? data.rarities : [],
+      finishes: Array.isArray(data?.finishes) ? data.finishes : [],
+      languages: Array.isArray(data?.languages) ? data.languages : []
+    };
+  } catch {
+    return { sets: [], rarities: [], finishes: [], languages: [] };
+  }
+}
+
+function mergeFilterOptions(optionSets) {
+  const merge = (key) => [...new Set(optionSets.flatMap((options) => options[key] || []))]
+    .sort((a, b) => String(a).localeCompare(String(b), 'en', { sensitivity: 'base' }));
+  return {
+    sets: merge('sets'),
+    rarities: merge('rarities'),
+    finishes: merge('finishes'),
+    languages: merge('languages')
+  };
 }
 
 function normalizeSetResult(set, game, products = []) {
@@ -332,6 +360,17 @@ export const searchOwner = {
         return String(b.release_date || '').localeCompare(String(a.release_date || ''));
       });
     return limit > 0 ? normalized.slice(0, limit) : normalized;
+  },
+
+  async listFilterOptions({ game } = {}) {
+    const searchGame = canonicalGame(game);
+    if (searchGame === 'all') {
+      return mergeFilterOptions(await Promise.all(SUPPORTED_SEARCH_GAMES.map(readCatalogFilterOptions)));
+    }
+    if (!SUPPORTED_SEARCH_GAMES.includes(searchGame)) {
+      return { sets: [], rarities: [], finishes: [], languages: [] };
+    }
+    return readCatalogFilterOptions(searchGame);
   }
 };
 

@@ -64,10 +64,47 @@ function resolveReleaseYear(value) {
   return Number.isNaN(date.getTime()) ? '' : String(date.getFullYear());
 }
 
+const STANDARD_CARD_CONDITIONS = ['near_mint', 'lightly_played', 'moderately_played', 'heavily_played', 'damaged'];
+const FILTER_LABELS = Object.freeze({
+  near_mint: 'Near Mint',
+  lightly_played: 'Lightly Played',
+  moderately_played: 'Moderately Played',
+  heavily_played: 'Heavily Played',
+  damaged: 'Damaged',
+  nonfoil: 'Non-Foil',
+  foil: 'Foil',
+  etched: 'Etched Foil',
+  en: 'English',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  it: 'Italian',
+  pt: 'Portuguese',
+  ja: 'Japanese',
+  ko: 'Korean',
+  ru: 'Russian',
+  zhs: 'Simplified Chinese',
+  zht: 'Traditional Chinese'
+});
+
+function formatFilterLabel(value) {
+  const raw = String(value || '').trim();
+  const normalized = raw.toLowerCase();
+  if (FILTER_LABELS[normalized]) return FILTER_LABELS[normalized];
+  return raw
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function filterValueMatches(left, right) {
+  return String(left || '').trim().toLowerCase() === String(right || '').trim().toLowerCase();
+}
+
 function FilterChoice({ active, children, onClick }) {
   return (
-    <button type="button" onClick={onClick} className={`flex w-full items-center gap-2.5 px-1 py-1 text-left text-[13px] transition-colors ${active ? 'font-semibold text-white' : 'text-slate-400 hover:text-slate-100'}`}>
-      <span className={`h-3 w-3 shrink-0 border ${active ? 'border-cyan-400 bg-cyan-400 shadow-[inset_0_0_0_2px_#0e1723]' : 'border-slate-600 bg-transparent'}`} />
+    <button type="button" onClick={onClick} className={`flex w-full items-center gap-2 px-1 py-0.5 text-left text-[12px] leading-5 transition-colors ${active ? 'font-semibold text-white' : 'text-slate-400 hover:text-slate-100'}`}>
+      <span className={`h-3 w-3 shrink-0 border ${active ? 'border-[#5f8198] bg-[#52738a] shadow-[inset_0_0_0_2px_#0e1723]' : 'border-slate-600 bg-transparent'}`} />
       <span className="truncate">{children}</span>
     </button>
   );
@@ -76,12 +113,12 @@ function FilterChoice({ active, children, onClick }) {
 function FilterSection({ title, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <details className="group border-b border-slate-700/45 py-2.5" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary className="flex cursor-pointer list-none items-center justify-between py-0.5 text-[11px] font-semibold uppercase text-slate-300 marker:content-none">
+    <details className="group border-b border-slate-700/40 py-2" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary className="flex cursor-pointer list-none items-center justify-between text-[10px] font-semibold uppercase text-slate-400 marker:content-none">
         <span>{title}</span>
         <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-open:rotate-180" />
       </summary>
-      <div className="mt-2 max-h-44 space-y-0.5 overflow-y-auto pr-1">{children}</div>
+      <div className="mt-1.5 max-h-44 overflow-y-auto pr-1">{children}</div>
     </details>
   );
 }
@@ -237,6 +274,12 @@ export default function Shop() {
   const [hoveredCardImage, setHoveredCardImage] = useState(null);
   const [singlesSearchDraft, setSinglesSearchDraft] = useState(filters.search || '');
   const [resultsView, setResultsView] = useState('grid');
+
+  const { data: catalogFilterOptions = { sets: [], rarities: [], finishes: [], languages: [] } } = useQuery({
+    queryKey: ['shop-catalog-filter-options', filters.game],
+    queryFn: () => searchOwner.listFilterOptions({ game: filters.game }),
+    staleTime: 30 * 60 * 1000
+  });
 
   // Booster Box Search State
   const [boxSearchQuery, setBoxSearchQuery] = useState('');
@@ -939,17 +982,11 @@ export default function Shop() {
     return groupedMagicSearchResults.length > 0 ? groupedMagicSearchResults : enrichedCardSearchResults;
   }, [groupedMagicSearchResults, enrichedCardSearchResults]);
 
-  // Get unique sets and rarities for filter dropdowns
-  // When searching, show only sets from search results; otherwise show all sets from inventory
-  const uniqueSets = filters.search && activeCardSearchResults.length > 0 ?
-  [...new Set(activeCardSearchResults.map((c) => c.set_name))].sort() :
-  [...new Set(cards.filter((c) => c.status === 'active').map((c) => c.set_name))].sort();
-  const uniqueRarities = filters.search && activeCardSearchResults.length > 0 ?
-  [...new Set(activeCardSearchResults.map((c) => c.rarity))].filter(Boolean).sort() :
-  [...new Set(cards.map((c) => c.rarity))].filter(Boolean).sort();
-  const uniqueConditions = [...new Set(cards.map((c) => c.condition).filter(Boolean))].sort();
-  const uniqueFinishes = [...new Set(cards.map((c) => c.finish).filter(Boolean))].sort();
-  const uniqueLanguages = [...new Set(cards.map((c) => c.language || c.lang).filter(Boolean))].sort();
+  const uniqueSets = catalogFilterOptions.sets;
+  const uniqueRarities = catalogFilterOptions.rarities;
+  const uniqueConditions = [...new Set([...STANDARD_CARD_CONDITIONS, ...cards.map((c) => c.condition).filter(Boolean)])];
+  const uniqueFinishes = catalogFilterOptions.finishes;
+  const uniqueLanguages = catalogFilterOptions.languages;
   const sealedSetOptions = [...new Set(allMTGSets.map((set) => set.name).filter(Boolean))].sort();
   const sealedReleaseYears = [...new Set(allMTGSets.map((set) => resolveReleaseYear(set.release_date)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
   const filteredMTGSets = allMTGSets.filter((set) => {
@@ -960,11 +997,11 @@ export default function Shop() {
   const filteredCards = useMemo(() => {
     return cards.filter((c) => {
       if (filters.inStock && !inventoryOwner.getStockState(c).inStock) return false;
-      if (filters.rarity !== 'all' && c.rarity !== filters.rarity) return false;
+      if (filters.rarity !== 'all' && !filterValueMatches(c.rarity, filters.rarity)) return false;
       if (filters.set !== 'all' && c.set_name !== filters.set) return false;
-      if (filters.condition !== 'all' && c.condition !== filters.condition) return false;
-      if (filters.finish !== 'all' && c.finish !== filters.finish) return false;
-      if (filters.language !== 'all' && (c.language || c.lang) !== filters.language) return false;
+      if (filters.condition !== 'all' && !filterValueMatches(c.condition, filters.condition)) return false;
+      if (filters.finish !== 'all' && !filterValueMatches(c.finish, filters.finish)) return false;
+      if (filters.language !== 'all' && !filterValueMatches(c.language || c.lang, filters.language)) return false;
       if (filters.search && !c.name?.toLowerCase().includes(filters.search.toLowerCase())) return false;
 
       const price = c.price || 0;
@@ -1006,10 +1043,10 @@ export default function Shop() {
 
   const filteredSearchResults = activeCardSearchResults.filter((card) => {
     if (filters.set !== 'all' && card.set_name !== filters.set) return false;
-    if (filters.rarity !== 'all' && card.rarity !== filters.rarity) return false;
-    if (filters.condition !== 'all' && card.condition !== filters.condition) return false;
-    if (filters.finish !== 'all' && card.finish !== filters.finish) return false;
-    if (filters.language !== 'all' && (card.language || card.lang) !== filters.language) return false;
+    if (filters.rarity !== 'all' && !filterValueMatches(card.rarity, filters.rarity)) return false;
+    if (filters.condition !== 'all' && !filterValueMatches(card.condition, filters.condition)) return false;
+    if (filters.finish !== 'all' && !filterValueMatches(card.finish, filters.finish)) return false;
+    if (filters.language !== 'all' && !filterValueMatches(card.language || card.lang, filters.language)) return false;
     if (filters.inStock && !card.inStock) return false;
     const resultPrice = resolveResultSellPrice(card) ?? resolveMarketPrice(card) ?? 0;
     if (filters.priceMin && resultPrice < Number(filters.priceMin)) return false;
@@ -1036,24 +1073,24 @@ export default function Shop() {
         <div className="grid min-w-0 gap-6 md:grid-cols-[228px_minmax(0,1fr)] lg:grid-cols-[244px_minmax(0,1fr)]">
           <aside className="hidden min-w-0 md:block">
             <div className="sticky top-24 rounded-[2px] border border-slate-700/40 bg-[#0e1723] px-4">
-              <div className="flex items-center justify-between border-b border-slate-700/45 py-3">
-                <h2 className="text-xs font-semibold uppercase text-slate-200">Filters</h2>
+              <div className="flex items-center justify-between border-b border-slate-700/40 py-2">
+                <h2 className="text-[10px] font-medium uppercase text-slate-500">Filters</h2>
                 <button type="button" onClick={clearFilters} disabled={!showClearFilters} className="text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-200 disabled:cursor-default disabled:opacity-35">Reset</button>
               </div>
 
-              <div className="border-b border-slate-700/45 py-3">
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase text-slate-400">Game</label>
+              <div className="border-b border-slate-700/40 py-2.5">
+                <label className="mb-1 block text-[10px] font-semibold uppercase text-slate-500">Game</label>
                 <Select value={filters.game} onValueChange={(game) => updateFilters({ ...filters, game, set: 'all', setType: 'all' })}>
-                  <SelectTrigger className="h-9 w-full rounded-[2px] border-slate-700/60 bg-slate-950/20 px-2.5 text-sm text-white"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-8 w-full rounded-[2px] border-slate-700/50 bg-slate-950/20 px-2 text-[13px] text-white"><SelectValue /></SelectTrigger>
                   <SelectContent className="border-slate-700 bg-[#111b29] text-slate-100">
                     {GAME_OPTIONS.map((game) => <SelectItem key={game.value} value={game.value}>{game.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="border-b border-slate-700/45 py-3">
-                <div className="mb-1.5 text-[11px] font-semibold uppercase text-slate-400">Product Type</div>
-                <div className="space-y-0.5">
+              <div className="border-b border-slate-700/40 py-2.5">
+                <div className="mb-1 text-[10px] font-semibold uppercase text-slate-500">Product Type</div>
+                <div>
                   {[
                     ['all', 'All Products'],
                     ['single_card', 'Single Cards'],
@@ -1073,7 +1110,7 @@ export default function Shop() {
 
               {showCardFilters && uniqueRarities.length > 0 && <FilterSection title="Rarity">
                 <FilterChoice active={filters.rarity === 'all'} onClick={() => updateFilters({ ...filters, rarity: 'all' })}>All Rarities</FilterChoice>
-                {uniqueRarities.map((rarity) => <FilterChoice key={rarity} active={filters.rarity === rarity} onClick={() => updateFilters({ ...filters, rarity })}>{rarity}</FilterChoice>)}
+                {uniqueRarities.map((rarity) => <FilterChoice key={rarity} active={filters.rarity === rarity} onClick={() => updateFilters({ ...filters, rarity })}>{formatFilterLabel(rarity)}</FilterChoice>)}
               </FilterSection>}
 
               {filters.type === 'booster_box' && filters.game === 'magic' && sealedSetOptions.length > 0 && <FilterSection title="Set">
@@ -1088,19 +1125,19 @@ export default function Shop() {
 
               <FilterSection title="Price" defaultOpen>
                 <div className="grid grid-cols-2 gap-2">
-                  <Input inputMode="decimal" value={filters.priceMin} onChange={(event) => updateFilters({ ...filters, priceMin: event.target.value })} placeholder="Min" className="h-8 rounded-[2px] border-slate-700/60 bg-slate-950/20 px-2 text-xs text-white placeholder:text-slate-600" />
-                  <Input inputMode="decimal" value={filters.priceMax} onChange={(event) => updateFilters({ ...filters, priceMax: event.target.value })} placeholder="Max" className="h-8 rounded-[2px] border-slate-700/60 bg-slate-950/20 px-2 text-xs text-white placeholder:text-slate-600" />
+                  <Input inputMode="decimal" value={filters.priceMin} onChange={(event) => updateFilters({ ...filters, priceMin: event.target.value })} placeholder="Min" className="h-7 rounded-[2px] border-slate-700/50 bg-slate-950/20 px-2 text-xs text-white placeholder:text-slate-600" />
+                  <Input inputMode="decimal" value={filters.priceMax} onChange={(event) => updateFilters({ ...filters, priceMax: event.target.value })} placeholder="Max" className="h-7 rounded-[2px] border-slate-700/50 bg-slate-950/20 px-2 text-xs text-white placeholder:text-slate-600" />
                 </div>
               </FilterSection>
 
               {showCardFilters && uniqueConditions.length > 0 && <FilterSection title="Condition">
                 <FilterChoice active={filters.condition === 'all'} onClick={() => updateFilters({ ...filters, condition: 'all' })}>All Conditions</FilterChoice>
-                {uniqueConditions.map((value) => <FilterChoice key={value} active={filters.condition === value} onClick={() => updateFilters({ ...filters, condition: value })}>{value}</FilterChoice>)}
+                {uniqueConditions.map((value) => <FilterChoice key={value} active={filters.condition === value} onClick={() => updateFilters({ ...filters, condition: value })}>{formatFilterLabel(value)}</FilterChoice>)}
               </FilterSection>}
 
               {showCardFilters && (uniqueFinishes.length > 0 || uniqueLanguages.length > 0) && <FilterSection title="Finish / Language">
-                {uniqueFinishes.length > 0 && <div className="pb-1.5"><div className="mb-1 px-1 text-[10px] uppercase text-slate-600">Finish</div><FilterChoice active={filters.finish === 'all'} onClick={() => updateFilters({ ...filters, finish: 'all' })}>All Finishes</FilterChoice>{uniqueFinishes.map((value) => <FilterChoice key={value} active={filters.finish === value} onClick={() => updateFilters({ ...filters, finish: value })}>{value}</FilterChoice>)}</div>}
-                {uniqueLanguages.length > 0 && <div><div className="mb-1 px-1 text-[10px] uppercase text-slate-600">Language</div><FilterChoice active={filters.language === 'all'} onClick={() => updateFilters({ ...filters, language: 'all' })}>All Languages</FilterChoice>{uniqueLanguages.map((value) => <FilterChoice key={value} active={filters.language === value} onClick={() => updateFilters({ ...filters, language: value })}>{value}</FilterChoice>)}</div>}
+                {uniqueFinishes.length > 0 && <div className="pb-1.5"><div className="mb-1 px-1 text-[10px] uppercase text-slate-600">Finish</div><FilterChoice active={filters.finish === 'all'} onClick={() => updateFilters({ ...filters, finish: 'all' })}>All Finishes</FilterChoice>{uniqueFinishes.map((value) => <FilterChoice key={value} active={filters.finish === value} onClick={() => updateFilters({ ...filters, finish: value })}>{formatFilterLabel(value)}</FilterChoice>)}</div>}
+                {uniqueLanguages.length > 0 && <div><div className="mb-1 px-1 text-[10px] uppercase text-slate-600">Language</div><FilterChoice active={filters.language === 'all'} onClick={() => updateFilters({ ...filters, language: 'all' })}>All Languages</FilterChoice>{uniqueLanguages.map((value) => <FilterChoice key={value} active={filters.language === value} onClick={() => updateFilters({ ...filters, language: value })}>{formatFilterLabel(value)}</FilterChoice>)}</div>}
               </FilterSection>}
             </div>
           </aside>

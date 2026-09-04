@@ -43,7 +43,8 @@ function buildPublishSelection(pipelineId) {
           `data/${game}/cards.json`,
           `data/${game}/cards-manifest.json`,
           `data/${game}/manifest.json`,
-          `data/${game}/sets.json`
+          `data/${game}/sets.json`,
+          `data/${game}/filter-options.json`
           ]),
           'data/mtg/search-lite',
           'data/mtg/search-lite-manifest.json',

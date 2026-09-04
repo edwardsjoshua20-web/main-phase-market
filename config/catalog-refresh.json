@@ -94,6 +94,16 @@
       "command": "npm",
       "args": ["run", "starwars:extract:sets"],
       "enabled": true
+    },
+    {
+      "id": "catalog-filter-options",
+      "label": "Build catalog filter options",
+      "command": "npm",
+      "args": ["run", "catalog:build:filter-options"],
+      "requires": [
+        { "type": "file-exists", "path": "public/data/mtg/search-lite", "label": "MTG lightweight catalog" }
+      ],
+      "enabled": true
     }
   ]
 }
