@@ -179,6 +179,7 @@ export default function DeckStackView({
   onSectionLayoutChange,
   onSaveTemplate,
   onApplyTemplate,
+  onDeleteTemplate,
   onUndoHistory,
   onChangeQty,
   onBulkQuantity,
@@ -197,6 +198,7 @@ export default function DeckStackView({
   const [newSectionName, setNewSectionName] = useState('');
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [templateName, setTemplateName] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
@@ -228,6 +230,7 @@ export default function DeckStackView({
   );
   const assignments = getSectionAssignments(sectionLayout);
   const customSections = getCustomSections(sectionLayout);
+  const customSectionKeys = new Set(customSections.map((section) => section.key));
   const groupedCards = Object.fromEntries(deckGroups.map((group) => [group.label, []]));
   customSections.forEach((section) => { groupedCards[section.key] = []; });
   nonCommanderItems.forEach((item) => {
@@ -261,7 +264,7 @@ export default function DeckStackView({
 
       const usedLabels = new Set(['Artifacts', 'Enchantments', 'Planeswalkers', 'Battles', 'Lands', 'Creatures', 'Instants', 'Sorceries', 'Other']);
       const remainingStacks = Object.keys(groupedCards)
-        .filter((type) => !usedLabels.has(type))
+        .filter((type) => !usedLabels.has(type) && !customSectionKeys.has(type))
         .map((type) => ({ type: 'stack', label: type }));
 
       return buildPackedColumns([...orderedSections, ...remainingStacks, ...customStacks], stackSectionHeight, targetColumnCount);
@@ -276,7 +279,7 @@ export default function DeckStackView({
       ...utilityTypes.map(makeStack),
     ].filter(Boolean);
     const remainingStacks = Object.keys(groupedCards)
-      .filter((type) => !usedLabels.has(type))
+      .filter((type) => !usedLabels.has(type) && !customSectionKeys.has(type))
       .map((type) => ({ type: 'stack', label: type }));
 
     return buildPackedColumns([...orderedSections, ...remainingStacks, ...customStacks], stackSectionHeight, Math.min(4, targetColumnCount));
@@ -366,6 +369,7 @@ export default function DeckStackView({
   };
 
   const compatibleTemplates = sectionTemplates.filter((template) => normalizeDeckGame(template.game) === normalizedGame);
+  const selectedTemplate = compatibleTemplates.find((template) => template.id === selectedTemplateId) || null;
   const saveTemplate = () => {
     const name = templateName.trim();
     if (!name) return;
@@ -402,14 +406,18 @@ export default function DeckStackView({
           </div>
         )}
         {compatibleTemplates.length > 0 && (
-          <select defaultValue="" onChange={(event) => {
-            const template = compatibleTemplates.find((item) => item.id === event.target.value);
-            if (template) onApplyTemplate?.(template);
-            event.target.value = '';
-          }} className="h-7 border border-slate-600/70 bg-slate-800/80 px-2 text-[10px] font-semibold text-slate-200" style={{ borderRadius: 3 }} aria-label="Apply section template">
-            <option value="" disabled>Apply template</option>
-            {compatibleTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
-          </select>
+          <div className="flex items-center gap-1">
+            <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)} className="h-7 border border-slate-600/70 bg-slate-800/80 px-2 text-[10px] font-semibold text-slate-200" style={{ borderRadius: 3 }} aria-label="Select section template">
+              <option value="" disabled>Select template</option>
+              {compatibleTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+            </select>
+            <button type="button" disabled={!selectedTemplate} onClick={() => onApplyTemplate?.(selectedTemplate)} aria-label="Apply section template" title="Apply template" className="flex h-7 w-7 items-center justify-center border border-slate-600 bg-slate-800 text-blue-300 disabled:cursor-not-allowed disabled:opacity-40" style={{ borderRadius: 3 }}><Check size={12} /></button>
+            <button type="button" disabled={!selectedTemplate} onClick={() => {
+              if (!window.confirm(`Delete template "${selectedTemplate?.name}"?`)) return;
+              onDeleteTemplate?.(selectedTemplate);
+              setSelectedTemplateId('');
+            }} aria-label="Delete section template" title="Delete template" className="flex h-7 w-7 items-center justify-center border border-slate-600 bg-slate-800 text-red-300 disabled:cursor-not-allowed disabled:opacity-40" style={{ borderRadius: 3 }}><Trash2 size={12} /></button>
+          </div>
         )}
         <div className="relative">
           <button type="button" onClick={() => setShowHistory((value) => !value)} className="inline-flex h-7 items-center gap-1 border border-slate-600/70 bg-slate-800/80 px-2 text-[10px] font-semibold text-slate-200 hover:bg-slate-700" style={{ borderRadius: 3 }}>

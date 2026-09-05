@@ -868,7 +868,9 @@ export default function AdvancedDeckBuilder() {
   }, [selectedGame, deckFormat]);
 
   const deckGame = normalizeDeckGame(selectedGame);
-  const availableSectionTemplates = decks.flatMap((deck) => Array.isArray(deck.section_templates) ? deck.section_templates : []);
+  const availableSectionTemplates = decks.flatMap((deck) => Array.isArray(deck.section_templates)
+    ? deck.section_templates.map((template) => ({ ...template, ownerDeckId: deck.id }))
+    : []);
 
   const isCommanderFormat = normalizeDeckFormatKey(activeDeck?.deck_format) === 'commander';
   const commanderDeckItem = isCommanderFormat ? activeDeck?.items?.find((item) => item.is_commander) || null : null;
@@ -1030,6 +1032,29 @@ export default function AdvancedDeckBuilder() {
     saveSectionLayout(applySectionTemplate(baseLayout, template), {
       message: 'Section template applied',
       historyLabel: `Applied ${template.name}`,
+    });
+  };
+
+  const deleteSavedTemplate = (template) => {
+    const ownerDeck = decks.find((deck) => deck.id === (template.ownerDeckId || activeDeckRef.current?.id));
+    if (!ownerDeck) return Promise.resolve();
+
+    if (ownerDeck.id === activeDeckRef.current?.id) {
+      return saveDeckChange((currentDeck) => {
+        const previousTemplates = currentDeck.section_templates || [];
+        return {
+          updates: { section_templates: previousTemplates.filter((candidate) => candidate.id !== template.id) },
+          undo: { kind: 'templates', section_templates: previousTemplates },
+        };
+      }, { label: `Deleted section template ${template.name}`, successMessage: 'Section template deleted' });
+    }
+
+    return queueDeckMutation(async () => {
+      await backend.data.CardList.update(ownerDeck.id, {
+        section_templates: (ownerDeck.section_templates || []).filter((candidate) => candidate.id !== template.id),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['cardlists', user?.email] });
+      toast.success('Section template deleted');
     });
   };
 
@@ -1324,6 +1349,7 @@ export default function AdvancedDeckBuilder() {
               onSectionLayoutChange={(layout, options) => saveSectionLayout(layout, options)}
               onSaveTemplate={saveSectionTemplate}
               onApplyTemplate={applySavedTemplate}
+              onDeleteTemplate={deleteSavedTemplate}
               onUndoHistory={undoHistoryEntry}
               onChangeQty={changeQty}
               onBulkQuantity={changeSelectedQuantities}
