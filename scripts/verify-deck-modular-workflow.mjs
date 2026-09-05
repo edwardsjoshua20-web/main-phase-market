@@ -25,7 +25,9 @@ assert.equal(anchored[0][0].canonicalKey, 'Commander', 'Commander must remain an
 
 let layout = addCustomSection(null, defaultColumns, 'custom:ramp', 'Ramp');
 layout = assignCardsToSection(layout, ['sol-ring'], 'custom:ramp');
+layout = createSectionLayout(defaultColumns.map((column, index) => index === 1 ? [...column, { type: 'custom', canonicalKey: 'custom:ramp', label: 'custom:ramp' }] : column), layout, { 'custom:ramp': 'Mana Ramp' });
 assert.equal(layout.assignments['sol-ring'], 'custom:ramp');
+assert.equal(layout.customSections[0].displayName, 'Mana Ramp', 'Custom section rename must persist into templates');
 const template = createSectionTemplate(layout, 'magic', 'Commander Template');
 const reapplied = applySectionTemplate(layout, template);
 assert.equal(reapplied.customSections.length, 1, 'Applying a template must not duplicate named custom sections');

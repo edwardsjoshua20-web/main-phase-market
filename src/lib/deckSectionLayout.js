@@ -72,7 +72,10 @@ export function createSectionLayout(columns, previousLayout, displayNameOverride
 
   return {
     version: DECK_SECTION_LAYOUT_VERSION,
-    customSections: getCustomSections(previousLayout),
+    customSections: getCustomSections(previousLayout).map((section) => ({
+      ...section,
+      ...(displayNameOverrides[section.key] ? { displayName: displayNameOverrides[section.key] } : {}),
+    })),
     assignments: getSectionAssignments(previousLayout),
     sections: columns.flatMap((column, columnIndex) => column.map((section, order) => {
       const key = getSectionKey(section);
