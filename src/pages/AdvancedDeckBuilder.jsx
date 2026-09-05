@@ -504,24 +504,66 @@ export default function AdvancedDeckBuilder() {
     toast.success('Card variant changed');
   });
 
-  const removeCardFromDeck = async (productId) => {
-    const updatedItems = activeDeck.items.filter(i => i.product_id !== productId);
-    await backend.data.CardList.update(activeDeck.id, { items: updatedItems });
-    setActiveDeck({ ...activeDeck, items: updatedItems });
-    queryClient.invalidateQueries(['cardlists']);
-  };
-
-  const changeQty = async (productId, qty) => {
-    if (qty < 1) {
-      removeCardFromDeck(productId);
+  const undoCardRemoval = (removal) => queueDeckMutation(async () => {
+    const currentDeck = activeDeckRef.current;
+    if (!currentDeck || currentDeck.id !== removal.deckId) {
+      toast.error('Return to the original deck to undo this removal');
       return;
     }
-    let updatedItems = activeDeck.items.map(i =>
-      i.product_id === productId ? { ...i, quantity: qty } : i
-    );
-    await backend.data.CardList.update(activeDeck.id, { items: updatedItems });
-    setActiveDeck({ ...activeDeck, items: updatedItems });
-    queryClient.invalidateQueries(['cardlists']);
+
+    const existingIndex = currentDeck.items.findIndex((item) => item.product_id === removal.item.product_id);
+    const restoredItems = [...currentDeck.items];
+    if (existingIndex >= 0) {
+      restoredItems[existingIndex] = removal.item;
+    } else {
+      restoredItems.splice(Math.min(removal.index, restoredItems.length), 0, removal.item);
+    }
+
+    const estimatedCost = calculateDeckValue(restoredItems);
+    const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: restoredItems, estimated_cost: estimatedCost });
+    commitSavedDeck(savedDeck);
+    toast.success(`Restored ${removal.item.product_name}`);
+  });
+
+  const removeCardFromDeck = (productId) => queueDeckMutation(async () => {
+    const currentDeck = activeDeckRef.current;
+    if (!currentDeck) return;
+    const itemIndex = currentDeck.items.findIndex((item) => item.product_id === productId);
+    if (itemIndex < 0) return;
+
+    const removedItem = { ...currentDeck.items[itemIndex] };
+    const previousQuantity = Math.max(1, removedItem.quantity || 1);
+    const updatedItems = previousQuantity > 1
+      ? currentDeck.items.map((item, index) => index === itemIndex ? { ...item, quantity: previousQuantity - 1 } : item)
+      : currentDeck.items.filter((_, index) => index !== itemIndex);
+    const estimatedCost = calculateDeckValue(updatedItems);
+    const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: updatedItems, estimated_cost: estimatedCost });
+    commitSavedDeck(savedDeck);
+
+    const removal = { deckId: currentDeck.id, item: removedItem, index: itemIndex };
+    toast.success(`Removed one ${removedItem.product_name}`, {
+      duration: 8000,
+      action: {
+        label: 'Undo',
+        onClick: () => undoCardRemoval(removal),
+      },
+    });
+  });
+
+  const changeQty = (productId, qty) => {
+    if (qty < 1) {
+      return removeCardFromDeck(productId);
+    }
+    return queueDeckMutation(async () => {
+      const currentDeck = activeDeckRef.current;
+      if (!currentDeck) return;
+      const updatedItems = currentDeck.items.map(i =>
+        i.product_id === productId ? { ...i, quantity: qty } : i
+      );
+      const estimatedCost = calculateDeckValue(updatedItems);
+      const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: updatedItems, estimated_cost: estimatedCost });
+      commitSavedDeck(savedDeck);
+    });
   };
 
   const clearDeckCards = async () => {
@@ -899,8 +941,8 @@ export default function AdvancedDeckBuilder() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Top Bar */}
       <div className="bg-gray-800 border-b border-gray-700 sticky top-0 z-40">
-        <div className="max-w-full px-3 py-2">
-          <div className="mb-2 flex items-center justify-between">
+        <div className="max-w-full px-3 py-1.5">
+          <div className="mb-1.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Swords className="w-6 h-6 text-blue-400" />
               <div>
@@ -985,7 +1027,7 @@ export default function AdvancedDeckBuilder() {
             {activeDeck && (() => {
               const validation = validateDeckLegality(activeDeck);
               return (
-                <div className={`rounded-lg border border-dashed border-blue-500 bg-gray-700 px-2 py-1 ${isCompactLayout ? 'space-y-2' : 'flex items-center gap-2'}`}>
+                <div className={`rounded-lg border border-dashed border-blue-500 bg-gray-700 px-2 py-0.5 ${isCompactLayout ? 'space-y-2' : 'flex items-center gap-2'}`}>
                   <div className="flex items-center gap-2 flex-1">
                     <span className="text-xs text-gray-400">Format:</span>
                     <button

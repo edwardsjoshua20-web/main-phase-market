@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { Trash2 } from 'lucide-react';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { resolveCardPricing } from '@/services/pricing/pricingPipeline';
 import { findStoreStockMatch } from '@/services/inventory/inventoryCore';
@@ -55,7 +56,7 @@ export default function CardStack({ type, cards, onChangeQty, onRemove, onChange
   const closeTimerRef = useRef(null);
 
   const totalQty = cards.reduce((s, c) => s + (c.quantity || 1), 0);
-  const stackHeight = CARD_HEIGHT + (cards.length - 1) * PEEK + 4;
+  const stackHeight = CARD_HEIGHT + (cards.length - 1) * PEEK + 2;
 
   const open = (idx) => {
     clearTimeout(closeTimerRef.current);
@@ -74,7 +75,7 @@ export default function CardStack({ type, cards, onChangeQty, onRemove, onChange
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: stackWidth, transition: 'width 0.22s ease', flexShrink: 0 }}>
-      <div style={{ marginBottom: 5 }}>
+      <div style={{ marginBottom: 3 }}>
         <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{type}</span>
         <span style={{ color: '#9ca3af', fontSize: 11, marginLeft: 8 }}>({totalQty})</span>
       </div>
@@ -174,9 +175,14 @@ export default function CardStack({ type, cards, onChangeQty, onRemove, onChange
                       style={{ width: 32, height: 32, background: '#92400e', color: '#fbbf24', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}
                       title="Set as Commander">👑</button>
                   )}
-                  <button onClick={e => { e.stopPropagation(); onRemove(item.product_id); }}
-                    style={{ width: 32, height: 32, background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}
-                    title="Remove">✕</button>
+                  <button
+                    onClick={e => { e.stopPropagation(); onRemove(item.product_id); }}
+                    style={{ width: 32, height: 32, background: '#7f1d1d', color: '#fecaca', border: '1px solid #991b1b', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}
+                    title="Remove one copy"
+                    aria-label={`Remove one copy of ${item.product_name}`}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </button>
                 </div>
               )}
             </div>

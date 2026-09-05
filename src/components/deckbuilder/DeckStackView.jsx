@@ -5,13 +5,20 @@ import { buildPackedColumns } from '@/lib/deckColumnLayout';
 import { getDeckSectionOrder, groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
 
 function getFittedColumnCount(width) {
-  return Math.max(1, Math.min(5, Math.floor((Math.max(0, width) + 16) / 276)));
+  const availableWidth = Math.max(0, width);
+  for (let count = 5; count > 1; count -= 1) {
+    const cardsWidth = count * 223;
+    const gapsWidth = (count - 1) * 8;
+    const activeRailAllowance = 66;
+    if (cardsWidth + gapsWidth + activeRailAllowance <= availableWidth) return count;
+  }
+  return 1;
 }
 
 function CommanderStack({ commanderItem, onChangeSet }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-      <div style={{ marginBottom: 5 }}>
+      <div style={{ marginBottom: 3 }}>
         <span style={{ color: '#fbbf24', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Commander</span>
       </div>
       {commanderItem ? (
@@ -70,10 +77,10 @@ function estimateSectionHeight(section, groupedCards) {
   }
 
   const cards = groupedCards[section.label] || [];
-  const stackHeight = 315 + Math.max(cards.length - 1, 0) * 42;
+  const stackHeight = 313 + Math.max(cards.length - 1, 0) * 42;
   const priceBarAllowance = cards.length > 0 ? 34 : 0;
-  const headerAllowance = 22;
-  const sectionGapAllowance = 12;
+  const headerAllowance = 20;
+  const sectionGapAllowance = 8;
 
   return stackHeight + priceBarAllowance + headerAllowance + sectionGapAllowance;
 }
@@ -156,11 +163,11 @@ export default function DeckStackView({
   return (
     <div ref={canvasRef} className="flex-1 overflow-auto px-4 py-3">
       <div
-        className="grid items-start gap-4"
-        style={{ gridTemplateColumns: `repeat(${stackColumns.length}, minmax(260px, 300px))` }}
+        className="grid items-start gap-2"
+        style={{ gridTemplateColumns: `repeat(${stackColumns.length}, minmax(223px, max-content))` }}
       >
         {stackColumns.map((column, columnIndex) => (
-          <div key={columnIndex} className="flex min-w-0 flex-col gap-3">
+          <div key={columnIndex} className="flex min-w-0 flex-col gap-2">
             {column.map((section) => {
               if (section.type === 'commander') {
                 return <CommanderStack key="commander" commanderItem={commanderItem} onChangeSet={onChangeSet} />;
