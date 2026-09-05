@@ -241,6 +241,7 @@ function normalizeDeckPayload(row) {
     deck_format: row.format || payload.deck_format || 'casual',
     estimated_cost: payload.estimated_cost || 0,
     items: Array.isArray(payload.items) ? payload.items : [],
+    section_layout: payload.section_layout || null,
     game: row.game || payload.game || 'mtg',
     source: row.source || payload.source || 'supabase',
     tags: Array.isArray(row.tags) ? row.tags : [],

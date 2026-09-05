@@ -18,6 +18,7 @@ import { simulateMtgCommanderDeck } from '@/lib/mtgCommanderCatalog';
 import { groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
 import { getCardImageUrl } from '@/lib/cardImages';
 import { buildPackedColumns } from '@/lib/deckColumnLayout';
+import { getSectionDisplayName, sortSectionsByLayout } from '@/lib/deckSectionLayout';
 import { toast } from 'sonner';
 import { calculateDeckValue } from '@/services/pricing/pricingPipeline';
 import { searchOwner } from '@/services/search/searchOwner';
@@ -205,6 +206,7 @@ export default function AdvancedDeckBuilder() {
   const cardSearchRunRef = useRef(0);
   const activeDeckRef = useRef(null);
   const deckMutationQueueRef = useRef(Promise.resolve());
+  const sectionLayoutSaveRef = useRef(0);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -225,6 +227,29 @@ export default function AdvancedDeckBuilder() {
       .then(mutation);
     deckMutationQueueRef.current = queued.catch(() => undefined);
     return queued;
+  };
+
+  const saveSectionLayout = (sectionLayout, { message } = {}) => {
+    const currentDeck = activeDeckRef.current;
+    if (!currentDeck) return Promise.resolve();
+
+    const previousLayout = currentDeck.section_layout || null;
+    const revision = ++sectionLayoutSaveRef.current;
+    commitSavedDeck({ ...currentDeck, section_layout: sectionLayout });
+
+    return queueDeckMutation(async () => {
+      const savedDeck = await backend.data.CardList.update(currentDeck.id, { section_layout: sectionLayout });
+      if (sectionLayoutSaveRef.current === revision && activeDeckRef.current?.id === currentDeck.id) {
+        commitSavedDeck(savedDeck);
+        if (message) toast.success(message);
+      }
+    }).catch((error) => {
+      if (sectionLayoutSaveRef.current === revision && activeDeckRef.current?.id === currentDeck.id) {
+        commitSavedDeck({ ...activeDeckRef.current, section_layout: previousLayout });
+      }
+      toast.error('Could not save section layout');
+      console.error('Failed to save section layout:', error);
+    });
   };
 
   useEffect(() => {
@@ -842,8 +867,9 @@ export default function AdvancedDeckBuilder() {
     const sourceItems = isCommanderFormat
       ? activeDeck.items.filter((item) => !item.is_commander)
       : activeDeck.items;
-    return groupDeckItems(sourceItems, deckGame)
+    const groups = groupDeckItems(sourceItems, deckGame)
       .filter((group) => group.label !== 'Commander');
+    return sortSectionsByLayout(groups, activeDeck.section_layout, (group) => group.label);
   })();
 
   const deckListColumns = (() => {
@@ -1062,6 +1088,16 @@ export default function AdvancedDeckBuilder() {
               />
               {searching && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-blue-400" />}
             </div>
+            {!isCompactLayout && activeDeck && (
+              <button
+                type="button"
+                onClick={() => saveSectionLayout(null, { message: 'Layout reset' })}
+                disabled={!activeDeck.section_layout}
+                className="h-7 px-2 text-[11px] font-semibold text-gray-400 transition-colors hover:text-white disabled:cursor-default disabled:opacity-35"
+              >
+                Reset Layout
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1108,7 +1144,7 @@ export default function AdvancedDeckBuilder() {
               {compactDeckGroups.map((group) => (
                 <div key={group.label} className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-white">{group.label}</h3>
+                    <h3 className="text-sm font-semibold text-white">{getSectionDisplayName(activeDeck.section_layout, group.label)}</h3>
                     <span className="text-xs text-gray-400">
                       {group.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} cards
                     </span>
@@ -1164,6 +1200,8 @@ export default function AdvancedDeckBuilder() {
               deck={activeDeck}
               game={deckGame}
               isCommanderFormat={isCommanderFormat}
+              sectionLayout={activeDeck.section_layout}
+              onSectionLayoutChange={(layout, options) => saveSectionLayout(layout, options)}
               onChangeQty={changeQty}
               onRemove={removeCardFromDeck}
               onChangeSet={(item) => { setShowSetModal(item); fetchCardVariants(item.product_name); }}
@@ -1233,7 +1271,7 @@ export default function AdvancedDeckBuilder() {
                       return (
                         <div key={group.label}>
                           <div className="mb-2 flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-white">{group.label}</span>
+                            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-white">{getSectionDisplayName(activeDeck.section_layout, group.label)}</span>
                             <span className="text-[11px] text-gray-400">({group.totalCards})</span>
                           </div>
                           <div className="overflow-hidden rounded-lg border border-gray-700 bg-gray-900/70">

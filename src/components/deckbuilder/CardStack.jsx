@@ -51,7 +51,7 @@ function PriceBar({ item, storeProducts }) {
   );
 }
 
-export default function CardStack({ type, cards, onChangeQty, onRemove, onChangeSet, onSetCommander, storeProducts }) {
+export default function CardStack({ type, cards, onChangeQty, onRemove, onChangeSet, onSetCommander, storeProducts, hideHeader = false }) {
   const [activeIdx, setActiveIdx] = useState(null);
   const closeTimerRef = useRef(null);
 
@@ -75,10 +75,12 @@ export default function CardStack({ type, cards, onChangeQty, onRemove, onChange
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: stackWidth, transition: 'width 0.22s ease', flexShrink: 0 }}>
-      <div style={{ marginBottom: 3 }}>
-        <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{type}</span>
-        <span style={{ color: '#9ca3af', fontSize: 11, marginLeft: 8 }}>({totalQty})</span>
-      </div>
+      {!hideHeader && (
+        <div style={{ marginBottom: 3 }}>
+          <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{type}</span>
+          <span style={{ color: '#9ca3af', fontSize: 11, marginLeft: 8 }}>({totalQty})</span>
+        </div>
+      )}
 
       <div style={{ position: 'relative', height: stackHeight, width: '100%' }}>
         {cards.map((item, idx) => {

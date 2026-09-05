@@ -392,6 +392,7 @@ function normalizeHostedDeck(row) {
     deck_format: row.format || payload.deck_format || 'casual',
     estimated_cost: payload.estimated_cost || 0,
     items,
+    section_layout: payload.section_layout || null,
     commander_name: commanderName,
     game: row.game || payload.game || 'mtg',
     source: row.source || payload.source || 'supabase-browser',
