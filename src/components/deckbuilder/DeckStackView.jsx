@@ -195,6 +195,8 @@ export default function DeckStackView({
   const [selectedProductIds, setSelectedProductIds] = useState(() => new Set());
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState('');
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState('');
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
@@ -364,6 +366,13 @@ export default function DeckStackView({
   };
 
   const compatibleTemplates = sectionTemplates.filter((template) => normalizeDeckGame(template.game) === normalizedGame);
+  const saveTemplate = () => {
+    const name = templateName.trim();
+    if (!name) return;
+    onSaveTemplate?.(name, stackColumns);
+    setTemplateName('');
+    setShowSaveTemplate(false);
+  };
 
   return (
     <div ref={canvasRef} className="relative flex-1 overflow-auto px-1 py-3">
@@ -380,12 +389,18 @@ export default function DeckStackView({
             <button type="button" onClick={createCustomSection} aria-label="Create section" className="flex h-7 w-7 items-center justify-center border border-slate-600 bg-slate-800 text-emerald-300" style={{ borderRadius: 3 }}><Check size={12} /></button>
           </div>
         )}
-        <button type="button" onClick={() => {
-          const name = window.prompt('Template name', `${deck?.name || 'Deck'} Template`);
-          if (name?.trim()) onSaveTemplate?.(name.trim(), stackColumns);
-        }} className="inline-flex h-7 items-center gap-1 border border-slate-600/70 bg-slate-800/80 px-2 text-[10px] font-semibold text-slate-200 hover:bg-slate-700" style={{ borderRadius: 3 }}>
+        <button type="button" onClick={() => { setShowSaveTemplate((value) => !value); setTemplateName(`${deck?.name || 'Deck'} Template`); }} className="inline-flex h-7 items-center gap-1 border border-slate-600/70 bg-slate-800/80 px-2 text-[10px] font-semibold text-slate-200 hover:bg-slate-700" style={{ borderRadius: 3 }}>
           <Save size={12} /> Template
         </button>
+        {showSaveTemplate && (
+          <div className="flex items-center gap-1">
+            <input autoFocus value={templateName} onChange={(event) => setTemplateName(event.target.value)} onKeyDown={(event) => {
+              if (event.key === 'Enter') saveTemplate();
+              if (event.key === 'Escape') setShowSaveTemplate(false);
+            }} aria-label="Template name" className="h-7 w-40 border border-slate-600 bg-slate-900 px-2 text-[11px] text-white outline-none focus:border-blue-500" style={{ borderRadius: 3 }} />
+            <button type="button" onClick={saveTemplate} aria-label="Save template" className="flex h-7 w-7 items-center justify-center border border-slate-600 bg-slate-800 text-emerald-300" style={{ borderRadius: 3 }}><Check size={12} /></button>
+          </div>
+        )}
         {compatibleTemplates.length > 0 && (
           <select defaultValue="" onChange={(event) => {
             const template = compatibleTemplates.find((item) => item.id === event.target.value);
