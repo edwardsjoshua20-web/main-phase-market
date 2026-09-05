@@ -8,7 +8,7 @@ function getFittedColumnCount(width) {
   const availableWidth = Math.max(0, width);
   for (let count = 5; count > 1; count -= 1) {
     const cardsWidth = count * 223;
-    const gapsWidth = (count - 1) * 14;
+    const gapsWidth = (count - 1) * 30;
     const activeRailAllowance = 66;
     if (cardsWidth + gapsWidth + activeRailAllowance <= availableWidth) return count;
   }
@@ -166,7 +166,7 @@ export default function DeckStackView({
         className="grid items-start"
         style={{
           gridTemplateColumns: `repeat(${stackColumns.length}, minmax(223px, max-content))`,
-          columnGap: 14,
+          columnGap: 30,
         }}
       >
         {stackColumns.map((column, columnIndex) => (
