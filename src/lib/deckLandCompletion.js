@@ -28,7 +28,9 @@ function countManaPips(items, allowedColors) {
 
 export function createBasicLandDistribution(deck, slots) {
   const commander = (deck.items || []).find((item) => item.is_commander);
-  const commanderColors = parseColorIdentity(commander?.color_identity || commander?.colors || commander?.color);
+  const commanderColors = parseColorIdentity(
+    commander?.color_identity || commander?.colors || commander?.color || commander?.mana_cost
+  );
   const detectedColors = commanderColors.length
     ? commanderColors
     : [...new Set((deck.items || []).flatMap((item) => parseColorIdentity(item.color_identity || item.colors || item.color || item.mana_cost)))];

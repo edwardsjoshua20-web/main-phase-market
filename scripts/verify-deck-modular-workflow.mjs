@@ -86,6 +86,18 @@ const monoRedLands = createBasicLandDistribution({
 }, 32);
 assert.deepEqual(monoRedLands, { Mountain: 32 }, 'Mono-red land completion should suggest Mountains');
 
+const persistedCommanderLands = createBasicLandDistribution({
+  items: [
+    { product_name: 'Krenko, Mob Boss', is_commander: true, mana_cost: '{2}{R}{R}', quantity: 1 },
+    { product_name: 'Persistent Petitioners', mana_cost: '{1}{U}', quantity: 8 },
+  ],
+}, 24);
+assert.deepEqual(
+  persistedCommanderLands,
+  { Mountain: 24 },
+  'Commander mana cost must constrain land suggestions when persisted color identity is unavailable'
+);
+
 const weightedLands = createBasicLandDistribution({
   items: [
     { product_name: 'Two-color Commander', is_commander: true, color_identity: ['U', 'R'], quantity: 1 },
