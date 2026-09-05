@@ -58,6 +58,7 @@ export default function CardStack({
   onRemove,
   onChangeSet,
   onSetCommander,
+  onMoveCard,
   storeProducts,
   hideHeader = false,
   interactionDisabled = false,
@@ -195,6 +196,11 @@ export default function CardStack({
                     <button onClick={e => { e.stopPropagation(); onSetCommander(item); }}
                       style={{ width: 32, height: 32, background: '#92400e', color: '#fbbf24', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}
                       title="Set as Commander">👑</button>
+                  )}
+                  {onMoveCard && (
+                    <button onClick={e => { e.stopPropagation(); onMoveCard(item); }}
+                      style={{ width: 32, height: 32, background: '#164e63', color: '#cffafe', border: '1px solid #155e75', borderRadius: 6, cursor: 'pointer', fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}
+                      title="Move to section">Move</button>
                   )}
                   <button
                     onClick={e => { e.stopPropagation(); onRemove(item.product_id); }}

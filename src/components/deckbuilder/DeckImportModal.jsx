@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { X, Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { searchOwner } from '@/services/search/searchOwner';
@@ -135,19 +135,29 @@ async function fetchCatalogCard(name, game) {
       set_code: bestLocal.set_code || '',
       mana_cost: bestLocal.mana_cost || '',
       cmc: bestLocal.cmc ?? 0,
+      oracle_text: bestLocal.oracle_text || '',
+      color_identity: bestLocal.color_identity || [],
     };
   }
 
   return null;
 }
 
-export default function DeckImportModal({ game, currentItems = [], onImport, onClose }) {
+export default function DeckImportModal({ game, currentItems = [], getCopyLimit, onImport, onClose }) {
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState('idle'); // idle | parsing | fetching | done | error
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [results, setResults] = useState([]); // { qty, name, card, error }
   const [errorMsg, setErrorMsg] = useState('');
   const fileRef = useRef();
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const processFile = async (file) => {
     setStatus('parsing');
@@ -206,8 +216,8 @@ export default function DeckImportModal({ game, currentItems = [], onImport, onC
   };
 
   const reconciliation = useMemo(() => {
-    return reconcileDeckImport(results, currentItems, normalizeCardKey);
-  }, [currentItems, results]);
+    return reconcileDeckImport(results, currentItems, normalizeCardKey, { getCopyLimit });
+  }, [currentItems, getCopyLimit, results]);
 
   const handleImport = () => {
     const items = reconciliation.willAdd.map((result) => {
@@ -235,6 +245,8 @@ export default function DeckImportModal({ game, currentItems = [], onImport, onC
   };
 
   const missingQuantity = reconciliation.willAdd.reduce((sum, result) => sum + result.missingQuantity, 0);
+  const alreadyQuantity = reconciliation.already.reduce((sum, result) => sum + result.alreadyQuantity, 0);
+  const conflictQuantity = reconciliation.conflicts.reduce((sum, result) => sum + result.conflictQuantity, 0);
 
   return (
     <div
@@ -251,7 +263,7 @@ export default function DeckImportModal({ game, currentItems = [], onImport, onC
             <Upload style={{ width: 16, height: 16, color: '#60a5fa' }} />
             <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Import Deck</span>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', display: 'flex' }}>
+          <button onClick={onClose} aria-label="Close import" style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', display: 'flex' }}>
             <X style={{ width: 18, height: 18 }} />
           </button>
         </div>
@@ -315,10 +327,11 @@ export default function DeckImportModal({ game, currentItems = [], onImport, onC
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 6, marginBottom: 12 }}>
                 {[
-                  ['Already in Deck', reconciliation.already.length, '#94a3b8'],
+                  ['Already in Deck', alreadyQuantity, '#94a3b8'],
                   ['Will Add', missingQuantity, '#34d399'],
                   ['Could Not Resolve', reconciliation.unresolved.length, '#f87171'],
                   ['Extra in Current Deck', reconciliation.extras.length, '#fbbf24'],
+                  ['Quantity Conflict', conflictQuantity, '#fb923c'],
                 ].map(([label, count, color]) => (
                   <div key={label} style={{ background: '#1f2937', borderRadius: 4, padding: '7px 9px', border: '1px solid #334155' }}>
                     <p style={{ color, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{label}</p>
@@ -327,8 +340,8 @@ export default function DeckImportModal({ game, currentItems = [], onImport, onC
                 ))}
               </div>
 
-              <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {[...reconciliation.willAdd.map((item) => ({ ...item, previewStatus: `Will add ${item.missingQuantity}` })), ...reconciliation.already.map((item) => ({ ...item, previewStatus: 'Already satisfied' })), ...reconciliation.unresolved.map((item) => ({ ...item, previewStatus: 'Could not resolve' })), ...reconciliation.extras.map((item) => ({ name: item.product_name, card: item, qty: item.quantity || 1, previewStatus: 'Extra - unchanged' }))].map((r, i) => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {[...reconciliation.willAdd.map((item) => ({ ...item, qty: item.missingQuantity, previewStatus: `Will add ${item.missingQuantity}` })), ...reconciliation.already.map((item) => ({ ...item, qty: item.alreadyQuantity, previewStatus: `Already satisfied ${item.alreadyQuantity}` })), ...reconciliation.conflicts.map((item) => ({ ...item, qty: item.conflictQuantity, previewStatus: `Exceeds format limit by ${item.conflictQuantity}` })), ...reconciliation.unresolved.map((item) => ({ ...item, previewStatus: 'Could not resolve' })), ...reconciliation.extras.map((item) => ({ name: item.product_name, card: item, qty: item.quantity || 1, previewStatus: 'Extra - unchanged' }))].map((r, i) => (
                   <div key={`${r.previewStatus}-${r.card?.id || r.card?.product_id || r.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 4, background: '#172033', border: '1px solid #2d3a50' }}>
                     {getCardImageUrl(r.card) && (
                       <img src={getCardImageUrl(r.card)} alt={r.card.name} onError={(event) => handleCardImageError(event, r.card)} style={{ width: 28, height: 39, borderRadius: 3, objectFit: 'cover', flexShrink: 0 }} />
@@ -343,7 +356,7 @@ export default function DeckImportModal({ game, currentItems = [], onImport, onC
                         {r.card ? r.card.name : r.name}
                       </p>
                       {r.card && <p style={{ color: '#4b5563', fontSize: 10 }}>{r.card.set_name}</p>}
-                      <p style={{ color: r.previewStatus.startsWith('Will') ? '#34d399' : r.previewStatus.startsWith('Could') ? '#f87171' : '#94a3b8', fontSize: 10 }}>{r.previewStatus}</p>
+                      <p style={{ color: r.previewStatus.startsWith('Will') ? '#34d399' : r.previewStatus.startsWith('Could') ? '#f87171' : r.previewStatus.startsWith('Exceeds') ? '#fb923c' : '#94a3b8', fontSize: 10 }}>{r.previewStatus}</p>
                     </div>
                     <span style={{ color: '#60a5fa', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>x{r.qty}</span>
                   </div>

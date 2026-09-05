@@ -9,6 +9,7 @@ import { Loader2, Plus, Trash2, Search, Swords, X, DownloadCloud, Share2, FlaskC
 import { searchCards } from '@/components/lib/cardSearch';
 import DeckPlaytester from '@/components/deckbuilder/DeckPlaytester';
 import DeckImportModal from '@/components/deckbuilder/DeckImportModal';
+import BasicLandCompletionModal from '@/components/deckbuilder/BasicLandCompletionModal';
 import DeckListSidebar from '@/components/deckbuilder/DeckListSidebar';
 import DeckStackView from '@/components/deckbuilder/DeckStackView';
 import AISimulationResults from '@/components/deckbuilder/AISimulationResults';
@@ -18,8 +19,9 @@ import { simulateMtgCommanderDeck } from '@/lib/mtgCommanderCatalog';
 import { groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
 import { getCardImageUrl } from '@/lib/cardImages';
 import { buildPackedColumns } from '@/lib/deckColumnLayout';
-import { applySectionTemplate, createSectionLayout, createSectionTemplate, getCustomSections, getSectionAssignments, getSectionDisplayName, sortSectionsByLayout } from '@/lib/deckSectionLayout';
+import { getCustomSections, getSectionAssignments, getSectionDisplayName, sortSectionsByLayout } from '@/lib/deckSectionLayout';
 import { appendDeckHistory, createDeckHistoryEntry, removeDeckHistoryEntry } from '@/lib/deckHistory';
+import { allowsAnyNumberOfCopies, getEffectiveDeckCopyLimit } from '@/lib/deckCopyLimits';
 import { toast } from 'sonner';
 import { calculateDeckValue } from '@/services/pricing/pricingPipeline';
 import { searchOwner } from '@/services/search/searchOwner';
@@ -128,40 +130,27 @@ function countCards(items, predicate) {
     .reduce((sum, item) => sum + (item.quantity || 1), 0);
 }
 
-const ANY_NUMBER_CARD_NAMES = new Set([
-  'dragons approach',
-  'hare apparent',
-  'persistent petitioners',
-  'rat colony',
-  'relentless rats',
-  'shadowborn apostle',
-  'slime against humanity',
-  'templar knight'
-]);
-
-function allowsAnyNumberOfCopies(item) {
-  const name = getDeckItemNameKey(item).replace(/['’]/g, '');
-  const oracleText = String(item?.oracle_text || '').toLowerCase();
-  return ANY_NUMBER_CARD_NAMES.has(name) || oracleText.includes('a deck can have any number of cards named');
-}
-
 function findCopyLimitErrors(items, maxCopies, options = {}) {
   if (!Number.isFinite(maxCopies)) return [];
-  const { keyBy = getDeckItemNameKey, ignore = () => false, label = 'card' } = options;
+  const { keyBy = getDeckItemNameKey, ignore = () => false, label = 'card', game } = options;
   const counts = new Map();
 
   for (const item of items) {
-    if (ignore(item) || allowsAnyNumberOfCopies(item)) continue;
+    if (ignore(item)) continue;
     const key = keyBy(item);
     if (!key) continue;
-    const current = counts.get(key) || { name: item.product_name || item.name || key, quantity: 0 };
+    const current = counts.get(key) || {
+      name: item.product_name || item.name || key,
+      quantity: 0,
+      copyLimit: getEffectiveDeckCopyLimit(item, { game, formatConfig: { maxCopies } }),
+    };
     current.quantity += item.quantity || 1;
     counts.set(key, current);
   }
 
   return [...counts.values()]
-    .filter((entry) => entry.quantity > maxCopies)
-    .map((entry) => `${entry.name} has ${entry.quantity} copies; ${label} limit is ${maxCopies}`);
+    .filter((entry) => Number.isFinite(entry.copyLimit) && entry.quantity > entry.copyLimit)
+    .map((entry) => `${entry.name} has ${entry.quantity} copies; ${label} limit is ${entry.copyLimit}`);
 }
 
 function estimateCompactSectionHeight(section) {
@@ -201,6 +190,7 @@ export default function AdvancedDeckBuilder() {
   const [simulationResults, setSimulationResults] = useState(null);
   const [showFormatChangeModal, setShowFormatChangeModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [landCompletionDeck, setLandCompletionDeck] = useState(null);
   const [newFormat, setNewFormat] = useState(deckFormat);
   const [clearingDeck, setClearingDeck] = useState(false);
   const [isCompactLayout, setIsCompactLayout] = useState(() => window.innerWidth < 768);
@@ -656,6 +646,15 @@ export default function AdvancedDeckBuilder() {
     cardPreview.clearPreview();
   };
 
+  useEffect(() => {
+    if (!(searchResults.length > 0 || (searching && searchQuery.length >= 2))) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') closeSearchResults();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [searchQuery.length, searchResults.length, searching]);
+
   const exportDeck = () => {
     if (!activeDeck?.items?.length) {
       toast.error('There are no cards to export');
@@ -724,6 +723,7 @@ export default function AdvancedDeckBuilder() {
 
     if (game === 'magic') {
       errors.push(...findCopyLimitErrors(items, fmt.maxCopies, {
+        game,
         ignore: (item) => getDeckItemType(item).includes('basic') && getDeckItemType(item).includes('land'),
         label: fmt.name
       }));
@@ -731,17 +731,18 @@ export default function AdvancedDeckBuilder() {
 
     if (game === 'pokemon') {
       errors.push(...findCopyLimitErrors(items, fmt.maxCopies, {
+        game,
         ignore: (item) => getDeckItemType(item).includes('basic energy'),
         label: fmt.name
       }));
     }
 
     if (game === 'yugioh') {
-      errors.push(...findCopyLimitErrors(items, fmt.maxCopies, { label: fmt.name }));
+      errors.push(...findCopyLimitErrors(items, fmt.maxCopies, { game, label: fmt.name }));
     }
 
     if (game === 'lorcana') {
-      errors.push(...findCopyLimitErrors(items, fmt.maxCopies, { label: fmt.name }));
+      errors.push(...findCopyLimitErrors(items, fmt.maxCopies, { game, label: fmt.name }));
       const inkColors = new Set(items.map((item) => String(item.ink || item.color || '').trim()).filter(Boolean));
       if (formatKey.includes('constructed') && inkColors.size > 2) {
         errors.push(`Lorcana constructed decks can use at most 2 ink colors (${inkColors.size} found)`);
@@ -772,6 +773,7 @@ export default function AdvancedDeckBuilder() {
         }
       }
       errors.push(...findCopyLimitErrors(items, fmt.maxCopies, {
+        game,
         keyBy: getDeckItemCopyKey,
         ignore: (item) => {
           const type = getDeckItemType(item);
@@ -799,6 +801,7 @@ export default function AdvancedDeckBuilder() {
         }
       }
       errors.push(...findCopyLimitErrors(items, fmt.maxCopies, {
+        game,
         ignore: (item) => {
           const type = getDeckItemType(item);
           return type.includes('hero') || type.includes('weapon') || type.includes('equipment');
@@ -822,6 +825,7 @@ export default function AdvancedDeckBuilder() {
         if (drawDeckCards < 80) errors.push(`Twin Suns needs at least 80 draw-deck cards (${drawDeckCards} found)`);
       }
       errors.push(...findCopyLimitErrors(items, fmt.maxCopies, {
+        game,
         ignore: (item) => {
           const type = getDeckItemType(item);
           return type.includes('leader') || type.includes('base');
@@ -868,10 +872,6 @@ export default function AdvancedDeckBuilder() {
   }, [selectedGame, deckFormat]);
 
   const deckGame = normalizeDeckGame(selectedGame);
-  const availableSectionTemplates = decks.flatMap((deck) => Array.isArray(deck.section_templates)
-    ? deck.section_templates.map((template) => ({ ...template, ownerDeckId: deck.id }))
-    : []);
-
   const isCommanderFormat = normalizeDeckFormatKey(activeDeck?.deck_format) === 'commander';
   const commanderDeckItem = isCommanderFormat ? activeDeck?.items?.find((item) => item.is_commander) || null : null;
   const compactDeckGroups = (() => {
@@ -964,7 +964,74 @@ export default function AdvancedDeckBuilder() {
   }, {
     label: (change) => `Imported ${change.addedCount} missing card${change.addedCount === 1 ? '' : 's'}`,
     successMessage: (change) => `Imported ${change.addedCount} missing card${change.addedCount === 1 ? '' : 's'}`,
-  }).then(() => setShowImportModal(false));
+  }).then((result) => {
+    setShowImportModal(false);
+    const savedDeck = result?.savedDeck;
+    if (!savedDeck || normalizeDeckGame(savedDeck.game) !== 'magic') return result;
+    const format = getDeckFormatConfig(savedDeck.deck_format, savedDeck.game);
+    const savedTotal = (savedDeck.items || []).reduce((sum, item) => sum + (item.quantity || 1), 0);
+    if (Number.isFinite(format.minCards) && savedTotal < format.minCards) setLandCompletionDeck(savedDeck);
+    return result;
+  });
+
+  const addBasicLands = async (distribution) => {
+    const currentDeck = activeDeckRef.current;
+    if (!currentDeck) return;
+    const requested = Object.entries(distribution).filter(([, quantity]) => Number(quantity) > 0);
+
+    try {
+      const resolved = await Promise.all(requested.map(async ([name, quantity]) => {
+        const existing = (currentDeck.items || []).find((item) => searchOwner.normalizeQuery(item.product_name) === searchOwner.normalizeQuery(name));
+        if (existing) return { source: existing, quantity: Number(quantity) };
+        const card = await searchOwner.resolveCanonicalCard(name, 'magic', { includeInventory: false });
+        if (!card) throw new Error(`Could not resolve ${name}`);
+        return { source: card, quantity: Number(quantity) };
+      }));
+
+      await saveDeckChange((deck) => {
+        const updatedItems = [...(deck.items || [])];
+        const restoredCards = [];
+        let addedCount = 0;
+        resolved.forEach(({ source, quantity }) => {
+          const productId = source.product_id || source.id;
+          const index = updatedItems.findIndex((item) => item.product_id === productId);
+          if (index >= 0) {
+            restoredCards.push({ product_id: productId, item: { ...updatedItems[index] }, index });
+            updatedItems[index] = { ...updatedItems[index], quantity: (updatedItems[index].quantity || 1) + quantity };
+          } else {
+            restoredCards.push({ product_id: productId, item: null, index: updatedItems.length });
+            updatedItems.push({
+              product_id: productId,
+              product_name: source.product_name || source.name,
+              product_image: getCardImageUrl(source),
+              image_url: source.image_url || null,
+              price: source.price || source.market_price || 0,
+              product_type: 'magic',
+              type: source.type || source.type_line || 'Basic Land',
+              quantity,
+              mana_cost: source.mana_cost || '',
+              oracle_text: source.oracle_text || '',
+              oracle_id: source.oracle_id || null,
+              set_code: source.set_code || '',
+              color_identity: source.color_identity || [],
+            });
+          }
+          addedCount += quantity;
+        });
+        return {
+          updates: { items: updatedItems, estimated_cost: calculateDeckValue(updatedItems) },
+          undo: { kind: 'restore_cards', cards: restoredCards },
+          addedCount,
+        };
+      }, {
+        label: (change) => `Added ${change.addedCount} basic lands`,
+        successMessage: (change) => `Added ${change.addedCount} basic lands`,
+      });
+      setLandCompletionDeck(null);
+    } catch (error) {
+      toast.error(error.message || 'Could not add basic lands');
+    }
+  };
 
   const setAsCommander = (item) => saveDeckChange((currentDeck) => {
     const updatedItems = currentDeck.items.map(i => ({
@@ -1015,48 +1082,6 @@ export default function AdvancedDeckBuilder() {
     label: `Removed ${productIds.length} selected card${productIds.length === 1 ? '' : 's'}`,
     successMessage: 'Selected cards removed. Use History to undo.',
   });
-
-  const saveSectionTemplate = (name, columns) => saveDeckChange((currentDeck) => {
-    const previousTemplates = currentDeck.section_templates || [];
-    const template = createSectionTemplate(createSectionLayout(columns, currentDeck.section_layout), deckGame, name);
-    return {
-      updates: { section_templates: [...previousTemplates, template] },
-      undo: { kind: 'templates', section_templates: previousTemplates },
-    };
-  }, { label: `Saved section template ${name}`, successMessage: 'Section template saved' });
-
-  const applySavedTemplate = (template) => {
-    const currentDeck = activeDeckRef.current;
-    if (!currentDeck) return;
-    const baseLayout = currentDeck.section_layout || { version: 1, sections: [], customSections: [], assignments: {} };
-    saveSectionLayout(applySectionTemplate(baseLayout, template), {
-      message: 'Section template applied',
-      historyLabel: `Applied ${template.name}`,
-    });
-  };
-
-  const deleteSavedTemplate = (template) => {
-    const ownerDeck = decks.find((deck) => deck.id === (template.ownerDeckId || activeDeckRef.current?.id));
-    if (!ownerDeck) return Promise.resolve();
-
-    if (ownerDeck.id === activeDeckRef.current?.id) {
-      return saveDeckChange((currentDeck) => {
-        const previousTemplates = currentDeck.section_templates || [];
-        return {
-          updates: { section_templates: previousTemplates.filter((candidate) => candidate.id !== template.id) },
-          undo: { kind: 'templates', section_templates: previousTemplates },
-        };
-      }, { label: `Deleted section template ${template.name}`, successMessage: 'Section template deleted' });
-    }
-
-    return queueDeckMutation(async () => {
-      await backend.data.CardList.update(ownerDeck.id, {
-        section_templates: (ownerDeck.section_templates || []).filter((candidate) => candidate.id !== template.id),
-      });
-      await queryClient.invalidateQueries({ queryKey: ['cardlists', user?.email] });
-      toast.success('Section template deleted');
-    });
-  };
 
   const undoHistoryEntry = (entry) => queueDeckMutation(async () => {
     const currentDeck = activeDeckRef.current;
@@ -1344,12 +1369,8 @@ export default function AdvancedDeckBuilder() {
               game={deckGame}
               isCommanderFormat={isCommanderFormat}
               sectionLayout={activeDeck.section_layout}
-              sectionTemplates={availableSectionTemplates}
               history={activeDeck.change_history || []}
               onSectionLayoutChange={(layout, options) => saveSectionLayout(layout, options)}
-              onSaveTemplate={saveSectionTemplate}
-              onApplyTemplate={applySavedTemplate}
-              onDeleteTemplate={deleteSavedTemplate}
               onUndoHistory={undoHistoryEntry}
               onChangeQty={changeQty}
               onBulkQuantity={changeSelectedQuantities}
@@ -1643,14 +1664,14 @@ export default function AdvancedDeckBuilder() {
 
       {(searchResults.length > 0 || (searching && searchQuery.length >= 2)) && (
         <div
-          className="fixed inset-0 z-[45] flex items-center justify-center bg-black/55 p-4"
+          className="fixed inset-x-0 bottom-0 top-[90px] z-[45] flex items-center justify-center bg-black/55 p-4"
           role="dialog"
           aria-modal="true"
           aria-label={`Card search results for ${searchQuery}`}
           onClick={closeSearchResults}
         >
           <div
-            className="flex max-h-[calc(100vh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-gray-600 bg-gray-800 shadow-2xl"
+            className="flex max-h-[calc(100vh-7.625rem)] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-gray-600 bg-gray-800 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-700 px-4 py-3">
@@ -1738,8 +1759,21 @@ export default function AdvancedDeckBuilder() {
         <DeckImportModal
           game={selectedGame}
           currentItems={activeDeck.items || []}
+          getCopyLimit={(card) => getEffectiveDeckCopyLimit(card, {
+            game: activeDeck.game || selectedGame,
+            formatConfig: getDeckFormatConfig(activeDeck.deck_format, activeDeck.game || selectedGame),
+          })}
           onImport={handleImportCards}
           onClose={() => setShowImportModal(false)}
+        />
+      )}
+
+      {landCompletionDeck && (
+        <BasicLandCompletionModal
+          deck={landCompletionDeck}
+          targetSize={getDeckFormatConfig(landCompletionDeck.deck_format, landCompletionDeck.game).minCards}
+          onConfirm={addBasicLands}
+          onClose={() => setLandCompletionDeck(null)}
         />
       )}
 

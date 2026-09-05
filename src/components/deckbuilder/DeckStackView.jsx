@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
-import { Check, Clock3, GripVertical, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { Check, Clock3, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
 import CardStack from './CardStack';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { buildPackedColumns } from '@/lib/deckColumnLayout';
@@ -174,12 +174,8 @@ export default function DeckStackView({
   game,
   isCommanderFormat,
   sectionLayout,
-  sectionTemplates = [],
   history = [],
   onSectionLayoutChange,
-  onSaveTemplate,
-  onApplyTemplate,
-  onDeleteTemplate,
   onUndoHistory,
   onChangeQty,
   onBulkQuantity,
@@ -190,16 +186,16 @@ export default function DeckStackView({
   storeProducts
 }) {
   const canvasRef = useRef(null);
+  const historyRegionRef = useRef(null);
   const selectionAnchorRef = useRef(null);
   const [targetColumnCount, setTargetColumnCount] = useState(() => getFittedColumnCount(window.innerWidth - 176));
   const [isSectionDragging, setIsSectionDragging] = useState(false);
+  const [dragDestination, setDragDestination] = useState(null);
   const [selectedProductIds, setSelectedProductIds] = useState(() => new Set());
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState('');
-  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
-  const [templateName, setTemplateName] = useState('');
-  const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [showHistory, setShowHistory] = useState(false);
+  const [moveRequest, setMoveRequest] = useState(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -217,6 +213,22 @@ export default function DeckStackView({
       [...current].filter((id) => deck?.items?.some((item) => item.product_id === id))
     ));
   }, [deck?.items]);
+
+  useEffect(() => {
+    if (!showHistory) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!historyRegionRef.current?.contains(event.target)) setShowHistory(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setShowHistory(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [showHistory]);
 
   const commanderItem = isCommanderFormat ? deck?.items?.find(i => i.is_commander) : null;
   const nonCommanderItems = isCommanderFormat
@@ -304,6 +316,7 @@ export default function DeckStackView({
 
   const handleDragEnd = ({ source, destination }) => {
     setIsSectionDragging(false);
+    setDragDestination(null);
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
@@ -317,6 +330,8 @@ export default function DeckStackView({
     ));
     saveColumns(nextColumns, {}, { message: 'Section moved', historyLabel: `Moved ${getSectionDisplayName(sectionLayout, getSectionKey(movedSection))}` });
   };
+
+  const handleDragUpdate = ({ destination }) => setDragDestination(destination || null);
 
   const renameSection = (sectionKey, displayName) => {
     saveColumns(stackColumns, { [sectionKey]: displayName }, { historyLabel: `Renamed section to ${displayName}` });
@@ -358,25 +373,22 @@ export default function DeckStackView({
     setSelectedProductIds(next);
   };
 
-  const moveSelected = (sectionKey) => {
-    if (!selectedProductIds.size) return;
+  const moveCards = (productIds, sectionKey) => {
+    if (!productIds.length) return;
     const baseLayout = sectionLayout || createSectionLayout(stackColumns, null);
-    onSectionLayoutChange(assignCardsToSection(baseLayout, [...selectedProductIds], sectionKey), {
+    const destinationName = sectionKey ? getSectionDisplayName(sectionLayout, sectionKey) : 'default groups';
+    onSectionLayoutChange(assignCardsToSection(baseLayout, productIds, sectionKey), {
       message: 'Cards moved',
-      historyLabel: `Moved ${selectedProductIds.size} card${selectedProductIds.size === 1 ? '' : 's'}`,
+      historyLabel: `Moved ${productIds.length} card${productIds.length === 1 ? '' : 's'} to ${destinationName}`,
     });
     setSelectedProductIds(new Set());
+    setMoveRequest(null);
   };
 
-  const compatibleTemplates = sectionTemplates.filter((template) => normalizeDeckGame(template.game) === normalizedGame);
-  const selectedTemplate = compatibleTemplates.find((template) => template.id === selectedTemplateId) || null;
-  const saveTemplate = () => {
-    const name = templateName.trim();
-    if (!name) return;
-    onSaveTemplate?.(name, stackColumns);
-    setTemplateName('');
-    setShowSaveTemplate(false);
-  };
+  const movableDestinations = stackColumns.flat().filter((section, index, all) => {
+    const key = getSectionKey(section);
+    return key !== 'Commander' && all.findIndex((candidate) => getSectionKey(candidate) === key) === index;
+  });
 
   return (
     <div ref={canvasRef} className="relative flex-1 overflow-auto px-1 py-3">
@@ -393,38 +405,16 @@ export default function DeckStackView({
             <button type="button" onClick={createCustomSection} aria-label="Create section" className="flex h-7 w-7 items-center justify-center border border-slate-600 bg-slate-800 text-emerald-300" style={{ borderRadius: 3 }}><Check size={12} /></button>
           </div>
         )}
-        <button type="button" onClick={() => { setShowSaveTemplate((value) => !value); setTemplateName(`${deck?.name || 'Deck'} Template`); }} className="inline-flex h-7 items-center gap-1 border border-slate-600/70 bg-slate-800/80 px-2 text-[10px] font-semibold text-slate-200 hover:bg-slate-700" style={{ borderRadius: 3 }}>
-          <Save size={12} /> Template
-        </button>
-        {showSaveTemplate && (
-          <div className="flex items-center gap-1">
-            <input autoFocus value={templateName} onChange={(event) => setTemplateName(event.target.value)} onKeyDown={(event) => {
-              if (event.key === 'Enter') saveTemplate();
-              if (event.key === 'Escape') setShowSaveTemplate(false);
-            }} aria-label="Template name" className="h-7 w-40 border border-slate-600 bg-slate-900 px-2 text-[11px] text-white outline-none focus:border-blue-500" style={{ borderRadius: 3 }} />
-            <button type="button" onClick={saveTemplate} aria-label="Save template" className="flex h-7 w-7 items-center justify-center border border-slate-600 bg-slate-800 text-emerald-300" style={{ borderRadius: 3 }}><Check size={12} /></button>
-          </div>
-        )}
-        {compatibleTemplates.length > 0 && (
-          <div className="flex items-center gap-1">
-            <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)} className="h-7 border border-slate-600/70 bg-slate-800/80 px-2 text-[10px] font-semibold text-slate-200" style={{ borderRadius: 3 }} aria-label="Select section template">
-              <option value="" disabled>Select template</option>
-              {compatibleTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
-            </select>
-            <button type="button" disabled={!selectedTemplate} onClick={() => onApplyTemplate?.(selectedTemplate)} aria-label="Apply section template" title="Apply template" className="flex h-7 w-7 items-center justify-center border border-slate-600 bg-slate-800 text-blue-300 disabled:cursor-not-allowed disabled:opacity-40" style={{ borderRadius: 3 }}><Check size={12} /></button>
-            <button type="button" disabled={!selectedTemplate} onClick={() => {
-              if (!window.confirm(`Delete template "${selectedTemplate?.name}"?`)) return;
-              onDeleteTemplate?.(selectedTemplate);
-              setSelectedTemplateId('');
-            }} aria-label="Delete section template" title="Delete template" className="flex h-7 w-7 items-center justify-center border border-slate-600 bg-slate-800 text-red-300 disabled:cursor-not-allowed disabled:opacity-40" style={{ borderRadius: 3 }}><Trash2 size={12} /></button>
-          </div>
-        )}
-        <div className="relative">
+        <div ref={historyRegionRef} className="relative">
           <button type="button" onClick={() => setShowHistory((value) => !value)} className="inline-flex h-7 items-center gap-1 border border-slate-600/70 bg-slate-800/80 px-2 text-[10px] font-semibold text-slate-200 hover:bg-slate-700" style={{ borderRadius: 3 }}>
             <Clock3 size={12} /> History
           </button>
           {showHistory && (
             <div className="absolute left-0 top-8 z-[250] w-72 border border-slate-600 bg-slate-950 p-2 shadow-2xl" style={{ borderRadius: 4 }}>
+              <div className="mb-1 flex items-center justify-between border-b border-slate-800 px-1 pb-1.5">
+                <span className="text-[10px] font-bold uppercase text-slate-400">Recent Changes</span>
+                <button type="button" onClick={() => setShowHistory(false)} className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-300 hover:text-white"><X size={11} /> Close</button>
+              </div>
               {history.length ? history.slice(0, 10).map((entry, index) => (
                 <div key={entry.id} className="flex items-center gap-2 border-b border-slate-800 px-1 py-1.5 last:border-0">
                   <div className="min-w-0 flex-1"><p className="truncate text-[11px] font-medium text-slate-200">{entry.label}</p><p className="text-[9px] text-slate-500">{new Date(entry.createdAt).toLocaleString()}</p></div>
@@ -437,11 +427,7 @@ export default function DeckStackView({
         {selectedProductIds.size > 0 && (
           <div className="ml-1 flex flex-wrap items-center gap-1 border-l border-slate-600 pl-2">
             <span className="text-[10px] font-semibold text-cyan-200">{selectedProductIds.size} selected</span>
-            <select defaultValue="none" onChange={(event) => { moveSelected(event.target.value === 'default' ? '' : event.target.value); event.target.value = 'none'; }} className="h-7 border border-slate-600 bg-slate-800 px-1 text-[10px] text-white" style={{ borderRadius: 3 }} aria-label="Move selected cards">
-              <option value="none" disabled>Move to...</option>
-              <option value="default">Default groups</option>
-              {stackColumns.flat().filter((section) => getSectionKey(section) !== 'Commander').map((section) => <option key={getSectionKey(section)} value={getSectionKey(section)}>{getSectionDisplayName(sectionLayout, getSectionKey(section))}</option>)}
-            </select>
+            <button type="button" onClick={() => setMoveRequest({ productIds: [...selectedProductIds] })} className="h-7 border border-cyan-900 bg-cyan-950/70 px-2 text-[10px] font-semibold text-cyan-100" style={{ borderRadius: 3 }}>Move</button>
             <button type="button" onClick={() => onBulkQuantity?.([...selectedProductIds], -1)} className="h-7 border border-slate-600 bg-slate-800 px-2 text-[10px] text-white" style={{ borderRadius: 3 }}>-1</button>
             <button type="button" onClick={() => onBulkQuantity?.([...selectedProductIds], 1)} className="h-7 border border-slate-600 bg-slate-800 px-2 text-[10px] text-white" style={{ borderRadius: 3 }}>+1</button>
             <button type="button" onClick={() => { onBulkRemove?.([...selectedProductIds]); setSelectedProductIds(new Set()); }} className="inline-flex h-7 items-center gap-1 border border-red-900 bg-red-950/70 px-2 text-[10px] text-red-200" style={{ borderRadius: 3 }}><Trash2 size={11} /> Remove</button>
@@ -449,12 +435,13 @@ export default function DeckStackView({
           </div>
         )}
       </div>
-      <DragDropContext onDragStart={() => setIsSectionDragging(true)} onDragEnd={handleDragEnd}>
+      <DragDropContext onDragStart={() => setIsSectionDragging(true)} onDragUpdate={handleDragUpdate} onDragEnd={handleDragEnd}>
         <div
-          className="grid items-start"
+          className="grid items-stretch"
           style={{
             gridTemplateColumns: `repeat(${stackColumns.length}, minmax(223px, max-content))`,
             columnGap: 30,
+            minHeight: 'calc(100vh - 150px)',
           }}
         >
           {movableColumns.map((column, columnIndex) => (
@@ -463,9 +450,9 @@ export default function DeckStackView({
                 <div
                   ref={dropProvided.innerRef}
                   {...dropProvided.droppableProps}
-                  className="flex min-w-0 flex-col gap-2"
+                  className="flex h-full min-w-0 flex-col gap-2"
                   style={{
-                    minHeight: isSectionDragging ? 180 : 42,
+                    minHeight: isSectionDragging ? '100%' : 42,
                     outline: isSectionDragging ? `1px dashed ${dropSnapshot.isDraggingOver ? '#60a5fa' : '#334155'}` : 'none',
                     outlineOffset: 3,
                     background: dropSnapshot.isDraggingOver ? 'rgba(59,130,246,0.09)' : 'transparent',
@@ -484,7 +471,11 @@ export default function DeckStackView({
                     const totalQty = cards.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
                     return (
-                      <Draggable key={sectionKey} draggableId={sectionKey} index={sectionIndex}>
+                      <React.Fragment key={sectionKey}>
+                      {isSectionDragging && dragDestination?.droppableId === `deck-column-${columnIndex}` && dragDestination.index === sectionIndex && (
+                        <div className="h-0.5 w-[223px] shrink-0 bg-blue-400/80 shadow-[0_0_8px_rgba(96,165,250,0.45)]" aria-hidden="true" />
+                      )}
+                      <Draggable draggableId={sectionKey} index={sectionIndex}>
                         {(dragProvided, dragSnapshot) => (
                           <div
                             ref={dragProvided.innerRef}
@@ -512,6 +503,7 @@ export default function DeckStackView({
                                 onRemove={onRemove}
                                 onChangeSet={onChangeSet}
                                 onSetCommander={onSetCommander}
+                                onMoveCard={(item) => setMoveRequest({ productIds: [item.product_id], cardName: item.product_name })}
                                 storeProducts={storeProducts}
                                 hideHeader
                                 interactionDisabled={isSectionDragging}
@@ -524,8 +516,12 @@ export default function DeckStackView({
                           </div>
                         )}
                       </Draggable>
+                      </React.Fragment>
                     );
                   })}
+                  {isSectionDragging && dragDestination?.droppableId === `deck-column-${columnIndex}` && dragDestination.index === column.length && (
+                    <div className="h-0.5 w-[223px] shrink-0 bg-blue-400/80 shadow-[0_0_8px_rgba(96,165,250,0.45)]" aria-hidden="true" />
+                  )}
                   {dropProvided.placeholder}
                 </div>
               )}
@@ -533,6 +529,23 @@ export default function DeckStackView({
           ))}
         </div>
       </DragDropContext>
+      {moveRequest && (
+        <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/45 p-4" onClick={() => setMoveRequest(null)}>
+          <div className="w-full max-w-xs border border-slate-600 bg-slate-950 p-3 shadow-2xl" style={{ borderRadius: 4 }} onClick={(event) => event.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="truncate text-xs font-semibold text-white">Move {moveRequest.cardName || `${moveRequest.productIds.length} selected cards`}</p>
+              <button type="button" onClick={() => setMoveRequest(null)} aria-label="Close move cards" className="text-slate-400 hover:text-white"><X size={15} /></button>
+            </div>
+            <div className="flex flex-col gap-1">
+              <button type="button" onClick={() => moveCards(moveRequest.productIds, '')} className="px-2 py-1.5 text-left text-[11px] font-semibold text-slate-200 hover:bg-slate-800">Default grouping</button>
+              {movableDestinations.map((section) => {
+                const key = getSectionKey(section);
+                return <button key={key} type="button" onClick={() => moveCards(moveRequest.productIds, key)} className="px-2 py-1.5 text-left text-[11px] font-semibold text-slate-200 hover:bg-slate-800">{getSectionDisplayName(sectionLayout, key)}</button>;
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
