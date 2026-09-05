@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
-import { Check, Clock3, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { BookOpen, Check, Clock3, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
 import CardStack from './CardStack';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { buildPackedColumns } from '@/lib/deckColumnLayout';
@@ -195,6 +195,7 @@ export default function DeckStackView({
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState('');
   const [showHistory, setShowHistory] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [moveRequest, setMoveRequest] = useState(null);
 
   useEffect(() => {
@@ -229,6 +230,15 @@ export default function DeckStackView({
       window.removeEventListener('keydown', closeOnEscape);
     };
   }, [showHistory]);
+
+  useEffect(() => {
+    if (!showGuide) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setShowGuide(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [showGuide]);
 
   const commanderItem = isCommanderFormat ? deck?.items?.find(i => i.is_commander) : null;
   const nonCommanderItems = isCommanderFormat
@@ -424,6 +434,9 @@ export default function DeckStackView({
             </div>
           )}
         </div>
+        <button type="button" onClick={() => setShowGuide(true)} className="inline-flex h-7 items-center gap-1 border border-slate-600/70 bg-slate-800/80 px-2 text-[10px] font-semibold text-slate-200 hover:bg-slate-700" style={{ borderRadius: 3 }}>
+          <BookOpen size={12} /> Deck Builder Guide
+        </button>
         {selectedProductIds.size > 0 && (
           <div className="ml-1 flex flex-wrap items-center gap-1 border-l border-slate-600 pl-2">
             <span className="text-[10px] font-semibold text-cyan-200">{selectedProductIds.size} selected</span>
@@ -529,6 +542,46 @@ export default function DeckStackView({
           ))}
         </div>
       </DragDropContext>
+      {showGuide && (
+        <div className="fixed inset-0 z-[330] flex items-center justify-center bg-black/70 p-4" onClick={() => setShowGuide(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="deck-builder-guide-title" className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto border border-slate-600 bg-slate-950 p-4 shadow-2xl" style={{ borderRadius: 4 }} onClick={(event) => event.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2">
+              <h2 id="deck-builder-guide-title" className="text-sm font-bold text-white">Deck Builder Guide</h2>
+              <button type="button" onClick={() => setShowGuide(false)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-300 hover:text-white"><X size={13} /> Close</button>
+            </div>
+            <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+              <section>
+                <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">Selection</h3>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Ctrl/Cmd + Click:</strong> select multiple cards</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Shift + Click:</strong> select a range</p>
+              </section>
+              <section>
+                <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">Organization</h3>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Drag sections:</strong> reposition them</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Move:</strong> move selected card(s) to another section</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Add Section:</strong> create a custom section</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Reset Layout:</strong> restore default section positions</p>
+              </section>
+              <section>
+                <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">Recovery</h3>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">History:</strong> view recent changes</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Undo:</strong> reverse supported recent actions</p>
+              </section>
+              <section>
+                <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">Cards</h3>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Change Printing / Art:</strong> select another printing or art</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Commander:</strong> remains anchored</p>
+              </section>
+              <section className="sm:col-span-2">
+                <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">Import</h3>
+                <p className="text-[11px] leading-5 text-slate-300">Import compares against the current deck and adds only missing legal quantities.</p>
+                <p className="text-[11px] leading-5 text-slate-300">Quantity conflicts report copies that exceed the format limit.</p>
+                <p className="text-[11px] leading-5 text-slate-300">Optional basic-land completion is offered when appropriate.</p>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
       {moveRequest && (
         <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/45 p-4" onClick={() => setMoveRequest(null)}>
           <div className="w-full max-w-xs border border-slate-600 bg-slate-950 p-3 shadow-2xl" style={{ borderRadius: 4 }} onClick={(event) => event.stopPropagation()}>

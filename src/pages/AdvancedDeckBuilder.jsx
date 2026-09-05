@@ -1705,7 +1705,7 @@ export default function AdvancedDeckBuilder() {
                         <CardImage
                           card={card}
                           alt={card.name}
-                          className="h-full w-full object-cover"
+                          className="h-full w-full bg-slate-950 object-contain"
                           renderFallback={() => <div className="flex h-full w-full items-center justify-center px-1 text-center text-[10px] text-gray-400">{card.name}</div>}
                         />
                       </div>
@@ -1726,7 +1726,7 @@ export default function AdvancedDeckBuilder() {
                       <CardImage
                         card={card}
                         alt={card.name}
-                        className="aspect-[2/3] w-full object-cover transition-opacity group-hover:opacity-75"
+                        className="aspect-[2/3] w-full bg-slate-950 object-contain transition-opacity group-hover:opacity-75"
                         onMouseEnter={() => cardPreview.showPreview(card)}
                         onMouseLeave={cardPreview.hidePreview}
                         renderFallback={() => <div className="flex aspect-[2/3] w-full items-center justify-center bg-gray-700 px-1 text-center text-xs text-gray-400">{card.name}</div>}

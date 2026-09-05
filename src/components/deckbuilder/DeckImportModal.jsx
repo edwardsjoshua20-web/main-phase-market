@@ -23,6 +23,16 @@ function normalizeCardKey(value) {
   return searchOwner.normalizeQuery(value);
 }
 
+function formatQuantityConflict(item) {
+  const name = item.card?.name || item.name || 'This card';
+  const requested = item.requestedQuantity || 0;
+  const legal = item.legalRequestedQuantity || 0;
+  const skipped = item.conflictQuantity || 0;
+  const requestedLabel = requested === 1 ? 'copy' : 'copies';
+  const skippedLabel = skipped === 1 ? 'copy will' : 'copies will';
+  return `${name} requests ${requested} ${requestedLabel}; this deck allows ${legal}. ${skipped} ${skippedLabel} be skipped.`;
+}
+
 function isSectionHeader(line) {
   return /^(commander|companion|sideboard|maybeboard|tokens|creatures|instants|sorceries|artifacts|enchantments|planeswalkers|lands|battles)\s*:?\s*(\(\d+\))?$/i.test(line);
 }
@@ -341,7 +351,7 @@ export default function DeckImportModal({ game, currentItems = [], getCopyLimit,
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {[...reconciliation.willAdd.map((item) => ({ ...item, qty: item.missingQuantity, previewStatus: `Will add ${item.missingQuantity}` })), ...reconciliation.already.map((item) => ({ ...item, qty: item.alreadyQuantity, previewStatus: `Already satisfied ${item.alreadyQuantity}` })), ...reconciliation.conflicts.map((item) => ({ ...item, qty: item.conflictQuantity, previewStatus: `Exceeds format limit by ${item.conflictQuantity}` })), ...reconciliation.unresolved.map((item) => ({ ...item, previewStatus: 'Could not resolve' })), ...reconciliation.extras.map((item) => ({ name: item.product_name, card: item, qty: item.quantity || 1, previewStatus: 'Extra - unchanged' }))].map((r, i) => (
+                {[...reconciliation.willAdd.map((item) => ({ ...item, qty: item.missingQuantity, previewStatus: `Will add ${item.missingQuantity}` })), ...reconciliation.already.map((item) => ({ ...item, qty: item.alreadyQuantity, previewStatus: `Already satisfied ${item.alreadyQuantity}` })), ...reconciliation.conflicts.map((item) => ({ ...item, qty: item.conflictQuantity, previewStatus: formatQuantityConflict(item) })), ...reconciliation.unresolved.map((item) => ({ ...item, previewStatus: 'Could not resolve' })), ...reconciliation.extras.map((item) => ({ name: item.product_name, card: item, qty: item.quantity || 1, previewStatus: 'Extra - unchanged' }))].map((r, i) => (
                   <div key={`${r.previewStatus}-${r.card?.id || r.card?.product_id || r.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 4, background: '#172033', border: '1px solid #2d3a50' }}>
                     {getCardImageUrl(r.card) && (
                       <img src={getCardImageUrl(r.card)} alt={r.card.name} onError={(event) => handleCardImageError(event, r.card)} style={{ width: 28, height: 39, borderRadius: 3, objectFit: 'cover', flexShrink: 0 }} />
@@ -356,7 +366,7 @@ export default function DeckImportModal({ game, currentItems = [], getCopyLimit,
                         {r.card ? r.card.name : r.name}
                       </p>
                       {r.card && <p style={{ color: '#4b5563', fontSize: 10 }}>{r.card.set_name}</p>}
-                      <p style={{ color: r.previewStatus.startsWith('Will') ? '#34d399' : r.previewStatus.startsWith('Could') ? '#f87171' : r.previewStatus.startsWith('Exceeds') ? '#fb923c' : '#94a3b8', fontSize: 10 }}>{r.previewStatus}</p>
+                      <p style={{ color: r.previewStatus.startsWith('Will') ? '#34d399' : r.previewStatus.startsWith('Could') ? '#f87171' : r.conflictQuantity ? '#fb923c' : '#94a3b8', fontSize: 10 }}>{r.previewStatus}</p>
                     </div>
                     <span style={{ color: '#60a5fa', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>x{r.qty}</span>
                   </div>
