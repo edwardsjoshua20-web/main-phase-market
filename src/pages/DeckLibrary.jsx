@@ -41,10 +41,9 @@ function getDeckArtwork(deck) {
   return representative ? getCardImageUrl(representative) : '';
 }
 
-function getDeckStatus(deck, game) {
+function getDeckStatus(deck) {
   const explicitStatus = deck?.legality_status || deck?.validation_status;
   if (explicitStatus) return formatLabel(explicitStatus);
-  if (!game.editorReady && deck?.tags?.includes('qa-example')) return 'Example shell';
   return getDeckCount(deck) ? 'Saved deck' : 'Ready to build';
 }
 
@@ -52,17 +51,17 @@ function DeckEntry({ deck, game, onOpen }) {
   const artwork = getDeckArtwork(deck);
   const artworkCard = (deck.items || []).find((item) => getCardImageUrl(item));
   return (
-    <article className="group grid min-h-[92px] grid-cols-[76px_minmax(0,1fr)_auto] overflow-hidden border border-slate-700/55 bg-[#111b29] transition-colors hover:border-slate-500 hover:bg-[#142132]" style={{ borderRadius: 4 }}>
+    <article className="group grid min-h-[68px] grid-cols-[92px_minmax(0,1fr)_auto] overflow-hidden bg-transparent transition-colors hover:bg-slate-700/20">
       <div className="relative bg-[#08111d]">
-        {artwork ? <img src={artwork} alt="" className="absolute inset-0 h-full w-full object-cover" onError={(event) => handleCardImageError(event, artworkCard || {})} /> : <div className="absolute inset-0 bg-[#132033]" />}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#111b29]/80" />
+        {artwork ? <img src={artwork} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_24%]" onError={(event) => handleCardImageError(event, artworkCard || {})} /> : <div className="absolute inset-0 bg-[#132033]" />}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#0d1724]/45" />
       </div>
-      <div className="min-w-0 px-3 py-3">
-        <h3 className="truncate text-sm font-semibold text-white">{deck.name}</h3>
-        <p className="mt-1 text-[11px] text-slate-400">{formatLabel(deck.deck_format)} · {getDeckCount(deck)} cards</p>
-        <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{getDeckStatus(deck, game)}</p>
+      <div className="min-w-0 px-2.5 py-2">
+        <h3 className="truncate text-[13px] font-semibold leading-5 text-white">{deck.name}</h3>
+        <p className="text-[10px] leading-4 text-slate-400">{formatLabel(deck.deck_format)} · {getDeckCount(deck)} cards</p>
+        <p className="text-[9px] font-semibold uppercase leading-4 tracking-wide text-slate-500">{getDeckStatus(deck)}</p>
       </div>
-      <button type="button" onClick={() => onOpen(deck, game)} className="m-3 inline-flex h-8 items-center gap-1 self-center px-2.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-slate-700/70 hover:text-white" style={{ borderRadius: 3 }}>
+      <button type="button" onClick={() => onOpen(deck, game)} className="mx-2 inline-flex h-7 items-center gap-1 self-center px-1.5 text-[10px] font-semibold text-slate-300 transition-colors hover:text-white">
         Open <ArrowRight size={13} aria-hidden="true" />
       </button>
     </article>
@@ -156,24 +155,24 @@ export default function DeckLibrary() {
 
   return (
     <div className="min-h-screen bg-[#07111d] text-white">
-      <section className="relative h-[184px] overflow-hidden border-b border-slate-700/70 bg-[#06101d]">
+      <section className="relative h-[148px] overflow-hidden border-b border-slate-700/70 bg-[#06101d]">
         <img src="/images/home-tools/deck-builder-blue-wave.png" alt="" className="absolute inset-0 h-full w-full object-cover object-center opacity-70" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#050c16] via-[#07111d]/88 to-[#07111d]/15" />
         <div className="relative mx-auto flex h-full max-w-[1680px] flex-col justify-center px-5 lg:px-8"><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Deck Builder</h1><p className="mt-2 text-sm text-slate-300 sm:text-base">Build, test, and manage your decks in one place.</p></div>
       </section>
 
-      <main className="mx-auto max-w-[1680px] px-5 py-7 lg:px-8">
-        <div className="mb-5 flex items-end justify-between gap-4 border-b border-slate-700/70 pb-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-300">Your collection</p><h2 className="mt-1 text-xl font-semibold">Your Deck Library</h2></div><span className="text-xs text-slate-500">{decks.length} saved {decks.length === 1 ? 'deck' : 'decks'}</span></div>
+      <main className="mx-auto max-w-[1680px] px-5 py-5 lg:px-8">
+        <div className="mb-3 flex items-end justify-between gap-4 border-b border-slate-700/60 pb-2.5"><div><p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-cyan-300">Your collection</p><h2 className="mt-0.5 text-lg font-semibold">Your Deck Library</h2></div><span className="text-[11px] text-slate-500">{decks.length} saved {decks.length === 1 ? 'deck' : 'decks'}</span></div>
 
         {loadingDecks ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-cyan-300" /></div> : (
-          <div className="divide-y divide-slate-700/65">
+          <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
             {GAMES.map((game) => (
-              <section key={game.id} className="grid gap-4 py-5 xl:grid-cols-[220px_minmax(0,1fr)]">
-                <div className="flex items-start justify-between gap-3 xl:block">
-                  <div><div className="flex h-10 items-center"><img src={game.logoSrc} alt="" className="max-h-9 max-w-[132px] object-contain object-left brightness-0 invert opacity-80" /></div><h3 className="mt-2 text-sm font-semibold text-slate-100">{game.label}</h3></div>
-                  <div className="flex gap-1.5 xl:mt-4"><button type="button" onClick={() => beginCreate(game)} className="inline-flex h-8 items-center gap-1 border border-slate-600/70 px-2.5 text-[10px] font-semibold text-slate-200 hover:border-slate-400 hover:bg-slate-800" style={{ borderRadius: 3 }}><Plus size={12} /> New Deck</button><button type="button" onClick={() => importForGame(game)} className="inline-flex h-8 items-center gap-1 px-2.5 text-[10px] font-semibold text-slate-400 hover:bg-slate-800 hover:text-white" style={{ borderRadius: 3 }}><Upload size={12} /> Import</button></div>
+              <section key={game.id} className="overflow-hidden border border-slate-700/45 bg-[#0b1522]" style={{ borderRadius: 3 }}>
+                <div className="flex min-h-[58px] items-center justify-between gap-3 border-b border-slate-700/45 px-3 py-2">
+                  <div className="flex min-w-0 items-center gap-2.5"><div className="flex h-8 w-16 shrink-0 items-center"><img src={game.logoSrc} alt="" className="max-h-7 max-w-16 object-contain object-left brightness-0 invert opacity-75" /></div><h3 className="truncate text-xs font-semibold text-slate-100">{game.label}</h3></div>
+                  <div className="flex shrink-0 gap-0.5"><button type="button" onClick={() => beginCreate(game)} className="inline-flex h-7 items-center gap-1 px-1.5 text-[9px] font-semibold text-slate-300 hover:bg-slate-700/40 hover:text-white"><Plus size={11} /> New Deck</button><button type="button" onClick={() => importForGame(game)} className="inline-flex h-7 items-center gap-1 px-1.5 text-[9px] font-semibold text-slate-500 hover:bg-slate-700/40 hover:text-white"><Upload size={11} /> Import</button></div>
                 </div>
-                {groupedDecks[game.id]?.length ? <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">{groupedDecks[game.id].map((deck) => <DeckEntry key={deck.id} deck={deck} game={game} onOpen={openDeck} />)}</div> : <div className="flex min-h-[92px] items-center border-y border-dashed border-slate-700/60 px-4 text-xs text-slate-500">No saved decks for this game.</div>}
+                {groupedDecks[game.id]?.length ? <div className="divide-y divide-slate-700/35">{groupedDecks[game.id].map((deck) => <DeckEntry key={deck.id} deck={deck} game={game} onOpen={openDeck} />)}</div> : <div className="flex min-h-[68px] items-center px-3 text-[11px] text-slate-500">No saved decks for this game.</div>}
               </section>
             ))}
           </div>
