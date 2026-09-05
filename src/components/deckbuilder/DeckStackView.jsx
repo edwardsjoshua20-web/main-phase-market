@@ -8,7 +8,7 @@ function getFittedColumnCount(width) {
   const availableWidth = Math.max(0, width);
   for (let count = 5; count > 1; count -= 1) {
     const cardsWidth = count * 223;
-    const gapsWidth = (count - 1) * 8;
+    const gapsWidth = (count - 1) * 14;
     const activeRailAllowance = 66;
     if (cardsWidth + gapsWidth + activeRailAllowance <= availableWidth) return count;
   }
@@ -161,10 +161,13 @@ export default function DeckStackView({
   })();
 
   return (
-    <div ref={canvasRef} className="flex-1 overflow-auto px-4 py-3">
+    <div ref={canvasRef} className="flex-1 overflow-auto px-1.5 py-3">
       <div
-        className="grid items-start gap-2"
-        style={{ gridTemplateColumns: `repeat(${stackColumns.length}, minmax(223px, max-content))` }}
+        className="grid items-start"
+        style={{
+          gridTemplateColumns: `repeat(${stackColumns.length}, minmax(223px, max-content))`,
+          columnGap: 14,
+        }}
       >
         {stackColumns.map((column, columnIndex) => (
           <div key={columnIndex} className="flex min-w-0 flex-col gap-2">
