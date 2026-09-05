@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Loader2, Plus, Upload, X } from 'lucide-react';
+import { ArrowRight, Loader2, Plus, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { backend } from '@/services/backend';
@@ -43,13 +43,13 @@ function getDeckArtwork(deck) {
 
 function getDeckStatus(deck) {
   const explicitStatus = deck?.legality_status || deck?.validation_status;
-  if (explicitStatus) return formatLabel(explicitStatus);
-  return getDeckCount(deck) ? 'Saved deck' : 'Ready to build';
+  return explicitStatus ? formatLabel(explicitStatus) : '';
 }
 
 function DeckEntry({ deck, game, onOpen }) {
   const artwork = getDeckArtwork(deck);
   const artworkCard = (deck.items || []).find((item) => getCardImageUrl(item));
+  const status = getDeckStatus(deck);
   return (
     <article className="group grid min-h-[68px] grid-cols-[92px_minmax(0,1fr)_auto] overflow-hidden bg-transparent transition-colors hover:bg-slate-700/20">
       <div className="relative bg-[#08111d]">
@@ -59,7 +59,7 @@ function DeckEntry({ deck, game, onOpen }) {
       <div className="min-w-0 px-2.5 py-2">
         <h3 className="truncate text-[13px] font-semibold leading-5 text-white">{deck.name}</h3>
         <p className="text-[10px] leading-4 text-slate-400">{formatLabel(deck.deck_format)} · {getDeckCount(deck)} cards</p>
-        <p className="text-[9px] font-semibold uppercase leading-4 tracking-wide text-slate-500">{getDeckStatus(deck)}</p>
+        {status && <p className="text-[9px] font-semibold uppercase leading-4 tracking-wide text-slate-500">{status}</p>}
       </div>
       <button type="button" onClick={() => onOpen(deck, game)} className="mx-2 inline-flex h-7 items-center gap-1 self-center px-1.5 text-[10px] font-semibold text-slate-300 transition-colors hover:text-white">
         Open <ArrowRight size={13} aria-hidden="true" />
@@ -77,7 +77,6 @@ export default function DeckLibrary() {
   const [createGame, setCreateGame] = useState(null);
   const [newDeckName, setNewDeckName] = useState('');
   const [newDeckFormat, setNewDeckFormat] = useState('casual');
-  const [notice, setNotice] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -129,20 +128,6 @@ export default function DeckLibrary() {
     else setSearchParams({ deck: deck.id });
   };
 
-  const importForGame = (game) => {
-    if (!game.editorReady) {
-      setNotice(`${game.label} import will be available with its full deck editor. Existing saved deck shells remain safe.`);
-      return;
-    }
-    const targetDeck = groupedDecks[game.id]?.[0];
-    if (!targetDeck) {
-      toast.error('Create a Magic deck before importing');
-      beginCreate(game);
-      return;
-    }
-    navigate(`/AdvancedDeckBuilder?deck=${encodeURIComponent(targetDeck.id)}&import=1`);
-  };
-
   if (loading) return <div className="flex min-h-[60vh] items-center justify-center bg-[#07111d]"><Loader2 className="h-7 w-7 animate-spin text-cyan-300" /></div>;
 
   if (!user) {
@@ -158,11 +143,11 @@ export default function DeckLibrary() {
       <section className="relative h-[148px] overflow-hidden border-b border-slate-700/70 bg-[#06101d]">
         <img src="/images/home-tools/deck-builder-blue-wave.png" alt="" className="absolute inset-0 h-full w-full object-cover object-center opacity-70" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#050c16] via-[#07111d]/88 to-[#07111d]/15" />
-        <div className="relative mx-auto flex h-full max-w-[1680px] flex-col justify-center px-5 lg:px-8"><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Deck Builder</h1><p className="mt-2 text-sm text-slate-300 sm:text-base">Build, test, and manage your decks in one place.</p></div>
+        <div className="relative mx-auto flex h-full max-w-[1680px] flex-col justify-center px-5 lg:px-8"><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Deck Builder</h1><p className="mt-2 text-sm text-slate-300 sm:text-base">Build, test, and manage your decks in one place.</p><div className="mt-3 flex items-center gap-2.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-cyan-100/65"><span>Build</span><span className="h-px w-3 bg-cyan-300/25" /><span>Test</span><span className="h-px w-3 bg-cyan-300/25" /><span>Manage</span></div></div>
       </section>
 
       <main className="mx-auto max-w-[1680px] px-5 py-5 lg:px-8">
-        <div className="mb-3 flex items-end justify-between gap-4 border-b border-slate-700/60 pb-2.5"><div><p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-cyan-300">Your collection</p><h2 className="mt-0.5 text-lg font-semibold">Your Deck Library</h2></div><span className="text-[11px] text-slate-500">{decks.length} saved {decks.length === 1 ? 'deck' : 'decks'}</span></div>
+        <div className="mb-3 flex items-end justify-between gap-4 border-b border-slate-700/60 pb-2.5"><h2 className="text-lg font-semibold">Your Deck Library</h2><span className="text-[11px] text-slate-500">{decks.length} saved {decks.length === 1 ? 'deck' : 'decks'}</span></div>
 
         {loadingDecks ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-cyan-300" /></div> : (
           <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -170,7 +155,7 @@ export default function DeckLibrary() {
               <section key={game.id} className="overflow-hidden border border-slate-700/45 bg-[#0b1522]" style={{ borderRadius: 3 }}>
                 <div className="flex min-h-[58px] items-center justify-between gap-3 border-b border-slate-700/45 px-3 py-2">
                   <div className="flex min-w-0 items-center gap-2.5"><div className="flex h-8 w-16 shrink-0 items-center"><img src={game.logoSrc} alt="" className="max-h-7 max-w-16 object-contain object-left brightness-0 invert opacity-75" /></div><h3 className="truncate text-xs font-semibold text-slate-100">{game.label}</h3></div>
-                  <div className="flex shrink-0 gap-0.5"><button type="button" onClick={() => beginCreate(game)} className="inline-flex h-7 items-center gap-1 px-1.5 text-[9px] font-semibold text-slate-300 hover:bg-slate-700/40 hover:text-white"><Plus size={11} /> New Deck</button><button type="button" onClick={() => importForGame(game)} className="inline-flex h-7 items-center gap-1 px-1.5 text-[9px] font-semibold text-slate-500 hover:bg-slate-700/40 hover:text-white"><Upload size={11} /> Import</button></div>
+                  <button type="button" onClick={() => beginCreate(game)} className="inline-flex h-7 shrink-0 items-center gap-1 px-1.5 text-[9px] font-semibold text-slate-300 hover:bg-slate-700/40 hover:text-white"><Plus size={11} /> New Deck</button>
                 </div>
                 {groupedDecks[game.id]?.length ? <div className="divide-y divide-slate-700/35">{groupedDecks[game.id].map((deck) => <DeckEntry key={deck.id} deck={deck} game={game} onOpen={openDeck} />)}</div> : <div className="flex min-h-[68px] items-center px-3 text-[11px] text-slate-500">No saved decks for this game.</div>}
               </section>
@@ -199,7 +184,6 @@ export default function DeckLibrary() {
         </div>
       )}
 
-      {notice && <div className="fixed inset-0 z-[330] flex items-center justify-center bg-black/70 p-4" onClick={() => setNotice(null)}><div role="dialog" aria-modal="true" aria-label="Import availability" className="w-full max-w-md border border-slate-600 bg-[#0b1523] p-4 shadow-2xl" style={{ borderRadius: 4 }} onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between gap-4"><p className="text-sm leading-6 text-slate-200">{notice}</p><button type="button" onClick={() => setNotice(null)} aria-label="Close import notice" className="text-slate-400 hover:text-white"><X size={16} /></button></div></div></div>}
     </div>
   );
 }
