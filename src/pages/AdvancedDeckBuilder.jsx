@@ -18,7 +18,8 @@ import { simulateMtgCommanderDeck } from '@/lib/mtgCommanderCatalog';
 import { groupDeckItems, normalizeDeckGame } from '@/lib/deckSections';
 import { getCardImageUrl } from '@/lib/cardImages';
 import { buildPackedColumns } from '@/lib/deckColumnLayout';
-import { getSectionDisplayName, sortSectionsByLayout } from '@/lib/deckSectionLayout';
+import { applySectionTemplate, createSectionLayout, createSectionTemplate, getCustomSections, getSectionAssignments, getSectionDisplayName, sortSectionsByLayout } from '@/lib/deckSectionLayout';
+import { appendDeckHistory, createDeckHistoryEntry, removeDeckHistoryEntry } from '@/lib/deckHistory';
 import { toast } from 'sonner';
 import { calculateDeckValue } from '@/services/pricing/pricingPipeline';
 import { searchOwner } from '@/services/search/searchOwner';
@@ -229,28 +230,48 @@ export default function AdvancedDeckBuilder() {
     return queued;
   };
 
-  const saveSectionLayout = (sectionLayout, { message } = {}) => {
+  const saveSectionLayout = (sectionLayout, { message, historyLabel = 'Updated section layout' } = {}) => {
     const currentDeck = activeDeckRef.current;
     if (!currentDeck) return Promise.resolve();
 
     const previousLayout = currentDeck.section_layout || null;
+    const historyEntry = createDeckHistoryEntry(historyLabel, { kind: 'layout', section_layout: previousLayout });
+    const changeHistory = appendDeckHistory(currentDeck.change_history, historyEntry);
     const revision = ++sectionLayoutSaveRef.current;
-    commitSavedDeck({ ...currentDeck, section_layout: sectionLayout });
+    commitSavedDeck({ ...currentDeck, section_layout: sectionLayout, change_history: changeHistory });
 
     return queueDeckMutation(async () => {
-      const savedDeck = await backend.data.CardList.update(currentDeck.id, { section_layout: sectionLayout });
+      const savedDeck = await backend.data.CardList.update(currentDeck.id, { section_layout: sectionLayout, change_history: changeHistory });
       if (sectionLayoutSaveRef.current === revision && activeDeckRef.current?.id === currentDeck.id) {
         commitSavedDeck(savedDeck);
         if (message) toast.success(message);
       }
     }).catch((error) => {
       if (sectionLayoutSaveRef.current === revision && activeDeckRef.current?.id === currentDeck.id) {
-        commitSavedDeck({ ...activeDeckRef.current, section_layout: previousLayout });
+        commitSavedDeck({ ...activeDeckRef.current, section_layout: previousLayout, change_history: currentDeck.change_history || [] });
       }
       toast.error('Could not save section layout');
       console.error('Failed to save section layout:', error);
     });
   };
+
+  const saveDeckChange = (buildChange, { label, successMessage } = {}) => queueDeckMutation(async () => {
+    const currentDeck = activeDeckRef.current;
+    if (!currentDeck) return null;
+    const change = buildChange(currentDeck);
+    if (!change) return null;
+    const historyEntry = label
+      ? createDeckHistoryEntry(typeof label === 'function' ? label(change, currentDeck) : label, change.undo || null, change.details)
+      : null;
+    const changeHistory = historyEntry
+      ? appendDeckHistory(currentDeck.change_history, historyEntry)
+      : (currentDeck.change_history || []);
+    const updates = { ...change.updates, change_history: changeHistory };
+    const savedDeck = await backend.data.CardList.update(currentDeck.id, updates);
+    commitSavedDeck(savedDeck);
+    if (successMessage) toast.success(typeof successMessage === 'function' ? successMessage(change, currentDeck) : successMessage);
+    return { savedDeck, historyEntry, change };
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -446,20 +467,19 @@ export default function AdvancedDeckBuilder() {
     }
   });
 
-  const addCardToDeck = (card, qty = 1) => queueDeckMutation(async () => {
-    const currentDeck = activeDeckRef.current;
-    if (!currentDeck) { toast.error('Select a deck first'); return; }
+  const addCardToDeck = (card, qty = 1) => saveDeckChange((currentDeck) => {
 
     if (normalizeDeckFormatKey(currentDeck.deck_format) === 'commander') {
       const isBasicLand = card.type?.toLowerCase().includes('basic');
       const currentItem = currentDeck.items?.find(i => i.product_id === card.id);
       if (currentItem && !isBasicLand && !allowsAnyNumberOfCopies(card)) {
         toast.error('Commander: Only 1 of each non-land card allowed');
-        return;
+        return null;
       }
     }
 
     const existing = currentDeck.items?.find(i => i.product_id === card.id);
+    const existingIndex = currentDeck.items?.findIndex(i => i.product_id === card.id) ?? -1;
     const updatedItems = existing
       ? currentDeck.items.map(i => i.product_id === card.id ? { ...i, quantity: (i.quantity || 1) + qty } : i)
       : [...(currentDeck.items || []), {
@@ -477,12 +497,18 @@ export default function AdvancedDeckBuilder() {
           mana_cost: card.mana_cost || '',
           cmc: card.cmc ?? 0,
           oracle_text: card.oracle_text || '',
+          oracle_id: card.oracle_id || null,
+          set_code: card.set_code || '',
         }];
 
     const newCost = calculateDeckValue(updatedItems);
-    const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: updatedItems, estimated_cost: newCost });
-    commitSavedDeck(savedDeck);
-    toast.success(existing ? `${card.name} +${qty}` : `Added ${card.name}`);
+    return {
+      updates: { items: updatedItems, estimated_cost: newCost },
+      undo: { kind: 'restore_cards', cards: [{ product_id: card.id, item: existing ? { ...existing } : null, index: existingIndex < 0 ? currentDeck.items.length : existingIndex }] },
+    };
+  }, {
+    label: `Added ${qty} ${card.name}`,
+    successMessage: () => `Added ${card.name}`,
   });
 
   const fetchCardVariants = async (cardName) => {
@@ -505,9 +531,9 @@ export default function AdvancedDeckBuilder() {
     }
   };
 
-  const updateCardVariant = (item, newVariant) => queueDeckMutation(async () => {
-    const currentDeck = activeDeckRef.current;
-    if (!currentDeck) return;
+  const updateCardVariant = (item, newVariant) => saveDeckChange((currentDeck) => {
+    const itemIndex = currentDeck.items.findIndex((candidate) => candidate.product_id === item.product_id);
+    if (itemIndex < 0) return null;
     const updatedItems = currentDeck.items.map(i =>
       i.product_id === item.product_id 
         ? {
@@ -523,38 +549,17 @@ export default function AdvancedDeckBuilder() {
         : i
     );
     const newCost = calculateDeckValue(updatedItems);
-    const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: updatedItems, estimated_cost: newCost });
-    commitSavedDeck(savedDeck);
+    return {
+      updates: { items: updatedItems, estimated_cost: newCost },
+      undo: { kind: 'restore_cards', cards: [{ product_id: newVariant.id, item: { ...item }, index: itemIndex }] },
+    };
+  }, { label: `Changed printing for ${item.product_name}`, successMessage: 'Card variant changed' }).then(() => {
     setShowSetModal(null);
-    toast.success('Card variant changed');
   });
 
-  const undoCardRemoval = (removal) => queueDeckMutation(async () => {
-    const currentDeck = activeDeckRef.current;
-    if (!currentDeck || currentDeck.id !== removal.deckId) {
-      toast.error('Return to the original deck to undo this removal');
-      return;
-    }
-
-    const existingIndex = currentDeck.items.findIndex((item) => item.product_id === removal.item.product_id);
-    const restoredItems = [...currentDeck.items];
-    if (existingIndex >= 0) {
-      restoredItems[existingIndex] = removal.item;
-    } else {
-      restoredItems.splice(Math.min(removal.index, restoredItems.length), 0, removal.item);
-    }
-
-    const estimatedCost = calculateDeckValue(restoredItems);
-    const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: restoredItems, estimated_cost: estimatedCost });
-    commitSavedDeck(savedDeck);
-    toast.success(`Restored ${removal.item.product_name}`);
-  });
-
-  const removeCardFromDeck = (productId) => queueDeckMutation(async () => {
-    const currentDeck = activeDeckRef.current;
-    if (!currentDeck) return;
+  const removeCardFromDeck = (productId) => saveDeckChange((currentDeck) => {
     const itemIndex = currentDeck.items.findIndex((item) => item.product_id === productId);
-    if (itemIndex < 0) return;
+    if (itemIndex < 0) return null;
 
     const removedItem = { ...currentDeck.items[itemIndex] };
     const previousQuantity = Math.max(1, removedItem.quantity || 1);
@@ -562,33 +567,33 @@ export default function AdvancedDeckBuilder() {
       ? currentDeck.items.map((item, index) => index === itemIndex ? { ...item, quantity: previousQuantity - 1 } : item)
       : currentDeck.items.filter((_, index) => index !== itemIndex);
     const estimatedCost = calculateDeckValue(updatedItems);
-    const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: updatedItems, estimated_cost: estimatedCost });
-    commitSavedDeck(savedDeck);
-
-    const removal = { deckId: currentDeck.id, item: removedItem, index: itemIndex };
-    toast.success(`Removed one ${removedItem.product_name}`, {
-      duration: 8000,
-      action: {
-        label: 'Undo',
-        onClick: () => undoCardRemoval(removal),
-      },
-    });
+    return {
+      updates: { items: updatedItems, estimated_cost: estimatedCost },
+      undo: { kind: 'restore_cards', cards: [{ product_id: productId, item: removedItem, index: itemIndex }] },
+      removedName: removedItem.product_name,
+    };
+  }, {
+    label: (change) => `Removed one ${change.removedName}`,
+    successMessage: (change) => `Removed one ${change.removedName}`,
   });
 
   const changeQty = (productId, qty) => {
     if (qty < 1) {
       return removeCardFromDeck(productId);
     }
-    return queueDeckMutation(async () => {
-      const currentDeck = activeDeckRef.current;
-      if (!currentDeck) return;
+    return saveDeckChange((currentDeck) => {
+      const previousItem = currentDeck.items.find((item) => item.product_id === productId);
+      if (!previousItem) return null;
       const updatedItems = currentDeck.items.map(i =>
         i.product_id === productId ? { ...i, quantity: qty } : i
       );
       const estimatedCost = calculateDeckValue(updatedItems);
-      const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: updatedItems, estimated_cost: estimatedCost });
-      commitSavedDeck(savedDeck);
-    });
+      return {
+        updates: { items: updatedItems, estimated_cost: estimatedCost },
+        undo: { kind: 'restore_cards', cards: [{ product_id: productId, item: { ...previousItem }, index: currentDeck.items.indexOf(previousItem) }] },
+        cardName: previousItem.product_name,
+      };
+    }, { label: (change) => `Changed ${change.cardName} quantity to ${qty}` });
   };
 
   const clearDeckCards = async () => {
@@ -607,9 +612,14 @@ export default function AdvancedDeckBuilder() {
       await queueDeckMutation(async () => {
         const currentDeck = activeDeckRef.current;
         if (!currentDeck) return;
+        const historyEntry = createDeckHistoryEntry('Cleared deck cards', {
+          kind: 'restore_cards',
+          cards: currentDeck.items.map((item, index) => ({ product_id: item.product_id, item: { ...item }, index })),
+        });
         const savedDeck = await backend.data.CardList.update(currentDeck.id, {
           items: [],
           estimated_cost: 0,
+          change_history: appendDeckHistory(currentDeck.change_history, historyEntry),
         });
         commitSavedDeck(savedDeck);
         toast.success('All cards removed from deck');
@@ -656,7 +666,7 @@ export default function AdvancedDeckBuilder() {
       .sort((a, b) => String(a.product_name || '').localeCompare(String(b.product_name || '')))
       .map((item) => `${item.quantity || 1} ${item.product_name}`)
       .join('\n');
-    const blob = new Blob([`${activeDeck.name}\n${activeDeck.deck_format || ''}\n\n${lines}\n`], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([`# ${activeDeck.name}\n# Format: ${activeDeck.deck_format || ''}\n\n${lines}\n`], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -858,6 +868,7 @@ export default function AdvancedDeckBuilder() {
   }, [selectedGame, deckFormat]);
 
   const deckGame = normalizeDeckGame(selectedGame);
+  const availableSectionTemplates = decks.flatMap((deck) => Array.isArray(deck.section_templates) ? deck.section_templates : []);
 
   const isCommanderFormat = normalizeDeckFormatKey(activeDeck?.deck_format) === 'commander';
   const commanderDeckItem = isCommanderFormat ? activeDeck?.items?.find((item) => item.is_commander) || null : null;
@@ -867,8 +878,23 @@ export default function AdvancedDeckBuilder() {
     const sourceItems = isCommanderFormat
       ? activeDeck.items.filter((item) => !item.is_commander)
       : activeDeck.items;
-    const groups = groupDeckItems(sourceItems, deckGame)
+    const canonicalGroups = groupDeckItems(sourceItems, deckGame)
       .filter((group) => group.label !== 'Commander');
+    const canonicalByProduct = new Map(canonicalGroups.flatMap((group) => group.items.map((item) => [item.product_id, group.label])));
+    const assignments = getSectionAssignments(activeDeck.section_layout);
+    const customSections = getCustomSections(activeDeck.section_layout);
+    const itemsBySection = Object.fromEntries(canonicalGroups.map((group) => [group.label, []]));
+    customSections.forEach((section) => { itemsBySection[section.key] = []; });
+    sourceItems.forEach((item) => {
+      const assigned = assignments[item.product_id];
+      const sectionKey = assigned && itemsBySection[assigned] ? assigned : canonicalByProduct.get(item.product_id) || 'Other';
+      if (!itemsBySection[sectionKey]) itemsBySection[sectionKey] = [];
+      itemsBySection[sectionKey].push(item);
+    });
+    const groups = [
+      ...canonicalGroups.map((group) => ({ ...group, items: itemsBySection[group.label] || [] })),
+      ...customSections.map((section) => ({ label: section.key, items: itemsBySection[section.key] || [] })),
+    ].filter((group) => group.items.length > 0);
     return sortSectionsByLayout(groups, activeDeck.section_layout, (group) => group.label);
   })();
 
@@ -905,43 +931,135 @@ export default function AdvancedDeckBuilder() {
     return buildPackedColumns(genericSections, estimateCompactSectionHeight, Math.min(4, genericSections.length || 1));
   })();
 
-  const handleImportCards = async (importedItems) => {
-    if (!activeDeck) return;
-    // Import should fill missing cards, not double cards already in the deck.
-    let updatedItems = [...(activeDeck.items || [])];
+  const handleImportCards = ({ items: importedItems, reconciliation }) => saveDeckChange((currentDeck) => {
+    const updatedItems = [...(currentDeck.items || [])];
+    const restoredCards = [];
     let addedCount = 0;
-    let skippedCount = 0;
-    for (const item of importedItems) {
-      const existing = updatedItems.find(i => i.product_id === item.product_id);
-      if (existing) {
-        skippedCount += item.quantity || 1;
+    importedItems.forEach((item) => {
+      const index = updatedItems.findIndex((candidate) => candidate.product_id === item.product_id);
+      if (index >= 0) {
+        restoredCards.push({ product_id: item.product_id, item: { ...updatedItems[index] }, index });
+        updatedItems[index] = { ...updatedItems[index], quantity: (updatedItems[index].quantity || 1) + (item.quantity || 1) };
       } else {
+        restoredCards.push({ product_id: item.product_id, item: null, index: updatedItems.length });
         updatedItems.push(item);
-        addedCount += item.quantity || 1;
       }
-    }
-    const newCost = calculateDeckValue(updatedItems);
-    await backend.data.CardList.update(activeDeck.id, { items: updatedItems, estimated_cost: newCost });
-    setActiveDeck({ ...activeDeck, items: updatedItems, estimated_cost: newCost });
-    queryClient.invalidateQueries(['cardlists']);
-    setShowImportModal(false);
-    toast.success(
-      skippedCount > 0 ?
-      `Imported ${addedCount} new cards and skipped ${skippedCount} already in deck.` :
-      `Imported ${addedCount} cards!`
-    );
-  };
+      addedCount += item.quantity || 1;
+    });
+    return {
+      updates: { items: updatedItems, estimated_cost: calculateDeckValue(updatedItems) },
+      undo: { kind: 'restore_cards', cards: restoredCards },
+      details: {
+        import: {
+          added: addedCount,
+          already: reconciliation.already.length,
+          unresolved: reconciliation.unresolved.map((result) => result.name),
+          extras: reconciliation.extras.map((item) => item.product_name),
+        },
+      },
+      addedCount,
+    };
+  }, {
+    label: (change) => `Imported ${change.addedCount} missing card${change.addedCount === 1 ? '' : 's'}`,
+    successMessage: (change) => `Imported ${change.addedCount} missing card${change.addedCount === 1 ? '' : 's'}`,
+  }).then(() => setShowImportModal(false));
 
-  const setAsCommander = (item) => queueDeckMutation(async () => {
-    const currentDeck = activeDeckRef.current;
-    if (!currentDeck) return;
+  const setAsCommander = (item) => saveDeckChange((currentDeck) => {
     const updatedItems = currentDeck.items.map(i => ({
       ...i,
       is_commander: i.product_id === item.product_id
     }));
-    const savedDeck = await backend.data.CardList.update(currentDeck.id, { items: updatedItems });
+    return {
+      updates: { items: updatedItems },
+      undo: { kind: 'commander', product_id: currentDeck.items.find((candidate) => candidate.is_commander)?.product_id || null },
+    };
+  }, { label: `Set ${item.product_name} as Commander`, successMessage: `${item.product_name} set as Commander` });
+
+  const changeSelectedQuantities = (productIds, delta) => saveDeckChange((currentDeck) => {
+    const selected = new Set(productIds);
+    const restoredCards = [];
+    const updatedItems = [];
+    currentDeck.items.forEach((item, index) => {
+      if (!selected.has(item.product_id)) {
+        updatedItems.push(item);
+        return;
+      }
+      restoredCards.push({ product_id: item.product_id, item: { ...item }, index });
+      const commanderSingleton = normalizeDeckFormatKey(currentDeck.deck_format) === 'commander'
+        && !String(item.type || item.type_line || '').toLowerCase().includes('basic')
+        && !allowsAnyNumberOfCopies(item);
+      const nextQuantity = commanderSingleton ? Math.min(1, (item.quantity || 1) + delta) : (item.quantity || 1) + delta;
+      if (nextQuantity > 0) updatedItems.push({ ...item, quantity: nextQuantity });
+    });
+    return {
+      updates: { items: updatedItems, estimated_cost: calculateDeckValue(updatedItems) },
+      undo: { kind: 'restore_cards', cards: restoredCards },
+    };
+  }, { label: `Changed quantity for ${productIds.length} selected card${productIds.length === 1 ? '' : 's'}` });
+
+  const removeSelectedCards = (productIds) => saveDeckChange((currentDeck) => {
+    const selected = new Set(productIds);
+    const restoredCards = currentDeck.items
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => selected.has(item.product_id))
+      .map(({ item, index }) => ({ product_id: item.product_id, item: { ...item }, index }));
+    if (!restoredCards.length) return null;
+    const updatedItems = currentDeck.items.filter((item) => !selected.has(item.product_id));
+    return {
+      updates: { items: updatedItems, estimated_cost: calculateDeckValue(updatedItems) },
+      undo: { kind: 'restore_cards', cards: restoredCards },
+    };
+  }, {
+    label: `Removed ${productIds.length} selected card${productIds.length === 1 ? '' : 's'}`,
+    successMessage: 'Selected cards removed. Use History to undo.',
+  });
+
+  const saveSectionTemplate = (name, columns) => saveDeckChange((currentDeck) => {
+    const previousTemplates = currentDeck.section_templates || [];
+    const template = createSectionTemplate(createSectionLayout(columns, currentDeck.section_layout), deckGame, name);
+    return {
+      updates: { section_templates: [...previousTemplates, template] },
+      undo: { kind: 'templates', section_templates: previousTemplates },
+    };
+  }, { label: `Saved section template ${name}`, successMessage: 'Section template saved' });
+
+  const applySavedTemplate = (template) => {
+    const currentDeck = activeDeckRef.current;
+    if (!currentDeck) return;
+    const baseLayout = currentDeck.section_layout || { version: 1, sections: [], customSections: [], assignments: {} };
+    saveSectionLayout(applySectionTemplate(baseLayout, template), {
+      message: 'Section template applied',
+      historyLabel: `Applied ${template.name}`,
+    });
+  };
+
+  const undoHistoryEntry = (entry) => queueDeckMutation(async () => {
+    const currentDeck = activeDeckRef.current;
+    if (!currentDeck || currentDeck.change_history?.[0]?.id !== entry.id || !entry.undo) {
+      toast.error('Only the latest reversible change can be undone');
+      return;
+    }
+
+    const updates = { change_history: removeDeckHistoryEntry(currentDeck.change_history, entry.id) };
+    if (entry.undo.kind === 'layout') updates.section_layout = entry.undo.section_layout;
+    if (entry.undo.kind === 'templates') updates.section_templates = entry.undo.section_templates || [];
+    if (entry.undo.kind === 'commander') {
+      updates.items = currentDeck.items.map((item) => ({ ...item, is_commander: item.product_id === entry.undo.product_id }));
+    }
+    if (entry.undo.kind === 'restore_cards') {
+      const restoredItems = [...currentDeck.items];
+      [...entry.undo.cards].sort((a, b) => a.index - b.index).forEach((card) => {
+        const currentIndex = restoredItems.findIndex((item) => item.product_id === card.product_id);
+        if (currentIndex >= 0) restoredItems.splice(currentIndex, 1);
+        if (card.item) restoredItems.splice(Math.min(card.index, restoredItems.length), 0, card.item);
+      });
+      updates.items = restoredItems;
+      updates.estimated_cost = calculateDeckValue(restoredItems);
+    }
+
+    const savedDeck = await backend.data.CardList.update(currentDeck.id, updates);
     commitSavedDeck(savedDeck);
-    toast.success(`${item.product_name} set as Commander`);
+    toast.success(`Undid: ${entry.label}`);
   });
 
   if (loading) return (
@@ -1091,7 +1209,7 @@ export default function AdvancedDeckBuilder() {
             {!isCompactLayout && activeDeck && (
               <button
                 type="button"
-                onClick={() => saveSectionLayout(null, { message: 'Layout reset' })}
+                onClick={() => saveSectionLayout(null, { message: 'Layout reset', historyLabel: 'Reset section layout' })}
                 disabled={!activeDeck.section_layout}
                 className="h-7 px-2 text-[11px] font-semibold text-gray-400 transition-colors hover:text-white disabled:cursor-default disabled:opacity-35"
               >
@@ -1201,8 +1319,15 @@ export default function AdvancedDeckBuilder() {
               game={deckGame}
               isCommanderFormat={isCommanderFormat}
               sectionLayout={activeDeck.section_layout}
+              sectionTemplates={availableSectionTemplates}
+              history={activeDeck.change_history || []}
               onSectionLayoutChange={(layout, options) => saveSectionLayout(layout, options)}
+              onSaveTemplate={saveSectionTemplate}
+              onApplyTemplate={applySavedTemplate}
+              onUndoHistory={undoHistoryEntry}
               onChangeQty={changeQty}
+              onBulkQuantity={changeSelectedQuantities}
+              onBulkRemove={removeSelectedCards}
               onRemove={removeCardFromDeck}
               onChangeSet={(item) => { setShowSetModal(item); fetchCardVariants(item.product_name); }}
               onSetCommander={isCommanderFormat ? setAsCommander : null}
@@ -1586,6 +1711,7 @@ export default function AdvancedDeckBuilder() {
       {showImportModal && activeDeck && (
         <DeckImportModal
           game={selectedGame}
+          currentItems={activeDeck.items || []}
           onImport={handleImportCards}
           onClose={() => setShowImportModal(false)}
         />

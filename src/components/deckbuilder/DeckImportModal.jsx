@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { X, Upload, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useMemo, useState, useRef } from 'react';
+import { X, Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { searchOwner } from '@/services/search/searchOwner';
+import { reconcileDeckImport } from '@/lib/deckImportReconciliation';
 
 /**
  * Clean a card name by stripping common deck-export annotations:
@@ -140,7 +141,7 @@ async function fetchCatalogCard(name, game) {
   return null;
 }
 
-export default function DeckImportModal({ game, onImport, onClose }) {
+export default function DeckImportModal({ game, currentItems = [], onImport, onClose }) {
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState('idle'); // idle | parsing | fetching | done | error
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -204,29 +205,36 @@ export default function DeckImportModal({ game, onImport, onClose }) {
     handleFile(e.dataTransfer.files[0]);
   };
 
+  const reconciliation = useMemo(() => {
+    return reconcileDeckImport(results, currentItems, normalizeCardKey);
+  }, [currentItems, results]);
+
   const handleImport = () => {
-    const items = results
-      .filter(r => r.card)
-      .map(r => ({
-        product_id: r.card.id,
-        product_name: r.card.name,
-        product_image: getCardImageUrl(r.card),
-        image_url: r.card.image_url || null,
-        english_image_url: r.card.english_image_url || null,
-        image_small: r.card.image_small || null,
-        fallback_image_url: r.card.fallback_image_url || null,
-        price: r.card.price,
-        product_type: r.card.product_type,
-        type: r.card.type,
-        quantity: r.qty,
-        mana_cost: r.card.mana_cost || '',
-        cmc: r.card.cmc ?? 0,
-      }));
-    onImport(items);
+    const items = reconciliation.willAdd.map((result) => {
+      const source = result.existing || result.card;
+      return {
+        ...(result.existing || {}),
+        product_id: source.product_id || source.id,
+        product_name: source.product_name || source.name,
+        product_image: getCardImageUrl(source),
+        image_url: source.image_url || null,
+        english_image_url: source.english_image_url || null,
+        image_small: source.image_small || null,
+        fallback_image_url: source.fallback_image_url || null,
+        price: source.price || source.market_price || 0,
+        product_type: source.product_type || source.game || game,
+        type: source.type || source.type_line || '',
+        quantity: result.missingQuantity,
+        oracle_id: source.oracle_id || '',
+        set_code: source.set_code || '',
+        mana_cost: source.mana_cost || '',
+        cmc: source.cmc ?? 0,
+      };
+    });
+    onImport({ items, reconciliation });
   };
 
-  const successCount = results.filter(r => r.card).length;
-  const failCount = results.filter(r => !r.card).length;
+  const missingQuantity = reconciliation.willAdd.reduce((sum, result) => sum + result.missingQuantity, 0);
 
   return (
     <div
@@ -305,22 +313,23 @@ export default function DeckImportModal({ game, onImport, onClose }) {
           {/* Results */}
           {status === 'done' && (
             <div>
-              <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-                <div style={{ flex: 1, background: '#052e16', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <CheckCircle style={{ width: 14, height: 14, color: '#34d399' }} />
-                  <span style={{ color: '#34d399', fontWeight: 700, fontSize: 13 }}>{successCount} found</span>
-                </div>
-                {failCount > 0 && (
-                  <div style={{ flex: 1, background: '#450a0a', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <AlertCircle style={{ width: 14, height: 14, color: '#f87171' }} />
-                    <span style={{ color: '#f87171', fontWeight: 700, fontSize: 13 }}>{failCount} not found</span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 6, marginBottom: 12 }}>
+                {[
+                  ['Already in Deck', reconciliation.already.length, '#94a3b8'],
+                  ['Will Add', missingQuantity, '#34d399'],
+                  ['Could Not Resolve', reconciliation.unresolved.length, '#f87171'],
+                  ['Extra in Current Deck', reconciliation.extras.length, '#fbbf24'],
+                ].map(([label, count, color]) => (
+                  <div key={label} style={{ background: '#1f2937', borderRadius: 4, padding: '7px 9px', border: '1px solid #334155' }}>
+                    <p style={{ color, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{label}</p>
+                    <p style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>{count}</p>
                   </div>
-                )}
+                ))}
               </div>
 
               <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {results.map((r, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 6, background: r.card ? '#0f2937' : '#1c0a0a', border: `1px solid ${r.card ? '#164e63' : '#450a0a'}` }}>
+                {[...reconciliation.willAdd.map((item) => ({ ...item, previewStatus: `Will add ${item.missingQuantity}` })), ...reconciliation.already.map((item) => ({ ...item, previewStatus: 'Already satisfied' })), ...reconciliation.unresolved.map((item) => ({ ...item, previewStatus: 'Could not resolve' })), ...reconciliation.extras.map((item) => ({ name: item.product_name, card: item, qty: item.quantity || 1, previewStatus: 'Extra - unchanged' }))].map((r, i) => (
+                  <div key={`${r.previewStatus}-${r.card?.id || r.card?.product_id || r.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 4, background: '#172033', border: '1px solid #2d3a50' }}>
                     {getCardImageUrl(r.card) && (
                       <img src={getCardImageUrl(r.card)} alt={r.card.name} onError={(event) => handleCardImageError(event, r.card)} style={{ width: 28, height: 39, borderRadius: 3, objectFit: 'cover', flexShrink: 0 }} />
                     )}
@@ -334,7 +343,7 @@ export default function DeckImportModal({ game, onImport, onClose }) {
                         {r.card ? r.card.name : r.name}
                       </p>
                       {r.card && <p style={{ color: '#4b5563', fontSize: 10 }}>{r.card.set_name}</p>}
-                      {r.error && <p style={{ color: '#f87171', fontSize: 10 }}>{r.error}</p>}
+                      <p style={{ color: r.previewStatus.startsWith('Will') ? '#34d399' : r.previewStatus.startsWith('Could') ? '#f87171' : '#94a3b8', fontSize: 10 }}>{r.previewStatus}</p>
                     </div>
                     <span style={{ color: '#60a5fa', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>x{r.qty}</span>
                   </div>
@@ -356,10 +365,10 @@ export default function DeckImportModal({ game, onImport, onClose }) {
               </button>
               <button
                 onClick={handleImport}
-                disabled={successCount === 0}
-                style={{ padding: '8px 20px', borderRadius: 6, border: 'none', background: successCount > 0 ? '#1d4ed8' : '#1f2937', color: successCount > 0 ? '#fff' : '#4b5563', fontSize: 13, fontWeight: 700, cursor: successCount > 0 ? 'pointer' : 'not-allowed' }}
+                disabled={missingQuantity === 0}
+                style={{ padding: '8px 20px', borderRadius: 6, border: 'none', background: missingQuantity > 0 ? '#1d4ed8' : '#1f2937', color: missingQuantity > 0 ? '#fff' : '#4b5563', fontSize: 13, fontWeight: 700, cursor: missingQuantity > 0 ? 'pointer' : 'not-allowed' }}
               >
-                Import {successCount} Cards
+                Import Missing{missingQuantity > 0 ? ` (${missingQuantity})` : ''}
               </button>
             </>
           )}

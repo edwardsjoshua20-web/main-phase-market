@@ -242,6 +242,8 @@ function normalizeDeckPayload(row) {
     estimated_cost: payload.estimated_cost || 0,
     items: Array.isArray(payload.items) ? payload.items : [],
     section_layout: payload.section_layout || null,
+    section_templates: Array.isArray(payload.section_templates) ? payload.section_templates : [],
+    change_history: Array.isArray(payload.change_history) ? payload.change_history : [],
     game: row.game || payload.game || 'mtg',
     source: row.source || payload.source || 'supabase',
     tags: Array.isArray(row.tags) ? row.tags : [],

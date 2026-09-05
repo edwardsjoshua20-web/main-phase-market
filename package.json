@@ -89,7 +89,8 @@
     "search:verify": "node scripts/verify-search-owner.mjs",
     "search:runtime:verify": "node scripts/verify-search-runtime.mjs",
     "search:certify": "node scripts/certify-card-search.mjs",
-    "listing:verify": "node scripts/verify-listing-owner.mjs"
+    "listing:verify": "node scripts/verify-listing-owner.mjs",
+    "deck:modular:verify": "node scripts/verify-deck-modular-workflow.mjs"
   },
   "dependencies": {
     "@babel/core": "^7.25.0",

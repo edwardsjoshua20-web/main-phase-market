@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { resolveCardPricing } from '@/services/pricing/pricingPipeline';
@@ -51,9 +51,25 @@ function PriceBar({ item, storeProducts }) {
   );
 }
 
-export default function CardStack({ type, cards, onChangeQty, onRemove, onChangeSet, onSetCommander, storeProducts, hideHeader = false }) {
+export default function CardStack({
+  type,
+  cards,
+  onChangeQty,
+  onRemove,
+  onChangeSet,
+  onSetCommander,
+  storeProducts,
+  hideHeader = false,
+  interactionDisabled = false,
+  selectedProductIds,
+  onCardSelect,
+}) {
   const [activeIdx, setActiveIdx] = useState(null);
   const closeTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (interactionDisabled) setActiveIdx(null);
+  }, [interactionDisabled]);
 
   const totalQty = cards.reduce((s, c) => s + (c.quantity || 1), 0);
   const stackHeight = CARD_HEIGHT + (cards.length - 1) * PEEK + 2;
@@ -85,6 +101,7 @@ export default function CardStack({ type, cards, onChangeQty, onRemove, onChange
       <div style={{ position: 'relative', height: stackHeight, width: '100%' }}>
         {cards.map((item, idx) => {
           const isActive = activeIdx === idx;
+          const isSelected = selectedProductIds?.has(item.product_id);
           const top = idx * PEEK;
 
           return (
@@ -98,21 +115,23 @@ export default function CardStack({ type, cards, onChangeQty, onRemove, onChange
                 alignItems: 'center',
                 gap: 8,
                 zIndex: isActive ? 100 : idx + 1,
+                pointerEvents: interactionDisabled ? 'none' : 'auto',
               }}
-              onMouseLeave={scheduleClose}
-              onMouseEnter={isActive ? cancelClose : undefined}
+              onMouseLeave={interactionDisabled ? undefined : scheduleClose}
+              onMouseEnter={!interactionDisabled && isActive ? cancelClose : undefined}
             >
               {/* Card visual + price bar */}
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <div
-                  onMouseEnter={() => !isActive && open(idx)}
+                  onMouseEnter={() => !interactionDisabled && !isActive && open(idx)}
+                  onClick={(event) => onCardSelect?.(item, event)}
                   style={{
                     width: CARD_WIDTH,
                     height: CARD_HEIGHT,
                     borderRadius: 8,
                     overflow: 'hidden',
-                    border: isActive ? '2px solid #60a5fa' : '2px solid #374151',
-                    boxShadow: isActive ? '0 8px 24px rgba(0,0,0,0.6)' : '0 2px 8px rgba(0,0,0,0.4)',
+                    border: isSelected ? '2px solid #22d3ee' : isActive ? '2px solid #60a5fa' : '2px solid #374151',
+                    boxShadow: isSelected ? '0 0 0 2px rgba(34,211,238,0.22)' : isActive ? '0 8px 24px rgba(0,0,0,0.6)' : '0 2px 8px rgba(0,0,0,0.4)',
                     cursor: 'pointer',
                     flexShrink: 0,
                     position: 'relative',
@@ -150,7 +169,7 @@ export default function CardStack({ type, cards, onChangeQty, onRemove, onChange
               </div>
 
               {/* Controls — slide in next to card when active */}
-              {isActive && (
+              {isActive && !interactionDisabled && (
                 <div style={{
                   display: 'flex',
                   flexDirection: 'column',
