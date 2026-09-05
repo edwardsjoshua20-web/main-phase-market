@@ -551,6 +551,19 @@ export default function DeckStackView({
             </div>
             <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
               <section>
+                <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">Getting Started</h3>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Format:</strong> choose the deck format and rules</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">New Deck:</strong> start from your deck library</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Deck View / Advanced View:</strong> switch the deck presentation</p>
+              </section>
+              <section>
+                <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">Test &amp; Share</h3>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">AI Simulate:</strong> review simulated deck performance</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Playtester:</strong> test opening hands and play</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Export:</strong> download the current deck list</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Clear Cards:</strong> remove all cards after confirmation</p>
+              </section>
+              <section>
                 <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">Selection</h3>
                 <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Ctrl/Cmd + Click:</strong> select multiple cards</p>
                 <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Shift + Click:</strong> select a range</p>

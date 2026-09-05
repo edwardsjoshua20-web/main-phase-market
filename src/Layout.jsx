@@ -189,7 +189,7 @@ export default function Layout({ children, currentPageName }) {
   const primaryNavItems = [
     { label: 'Home', to: '/', pages: ['Home'] },
     { label: 'Shop', to: '/Shop', pages: ['Shop'] },
-    { label: 'Deck Builder', to: '/AdvancedDeckBuilder', pages: ['AdvancedDeckBuilder', 'DeckBuilder'] },
+    { label: 'Deck Builder', to: '/DeckBuilder', pages: ['AdvancedDeckBuilder', 'DeckBuilder'] },
     { label: 'Commander Hub', to: '/CommanderHub', pages: ['CommanderHub', 'CommanderDetail'], desktopOnly: true },
     { label: 'Community', to: '/CommunityDecks', pages: ['CommunityDecks'], desktopOnly: true },
     { label: 'Forum', to: '/Forum', pages: ['Forum', 'ForumThread'], desktopOnly: true }

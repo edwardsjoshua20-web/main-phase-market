@@ -417,6 +417,14 @@ export default function AdvancedDeckBuilder() {
     setSearchParams(nextParams, { replace: true });
   }, [activeDeck?.id]);
 
+  useEffect(() => {
+    if (searchParams.get('import') !== '1' || !activeDeck?.id) return;
+    setShowImportModal(true);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('import');
+    setSearchParams(nextParams, { replace: true });
+  }, [activeDeck?.id, searchParams, setSearchParams]);
+
   const createDeckMutation = useMutation({
     mutationFn: () => backend.data.CardList.create({
       user_email: user.email,

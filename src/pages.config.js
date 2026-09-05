@@ -54,7 +54,7 @@ import AdvancedDeckBuilder from './pages/AdvancedDeckBuilder';
 import Article from './pages/Article';
 import CardDetail from './pages/CardDetail';
 import Checkout from './pages/Checkout';
-import DeckBuilder from './pages/DeckBuilder';
+import DeckBuilder from './pages/DeckLibrary';
 import Dice from './pages/Dice';
 import Home from './pages/Home';
 import ProductDetail from './pages/ProductDetail';

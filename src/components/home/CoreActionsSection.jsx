@@ -6,7 +6,7 @@ const actions = [
   {
     title: 'Deck Builder',
     action: 'BUILD DECKS →',
-    to: '/AdvancedDeckBuilder',
+    to: '/DeckBuilder',
     backgroundImage: '/images/home-tools/deck-builder-blue-wave.png',
     backgroundPosition: '100% 50%',
   },
