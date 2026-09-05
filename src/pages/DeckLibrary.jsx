@@ -8,13 +8,13 @@ import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
 import { normalizeDeckGame } from '@/lib/deckSections';
 
 const GAMES = [
-  { id: 'magic', label: 'Magic: The Gathering', logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Magic_the_Gathering_2017.svg', formats: ['commander', 'standard', 'modern', 'pioneer', 'legacy', 'pauper', 'casual'], editorReady: true },
-  { id: 'pokemon', label: 'Pokémon', logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Pok%C3%A9mon_Trading_Card_Game_logo.svg', formats: ['standard', 'expanded', 'unlimited', 'gym_leader_challenge', 'casual'] },
-  { id: 'yugioh', label: 'Yu-Gi-Oh!', logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Yu-Gi-Oh!.png', formats: ['advanced', 'traditional', 'goat', 'edison', 'casual'] },
-  { id: 'lorcana', label: 'Disney Lorcana', logoSrc: '/images/disney-lorcana-logo.png', formats: ['core_constructed', 'infinity_constructed', 'casual'] },
-  { id: 'flesh_and_blood', label: 'Flesh and Blood', logoSrc: 'https://uchroniesgames.fr/web/image/event.event/168/image_1024', formats: ['classic_constructed', 'blitz', 'commoner', 'living_legend', 'casual'] },
-  { id: 'onepiece', label: 'One Piece', logoSrc: '/images/oplogo.webp', formats: ['standard', 'block_constructed', 'casual'] },
-  { id: 'starwars', label: 'Star Wars Unlimited', logoSrc: '/images/star-wars-unlimited-logo.png', formats: ['premier', 'twin_suns', 'casual'] },
+  { id: 'magic', label: 'Magic: The Gathering', logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Magic_the_Gathering_2017.svg', logoClass: 'brightness-0 invert opacity-85', formats: ['commander', 'standard', 'modern', 'pioneer', 'legacy', 'pauper', 'casual'], editorReady: true },
+  { id: 'pokemon', label: 'Pokémon', logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Pok%C3%A9mon_Trading_Card_Game_logo.svg', logoClass: 'opacity-90', formats: ['standard', 'expanded', 'unlimited', 'gym_leader_challenge', 'casual'] },
+  { id: 'yugioh', label: 'Yu-Gi-Oh!', logoSrc: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Yu-Gi-Oh!.png', logoClass: 'opacity-90', formats: ['advanced', 'traditional', 'goat', 'edison', 'casual'] },
+  { id: 'lorcana', label: 'Disney Lorcana', logoSrc: '/images/disney-lorcana-logo.png', logoClass: 'opacity-90', formats: ['core_constructed', 'infinity_constructed', 'casual'] },
+  { id: 'flesh_and_blood', label: 'Flesh and Blood', logoSrc: 'https://uchroniesgames.fr/web/image/event.event/168/image_1024', logoClass: 'opacity-90', formats: ['classic_constructed', 'blitz', 'commoner', 'living_legend', 'casual'] },
+  { id: 'onepiece', label: 'One Piece', logoSrc: '/images/oplogo.webp', logoClass: 'brightness-0 invert opacity-80', formats: ['standard', 'block_constructed', 'casual'] },
+  { id: 'starwars', label: 'Star Wars Unlimited', logoSrc: '/images/star-wars-unlimited-logo.png', logoClass: 'brightness-0 invert opacity-80', formats: ['premier', 'twin_suns', 'casual'] },
 ];
 
 function formatLabel(value) {
@@ -51,7 +51,7 @@ function DeckEntry({ deck, game, onOpen }) {
   const artworkCard = (deck.items || []).find((item) => getCardImageUrl(item));
   const status = getDeckStatus(deck);
   return (
-    <article className="group grid min-h-[68px] grid-cols-[92px_minmax(0,1fr)_auto] overflow-hidden bg-transparent transition-colors hover:bg-slate-700/20">
+    <article className="group grid min-h-[68px] grid-cols-[92px_minmax(0,1fr)_auto] overflow-hidden bg-white/[0.018] transition-colors hover:bg-white/[0.04]">
       <div className="relative bg-[#08111d]">
         {artwork ? <img src={artwork} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_24%]" onError={(event) => handleCardImageError(event, artworkCard || {})} /> : <div className="absolute inset-0 bg-[#132033]" />}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#0d1724]/45" />
@@ -143,7 +143,7 @@ export default function DeckLibrary() {
       <section className="relative h-[148px] overflow-hidden border-b border-slate-700/70 bg-[#06101d]">
         <img src="/images/home-tools/deck-builder-blue-wave.png" alt="" className="absolute inset-0 h-full w-full object-cover object-center opacity-70" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#050c16] via-[#07111d]/88 to-[#07111d]/15" />
-        <div className="relative mx-auto flex h-full max-w-[1680px] flex-col justify-center px-5 lg:px-8"><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Deck Builder</h1><p className="mt-2 text-sm text-slate-300 sm:text-base">Build, test, and manage your decks in one place.</p><div className="mt-3 flex items-center gap-2.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-cyan-100/65"><span>Build</span><span className="h-px w-3 bg-cyan-300/25" /><span>Test</span><span className="h-px w-3 bg-cyan-300/25" /><span>Manage</span></div></div>
+        <div className="relative mx-auto flex h-full max-w-[1680px] flex-col justify-center px-5 lg:px-8"><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Deck Builder</h1><p className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/70 sm:text-sm">Build · Test · Manage</p></div>
       </section>
 
       <main className="mx-auto max-w-[1680px] px-5 py-5 lg:px-8">
@@ -152,12 +152,12 @@ export default function DeckLibrary() {
         {loadingDecks ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-cyan-300" /></div> : (
           <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
             {GAMES.map((game) => (
-              <section key={game.id} className="overflow-hidden border border-slate-700/45 bg-[#0b1522]" style={{ borderRadius: 3 }}>
-                <div className="flex min-h-[58px] items-center justify-between gap-3 border-b border-slate-700/45 px-3 py-2">
-                  <div className="flex min-w-0 items-center gap-2.5"><div className="flex h-8 w-16 shrink-0 items-center"><img src={game.logoSrc} alt="" className="max-h-7 max-w-16 object-contain object-left brightness-0 invert opacity-75" /></div><h3 className="truncate text-xs font-semibold text-slate-100">{game.label}</h3></div>
+              <section key={game.id} className="min-w-0">
+                <div className="flex min-h-[52px] items-center justify-between gap-3 border-b border-slate-700/50 px-1 py-2">
+                  <div className="flex min-w-0 items-center gap-2.5"><div className="flex h-8 w-20 shrink-0 items-center"><img src={game.logoSrc} alt="" className={`max-h-7 max-w-20 object-contain object-left ${game.logoClass}`} /></div><h3 className="truncate text-xs font-semibold text-slate-100">{game.label}</h3></div>
                   <button type="button" onClick={() => beginCreate(game)} className="inline-flex h-7 shrink-0 items-center gap-1 px-1.5 text-[9px] font-semibold text-slate-300 hover:bg-slate-700/40 hover:text-white"><Plus size={11} /> New Deck</button>
                 </div>
-                {groupedDecks[game.id]?.length ? <div className="divide-y divide-slate-700/35">{groupedDecks[game.id].map((deck) => <DeckEntry key={deck.id} deck={deck} game={game} onOpen={openDeck} />)}</div> : <div className="flex min-h-[68px] items-center px-3 text-[11px] text-slate-500">No saved decks for this game.</div>}
+                {groupedDecks[game.id]?.length ? <div className="divide-y divide-slate-700/35">{groupedDecks[game.id].map((deck) => <DeckEntry key={deck.id} deck={deck} game={game} onOpen={openDeck} />)}</div> : <div className="flex min-h-[68px] items-center px-1 text-[11px] text-slate-500">No saved decks for this game.</div>}
               </section>
             ))}
           </div>
