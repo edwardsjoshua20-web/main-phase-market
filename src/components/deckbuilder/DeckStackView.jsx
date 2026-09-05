@@ -161,7 +161,7 @@ export default function DeckStackView({
   })();
 
   return (
-    <div ref={canvasRef} className="flex-1 overflow-auto px-1.5 py-3">
+    <div ref={canvasRef} className="flex-1 overflow-auto px-1 py-3">
       <div
         className="grid items-start"
         style={{
