@@ -5,7 +5,7 @@ import { normalizeDeckGame } from '@/lib/deckSections';
 
 const GAME_GROUPS = [
   { key: 'magic', label: 'Magic: The Gathering' },
-  { key: 'pokemon', label: 'Pokemon' },
+  { key: 'pokemon', label: 'Pokémon' },
   { key: 'yugioh', label: 'Yu-Gi-Oh!' },
   { key: 'lorcana', label: 'Disney Lorcana' },
   { key: 'flesh_and_blood', label: 'Flesh and Blood' },
@@ -171,6 +171,7 @@ export default function DeckListSidebar({
                   {group.decks.map((deck) => {
                     const renderedDeck = activeDeck?.id === deck.id ? activeDeck : deck;
                     const selected = activeDeck?.id === deck.id;
+                    const cardCount = getDeckCardCount(renderedDeck);
                     return (
                       <button
                         key={deck.id}
@@ -185,7 +186,7 @@ export default function DeckListSidebar({
                       >
                         <span className="block truncate text-xs font-semibold">{deck.name}</span>
                         <span className="block truncate text-[10px] leading-4 text-slate-500">
-                          {formatLabel(deck.deck_format)} · {getDeckCardCount(renderedDeck)} cards
+                          {formatLabel(deck.deck_format)} · {cardCount} {cardCount === 1 ? 'card' : 'cards'}
                         </span>
                       </button>
                     );
