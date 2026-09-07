@@ -52,6 +52,7 @@
     "commander:ingest:certify": "node scripts/certify-commander-ingestion.mjs",
     "commander:corpus:revalidate": "node scripts/revalidate-mtg-commander-corpus.mjs",
     "commander:public:build": "node scripts/build-mtg-commander-public-data.mjs",
+    "commander:public:publish": "node scripts/publish-mtg-commander-public-data.mjs",
     "commander:reset:corpus": "node scripts/commander-reset-corpus.mjs",
     "local:import:csv": "node scripts/import-local-csv.mjs",
     "pricing:import:source": "node scripts/import-pricing-source-snapshot.mjs",

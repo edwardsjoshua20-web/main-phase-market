@@ -170,6 +170,11 @@ async function main() {
   let detailCount = 0;
   if (deckCounts.size > 0) {
     fs.mkdirSync(DETAILS_DIR, { recursive: true });
+    for (const fileName of fs.readdirSync(DETAILS_DIR)) {
+      if (fileName.endsWith('.json')) {
+        fs.rmSync(path.join(DETAILS_DIR, fileName));
+      }
+    }
     for (const commander of commanders) {
       if (commander.deck_count <= 0) continue;
       const payload = snapshot.details.get(commander.oracle_id);
