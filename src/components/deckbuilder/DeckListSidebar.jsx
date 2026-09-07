@@ -127,7 +127,7 @@ export default function DeckListSidebar({
               <button
                 type="button"
                 onClick={() => toggleGame(group.key)}
-                className="flex w-full items-center gap-1.5 py-1.5 text-left text-xs font-bold uppercase text-slate-300 transition-colors hover:text-white"
+                className="flex w-full items-center gap-1.5 py-1.5 text-left text-[11px] font-bold uppercase text-slate-300 transition-colors hover:text-white"
                 aria-expanded={!collapsed}
               >
                 {collapsed ? <ChevronRight className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />}
