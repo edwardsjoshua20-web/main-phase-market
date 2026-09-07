@@ -1572,30 +1572,17 @@ export default function AdvancedDeckBuilder() {
             <>
               {/* Decks Sidebar */}
               <div className="flex gap-6">
-                <div className="w-56 flex-shrink-0">
-                  <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 h-fit max-h-96 overflow-y-auto sticky top-0">
-                    <h3 className="font-semibold text-white mb-3 text-sm">MY DECKS</h3>
-                    <div className="space-y-2">
-                      {decks.map(deck => (
-                        <button
-                          key={deck.id}
-                          onClick={() => setActiveDeck(deck)}
-                          className={`w-full text-left p-2.5 rounded-lg border text-sm transition-all ${
-                            activeDeck?.id === deck.id
-                              ? 'border-blue-400 bg-blue-900'
-                              : 'border-gray-700 hover:border-blue-400 hover:bg-gray-700'
-                          }`}
-                        >
-                          <p className="font-medium text-white">{deck.name}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{(activeDeck?.id === deck.id ? activeDeck : deck).items?.reduce((s, i) => s + (i.quantity || 1), 0) || 0} cards</p>
-                        </button>
-                      ))}
-                    </div>
-                    <Button onClick={() => setCreatingDeck(true)} className="w-full mt-3 h-8 text-xs bg-blue-600 hover:bg-blue-700">
-                      <Plus className="w-3 h-3 mr-1" /> New Deck
-                    </Button>
-                  </div>
-                </div>
+                <DeckListSidebar
+                  decks={decks}
+                  activeDeck={activeDeck}
+                  onSelectDeck={setActiveDeck}
+                  onCreateNew={() => setCreatingDeck(true)}
+                  creatingDeck={creatingDeck}
+                  newDeckName={newDeckName}
+                  onNameChange={setNewDeckName}
+                  onConfirmCreate={handleCreateDeck}
+                  onCancelCreate={() => setCreatingDeck(false)}
+                />
 
                 {/* Card Grid */}
                 <div className="flex-1">
