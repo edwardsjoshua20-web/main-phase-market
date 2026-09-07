@@ -77,7 +77,8 @@ export default function DeckListSidebar({
   };
 
   return (
-    <aside className="sticky top-24 h-[calc(100vh-120px)] w-60 flex-shrink-0 self-start overflow-y-auto border-r border-slate-700/60 bg-slate-950/90 px-3 py-2.5" aria-label="My decks">
+    <aside className="absolute inset-y-0 left-0 z-30 w-60 border-r border-slate-700/60 bg-slate-950/90" aria-label="My decks">
+      <div className="sticky top-[5.5rem] h-[calc(100vh-5.5rem)] overflow-y-auto px-3 py-2.5">
       <div className="flex items-center justify-between gap-2 pb-2">
         <h2 className="whitespace-nowrap text-xs font-bold uppercase text-slate-200">My Decks</h2>
         <button
@@ -168,6 +169,7 @@ export default function DeckListSidebar({
         {groupedDecks.length === 0 && (
           <p className="px-1 py-3 text-center text-[11px] text-slate-500">No decks yet</p>
         )}
+      </div>
       </div>
     </aside>
   );

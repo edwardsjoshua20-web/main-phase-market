@@ -1140,9 +1140,22 @@ export default function AdvancedDeckBuilder() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      {!isCompactLayout && (
+        <DeckListSidebar
+          decks={decks}
+          activeDeck={activeDeck}
+          onSelectDeck={setActiveDeck}
+          onCreateNew={() => setCreatingDeck(true)}
+          creatingDeck={creatingDeck && !!activeDeck}
+          newDeckName={newDeckName}
+          onNameChange={setNewDeckName}
+          onConfirmCreate={handleCreateDeck}
+          onCancelCreate={() => setCreatingDeck(false)}
+        />
+      )}
       {/* Top Bar */}
-      <div className="bg-gray-800 border-b border-gray-700 sticky top-0 z-40">
+      <div className={`bg-gray-800 border-b border-gray-700 sticky top-0 z-40 ${isCompactLayout ? '' : 'ml-60'}`}>
         <div className="max-w-full px-3 py-1.5">
           <div className="mb-1.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -1278,24 +1291,10 @@ export default function AdvancedDeckBuilder() {
         </div>
       </div>
 
-      <div className="max-w-full mx-auto">
+      <div className={`max-w-full mx-auto ${isCompactLayout ? '' : 'ml-60'}`}>
         {/* Show deck stack view when a deck is selected and has cards, otherwise show search/select view */}
         {(activeDeck && activeDeck.items && activeDeck.items.length > 0) ? (
         <div className={`min-h-[calc(100vh-140px)] ${isCompactLayout ? 'px-4 py-5' : 'flex'}`}>
-          {!isCompactLayout && (
-            <DeckListSidebar
-              decks={decks}
-              activeDeck={activeDeck}
-              onSelectDeck={setActiveDeck}
-              onCreateNew={() => setCreatingDeck(true)}
-              creatingDeck={creatingDeck}
-              newDeckName={newDeckName}
-              onNameChange={setNewDeckName}
-              onConfirmCreate={handleCreateDeck}
-              onCancelCreate={() => setCreatingDeck(false)}
-            />
-          )}
-
           {isCompactLayout ? (
             <div className="space-y-5">
               <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
@@ -1572,18 +1571,6 @@ export default function AdvancedDeckBuilder() {
             <>
               {/* Decks Sidebar */}
               <div className="flex gap-6">
-                <DeckListSidebar
-                  decks={decks}
-                  activeDeck={activeDeck}
-                  onSelectDeck={setActiveDeck}
-                  onCreateNew={() => setCreatingDeck(true)}
-                  creatingDeck={creatingDeck}
-                  newDeckName={newDeckName}
-                  onNameChange={setNewDeckName}
-                  onConfirmCreate={handleCreateDeck}
-                  onCancelCreate={() => setCreatingDeck(false)}
-                />
-
                 {/* Card Grid */}
                 <div className="flex-1">
                   {searchResults.length === 0 && activeDeck?.items?.length === 0 && !searching && (
