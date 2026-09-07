@@ -1155,7 +1155,7 @@ export default function AdvancedDeckBuilder() {
         />
       )}
       {/* Top Bar */}
-      <div className={`bg-gray-800 border-b border-gray-700 sticky top-0 z-40 ${isCompactLayout ? '' : 'ml-60'}`}>
+      <div className={`bg-gray-800 border-b border-gray-700 sticky top-0 z-40 ${isCompactLayout ? '' : 'ml-[200px]'}`}>
         <div className="max-w-full px-3 py-1.5">
           <div className="mb-1.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -1291,7 +1291,7 @@ export default function AdvancedDeckBuilder() {
         </div>
       </div>
 
-      <div className={`max-w-full mx-auto ${isCompactLayout ? '' : 'ml-60'}`}>
+      <div className={`max-w-full mx-auto ${isCompactLayout ? '' : 'ml-[200px]'}`}>
         {/* Show deck stack view when a deck is selected and has cards, otherwise show search/select view */}
         {(activeDeck && activeDeck.items && activeDeck.items.length > 0) ? (
         <div className={`min-h-[calc(100vh-140px)] ${isCompactLayout ? 'px-4 py-5' : 'flex'}`}>

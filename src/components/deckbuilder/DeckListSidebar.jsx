@@ -77,8 +77,8 @@ export default function DeckListSidebar({
   };
 
   return (
-    <aside className="absolute inset-y-0 left-0 z-30 w-60 border-r border-slate-700/60 bg-slate-950/90" aria-label="My decks">
-      <div className="sticky top-[5.5rem] h-[calc(100vh-5.5rem)] overflow-y-auto px-3 py-2.5">
+    <aside className="absolute inset-y-0 left-0 z-30 w-[200px] border-r border-slate-700/60 bg-slate-950/90" aria-label="My decks">
+      <div className="sticky top-[5.5rem] h-[calc(100vh-5.5rem)] overflow-y-auto px-3 py-2.5 [scrollbar-color:rgb(51_65_85_/_0.65)_rgb(2_6_23_/_0.35)] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-700/60 hover:[&::-webkit-scrollbar-thumb]:bg-slate-600/80 [&::-webkit-scrollbar-track]:bg-slate-950/30">
       <div className="flex items-center justify-between gap-2 pb-2">
         <h2 className="whitespace-nowrap text-xs font-bold uppercase text-slate-200">My Decks</h2>
         <button
@@ -153,7 +153,7 @@ export default function DeckListSidebar({
                         }`}
                         aria-current={selected ? 'true' : undefined}
                       >
-                        <span className="block break-words text-[13px] font-semibold leading-4">{deck.name}</span>
+                        <span className="block truncate text-[13px] font-semibold leading-4">{deck.name}</span>
                         <span className="block truncate text-[10px] leading-4 text-slate-500">
                           {formatLabel(deck.deck_format)} · {cardCount} {cardCount === 1 ? 'card' : 'cards'}
                         </span>
