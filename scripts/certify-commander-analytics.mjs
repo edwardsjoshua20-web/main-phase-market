@@ -408,6 +408,20 @@ if (fs.existsSync(manifestPath)) {
   if (manifest.analytics_version === COMMANDER_ANALYTICS_VERSION) {
     assert(manifest.dataset_version === snapshot.datasetVersion, 'Published manifest dataset version mismatches current analytics snapshot.');
     assert(manifest.active_deck_count === activeDeckRows.length && manifest.detail_count === indexRows.length, 'Published manifest counts mismatch current analytics snapshot.');
+
+    const publicIndex = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'public', 'data', 'mtg', 'commanders.json'), 'utf8'));
+    assert(publicIndex.every((row) => row.dataset_version === snapshot.datasetVersion), 'Commander index contains mixed dataset versions.');
+    assert(publicIndex.every((row) => row.analytics_version === COMMANDER_ANALYTICS_VERSION), 'Commander index contains mixed analytics versions.');
+
+    const detailsDir = path.join(process.cwd(), 'public', 'data', 'mtg', 'commander-details');
+    const detailFiles = fs.readdirSync(detailsDir).filter((fileName) => fileName.endsWith('.json'));
+    assert(detailFiles.length === manifest.detail_count, 'Published commander detail file count mismatches manifest.');
+    for (const fileName of detailFiles) {
+      const detail = JSON.parse(fs.readFileSync(path.join(detailsDir, fileName), 'utf8'));
+      assert(detail.dataset_version === snapshot.datasetVersion, `Commander detail ${fileName} has a mismatched dataset version.`);
+      assert(detail.analytics_version === COMMANDER_ANALYTICS_VERSION, `Commander detail ${fileName} has a mismatched analytics version.`);
+      assert(detail.sample_confidence?.tier, `Commander detail ${fileName} is missing sample confidence metadata.`);
+    }
   }
 }
 

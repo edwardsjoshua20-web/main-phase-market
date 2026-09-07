@@ -78,7 +78,7 @@ function isCommander(row, commanderOracleIds) {
   return commanderOracleIds.has(row.oracle_id);
 }
 
-function toCommander(row, deckCounts) {
+function toCommander(row, deckCounts, snapshot) {
   const deckCount = Number(deckCounts.get(row.oracle_id) || 0);
   const sampleConfidence = getCommanderSampleConfidence(deckCount);
   return {
@@ -101,6 +101,8 @@ function toCommander(row, deckCounts) {
     set_code: row.set_code || '',
     rarity: row.rarity || '',
     deck_count: deckCount,
+    dataset_version: snapshot.datasetVersion,
+    analytics_version: COMMANDER_ANALYTICS_VERSION,
     confidence_tier: sampleConfidence.tier,
     analytics_eligible: sampleConfidence.analytics_eligible,
     legal_commander: Boolean(row.legal_commander),
@@ -162,7 +164,7 @@ async function main() {
         continue;
       }
 
-      const candidate = toCommander(row, deckCounts);
+      const candidate = toCommander(row, deckCounts, snapshot);
       const existing = commandersByOracleId.get(row.oracle_id);
       if (!existing || compareCommanderRows(candidate, existing) < 0) {
         commandersByOracleId.set(row.oracle_id, candidate);
@@ -189,7 +191,11 @@ async function main() {
       const payload = snapshot.details.get(commander.oracle_id);
       if (!payload?.has_local_data) continue;
       const outputPath = path.join(DETAILS_DIR, `${commander.oracle_id}.json`);
-      fs.writeFileSync(outputPath, `${JSON.stringify(makeHostedPayload(payload))}\n`);
+      fs.writeFileSync(outputPath, `${JSON.stringify(makeHostedPayload({
+        ...payload,
+        dataset_version: snapshot.datasetVersion,
+        analytics_version: COMMANDER_ANALYTICS_VERSION
+      }))}\n`);
       detailCount += 1;
     }
   }
