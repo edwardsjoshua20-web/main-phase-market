@@ -1161,21 +1161,25 @@ export default function AdvancedDeckBuilder() {
       )}
       {/* Top Bar */}
       <div className={`bg-gray-800 border-b border-gray-700 sticky top-0 z-40 ${isCompactLayout ? '' : 'ml-[200px]'}`}>
-        <div className="max-w-full px-3 py-2">
+        <div className="max-w-full px-3 py-1.5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-lg font-bold leading-5 text-white">
-                {activeDeck?.name || 'Advanced Deck Builder'}
-              </h1>
+              <div className="flex min-w-0 items-center gap-2">
+                <h1 className="truncate text-lg font-bold leading-5 text-white">
+                  {activeDeck?.name || 'Advanced Deck Builder'}
+                </h1>
+                {activeDeck && (
+                  <div className={`flex shrink-0 items-center gap-1 text-[10px] font-bold uppercase ${activeValidation.isLegal ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${activeValidation.isLegal ? 'bg-emerald-400' : 'bg-red-400'}`} aria-hidden="true" />
+                    {activeValidation.isLegal ? 'Legal' : 'Not Legal'}
+                  </div>
+                )}
+              </div>
               {activeDeck && (
                 <>
                   <p className="mt-0.5 truncate text-[11px] leading-4 text-slate-400">
                     {activeFormat.name} · {totalCards} cards · {activeDeck.items?.length || 0} unique · ${activeDeck.estimated_cost?.toFixed(2) || '0.00'}
                   </p>
-                  <div className={`mt-0.5 flex items-center gap-1 text-[10px] font-bold uppercase ${activeValidation.isLegal ? 'text-emerald-400' : 'text-red-400'}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${activeValidation.isLegal ? 'bg-emerald-400' : 'bg-red-400'}`} aria-hidden="true" />
-                    {activeValidation.isLegal ? 'Legal' : 'Not Legal'}
-                  </div>
                   {!activeValidation.isLegal && activeValidation.errors.length > 0 && (
                     <p className="mt-0.5 max-w-xl truncate text-[10px] text-red-300" title={activeValidation.errors.join(' | ')}>
                       {activeValidation.errors.slice(0, 2).join(' | ')}
@@ -1240,7 +1244,7 @@ export default function AdvancedDeckBuilder() {
           </div>
 
           {/* Search and Controls */}
-          <div className={`mt-1.5 flex gap-2 border-t border-slate-700/70 pt-1.5 ${isCompactLayout ? 'flex-col items-stretch' : 'items-center'}`}>
+          <div className={`mt-1 flex gap-2 border-t border-slate-700/70 pt-1 ${isCompactLayout ? 'flex-col items-stretch' : 'items-center'}`}>
             {activeDeck && (
               <button
                 type="button"
