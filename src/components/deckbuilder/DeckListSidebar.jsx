@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { normalizeDeckGame } from '@/lib/deckSections';
 
@@ -34,8 +34,6 @@ export default function DeckListSidebar({
   onCancelCreate
 }) {
   const [collapsedGames, setCollapsedGames] = useState(() => new Set());
-  const [showSearch, setShowSearch] = useState(false);
-  const [query, setQuery] = useState('');
   const activeGame = normalizeDeckGame(activeDeck?.game);
 
   useEffect(() => {
@@ -50,10 +48,8 @@ export default function DeckListSidebar({
 
   const groupedDecks = useMemo(() => {
     const groups = new Map();
-    const normalizedQuery = query.trim().toLowerCase();
 
     decks.forEach((deck) => {
-      if (normalizedQuery && !String(deck.name || '').toLowerCase().includes(normalizedQuery)) return;
       const game = normalizeDeckGame(deck.game);
       if (!groups.has(game)) groups.set(game, []);
       groups.get(game).push(deck);
@@ -69,7 +65,7 @@ export default function DeckListSidebar({
       .sort((a, b) => a.label.localeCompare(b.label));
 
     return [...knownGroups, ...otherGroups];
-  }, [decks, query]);
+  }, [decks]);
 
   const toggleGame = (game) => {
     setCollapsedGames((current) => {
@@ -80,46 +76,18 @@ export default function DeckListSidebar({
     });
   };
 
-  const closeSearch = () => {
-    setQuery('');
-    setShowSearch(false);
-  };
-
   return (
     <aside className="sticky top-24 h-[calc(100vh-120px)] w-44 flex-shrink-0 self-start overflow-y-auto border-r border-slate-700/60 bg-slate-900/80 px-2 py-2" aria-label="My decks">
       <div className="flex items-center justify-between gap-1 pb-1.5">
-        <h2 className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-300">My Decks</h2>
-        <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={() => showSearch ? closeSearch() : setShowSearch(true)}
-            className="flex h-6 w-6 items-center justify-center text-slate-500 transition-colors hover:text-slate-200"
-            aria-label={showSearch ? 'Close deck search' : 'Search decks'}
-            title={showSearch ? 'Close search' : 'Search decks'}
-          >
-            {showSearch ? <X className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
-          </button>
-          <button
-            type="button"
-            onClick={onCreateNew}
-            className="flex h-6 items-center gap-0.5 px-1 text-[11px] font-semibold text-blue-300 transition-colors hover:text-blue-100"
-          >
-            <Plus className="h-3 w-3" /> New Deck
-          </button>
-        </div>
+        <h2 className="whitespace-nowrap text-[11px] font-bold uppercase text-slate-300">My Decks</h2>
+        <button
+          type="button"
+          onClick={onCreateNew}
+          className="flex h-6 shrink-0 items-center gap-0.5 px-1 text-[11px] font-semibold text-blue-300 transition-colors hover:text-blue-100"
+        >
+          <Plus className="h-3 w-3" /> New Deck
+        </button>
       </div>
-
-      {showSearch && (
-        <div className="pb-2">
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Filter decks..."
-            autoFocus
-            className="h-7 rounded-sm border-slate-700 bg-slate-950/70 px-2 text-xs text-white placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-blue-500"
-          />
-        </div>
-      )}
 
       {creatingDeck && (
         <div className="mb-2 border-y border-slate-700/60 py-2">
@@ -158,7 +126,7 @@ export default function DeckListSidebar({
               <button
                 type="button"
                 onClick={() => toggleGame(group.key)}
-                className="flex w-full items-center gap-1 py-1 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 transition-colors hover:text-slate-200"
+                className="flex w-full items-center gap-1 py-1 text-left text-[10px] font-semibold text-slate-400 transition-colors hover:text-slate-200"
                 aria-expanded={!collapsed}
               >
                 {collapsed ? <ChevronRight className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />}
@@ -198,9 +166,7 @@ export default function DeckListSidebar({
         })}
 
         {groupedDecks.length === 0 && (
-          <p className="px-1 py-3 text-center text-[11px] text-slate-500">
-            {query ? 'No matching decks' : 'No decks yet'}
-          </p>
+          <p className="px-1 py-3 text-center text-[11px] text-slate-500">No decks yet</p>
         )}
       </div>
     </aside>
