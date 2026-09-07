@@ -35,7 +35,11 @@ export function createEmptyCommanderPageState() {
     activeTheme: '',
     activeMode: 'commander',
     totalDecks: 0,
-    hasLocalData: false
+    hasLocalData: false,
+    hasAnalyticsData: false,
+    sampleConfidence: null,
+    analyticsSuppressed: false,
+    averageDeckKind: null
   };
 }
 
@@ -54,7 +58,11 @@ export function normalizeCommanderPagePayload(pagePayload) {
     activeTheme: pagePayload?.active_theme || '',
     activeMode: pagePayload?.active_mode || 'commander',
     totalDecks: pagePayload?.total_decks || 0,
-    hasLocalData: Boolean(pagePayload?.has_local_data)
+    hasLocalData: Boolean(pagePayload?.has_local_data),
+    hasAnalyticsData: Boolean(pagePayload?.has_analytics_data),
+    sampleConfidence: pagePayload?.sample_confidence || null,
+    analyticsSuppressed: Boolean(pagePayload?.analytics_suppressed),
+    averageDeckKind: pagePayload?.average_deck_kind || null
   };
 }
 

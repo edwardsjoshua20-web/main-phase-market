@@ -4,6 +4,11 @@ import {
   getMtgCommanderPublicSnapshot,
   refreshMtgCommanderEngine
 } from '../server/mtgCommanderEngine.mjs';
+import {
+  COMMANDER_ANALYTICS_VERSION,
+  COMMANDER_SAMPLE_THRESHOLDS,
+  getCommanderSampleConfidence
+} from '../server/mtgCommanderAnalyticsPolicy.mjs';
 
 const PROJECT_ROOT = process.cwd();
 const SEARCH_SHARDS_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'search-shards');
@@ -74,6 +79,8 @@ function isCommander(row, commanderOracleIds) {
 }
 
 function toCommander(row, deckCounts) {
+  const deckCount = Number(deckCounts.get(row.oracle_id) || 0);
+  const sampleConfidence = getCommanderSampleConfidence(deckCount);
   return {
     id: row.id,
     oracle_id: row.oracle_id,
@@ -93,7 +100,9 @@ function toCommander(row, deckCounts) {
     set_name: row.set_name || '',
     set_code: row.set_code || '',
     rarity: row.rarity || '',
-    deck_count: Number(deckCounts.get(row.oracle_id) || 0),
+    deck_count: deckCount,
+    confidence_tier: sampleConfidence.tier,
+    analytics_eligible: sampleConfidence.analytics_eligible,
     legal_commander: Boolean(row.legal_commander),
     can_be_commander: true,
     game: 'magic'
@@ -193,6 +202,8 @@ async function main() {
 
   fs.writeFileSync(MANIFEST_PATH, `${JSON.stringify({
     dataset_version: snapshot.datasetVersion,
+    analytics_version: COMMANDER_ANALYTICS_VERSION,
+    sample_thresholds: COMMANDER_SAMPLE_THRESHOLDS,
     generated_at: snapshot.generatedAt,
     active_deck_count: snapshot.activeDeckCount,
     index_deck_total: snapshot.indexDeckTotal,

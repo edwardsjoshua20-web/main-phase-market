@@ -3,9 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db } from './db.mjs';
 import { ensureCommanderCorpusTables } from './mtgCommanderCorpus.mjs';
+import {
+  COMMANDER_ANALYTICS_VERSION,
+  COMMANDER_PRESENTABLE_THEME_SLUGS,
+  COMMANDER_SAMPLE_THRESHOLDS,
+  getCommanderSampleConfidence
+} from './mtgCommanderAnalyticsPolicy.mjs';
 
 const mtgSearchDir = path.join(process.cwd(), 'public', 'data', 'mtg', 'search');
-const INDEX_VERSION = 5;
+const INDEX_VERSION = 6;
 const COMMANDER_CATEGORY_ORDER = [
   'creatures',
   'instants',
@@ -177,6 +183,7 @@ function buildCardLookup(rows) {
       image_url: primary.image_normal || primary.image_small || null,
       image_art_crop: primary.image_art_crop || null,
       mana_cost: primary.mana_cost || '',
+      cmc: Number.isFinite(Number(primary.cmc)) ? Number(primary.cmc) : null,
       type_line: primary.type_line || '',
       oracle_text: primary.oracle_text || '',
       released_at: primary.released_at || null,
@@ -195,6 +202,7 @@ function persistCardLookup(lookup) {
     image_url: card.image_url || null,
     image_art_crop: card.image_art_crop || null,
     mana_cost: card.mana_cost || '',
+    cmc: card.cmc,
     type_line: card.type_line || '',
     oracle_text: card.oracle_text || '',
     released_at: card.released_at || null,
@@ -226,6 +234,7 @@ function loadCardLookupFromDb() {
       image_url: row.image_url || null,
       image_art_crop: row.image_art_crop || null,
       mana_cost: row.mana_cost || '',
+      cmc: row.cmc === null || row.cmc === undefined ? null : Number(row.cmc),
       type_line: row.type_line || '',
       oracle_text: row.oracle_text || '',
       released_at: row.released_at || null,
@@ -329,6 +338,7 @@ function categoryLabel(category) {
 
 function mapCommanderRow(row) {
   if (!row) return null;
+  const sampleConfidence = getCommanderSampleConfidence(row.deck_count);
   return {
     oracle_id: row.oracle_id,
     name: row.name,
@@ -341,7 +351,9 @@ function mapCommanderRow(row) {
     released_at: row.released_at || null,
     color_identity: parseJsonArray(row.color_identity_json),
     deck_count: Number(row.deck_count || 0),
-    rank: Number(row.rank || 0)
+    rank: sampleConfidence.ranking_eligible ? Number(row.rank || 0) : null,
+    confidence_tier: sampleConfidence.tier,
+    analytics_eligible: sampleConfidence.analytics_eligible
   };
 }
 
@@ -351,6 +363,7 @@ function mapStatRow(row) {
     card_name: row.card_name,
     image_url: row.image_url || null,
     mana_cost: row.mana_cost || '',
+    cmc: row.cmc === null || row.cmc === undefined ? null : Number(row.cmc),
     type_line: row.type_line || '',
     oracle_text: row.oracle_text || '',
     color_identity: parseJsonArray(row.color_identity_json),
@@ -399,7 +412,7 @@ function classifyDeckType(typeLine) {
   if (type.includes('sorcery')) return 'Sorcery';
   if (type.includes('planeswalker')) return 'Planeswalker';
   if (type.includes('battle')) return 'Battle';
-  return 'Battle';
+  return 'Other';
 }
 
 function parseManaValue(manaCost) {
@@ -420,6 +433,17 @@ function parseManaValue(manaCost) {
   }
 
   return total;
+}
+
+function getManaValue(card) {
+  if (card?.cmc === null || card?.cmc === undefined || card?.cmc === '') {
+    return parseManaValue(card?.mana_cost || '');
+  }
+  const catalogManaValue = Number(card?.cmc);
+  if (Number.isFinite(catalogManaValue) && catalogManaValue >= 0) {
+    return catalogManaValue;
+  }
+  return parseManaValue(card?.mana_cost || '');
 }
 
 function clampNumber(value, min, max) {
@@ -747,6 +771,7 @@ function ensureCommanderTables() {
       card_name_lower TEXT NOT NULL,
       image_url TEXT,
       mana_cost TEXT,
+      cmc REAL,
       type_line TEXT,
       oracle_text TEXT,
       color_identity_json TEXT NOT NULL,
@@ -778,6 +803,7 @@ function ensureCommanderTables() {
       image_url TEXT,
       image_art_crop TEXT,
       mana_cost TEXT,
+      cmc REAL,
       type_line TEXT,
       oracle_text TEXT,
       released_at TEXT,
@@ -787,6 +813,8 @@ function ensureCommanderTables() {
   `);
 
   ensureColumn('mtg_commander_card_stats', 'released_at', 'TEXT');
+  ensureColumn('mtg_commander_card_stats', 'cmc', 'REAL');
+  ensureColumn('mtg_card_lookup', 'cmc', 'REAL');
 }
 
 ensureCommanderCorpusTables();
@@ -817,22 +845,22 @@ const insertCommanderIndexStmt = db.prepare(`
 const insertCommanderStatStmt = db.prepare(`
   INSERT INTO mtg_commander_card_stats (
     commander_oracle_id, commander_name, card_oracle_id, card_name, card_name_lower, image_url,
-    mana_cost, type_line, oracle_text, color_identity_json, deck_count, total_commander_decks,
+    mana_cost, cmc, type_line, oracle_text, color_identity_json, deck_count, total_commander_decks,
     inclusion_rate, global_deck_count, total_global_decks, global_inclusion_rate, synergy_score,
     confidence_score, weighted_score, category, released_at
   ) VALUES (
     @commander_oracle_id, @commander_name, @card_oracle_id, @card_name, @card_name_lower, @image_url,
-    @mana_cost, @type_line, @oracle_text, @color_identity_json, @deck_count, @total_commander_decks,
+    @mana_cost, @cmc, @type_line, @oracle_text, @color_identity_json, @deck_count, @total_commander_decks,
     @inclusion_rate, @global_deck_count, @total_global_decks, @global_inclusion_rate, @synergy_score,
     @confidence_score, @weighted_score, @category, @released_at
   )
 `);
 const insertCardLookupStmt = db.prepare(`
   INSERT INTO mtg_card_lookup (
-    oracle_id, name, name_normalized, image_url, image_art_crop, mana_cost,
+    oracle_id, name, name_normalized, image_url, image_art_crop, mana_cost, cmc,
     type_line, oracle_text, released_at, color_identity_json
   ) VALUES (
-    @oracle_id, @name, @name_normalized, @image_url, @image_art_crop, @mana_cost,
+    @oracle_id, @name, @name_normalized, @image_url, @image_art_crop, @mana_cost, @cmc,
     @type_line, @oracle_text, @released_at, @color_identity_json
   )
 `);
@@ -922,6 +950,21 @@ function rebuildCommanderStats() {
       GROUP BY card_oracle_id
     `).all().map((row) => [row.card_oracle_id, Number(row.deck_count || 0)])
   );
+  const deckCountsByColorMask = new Map(
+    db.prepare(`
+      SELECT idx.color_mask, COUNT(*) AS deck_count
+      FROM mtg_commander_corpus_decks decks
+      INNER JOIN mtg_commander_index idx ON idx.oracle_id = decks.commander_oracle_id
+      WHERE decks.${VALID_CORPUS_DECK_SQL}
+      GROUP BY idx.color_mask
+    `).all().map((row) => [Number(row.color_mask || 0), Number(row.deck_count || 0)])
+  );
+  const eligibleDeckCount = (cardColors) => {
+    const cardMask = computeColorMask(cardColors);
+    return [...deckCountsByColorMask.entries()].reduce((sum, [deckMask, deckCount]) => (
+      (deckMask & cardMask) === cardMask ? sum + deckCount : sum
+    ), 0);
+  };
 
   const commanderRows = db.prepare(`
     SELECT commander_oracle_id, commander_name, COUNT(*) AS deck_count
@@ -970,6 +1013,7 @@ function rebuildCommanderStats() {
         image_url: null,
         image_art_crop: null,
         mana_cost: '',
+        cmc: null,
         type_line: '',
         oracle_text: '',
         released_at: null,
@@ -978,7 +1022,8 @@ function rebuildCommanderStats() {
 
       const inclusionRate = deckCount / totalCommanderDecks;
       const globalDeckCount = globalCounts.get(row.card_oracle_id) || 0;
-      const globalInclusionRate = totalGlobalDecks > 0 ? globalDeckCount / totalGlobalDecks : 0;
+      const totalEligibleDecks = eligibleDeckCount(cardMeta.color_identity || []);
+      const globalInclusionRate = totalEligibleDecks > 0 ? globalDeckCount / totalEligibleDecks : 0;
       const synergyScore = inclusionRate - globalInclusionRate;
       const confidenceScore = Math.tanh(deckCount / 20);
       const weightedScore = synergyScore * confidenceScore;
@@ -994,6 +1039,7 @@ function rebuildCommanderStats() {
         card_name_lower: cardMeta.name_normalized || normalizeText(row.card_name || 'Unknown Card'),
         image_url: cardMeta.image_url || null,
         mana_cost: cardMeta.mana_cost || '',
+        cmc: cardMeta.cmc,
         type_line: cardMeta.type_line || '',
         oracle_text: cardMeta.oracle_text || '',
         color_identity_json: JSON.stringify(cardMeta.color_identity || []),
@@ -1001,7 +1047,7 @@ function rebuildCommanderStats() {
         total_commander_decks: totalCommanderDecks,
         inclusion_rate: inclusionRate,
         global_deck_count: globalDeckCount,
-        total_global_decks: totalGlobalDecks,
+        total_global_decks: totalEligibleDecks,
         global_inclusion_rate: globalInclusionRate,
         synergy_score: synergyScore,
         confidence_score: confidenceScore,
@@ -1110,30 +1156,38 @@ export function getMtgCommanderPublicSnapshot() {
           `Commander detail mismatch for ${row.oracle_id}: detail=${payload.total_decks}, index=${row.deck_count}`
         );
       }
-      if (Number(payload.average_deck_profile?.total_decks || 0) !== Number(row.deck_count || 0)) {
+      const sampleConfidence = getCommanderSampleConfidence(row.deck_count);
+      const expectedAverageDeckCount = sampleConfidence.analytics_eligible ? Number(row.deck_count || 0) : 0;
+      if (Number(payload.average_deck_profile?.total_decks || 0) !== expectedAverageDeckCount) {
         throw new Error(
-          `Commander average-deck mismatch for ${row.oracle_id}: profile=${payload.average_deck_profile?.total_decks}, index=${row.deck_count}`
+          `Commander average-deck mismatch for ${row.oracle_id}: profile=${payload.average_deck_profile?.total_decks}, expected=${expectedAverageDeckCount}`
         );
       }
       details.set(row.oracle_id, payload);
     }
 
     const denominatorRows = db.prepare(`
-      SELECT DISTINCT total_global_decks
+      SELECT global_deck_count, total_global_decks
       FROM mtg_commander_card_stats
-      WHERE total_global_decks > 0
     `).all();
-    if (denominatorRows.some((row) => Number(row.total_global_decks || 0) !== activeDecks.length)) {
-      throw new Error('Commander stats were not built from the active corpus snapshot.');
+    if (denominatorRows.some((row) => (
+      Number(row.total_global_decks || 0) <= 0
+      || Number(row.total_global_decks || 0) > activeDecks.length
+      || Number(row.global_deck_count || 0) > Number(row.total_global_decks || 0)
+    ))) {
+      throw new Error('Commander stats contain an invalid color-eligible global baseline.');
     }
 
     const revisionSeed = activeDecks
       .map((deck) => `${deck.source_identity || deck.deck_key}:${deck.content_hash || ''}:${deck.commander_oracle_id}`)
+      .concat(`analytics:${COMMANDER_ANALYTICS_VERSION}`)
       .join('|');
     const datasetVersion = crypto.createHash('sha256').update(revisionSeed).digest('hex').slice(0, 16);
 
     return {
       datasetVersion,
+      analyticsVersion: COMMANDER_ANALYTICS_VERSION,
+      sampleThresholds: COMMANDER_SAMPLE_THRESHOLDS,
       generatedAt: new Date().toISOString(),
       activeDeckCount: activeDecks.length,
       indexDeckTotal,
@@ -1301,6 +1355,7 @@ function buildGameChangers(statRows, totalDecks) {
 
 function buildRelatedCommanders(commanderRow, statRows) {
   const signatureCards = statRows
+    .filter((row) => !shouldOmitFromRecommendations(row))
     .filter((row) => Number(row.weighted_score || 0) > 0)
     .slice(0, 8)
     .map((row) => row.card_oracle_id);
@@ -1333,9 +1388,10 @@ function buildRelatedCommanders(commanderRow, statRows) {
       ON idx.oracle_id = stats.commander_oracle_id
     WHERE stats.card_oracle_id IN (${placeholders})
       AND stats.commander_oracle_id <> @oracleId
-      AND idx.deck_count > 0
-      AND (idx.color_mask & @colorMask) = @colorMask
+      AND idx.deck_count >= 10
+      AND idx.color_mask = @colorMask
     GROUP BY idx.oracle_id
+    HAVING COUNT(*) >= 2
     ORDER BY shared_cards DESC, idx.deck_count DESC, idx.name_normalized ASC
     LIMIT 6
   `).all(params);
@@ -1396,13 +1452,13 @@ function buildAverageDeckProfile(oracleId) {
       continue;
     }
 
-    const manaValue = parseManaValue(card?.mana_cost || '');
+    const manaValue = getManaValue(card);
     if (manaValue === null) continue;
     const bucket = Math.min(manaValue, 7);
     manaTotals.set(bucket, (manaTotals.get(bucket) || 0) + quantity);
   }
 
-  const typeOrder = ['Land', 'Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Planeswalker', 'Battle'];
+  const typeOrder = ['Land', 'Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Planeswalker', 'Battle', 'Other'];
   const typeDistribution = typeOrder
     .filter((label) => typeTotals.has(label))
     .map((label) => ({
@@ -1492,8 +1548,8 @@ function getDeckCardsByDeckKeys(deckKeys) {
   `).all(...deckKeys);
 }
 
-function getGlobalCardCounts() {
-  return new Map(
+function getGlobalCardBaselines() {
+  const globalCounts = new Map(
     db.prepare(`
       SELECT card_oracle_id, COUNT(DISTINCT cards.deck_key) AS deck_count
       FROM mtg_commander_corpus_cards cards
@@ -1504,6 +1560,23 @@ function getGlobalCardCounts() {
       GROUP BY card_oracle_id
     `).all().map((row) => [row.card_oracle_id, Number(row.deck_count || 0)])
   );
+  const deckCountsByColorMask = new Map(
+    db.prepare(`
+      SELECT idx.color_mask, COUNT(*) AS deck_count
+      FROM mtg_commander_corpus_decks decks
+      INNER JOIN mtg_commander_index idx ON idx.oracle_id = decks.commander_oracle_id
+      WHERE decks.${VALID_CORPUS_DECK_SQL}
+      GROUP BY idx.color_mask
+    `).all().map((row) => [Number(row.color_mask || 0), Number(row.deck_count || 0)])
+  );
+  const cardLookup = getCardLookup();
+  return new Map([...globalCounts.entries()].map(([oracleId, deckCount]) => {
+    const cardMask = computeColorMask(cardLookup.get(oracleId)?.color_identity || []);
+    const totalDecks = [...deckCountsByColorMask.entries()].reduce((sum, [deckMask, count]) => (
+      (deckMask & cardMask) === cardMask ? sum + count : sum
+    ), 0);
+    return [oracleId, { deck_count: deckCount, total_decks: totalDecks }];
+  }));
 }
 
 function buildDeckCorpus(oracleId) {
@@ -1529,6 +1602,7 @@ function buildDeckCorpus(oracleId) {
       type_line: cardMeta?.type_line || '',
       oracle_text: cardMeta?.oracle_text || '',
       mana_cost: cardMeta?.mana_cost || '',
+      cmc: cardMeta?.cmc,
       released_at: cardMeta?.released_at || null,
       color_identity: cardMeta?.color_identity || [],
       image_url: cardMeta?.image_url || null
@@ -1562,6 +1636,7 @@ function buildDeckCorpusFromRows(deckRows) {
       type_line: cardMeta?.type_line || '',
       oracle_text: cardMeta?.oracle_text || '',
       mana_cost: cardMeta?.mana_cost || '',
+      cmc: cardMeta?.cmc,
       released_at: cardMeta?.released_at || null,
       color_identity: cardMeta?.color_identity || [],
       image_url: cardMeta?.image_url || null
@@ -1614,8 +1689,7 @@ function inferDeckThemes(deck) {
   const comboCount = sumDeckQuantity(cards, (card) => {
     const text = String(card.oracle_text || '').toLowerCase();
     const name = String(card.name || '').toLowerCase();
-    return text.includes('search your library')
-      || text.includes('you may cast')
+    return text.includes('you may cast')
       || text.includes('draw a card whenever')
       || name.includes('curiosity')
       || name.includes('ophidian eye')
@@ -1728,6 +1802,7 @@ function buildThemeSummary(decks) {
   }
 
   return COMMANDER_THEME_DEFINITIONS
+    .filter((theme) => COMMANDER_PRESENTABLE_THEME_SLUGS.has(theme.slug))
     .map((theme) => ({
       ...theme,
       deck_count: Number(counts.get(theme.slug) || 0),
@@ -1782,7 +1857,7 @@ function buildDeckSnapshot(deck) {
       if (color) colorIdentity.add(String(color).toUpperCase());
     }
     if (!typeLine.includes('land')) {
-      const manaValue = parseManaValue(card.mana_cost || '');
+      const manaValue = getManaValue(card);
       if (manaValue !== null) {
         const bucket = Math.min(manaValue, 7);
         manaCurve[bucket] += quantity;
@@ -1806,12 +1881,12 @@ function buildDeckSnapshot(deck) {
     planeswalkers: countDeckSignal(cards, (card) => getTypeLine(card).includes('planeswalker')),
     lowCurve: countDeckSignal(cards, (card) => {
       if (isLandCard(card)) return false;
-      const manaValue = parseManaValue(card.mana_cost || '');
+      const manaValue = getManaValue(card);
       return manaValue !== null && manaValue <= 2;
     }),
     highCurve: countDeckSignal(cards, (card) => {
       if (isLandCard(card)) return false;
-      const manaValue = parseManaValue(card.mana_cost || '');
+      const manaValue = getManaValue(card);
       return manaValue !== null && manaValue >= 5;
     }),
     ramp: countDeckSignal(cards, isRampCard),
@@ -2287,7 +2362,7 @@ function warmSimulationGauntletsSoon() {
   timer.unref?.();
 }
 
-function buildSliceStats(commanderRow, decks, totalGlobalDecks, globalCardCounts) {
+function buildSliceStats(commanderRow, decks, globalCardBaselines) {
   if (!decks.length) {
     return [];
   }
@@ -2315,7 +2390,9 @@ function buildSliceStats(commanderRow, decks, totalGlobalDecks, globalCardCounts
       const deckCount = Number(value.deck_count || 0);
       const totalDecks = decks.length;
       const inclusionRate = totalDecks > 0 ? deckCount / totalDecks : 0;
-      const globalDeckCount = Number(globalCardCounts.get(cardOracleId) || 0);
+      const globalBaseline = globalCardBaselines.get(cardOracleId) || { deck_count: 0, total_decks: 0 };
+      const globalDeckCount = Number(globalBaseline.deck_count || 0);
+      const totalGlobalDecks = Number(globalBaseline.total_decks || 0);
       const globalInclusionRate = totalGlobalDecks > 0 ? globalDeckCount / totalGlobalDecks : 0;
       const synergyScore = inclusionRate - globalInclusionRate;
       const confidenceScore = Math.tanh(deckCount / 20);
@@ -2330,6 +2407,7 @@ function buildSliceStats(commanderRow, decks, totalGlobalDecks, globalCardCounts
         card_name_lower: normalizeText(cardMeta.name),
         image_url: cardMeta.image_url || null,
         mana_cost: cardMeta.mana_cost || '',
+        cmc: cardMeta.cmc,
         type_line: cardMeta.type_line || '',
         oracle_text: cardMeta.oracle_text || '',
         color_identity_json: JSON.stringify(cardMeta.color_identity || []),
@@ -2374,7 +2452,7 @@ function buildAverageDeckProfileFromDecks(decks) {
       totalCards += quantity;
 
       if (typeLabel === 'Land') continue;
-      const manaValue = parseManaValue(card.mana_cost || '');
+      const manaValue = getManaValue(card);
       if (manaValue === null) continue;
       const bucket = Math.min(manaValue, 7);
       manaTotals.set(bucket, (manaTotals.get(bucket) || 0) + quantity);
@@ -2382,7 +2460,7 @@ function buildAverageDeckProfileFromDecks(decks) {
   }
 
   const deckCount = decks.length;
-  const typeOrder = ['Land', 'Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Planeswalker', 'Battle'];
+  const typeOrder = ['Land', 'Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Planeswalker', 'Battle', 'Other'];
   const typeDistribution = typeOrder
     .filter((label) => typeTotals.has(label))
     .map((label) => ({
@@ -2512,16 +2590,16 @@ export function getMtgCommanderPage(oracleId, options = {}) {
 
   const activeMode = String(options.mode || 'commander').toLowerCase();
   const requestedTheme = normalizeText(options.theme || '').replace(/\s+/g, '-');
-  const totalGlobalDecks = Number(countCorpusDecksStmt.get()?.count || 0);
   const baseDecks = activeMode === 'card' ? buildCardDeckCorpus(oracleId) : buildDeckCorpus(oracleId);
-  const themeOptions = buildThemeSummary(baseDecks);
+  const baseSampleConfidence = getCommanderSampleConfidence(baseDecks.length);
+  const themeOptions = baseSampleConfidence.analytics_eligible ? buildThemeSummary(baseDecks) : [];
   const activeTheme = themeOptions.some((theme) => theme.slug === requestedTheme) ? requestedTheme : '';
   const slicedDecks = filterDecksByTheme(baseDecks, activeTheme);
   const statRows = activeMode === 'card'
-    ? buildSliceStats(commanderRow, slicedDecks, totalGlobalDecks, getGlobalCardCounts())
+    ? buildSliceStats(commanderRow, slicedDecks, getGlobalCardBaselines())
       .filter((row) => row.card_oracle_id !== oracleId)
     : activeTheme
-      ? buildSliceStats(commanderRow, slicedDecks, totalGlobalDecks, getGlobalCardCounts())
+      ? buildSliceStats(commanderRow, slicedDecks, getGlobalCardBaselines())
       : selectCommanderStats(oracleId);
   const commander = mapCommanderRow(commanderRow);
   const totalDecks = activeMode === 'card'
@@ -2530,14 +2608,16 @@ export function getMtgCommanderPage(oracleId, options = {}) {
       ? slicedDecks.length
       : Number(statRows[0]?.total_commander_decks || commander.deck_count || 0);
   const hasLocalData = statRows.length > 0 && totalDecks > 0;
+  const sampleConfidence = getCommanderSampleConfidence(totalDecks);
+  const hasAnalyticsData = hasLocalData && sampleConfidence.analytics_eligible;
   const topCommanders = activeMode === 'card' && totalDecks > 0 ? buildTopCommanderRows(slicedDecks) : [];
 
-  const topSynergyCards = hasLocalData ? buildTopSynergy(statRows) : [];
-  const newCards = hasLocalData ? buildNewCards(statRows) : [];
-  const gameChangers = hasLocalData ? buildGameChangers(statRows, totalDecks) : [];
-  const categories = hasLocalData ? buildCategorySections(statRows) : [];
-  const relatedCommanders = hasLocalData && activeMode !== 'card' ? buildRelatedCommanders(commanderRow, statRows) : [];
-  const averageDeckProfile = hasLocalData ? (
+  const topSynergyCards = hasAnalyticsData ? buildTopSynergy(statRows) : [];
+  const newCards = hasAnalyticsData ? buildNewCards(statRows) : [];
+  const gameChangers = hasAnalyticsData ? buildGameChangers(statRows, totalDecks) : [];
+  const categories = hasAnalyticsData ? buildCategorySections(statRows) : [];
+  const relatedCommanders = hasAnalyticsData && activeMode !== 'card' ? buildRelatedCommanders(commanderRow, statRows) : [];
+  const averageDeckProfile = hasAnalyticsData ? (
     activeMode === 'card' || activeTheme ? buildAverageDeckProfileFromDecks(slicedDecks) : buildAverageDeckProfile(oracleId)
   ) : {
     total_decks: 0,
@@ -2545,11 +2625,15 @@ export function getMtgCommanderPage(oracleId, options = {}) {
     type_distribution: [],
     mana_curve: []
   };
-  const averageDeckSections = hasLocalData ? buildAverageDeckSections(statRows, averageDeckProfile) : [];
+  const averageDeckSections = hasAnalyticsData ? buildAverageDeckSections(statRows, averageDeckProfile) : [];
   const deckRows = hasLocalData ? buildDeckModeRows(activeTheme ? slicedDecks : baseDecks) : [];
 
   return {
     has_local_data: hasLocalData,
+    has_analytics_data: hasAnalyticsData,
+    sample_confidence: sampleConfidence,
+    analytics_suppressed: hasLocalData && !hasAnalyticsData,
+    average_deck_kind: hasAnalyticsData ? 'synthetic_profile' : null,
     active_mode: activeMode,
     active_theme: activeTheme,
     theme_options: themeOptions,

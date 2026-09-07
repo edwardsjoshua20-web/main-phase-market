@@ -50,6 +50,7 @@
     "commander:clean:unresolved-archidekt": "node scripts/commander-clean-unresolved-archidekt.mjs",
     "commander:repair:near-miss": "node scripts/commander-repair-near-miss.mjs",
     "commander:ingest:certify": "node scripts/certify-commander-ingestion.mjs",
+    "commander:analytics:certify": "node scripts/certify-commander-analytics.mjs",
     "commander:corpus:revalidate": "node scripts/revalidate-mtg-commander-corpus.mjs",
     "commander:public:build": "node scripts/build-mtg-commander-public-data.mjs",
     "commander:public:publish": "node scripts/publish-mtg-commander-public-data.mjs",
