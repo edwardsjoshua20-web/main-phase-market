@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Plus, Trash2, Search, Swords, X, DownloadCloud, Share2, FlaskConical, BrainCircuit, RotateCcw } from 'lucide-react';
+import { Loader2, Plus, Trash2, Search, Swords, X, DownloadCloud, Share2, FlaskConical, BrainCircuit, RotateCcw, ChevronDown } from 'lucide-react';
 import { searchCards } from '@/components/lib/cardSearch';
 import DeckPlaytester from '@/components/deckbuilder/DeckPlaytester';
 import DeckImportModal from '@/components/deckbuilder/DeckImportModal';
@@ -1139,6 +1139,11 @@ export default function AdvancedDeckBuilder() {
     </div>
   );
 
+  const activeValidation = activeDeck ? validateDeckLegality(activeDeck) : null;
+  const activeFormat = activeDeck
+    ? getDeckFormatConfig(activeDeck.deck_format || getDefaultDeckFormat(deckGame), deckGame)
+    : null;
+
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {!isCompactLayout && (
@@ -1156,25 +1161,35 @@ export default function AdvancedDeckBuilder() {
       )}
       {/* Top Bar */}
       <div className={`bg-gray-800 border-b border-gray-700 sticky top-0 z-40 ${isCompactLayout ? '' : 'ml-[200px]'}`}>
-        <div className="max-w-full px-3 py-1.5">
-          <div className="mb-1.5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Swords className="w-6 h-6 text-blue-400" />
-              <div>
-                <h1 className="text-lg font-bold leading-tight text-white">
-                  {activeDeck ? `${activeDeck.name} - ${getDeckFormatConfig(activeDeck.deck_format || getDefaultDeckFormat(deckGame), deckGame).name}` : 'Advanced Deck Builder'}
-                </h1>
-                {activeDeck && (
-                  <p className="text-[11px] leading-tight text-gray-400">{totalCards} cards | {activeDeck.items?.length || 0} unique</p>
-                )}
-              </div>
+        <div className="max-w-full px-3 py-2">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-lg font-bold leading-5 text-white">
+                {activeDeck?.name || 'Advanced Deck Builder'}
+              </h1>
+              {activeDeck && (
+                <>
+                  <p className="mt-0.5 truncate text-[11px] leading-4 text-slate-400">
+                    {activeFormat.name} · {totalCards} cards · {activeDeck.items?.length || 0} unique · ${activeDeck.estimated_cost?.toFixed(2) || '0.00'}
+                  </p>
+                  <div className={`mt-0.5 flex items-center gap-1 text-[10px] font-bold uppercase ${activeValidation.isLegal ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${activeValidation.isLegal ? 'bg-emerald-400' : 'bg-red-400'}`} aria-hidden="true" />
+                    {activeValidation.isLegal ? 'Legal' : 'Not Legal'}
+                  </div>
+                  {!activeValidation.isLegal && activeValidation.errors.length > 0 && (
+                    <p className="mt-0.5 max-w-xl truncate text-[10px] text-red-300" title={activeValidation.errors.join(' | ')}>
+                      {activeValidation.errors.slice(0, 2).join(' | ')}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
               {activeDeck && (
                 <>
                   <Button
                     size="sm" variant="outline"
-                    className="h-8 text-xs bg-yellow-700 border-yellow-600 text-white hover:bg-yellow-600 disabled:opacity-60"
+                    className="h-7 rounded-sm border-blue-500/50 bg-blue-950/70 px-2 text-[11px] text-blue-100 hover:bg-blue-900 disabled:opacity-60"
                     onClick={handleSimulation}
                     disabled={simulationLoading}
                   >
@@ -1182,29 +1197,29 @@ export default function AdvancedDeckBuilder() {
                   </Button>
                   <Button
                     size="sm" variant="outline"
-                    className="h-8 text-xs bg-purple-700 border-purple-600 text-white hover:bg-purple-600"
+                    className="h-7 rounded-sm border-indigo-500/40 bg-indigo-950/60 px-2 text-[11px] text-indigo-100 hover:bg-indigo-900/70"
                     onClick={() => setShowPlaytester(true)}
                   >
                     <FlaskConical className="w-3 h-3 mr-1" />Playtester
                   </Button>
-                  <Button size="sm" variant="outline" className="h-8 text-xs bg-teal-800 border-teal-600 text-teal-200 hover:bg-teal-700" onClick={() => setShowImportModal(true)}>
+                  <Button size="sm" variant="outline" className="h-7 rounded-sm border-slate-600/70 bg-slate-700/50 px-2 text-[11px] text-slate-200 hover:bg-slate-700" onClick={() => setShowImportModal(true)}>
                     <DownloadCloud className="w-3 h-3 mr-1" />Import
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-8 text-xs bg-blue-900 border-blue-700 text-blue-100 hover:bg-blue-800"
+                    className="h-7 rounded-sm border-slate-600/70 bg-slate-700/50 px-2 text-[11px] text-slate-200 hover:bg-slate-700"
                     onClick={() => setCardDisplayMode((current) => current === 'grid' ? 'text' : 'grid')}
                   >
                     {cardDisplayMode === 'grid' ? 'Deck View' : 'Advanced View'}
                   </Button>
-                  <Button size="sm" variant="outline" className="h-8 text-xs bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600" onClick={exportDeck}>
+                  <Button size="sm" variant="outline" className="h-7 rounded-sm border-slate-600/70 bg-slate-700/50 px-2 text-[11px] text-slate-200 hover:bg-slate-700" onClick={exportDeck}>
                     <Share2 className="w-3 h-3 mr-1" />Export
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-8 text-xs bg-amber-900 border-amber-700 text-amber-100 hover:bg-amber-800"
+                    className="h-7 rounded-sm border-amber-700/60 bg-amber-950/40 px-2 text-[11px] text-amber-200 hover:bg-amber-900/50"
                     onClick={clearDeckCards}
                     disabled={clearingDeck}
                   >
@@ -1214,66 +1229,37 @@ export default function AdvancedDeckBuilder() {
                   <Button
                     size="sm" 
                     variant="outline"
-                    className="h-8 text-xs bg-red-900 border-red-700 text-red-200 hover:bg-red-800"
+                    className="h-7 rounded-sm border-red-800/70 bg-red-950/40 px-2 text-[11px] text-red-300 hover:bg-red-900/50"
                     onClick={() => { if (confirm(`Delete "${activeDeck.name}"?`)) deleteDeckMutation.mutate(activeDeck.id); }}
                   >
                     <Trash2 className="w-3 h-3 mr-1" />Delete
                   </Button>
                 </>
               )}
-              <select
-                value={selectedGame}
-                onChange={e => { setSelectedGame(e.target.value); setSearchResults([]); setSearchQuery(''); }}
-                className="h-8 text-xs border border-gray-600 rounded px-2 bg-gray-700 text-white"
-              >
-                <option value="magic">MTG</option>
-                <option value="pokemon">Pokemon</option>
-                <option value="yugioh">Yu-Gi-Oh!</option>
-                <option value="lorcana">Lorcana</option>
-                <option value="onepiece">One Piece</option>
-                <option value="flesh_and_blood">Flesh and Blood</option>
-                <option value="starwars">Star Wars</option>
-              </select>
             </div>
           </div>
 
           {/* Search and Controls */}
-          <div className={`flex gap-2 ${isCompactLayout ? 'flex-col items-stretch' : 'items-center'}`}>
-            {activeDeck && (() => {
-              const validation = validateDeckLegality(activeDeck);
-              return (
-                <div className={`rounded-lg border border-dashed border-blue-500 bg-gray-700 px-2 py-0.5 ${isCompactLayout ? 'space-y-2' : 'flex items-center gap-2'}`}>
-                  <div className="flex items-center gap-2 flex-1">
-                    <span className="text-xs text-gray-400">Format:</span>
-                    <button
-                      onClick={() => { setNewFormat(activeDeck.deck_format || getDefaultDeckFormat(deckGame)); setShowFormatChangeModal(true); }}
-                      className="text-xs font-semibold text-blue-300 hover:text-blue-100 transition-colors bg-blue-900 px-2 py-1 rounded hover:bg-blue-800"
-                    >
-                      {getDeckFormatConfig(activeDeck.deck_format || getDefaultDeckFormat(deckGame), deckGame).name}
-                    </button>
-                  </div>
-                  {!isCompactLayout && <span className="text-xs text-gray-500">|</span>}
-                  <div className={`text-xs font-semibold px-2 py-1 rounded ${validation.isLegal ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
-                    {validation.isLegal ? 'Legal' : 'Not Legal'}
-                  </div>
-                  {!validation.isLegal && (
-                    <div className="text-xs text-red-200 max-w-md">
-                      {validation.errors.slice(0, 2).join(' | ')}
-                    </div>
-                  )}
-                  {!isCompactLayout && <span className="text-xs text-gray-500">|</span>}
-                  <div className="text-xs text-gray-300 font-semibold">Deck Value: ${activeDeck.estimated_cost?.toFixed(2) || '0.00'}</div>
-                </div>
-              );
-            })()}
-            <div className={`relative flex-1 ${isCompactLayout ? 'w-full' : 'max-w-md'}`}>
+          <div className={`mt-1.5 flex gap-2 border-t border-slate-700/70 pt-1.5 ${isCompactLayout ? 'flex-col items-stretch' : 'items-center'}`}>
+            {activeDeck && (
+              <button
+                type="button"
+                onClick={() => { setNewFormat(activeDeck.deck_format || getDefaultDeckFormat(deckGame)); setShowFormatChangeModal(true); }}
+                className="flex h-7 shrink-0 items-center gap-1 rounded-sm border border-slate-600/70 bg-slate-900/40 px-2 text-[11px] text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+              >
+                <span>Format:</span>
+                <span className="font-semibold text-slate-100">{activeFormat.name}</span>
+                <ChevronDown className="h-3 w-3" aria-hidden="true" />
+              </button>
+            )}
+            <div className={`relative flex-1 ${isCompactLayout ? 'w-full' : 'max-w-2xl'}`}>
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 value={searchQuery}
                 onChange={handleSearchChange}
                 onFocus={() => searchResults.length > 0 && setSearchResults(searchResults)}
                 placeholder="Search cards..."
-                className="pl-9 h-8 text-sm border-gray-600 bg-gray-700 text-white placeholder:text-gray-400"
+                className="h-7 rounded-sm border-slate-600/70 bg-slate-900/40 pl-9 text-xs text-white placeholder:text-slate-500"
               />
               {searching && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-blue-400" />}
             </div>
@@ -1282,7 +1268,7 @@ export default function AdvancedDeckBuilder() {
                 type="button"
                 onClick={() => saveSectionLayout(null, { message: 'Layout reset', historyLabel: 'Reset section layout' })}
                 disabled={!activeDeck.section_layout}
-                className="h-7 px-2 text-[11px] font-semibold text-gray-400 transition-colors hover:text-white disabled:cursor-default disabled:opacity-35"
+                className="h-7 shrink-0 px-2 text-[11px] font-semibold text-slate-400 transition-colors hover:text-white disabled:cursor-default disabled:opacity-35"
               >
                 Reset Layout
               </button>
