@@ -259,6 +259,12 @@ export function ensureCommanderCorpusTables() {
       unresolved_cards INTEGER NOT NULL DEFAULT 0,
       quality_status TEXT NOT NULL DEFAULT 'unknown',
       validation_notes TEXT,
+      source_identity TEXT,
+      content_hash TEXT,
+      lifecycle_status TEXT NOT NULL DEFAULT 'quarantined',
+      rejection_reason TEXT,
+      last_validated_at TEXT,
+      retired_at TEXT,
       imported_at TEXT NOT NULL
     );
 
@@ -282,6 +288,54 @@ export function ensureCommanderCorpusTables() {
   ensureColumn('mtg_commander_corpus_decks', 'unresolved_cards', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('mtg_commander_corpus_decks', 'quality_status', `TEXT NOT NULL DEFAULT 'unknown'`);
   ensureColumn('mtg_commander_corpus_decks', 'validation_notes', 'TEXT');
+  ensureColumn('mtg_commander_corpus_decks', 'source_identity', 'TEXT');
+  ensureColumn('mtg_commander_corpus_decks', 'content_hash', 'TEXT');
+  ensureColumn('mtg_commander_corpus_decks', 'lifecycle_status', `TEXT NOT NULL DEFAULT 'quarantined'`);
+  ensureColumn('mtg_commander_corpus_decks', 'rejection_reason', 'TEXT');
+  ensureColumn('mtg_commander_corpus_decks', 'last_validated_at', 'TEXT');
+  ensureColumn('mtg_commander_corpus_decks', 'retired_at', 'TEXT');
+
+  db.exec(`
+    UPDATE mtg_commander_corpus_decks
+    SET source_identity = lower(source_name) || ':' || source_deck_id
+    WHERE source_identity IS NULL
+      AND source_deck_id IS NOT NULL
+      AND trim(source_deck_id) <> '';
+
+    UPDATE mtg_commander_corpus_decks
+    SET content_hash = deck_key
+    WHERE content_hash IS NULL;
+
+    UPDATE mtg_commander_corpus_decks
+    SET quality_status = 'valid', lifecycle_status = 'active', rejection_reason = NULL
+    WHERE quality_status IN ('clean', 'repaired');
+
+    UPDATE mtg_commander_corpus_decks
+    SET lifecycle_status = 'quarantined'
+    WHERE quality_status <> 'valid'
+      AND lifecycle_status <> 'retired';
+
+    UPDATE mtg_commander_corpus_decks
+    SET rejection_reason = CASE
+      WHEN validation_notes LIKE '%commander:unresolved%' THEN 'unresolved_commander'
+      WHEN validation_notes LIKE '%commander:invalid%' THEN 'invalid_commander'
+      WHEN validation_notes LIKE '%format:%' OR validation_notes LIKE '%theorycrafted%' THEN 'non_commander_deck'
+      WHEN validation_notes LIKE '%unresolved:%' THEN 'missing_cards'
+      WHEN validation_notes LIKE '%size:%' OR validation_notes LIKE '%commanders:%' THEN 'malformed_deck'
+      WHEN validation_notes LIKE '%duplicate:%' THEN 'duplicate'
+      WHEN validation_notes LIKE '%encoding:%' THEN 'encoding_corruption'
+      WHEN lifecycle_status = 'retired' THEN 'retired_source'
+      ELSE 'other'
+    END
+    WHERE quality_status <> 'valid'
+      AND (rejection_reason IS NULL OR rejection_reason = '');
+
+    CREATE INDEX IF NOT EXISTS idx_mtg_commander_corpus_decks_source_identity
+    ON mtg_commander_corpus_decks (source_identity);
+
+    CREATE INDEX IF NOT EXISTS idx_mtg_commander_corpus_decks_active
+    ON mtg_commander_corpus_decks (lifecycle_status, quality_status, commander_oracle_id);
+  `);
 }
 
 ensureCommanderCorpusTables();
@@ -325,11 +379,13 @@ const insertDeckStmt = db.prepare(`
   INSERT INTO mtg_commander_corpus_decks (
     deck_key, source_id, source_name, source_deck_id, source_url, deck_name,
     commander_oracle_id, commander_name, commander_name_normalized, total_cards,
-    unresolved_cards, quality_status, validation_notes, imported_at
+    unresolved_cards, quality_status, validation_notes, source_identity, content_hash,
+    lifecycle_status, rejection_reason, last_validated_at, retired_at, imported_at
   ) VALUES (
     @deck_key, @source_id, @source_name, @source_deck_id, @source_url, @deck_name,
     @commander_oracle_id, @commander_name, @commander_name_normalized, @total_cards,
-    @unresolved_cards, @quality_status, @validation_notes, @imported_at
+    @unresolved_cards, @quality_status, @validation_notes, @source_identity, @content_hash,
+    @lifecycle_status, @rejection_reason, @last_validated_at, @retired_at, @imported_at
   )
   ON CONFLICT(deck_key) DO UPDATE SET
     source_id = excluded.source_id,
@@ -344,6 +400,12 @@ const insertDeckStmt = db.prepare(`
     unresolved_cards = excluded.unresolved_cards,
     quality_status = excluded.quality_status,
     validation_notes = excluded.validation_notes,
+    source_identity = excluded.source_identity,
+    content_hash = excluded.content_hash,
+    lifecycle_status = excluded.lifecycle_status,
+    rejection_reason = excluded.rejection_reason,
+    last_validated_at = excluded.last_validated_at,
+    retired_at = excluded.retired_at,
     imported_at = excluded.imported_at
 `);
 const deleteDeckCardsStmt = db.prepare(`DELETE FROM mtg_commander_corpus_cards WHERE deck_key = ?`);
@@ -363,6 +425,42 @@ const selectDecksBySourceStmt = db.prepare(`
   FROM mtg_commander_corpus_decks
   WHERE source_id = ?
   ORDER BY imported_at DESC
+`);
+const selectDeckBySourceIdentityStmt = db.prepare(`
+  SELECT *
+  FROM mtg_commander_corpus_decks
+  WHERE source_identity = ?
+  ORDER BY
+    CASE lifecycle_status WHEN 'active' THEN 0 WHEN 'quarantined' THEN 1 ELSE 2 END,
+    imported_at DESC
+  LIMIT 1
+`);
+const retireDeckStmt = db.prepare(`
+  UPDATE mtg_commander_corpus_decks
+  SET lifecycle_status = 'retired',
+      rejection_reason = @reason,
+      validation_notes = CASE
+        WHEN validation_notes IS NULL OR validation_notes = '' THEN @note
+        WHEN instr(validation_notes, @note) > 0 THEN validation_notes
+        ELSE validation_notes || ',' || @note
+      END,
+      last_validated_at = @timestamp,
+      retired_at = @timestamp
+  WHERE deck_key = @deck_key
+`);
+const updateDeckValidationStmt = db.prepare(`
+  UPDATE mtg_commander_corpus_decks
+  SET commander_oracle_id = @commander_oracle_id,
+      commander_name = @commander_name,
+      commander_name_normalized = @commander_name_normalized,
+      total_cards = @total_cards,
+      quality_status = @quality_status,
+      validation_notes = @validation_notes,
+      lifecycle_status = @lifecycle_status,
+      rejection_reason = @rejection_reason,
+      last_validated_at = @last_validated_at,
+      retired_at = NULL
+  WHERE deck_key = @deck_key
 `);
 
 function toSourceId(entry) {
@@ -542,7 +640,9 @@ function buildNormalizedDeck({
   sourceUrl,
   deckName,
   commanders,
-  cards
+  cards,
+  format = null,
+  theorycrafted = false
 }) {
   return {
     source_name: sourceName,
@@ -550,7 +650,9 @@ function buildNormalizedDeck({
     url: sourceUrl || null,
     name: deckName || null,
     commanders,
-    cards
+    cards,
+    format,
+    theorycrafted: Boolean(theorycrafted)
   };
 }
 
@@ -588,9 +690,9 @@ function normalizeArchidektDeckPayload(payload, sourceUrl) {
     const isCommander = Array.isArray(item?.categories)
       && item.categories.some((category) => String(category?.name || '').toLowerCase() === 'commander');
 
-    if (!resolved?.oracle_id) continue;
-
-    const normalizedEntry = [resolved.oracle_id, quantity, resolved.name || name || ''];
+    const normalizedEntry = resolved?.oracle_id
+      ? [resolved.oracle_id, quantity, resolved.name || name || '']
+      : [oracleCard?.uid || rawCard?.uid || '', quantity, name];
     if (isCommander) {
       commanders.push(normalizedEntry);
     } else {
@@ -606,7 +708,9 @@ function normalizeArchidektDeckPayload(payload, sourceUrl) {
         sourceUrl,
         deckName: payload?.name,
         commanders,
-        cards
+        cards,
+        format: payload?.format,
+        theorycrafted: payload?.theorycrafted
       })
     ]
   };
@@ -660,9 +764,9 @@ function normalizeMoxfieldDeckPayload(payload, sourceUrl) {
       });
       const quantity = Number(entry?.quantity) || 1;
 
-      if (!resolved?.oracle_id) continue;
-
-      const normalizedEntry = [resolved.oracle_id, quantity, resolved.name || name || ''];
+      const normalizedEntry = resolved?.oracle_id
+        ? [resolved.oracle_id, quantity, resolved.name || name || '']
+        : [rawCard?.oracleId || rawCard?.oracle_id || rawCard?.scryfallOracleId || '', quantity, name];
       if (isCommanderBoard) {
         commanders.push(normalizedEntry);
       } else {
@@ -685,7 +789,7 @@ function normalizeMoxfieldDeckPayload(payload, sourceUrl) {
   };
 }
 
-function buildDeckKey(sourceName, deck) {
+function buildContentHash(sourceName, deck) {
   const seed = [
     sourceName,
     deck.source_deck_id || deck.id || '',
@@ -696,6 +800,35 @@ function buildDeckKey(sourceName, deck) {
   ].join('|');
 
   return crypto.createHash('sha1').update(seed).digest('hex');
+}
+
+function buildSourceIdentity(sourceRow, deck, deckIndex = 0) {
+  const sourceName = normalizeText(deck.source_name || sourceRow.source_name || 'unknown').replace(/\s+/g, '-');
+  const sourceDeckId = String(deck.source_deck_id || deck.id || '').trim();
+  if (sourceDeckId) return `${sourceName}:${sourceDeckId}`;
+
+  const sourceUrl = String(deck.url || '').trim().replace(/[?#].*$/, '').replace(/\/$/, '');
+  if (sourceUrl) return `${sourceName}:url:${sourceUrl.toLowerCase()}`;
+
+  return `${sourceName}:source:${sourceRow.source_id}:${deckIndex}`;
+}
+
+function buildDeckKey(sourceIdentity) {
+  return crypto.createHash('sha1').update(sourceIdentity).digest('hex');
+}
+
+export function classifyCommanderRejectionReason(notes = []) {
+  const values = Array.isArray(notes) ? notes : String(notes || '').split(',').filter(Boolean);
+  if (values.some((note) => note.startsWith('commander:unresolved'))) return 'unresolved_commander';
+  if (values.some((note) => note.startsWith('commander:invalid'))) return 'invalid_commander';
+  if (values.some((note) => note.startsWith('format:'))) return 'non_commander_deck';
+  if (values.some((note) => note === 'theorycrafted')) return 'non_commander_deck';
+  if (values.some((note) => note.startsWith('unresolved:'))) return 'missing_cards';
+  if (values.some((note) => note.startsWith('size:') || note.startsWith('commanders:'))) return 'malformed_deck';
+  if (values.some((note) => note.startsWith('duplicate:'))) return 'duplicate';
+  if (values.some((note) => note.startsWith('encoding:'))) return 'encoding_corruption';
+  if (values.some((note) => note.startsWith('retired:'))) return 'retired_source';
+  return values.length > 0 ? 'other' : null;
 }
 
 function ensureDir(dirPath) {
@@ -887,23 +1020,27 @@ function importDeckPayload(sourceRow, payload) {
   const decks = parseDeckArray(payload);
   const importedAt = nowIso();
   let importedDecks = 0;
+  const importedSourceIdentities = [];
 
   const transaction = db.transaction(() => {
-    for (const deck of decks) {
+    for (const [deckIndex, deck] of decks.entries()) {
       const rawCommanders = parseCommanders(deck.commanders);
       const rawCards = parseCards(deck.cards);
-      const unresolvedEntries = [];
+      const unresolvedCommanders = [];
+      const unresolvedCards = [];
       const commanders = rawCommanders
         .map((entry) => {
           const resolved = resolveMtgCard(entry);
           if (!resolved) {
-            unresolvedEntries.push(entry.name || entry.oracle_id || 'Unknown commander');
+            unresolvedCommanders.push(entry.name || entry.oracle_id || 'Unknown commander');
             return null;
           }
           return {
             oracle_id: resolved.oracle_id,
             quantity: Number(entry.quantity) || 1,
-            name: resolved.name || entry.name || ''
+            name: resolved.name || entry.name || '',
+            type_line: resolved.type_line || '',
+            oracle_text: resolved.oracle_text || ''
           };
         })
         .filter(Boolean);
@@ -911,7 +1048,7 @@ function importDeckPayload(sourceRow, payload) {
         .map((entry) => {
           const resolved = resolveMtgCard(entry);
           if (!resolved) {
-            unresolvedEntries.push(entry.name || entry.oracle_id || 'Unknown card');
+            unresolvedCards.push(entry.name || entry.oracle_id || 'Unknown card');
             return null;
           }
           return {
@@ -922,24 +1059,34 @@ function importDeckPayload(sourceRow, payload) {
         })
         .filter(Boolean);
       const primaryCommander = commanders.find((entry) => UUID_RE.test(String(entry.oracle_id || '')));
-      if (!primaryCommander?.oracle_id) continue;
-
-      const commanderQuantity = commanders.reduce((sum, entry) => sum + (Number(entry.quantity) || 1), 0);
-      const nonCommanderQuantity = cards.reduce((sum, entry) => sum + (Number(entry.quantity) || 1), 0);
+      const commanderQuantity = rawCommanders.reduce((sum, entry) => sum + (Number(entry.quantity) || 1), 0);
+      const nonCommanderQuantity = rawCards.reduce((sum, entry) => sum + (Number(entry.quantity) || 1), 0);
       const totalCards = commanderQuantity + nonCommanderQuantity;
       const notes = [];
-      if (!canResolvedCardBeCommander(primaryCommander)) {
+      if (!primaryCommander?.oracle_id) {
+        notes.push('commander:unresolved');
+      } else if (!canResolvedCardBeCommander(primaryCommander)) {
         notes.push('commander:invalid');
       }
+      const unresolvedEntries = [...unresolvedCommanders, ...unresolvedCards];
       if (unresolvedEntries.length > 0) {
         notes.push(`unresolved:${unresolvedEntries.length}`);
         notes.push(`names:${unresolvedEntries.join('|')}`);
       }
       if (totalCards !== 100) notes.push(`size:${totalCards}`);
       if (commanderQuantity < 1 || commanderQuantity > 2) notes.push(`commanders:${commanderQuantity}`);
-      const qualityStatus = notes.length === 0 ? 'clean' : 'invalid';
+      if (deck.theorycrafted) notes.push('theorycrafted');
+      if (!isCommanderLikeArchidektFormat(deck.format)) notes.push(`format:${deck.format || 'unknown'}`);
+      const qualityStatus = notes.length === 0 ? 'valid' : 'invalid';
+      const lifecycleStatus = qualityStatus === 'valid' ? 'active' : 'quarantined';
 
-      const deckKey = buildDeckKey(sourceRow.source_name, deck);
+      const sourceIdentity = buildSourceIdentity(sourceRow, deck, deckIndex);
+      const existingDeck = selectDeckBySourceIdentityStmt.get(sourceIdentity);
+      const deckKey = existingDeck?.deck_key || buildDeckKey(sourceIdentity);
+      const commanderName = primaryCommander?.name
+        || rawCommanders[0]?.name
+        || 'Unresolved Commander';
+      importedSourceIdentities.push(sourceIdentity);
       insertDeckStmt.run({
         deck_key: deckKey,
         source_id: sourceRow.source_id,
@@ -947,21 +1094,23 @@ function importDeckPayload(sourceRow, payload) {
         source_deck_id: deck.source_deck_id ? String(deck.source_deck_id) : null,
         source_url: deck.url || null,
         deck_name: deck.name || null,
-        commander_oracle_id: primaryCommander.oracle_id,
-        commander_name: primaryCommander.name || 'Unknown Commander',
-        commander_name_normalized: normalizeText(primaryCommander.name || 'Unknown Commander'),
+        commander_oracle_id: primaryCommander?.oracle_id || `unresolved:${crypto.createHash('sha1').update(commanderName).digest('hex').slice(0, 20)}`,
+        commander_name: commanderName,
+        commander_name_normalized: normalizeText(commanderName),
         total_cards: totalCards,
         unresolved_cards: unresolvedEntries.length,
         quality_status: qualityStatus,
         validation_notes: notes.length ? notes.join(',') : null,
+        source_identity: sourceIdentity,
+        content_hash: buildContentHash(sourceRow.source_name, deck),
+        lifecycle_status: lifecycleStatus,
+        rejection_reason: classifyCommanderRejectionReason(notes),
+        last_validated_at: importedAt,
+        retired_at: null,
         imported_at: importedAt
       });
       deleteDeckCardsStmt.run(deckKey);
-      if (qualityStatus !== 'clean') {
-        continue;
-      }
-
-      importedDecks += 1;
+      if (qualityStatus === 'valid') importedDecks += 1;
 
       for (const commander of commanders) {
         if (!UUID_RE.test(String(commander.oracle_id || ''))) continue;
@@ -987,10 +1136,136 @@ function importDeckPayload(sourceRow, payload) {
         });
       }
     }
+
+    const currentIdentities = new Set(importedSourceIdentities);
+    for (const existingDeck of selectDecksBySourceStmt.all(sourceRow.source_id)) {
+      if (currentIdentities.has(existingDeck.source_identity)) continue;
+      retireDeckStmt.run({
+        deck_key: existingDeck.deck_key,
+        reason: 'retired_source',
+        note: 'retired:missing_from_source',
+        timestamp: importedAt
+      });
+    }
   });
 
   transaction();
-  return { totalDecks: decks.length, importedDecks };
+  return { totalDecks: decks.length, importedDecks, sourceIdentities: importedSourceIdentities };
+}
+
+export function importCommanderDeckPayload(source, payload) {
+  ensureCommanderCorpusTables();
+  const timestamp = nowIso();
+  const sourceRow = {
+    source_id: source.source_id || toSourceId(source),
+    label: source.label || source.source_deck_id || 'Commander deck fixture',
+    source_type: source.source_type || 'fixture',
+    source_name: source.source_name || 'archidekt',
+    location: source.location || source.source_url || `fixture://${source.source_id || 'deck'}`,
+    status: 'running',
+    downloaded_path: null,
+    total_decks: 0,
+    imported_decks: 0,
+    last_error: null,
+    created_at: timestamp,
+    updated_at: timestamp,
+    last_started_at: timestamp,
+    last_finished_at: null
+  };
+  upsertSourceStmt.run(sourceRow);
+  const result = importDeckPayload(sourceRow, payload);
+  upsertSourceStmt.run({
+    ...sourceRow,
+    status: 'done',
+    total_decks: result.totalDecks,
+    imported_decks: result.importedDecks,
+    updated_at: nowIso(),
+    last_finished_at: nowIso()
+  });
+  return {
+    ...result,
+    source_id: sourceRow.source_id,
+    decks: selectDecksBySourceStmt.all(sourceRow.source_id)
+  };
+}
+
+export function retireCommanderSourceDecks(sourceId, reason = 'retired_source') {
+  ensureCommanderCorpusTables();
+  const timestamp = nowIso();
+  let retired = 0;
+  const transaction = db.transaction(() => {
+    for (const deck of selectDecksBySourceStmt.all(sourceId)) {
+      retired += retireDeckStmt.run({
+        deck_key: deck.deck_key,
+        reason,
+        note: `retired:${reason}`,
+        timestamp
+      }).changes;
+    }
+  });
+  transaction();
+  return retired;
+}
+
+export function revalidateStoredCommanderDecks() {
+  ensureCommanderCorpusTables();
+  const timestamp = nowIso();
+  const rows = db.prepare(`
+    SELECT
+      decks.*,
+      COALESCE(SUM(cards.quantity), 0) stored_card_total,
+      COALESCE(SUM(CASE WHEN cards.is_commander = 1 THEN cards.quantity ELSE 0 END), 0) stored_commander_total,
+      COUNT(cards.card_oracle_id) stored_card_rows
+    FROM mtg_commander_corpus_decks decks
+    LEFT JOIN mtg_commander_corpus_cards cards ON cards.deck_key = decks.deck_key
+    WHERE decks.lifecycle_status <> 'retired'
+    GROUP BY decks.deck_key
+  `).all();
+  let active = 0;
+  let quarantined = 0;
+  let skippedWithoutCards = 0;
+
+  const transaction = db.transaction(() => {
+    for (const row of rows) {
+      if (Number(row.stored_card_rows || 0) === 0) {
+        skippedWithoutCards += 1;
+        continue;
+      }
+
+      const resolvedCommander = resolveMtgCard({
+        oracle_id: row.commander_oracle_id,
+        name: row.commander_name
+      });
+      const notes = [];
+      if (!resolvedCommander) notes.push('commander:unresolved');
+      else if (!canResolvedCardBeCommander(resolvedCommander)) notes.push('commander:invalid');
+      if (Number(row.unresolved_cards || 0) > 0) notes.push(`unresolved:${Number(row.unresolved_cards)}`);
+      if (Number(row.stored_card_total || 0) !== 100) notes.push(`size:${Number(row.stored_card_total || 0)}`);
+      if (Number(row.stored_commander_total || 0) < 1 || Number(row.stored_commander_total || 0) > 2) {
+        notes.push(`commanders:${Number(row.stored_commander_total || 0)}`);
+      }
+
+      const qualityStatus = notes.length === 0 ? 'valid' : 'invalid';
+      const lifecycleStatus = qualityStatus === 'valid' ? 'active' : 'quarantined';
+      updateDeckValidationStmt.run({
+        deck_key: row.deck_key,
+        commander_oracle_id: resolvedCommander?.oracle_id || row.commander_oracle_id,
+        commander_name: resolvedCommander?.name || row.commander_name,
+        commander_name_normalized: normalizeText(resolvedCommander?.name || row.commander_name),
+        total_cards: Number(row.stored_card_total || 0),
+        quality_status: qualityStatus,
+        validation_notes: notes.length > 0 ? notes.join(',') : null,
+        lifecycle_status: lifecycleStatus,
+        rejection_reason: classifyCommanderRejectionReason(notes),
+        last_validated_at: timestamp
+      });
+      if (lifecycleStatus === 'active') active += 1;
+      else quarantined += 1;
+    }
+  });
+  transaction();
+
+  return { checked: rows.length - skippedWithoutCards, active, quarantined, skippedWithoutCards };
 }
 
 export async function importCommanderDeckText(text, options = {}) {
@@ -1066,43 +1341,6 @@ export async function processCommanderCorpusSource(sourceId, options = {}) {
       payload = readJson(filePath);
     } else if (sourceRow.source_type === 'archidekt_deck') {
       const rawPayload = extractArchidektDeckPayload(await fetchText(sourceRow.location), sourceRow.location);
-      const summary = summarizeArchidektDeckPayload(rawPayload);
-      const formatLooksCommander = isCommanderLikeArchidektFormat(summary.format);
-      const shouldSkip = summary.totalCards !== 100
-        || summary.commanderQuantity < 1
-        || summary.commanderQuantity > 2
-        || summary.theorycrafted
-        || !formatLooksCommander;
-
-      if (shouldSkip) {
-        const skipNotes = [];
-        if (summary.totalCards !== 100) skipNotes.push(`size:${summary.totalCards}`);
-        if (summary.commanderQuantity < 1 || summary.commanderQuantity > 2) skipNotes.push(`commanders:${summary.commanderQuantity}`);
-        if (summary.theorycrafted) skipNotes.push('theorycrafted');
-        if (!formatLooksCommander) skipNotes.push(`format:${summary.format || 'unknown'}`);
-
-        upsertSourceStmt.run({
-          ...sourceRow,
-          status: 'done',
-          downloaded_path: filePath,
-          total_decks: 1,
-          imported_decks: 0,
-          last_error: null,
-          updated_at: nowIso(),
-          last_started_at: sourceRow.last_started_at || nowIso(),
-          last_finished_at: nowIso()
-        });
-
-        return {
-          source_id: sourceId,
-          status: 'done',
-          skipped: true,
-          skipped_reason: skipNotes.join(',') || 'invalid_shape',
-          total_decks: 1,
-          imported_decks: 0
-        };
-      }
-
       payload = normalizeArchidektDeckPayload(rawPayload, sourceRow.location);
     } else if (sourceRow.source_type === 'moxfield_deck') {
       payload = normalizeMoxfieldDeckPayload(
@@ -1153,13 +1391,15 @@ export async function processCommanderCorpusSource(sourceId, options = {}) {
     });
 
     if (isDeadArchidektDeck) {
+      const retiredDecks = retireCommanderSourceDecks(sourceId, 'source_not_found');
       return {
         source_id: sourceId,
         status: 'done',
         skipped: true,
         skipped_reason: 'dead_link:404',
         total_decks: 0,
-        imported_decks: 0
+        imported_decks: 0,
+        retired_decks: retiredDecks
       };
     }
 
@@ -1174,8 +1414,9 @@ export function getCommanderCorpusStatus() {
     SELECT
       COUNT(*) AS deck_count,
       COUNT(DISTINCT commander_oracle_id) AS commander_count,
-      SUM(CASE WHEN quality_status IN ('clean', 'repaired') THEN 1 ELSE 0 END) AS usable_deck_count,
-      SUM(CASE WHEN quality_status = 'invalid' THEN 1 ELSE 0 END) AS invalid_deck_count
+      SUM(CASE WHEN lifecycle_status = 'active' AND quality_status = 'valid' THEN 1 ELSE 0 END) AS usable_deck_count,
+      SUM(CASE WHEN lifecycle_status = 'quarantined' THEN 1 ELSE 0 END) AS invalid_deck_count,
+      SUM(CASE WHEN lifecycle_status = 'retired' THEN 1 ELSE 0 END) AS retired_deck_count
     FROM mtg_commander_corpus_decks
   `).get();
   const cardTotals = db.prepare(`
@@ -1189,6 +1430,7 @@ export function getCommanderCorpusStatus() {
     commander_count: Number(totals?.commander_count || 0),
     usable_deck_count: Number(totals?.usable_deck_count || 0),
     invalid_deck_count: Number(totals?.invalid_deck_count || 0),
+    retired_deck_count: Number(totals?.retired_deck_count || 0),
     card_row_count: Number(cardTotals?.card_row_count || 0),
     sources: sources.map((source) => ({
       source_id: source.source_id,

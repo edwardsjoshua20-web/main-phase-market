@@ -1,10 +1,11 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { db } from './db.mjs';
 import { ensureCommanderCorpusTables } from './mtgCommanderCorpus.mjs';
 
 const mtgSearchDir = path.join(process.cwd(), 'public', 'data', 'mtg', 'search');
-const INDEX_VERSION = 4;
+const INDEX_VERSION = 5;
 const COMMANDER_CATEGORY_ORDER = [
   'creatures',
   'instants',
@@ -40,7 +41,7 @@ const COLOR_BITS = {
   R: 8,
   G: 16
 };
-const VALID_CORPUS_DECK_SQL = `quality_status IN ('clean', 'repaired')`;
+const VALID_CORPUS_DECK_SQL = `quality_status = 'valid' AND lifecycle_status = 'active'`;
 
 let ensurePromise = null;
 let cardLookupCache = null;
@@ -848,7 +849,7 @@ function rebuildCommanderIndex() {
     if (!canCardBeCommander(row)) continue;
 
     const oracleId = String(row?.oracle_id || '').trim();
-    if (!oracleId || !hasImage(row)) continue;
+    if (!oracleId) continue;
 
     if (!grouped.has(oracleId)) {
       grouped.set(oracleId, []);
@@ -1073,6 +1074,76 @@ export async function refreshMtgCommanderEngine() {
   simulationGauntletCache = null;
   writeMetaStmt.run('mtg_commander_index_version', '0');
   return ensureMtgCommanderEngine();
+}
+
+export function getMtgCommanderPublicSnapshot() {
+  ensureCommanderCorpusTables();
+  ensureCommanderTables();
+
+  const readSnapshot = db.transaction(() => {
+    const activeDecks = db.prepare(`
+      SELECT deck_key, source_identity, content_hash, commander_oracle_id
+      FROM mtg_commander_corpus_decks
+      WHERE ${VALID_CORPUS_DECK_SQL}
+      ORDER BY deck_key ASC
+    `).all();
+    const indexRows = db.prepare(`
+      SELECT oracle_id, deck_count
+      FROM mtg_commander_index
+      ORDER BY oracle_id ASC
+    `).all();
+    const positiveRows = indexRows.filter((row) => Number(row.deck_count || 0) > 0);
+    const indexDeckTotal = positiveRows.reduce((sum, row) => sum + Number(row.deck_count || 0), 0);
+
+    if (indexDeckTotal !== activeDecks.length) {
+      throw new Error(`Commander snapshot mismatch: index=${indexDeckTotal}, active=${activeDecks.length}`);
+    }
+
+    const details = new Map();
+    for (const row of positiveRows) {
+      const payload = getMtgCommanderPage(row.oracle_id);
+      if (!payload?.has_local_data) {
+        throw new Error(`Commander snapshot missing detail data for ${row.oracle_id}`);
+      }
+      if (Number(payload.total_decks || 0) !== Number(row.deck_count || 0)) {
+        throw new Error(
+          `Commander detail mismatch for ${row.oracle_id}: detail=${payload.total_decks}, index=${row.deck_count}`
+        );
+      }
+      if (Number(payload.average_deck_profile?.total_decks || 0) !== Number(row.deck_count || 0)) {
+        throw new Error(
+          `Commander average-deck mismatch for ${row.oracle_id}: profile=${payload.average_deck_profile?.total_decks}, index=${row.deck_count}`
+        );
+      }
+      details.set(row.oracle_id, payload);
+    }
+
+    const denominatorRows = db.prepare(`
+      SELECT DISTINCT total_global_decks
+      FROM mtg_commander_card_stats
+      WHERE total_global_decks > 0
+    `).all();
+    if (denominatorRows.some((row) => Number(row.total_global_decks || 0) !== activeDecks.length)) {
+      throw new Error('Commander stats were not built from the active corpus snapshot.');
+    }
+
+    const revisionSeed = activeDecks
+      .map((deck) => `${deck.source_identity || deck.deck_key}:${deck.content_hash || ''}:${deck.commander_oracle_id}`)
+      .join('|');
+    const datasetVersion = crypto.createHash('sha256').update(revisionSeed).digest('hex').slice(0, 16);
+
+    return {
+      datasetVersion,
+      generatedAt: new Date().toISOString(),
+      activeDeckCount: activeDecks.length,
+      indexDeckTotal,
+      positiveCommanderCount: positiveRows.length,
+      indexRows,
+      details
+    };
+  });
+
+  return readSnapshot();
 }
 
 export function searchMtgCommanderEngine(query = '', colors = [], limit = 120, minDeckCount = 0) {
@@ -2205,14 +2276,15 @@ export function simulateMtgDeckGauntlet(inputDeck) {
 }
 
 function warmSimulationGauntletsSoon() {
-  if (simulationGauntletCache) return;
-  setTimeout(() => {
+  if (simulationGauntletCache || process.env.MPM_DISABLE_COMMANDER_PREWARM === '1') return;
+  const timer = setTimeout(() => {
     try {
       getSimulationGauntlets();
     } catch (error) {
       console.warn('Failed to prewarm MTG simulation gauntlets:', error?.message || error);
     }
   }, 0);
+  timer.unref?.();
 }
 
 function buildSliceStats(commanderRow, decks, totalGlobalDecks, globalCardCounts) {

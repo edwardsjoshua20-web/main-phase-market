@@ -1,14 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import Database from 'better-sqlite3';
-import { getMtgCommanderPage } from '../server/mtgCommanderEngine.mjs';
+import {
+  getMtgCommanderPublicSnapshot,
+  refreshMtgCommanderEngine
+} from '../server/mtgCommanderEngine.mjs';
 
 const PROJECT_ROOT = process.cwd();
 const SEARCH_SHARDS_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'search-shards');
 const SEARCH_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'search');
 const OUTPUT_PATH = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commanders.json');
 const DETAILS_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commander-details');
-const COMMANDER_DB_PATH = path.join(PROJECT_ROOT, 'server', 'data', 'main-phase-market.db');
+const MANIFEST_PATH = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commander-manifest.json');
 const HOSTED_PUBLIC_DATA_BASE_URL = 'https://wwvvyrhlybwijqlhubdv.supabase.co/storage/v1/object/public/main-phase-market-public/data';
 
 function normalizeText(value) {
@@ -64,17 +66,11 @@ function getImageUrl(row) {
   );
 }
 
-function isCommander(row) {
+function isCommander(row, commanderOracleIds) {
   if (!row || String(row.lang || '').toLowerCase() !== 'en') {
     return false;
   }
-
-  if (row.can_be_commander) {
-    return true;
-  }
-
-  const typeLine = String(row.type_line || '');
-  return typeLine.includes('Legendary') && typeLine.includes('Creature');
+  return commanderOracleIds.has(row.oracle_id);
 }
 
 function toCommander(row, deckCounts) {
@@ -129,23 +125,21 @@ function compareCommanderRows(a, b) {
   return String(a.name || '').localeCompare(String(b.name || ''));
 }
 
-function main() {
-  const files = collectJsonFiles(SEARCH_SHARDS_DIR);
-  const sourceFiles = files.length > 0 ? files : collectJsonFiles(SEARCH_DIR);
+async function main() {
+  const files = collectJsonFiles(SEARCH_DIR);
+  const sourceFiles = files.length > 0 ? files : collectJsonFiles(SEARCH_SHARDS_DIR);
 
   if (sourceFiles.length === 0) {
     throw new Error('No MTG search files found to build commander data.');
   }
 
   const commandersByOracleId = new Map();
+  await refreshMtgCommanderEngine();
+  const snapshot = getMtgCommanderPublicSnapshot();
+  const commanderOracleIds = new Set(snapshot.indexRows.map((row) => row.oracle_id));
   const deckCounts = new Map();
-  if (fs.existsSync(COMMANDER_DB_PATH)) {
-    const commanderDb = new Database(COMMANDER_DB_PATH, { readonly: true });
-    const rows = commanderDb.prepare('SELECT oracle_id, deck_count FROM mtg_commander_index').all();
-    for (const row of rows) {
-      deckCounts.set(row.oracle_id, Number(row.deck_count || 0));
-    }
-    commanderDb.close();
+  for (const row of snapshot.indexRows) {
+    deckCounts.set(row.oracle_id, Number(row.deck_count || 0));
   }
 
   for (const filePath of sourceFiles) {
@@ -155,7 +149,7 @@ function main() {
     }
 
     for (const row of rows) {
-      if (!isCommander(row) || !row.oracle_id) {
+      if (!isCommander(row, commanderOracleIds) || !row.oracle_id) {
         continue;
       }
 
@@ -178,7 +172,7 @@ function main() {
     fs.mkdirSync(DETAILS_DIR, { recursive: true });
     for (const commander of commanders) {
       if (commander.deck_count <= 0) continue;
-      const payload = getMtgCommanderPage(commander.oracle_id);
+      const payload = snapshot.details.get(commander.oracle_id);
       if (!payload?.has_local_data) continue;
       const outputPath = path.join(DETAILS_DIR, `${commander.oracle_id}.json`);
       fs.writeFileSync(outputPath, `${JSON.stringify(makeHostedPayload(payload))}\n`);
@@ -186,7 +180,25 @@ function main() {
     }
   }
 
-  console.log(`Wrote ${commanders.length} commanders and ${detailCount} rich detail pages to ${path.relative(PROJECT_ROOT, path.dirname(OUTPUT_PATH))}`);
+  if (detailCount !== snapshot.positiveCommanderCount) {
+    throw new Error(
+      `Commander publication mismatch: details=${detailCount}, positive commanders=${snapshot.positiveCommanderCount}`
+    );
+  }
+
+  fs.writeFileSync(MANIFEST_PATH, `${JSON.stringify({
+    dataset_version: snapshot.datasetVersion,
+    generated_at: snapshot.generatedAt,
+    active_deck_count: snapshot.activeDeckCount,
+    index_deck_total: snapshot.indexDeckTotal,
+    positive_commander_count: snapshot.positiveCommanderCount,
+    detail_count: detailCount
+  })}\n`);
+
+  console.log(`Wrote ${commanders.length} commanders and ${detailCount} rich detail pages from snapshot ${snapshot.datasetVersion}`);
 }
 
-main();
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

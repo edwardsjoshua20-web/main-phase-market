@@ -2,8 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 
-const dataDir = path.resolve(process.cwd(), 'server', 'data');
-const dbPath = path.join(dataDir, 'main-phase-market.db');
+const defaultDataDir = path.resolve(process.cwd(), 'server', 'data');
+const configuredDbPath = String(process.env.MPM_DB_PATH || '').trim();
+const dbPath = configuredDbPath ? path.resolve(configuredDbPath) : path.join(defaultDataDir, 'main-phase-market.db');
+const dataDir = path.dirname(dbPath);
 
 fs.mkdirSync(dataDir, { recursive: true });
 
