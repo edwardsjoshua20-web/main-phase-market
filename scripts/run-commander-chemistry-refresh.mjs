@@ -90,6 +90,7 @@ runNode('scripts/commander-archidekt-bot.mjs', [
   '--start-page', '1',
   '--max-page', '1',
   '--batch-size', '5',
+  '--order-by', '-viewCount',
   '--request-delay-ms', '1500',
   '--max-retries', '2'
 ]);

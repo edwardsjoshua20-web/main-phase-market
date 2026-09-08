@@ -132,7 +132,7 @@ async function fetchTextWithBackoff(url, args) {
 }
 
 function extractArchidektDeckUrls(text) {
-  const completeDeckUrls = [];
+  const completeDecks = [];
   let structuredResultCount = 0;
   const anchorPattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
   for (const match of String(text || '').matchAll(anchorPattern)) {
@@ -144,12 +144,21 @@ function extractArchidektDeckUrls(text) {
     const cardCountMatch = String(match[2] || '').match(/\b([\d,]+)\s+cards\b/i);
     const cardCount = Number(String(cardCountMatch?.[1] || '').replace(/,/g, ''));
     if (cardCount === 100) {
-      completeDeckUrls.push(`https://archidekt.com/decks/${deckMatch[1]}`);
+      const viewCountMatch = String(match[2] || '').match(/\b([\d,]+)\s+views\b/i);
+      completeDecks.push({
+        url: `https://archidekt.com/decks/${deckMatch[1]}`,
+        viewCount: Number(String(viewCountMatch?.[1] || '').replace(/,/g, '')) || 0,
+        sourceOrder: completeDecks.length
+      });
     }
   }
 
   if (structuredResultCount > 0) {
-    return [...new Set(completeDeckUrls)];
+    return [...new Map(
+      completeDecks
+        .sort((a, b) => b.viewCount - a.viewCount || a.sourceOrder - b.sourceOrder)
+        .map((deck) => [deck.url, deck.url])
+    ).values()];
   }
 
   const matches = text.match(/https?:\/\/archidekt\.com\/decks\/\d+/gi) || [];
