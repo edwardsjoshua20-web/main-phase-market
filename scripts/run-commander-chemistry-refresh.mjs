@@ -4,11 +4,13 @@ import { spawnSync } from 'node:child_process';
 import Database from 'better-sqlite3';
 import {
   downloadCommanderCorpusState,
+  exportCommanderCorpusState,
   uploadCommanderCorpusState
 } from './lib/commander-corpus-state.mjs';
 
 const projectRoot = process.cwd();
 const statePath = path.join(projectRoot, '.runtime', 'commander', 'commander-corpus.db');
+const uploadStatePath = path.join(projectRoot, '.runtime', 'commander', 'commander-corpus-upload.db');
 const manifestPath = path.join(projectRoot, 'public', 'data', 'mtg', 'commander-manifest.json');
 const childEnv = {
   ...process.env,
@@ -71,6 +73,11 @@ function setFreshness(values) {
   }
 }
 
+async function uploadFilteredCommanderState() {
+  exportCommanderCorpusState(statePath, uploadStatePath);
+  return uploadCommanderCorpusState(uploadStatePath);
+}
+
 await downloadCommanderCorpusState(statePath);
 const before = readCorpusCounts();
 const previousDatasetVersion = fs.existsSync(manifestPath)
@@ -93,14 +100,14 @@ runNode('scripts/certify-commander-analytics.mjs');
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 setFreshness({ last_analytics_rebuild_time: manifest.generated_at });
-await uploadCommanderCorpusState(statePath);
+await uploadFilteredCommanderState();
 
 const publicationTime = new Date().toISOString();
 manifest.last_publication_time = publicationTime;
 fs.writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
 runNode('scripts/publish-mtg-commander-public-data.mjs');
 setFreshness({ last_publication_time: publicationTime });
-const stateUpload = await uploadCommanderCorpusState(statePath);
+const stateUpload = await uploadFilteredCommanderState();
 const after = readCorpusCounts();
 
 if (manifest.dataset_version === previousDatasetVersion && after.active_decks !== before.active_decks) {
