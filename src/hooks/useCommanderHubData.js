@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getMtgCommanderPage, searchMtgCommanders } from '@/lib/mtgCommanderCatalog';
+import { searchMtgCommanders } from '@/lib/mtgCommanderCatalog';
 import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 
 export function useCommanderHubData() {
   const [featuredCommanders, setFeaturedCommanders] = useState([]);
-  const [featuredDetails, setFeaturedDetails] = useState({});
   const [browseResults, setBrowseResults] = useState([]);
   const [browseTotal, setBrowseTotal] = useState(0);
   const [manifest, setManifest] = useState(null);
@@ -29,17 +28,6 @@ export function useCommanderHubData() {
         if (manifestResponse?.ok) {
           setManifest(await manifestResponse.json());
         }
-
-        const details = await Promise.all(
-          featured.slice(0, 5).map(async (commander) => {
-            try {
-              return [commander.oracle_id, await getMtgCommanderPage(commander.oracle_id)];
-            } catch {
-              return [commander.oracle_id, null];
-            }
-          })
-        );
-        if (mounted) setFeaturedDetails(Object.fromEntries(details));
       } finally {
         if (mounted) setFeaturedLoading(false);
       }
@@ -82,7 +70,6 @@ export function useCommanderHubData() {
 
   return {
     featuredCommanders,
-    featuredDetails,
     browseResults,
     browseTotal,
     manifest,

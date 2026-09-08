@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronDown, Loader2, Search } from 'lucide-react';
+import { ChevronDown, Loader2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import ColorIdentity from '@/components/commander/ColorIdentity';
 import CardImage from '@/components/cards/CardImage';
 import { CardHoverPreview, useCardHoverPreview } from '@/components/cards/CardPresentation';
 import { useCommanderHubData } from '@/hooks/useCommanderHubData';
@@ -33,13 +32,6 @@ const deckCountFilters = [
   { value: '5', label: '5+ decks' }
 ];
 
-const confidenceLabels = {
-  strong: 'Strong sample',
-  usable: 'Usable sample',
-  low: 'Low confidence',
-  insufficient: 'Insufficient sample'
-};
-
 function formatUpdatedAt(value) {
   if (!value) return 'Freshness unavailable';
   const date = new Date(value);
@@ -47,111 +39,35 @@ function formatUpdatedAt(value) {
   return `Updated ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
 }
 
-function getFeaturedSignals(commander, detail) {
-  if (!commander?.analytics_eligible || detail?.analytics_suppressed) {
-    return { theme: null, recommendation: null };
-  }
-
-  const theme = [...(detail?.theme_options || [])]
-    .filter((item) => Number(item.deck_count || 0) > 0)
-    .sort((a, b) => Number(b.deck_count || 0) - Number(a.deck_count || 0))[0] || null;
-  const recommendation = detail?.top_synergy_cards?.[0] || null;
-  return { theme, recommendation };
-}
-
-function getFeaturedSampleCount(commander, detail) {
-  return Number(detail?.sample_confidence?.deck_count ?? commander?.unique_configuration_count ?? commander?.deck_count ?? 0);
-}
-
 function getBrowseSampleCount(commander) {
   return Number(commander?.unique_configuration_count ?? commander?.deck_count ?? 0);
 }
 
-function PrimaryFeaturedProfile({ commander, detail }) {
-  const { theme, recommendation } = getFeaturedSignals(commander, detail);
-  const art = detail?.commander?.image_art_crop || commander.image_url;
-  const sampleCount = getFeaturedSampleCount(commander, detail);
-
-  return (
-    <Link
-      to={`/commanders/${encodeURIComponent(commander.oracle_id)}`}
-      className="group relative flex min-h-[330px] overflow-hidden rounded-[4px] border border-sky-300/25 bg-[#0b1624] transition hover:border-sky-300/50"
-    >
-      {art && <img src={art} alt="" className="absolute inset-0 h-full w-full object-cover object-center opacity-65 transition duration-500 group-hover:scale-[1.015]" />}
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(3,8,18,0.97)_0%,rgba(3,8,18,0.90)_38%,rgba(3,8,18,0.28)_78%)]" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#030812] via-transparent to-black/20" />
-
-      <div className="relative flex max-w-[620px] flex-col justify-between p-6 sm:p-8">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">#1 Featured Chemistry</span>
-          <h3 className="mt-3 max-w-lg text-3xl font-black leading-tight text-white sm:text-4xl">{commander.name}</h3>
-          <div className="mt-4"><ColorIdentity colors={commander.color_identity || []} /></div>
-        </div>
-
-        <div className="mt-8">
-          <div className="grid max-w-lg grid-cols-2 gap-x-5 gap-y-3 border-y border-white/10 py-4 text-sm">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Sample</p>
-              <p className="mt-1 font-semibold text-white">{sampleCount.toLocaleString()} decks</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Confidence</p>
-              <p className="mt-1 font-semibold text-sky-300">{confidenceLabels[commander.confidence_tier] || commander.confidence_tier}</p>
-            </div>
-            {theme && (
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Leading theme</p>
-                <p className="mt-1 font-semibold text-white">{theme.label}</p>
-              </div>
-            )}
-            {recommendation && (
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Strong chemistry</p>
-                <p className="mt-1 line-clamp-1 font-semibold text-white">{recommendation.card_name}</p>
-              </div>
-            )}
-          </div>
-          <span className="mt-5 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-white">
-            View Chemistry <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-          </span>
-        </div>
-      </div>
-    </Link>
-  );
+function hasLimitedData(commander) {
+  return ['low', 'insufficient'].includes(commander?.confidence_tier);
 }
 
-function SecondaryFeaturedProfile({ commander, detail }) {
-  const { theme, recommendation } = getFeaturedSignals(commander, detail);
-  const art = detail?.commander?.image_art_crop || commander.image_url;
-  const sampleCount = getFeaturedSampleCount(commander, detail);
+function TopCommanderCard({ commander, onPreviewEnter, onPreviewLeave }) {
+  const sampleCount = getBrowseSampleCount(commander);
 
   return (
     <Link
       to={`/commanders/${encodeURIComponent(commander.oracle_id)}`}
-      className="group relative min-h-[156px] overflow-hidden rounded-[4px] border border-white/10 bg-[#0b1624] p-4 transition hover:border-sky-300/40 hover:bg-[#0e1b2b]"
+      className="group relative aspect-[5/7] overflow-hidden rounded-[3px] bg-[#0b1624] ring-1 ring-white/10 transition hover:ring-sky-300/45"
+      onMouseEnter={() => onPreviewEnter(commander)}
+      onMouseLeave={onPreviewLeave}
     >
-      {art && <img src={art} alt="" className="absolute inset-0 h-full w-full object-cover object-center opacity-30 transition duration-500 group-hover:scale-[1.02] group-hover:opacity-40" />}
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,9,18,0.96)_0%,rgba(4,9,18,0.88)_58%,rgba(4,9,18,0.38)_100%)]" />
-      <div className="relative flex h-full flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300">#{commander.rank}</span>
-            <ColorIdentity colors={commander.color_identity || []} />
-          </div>
-          <h3 className="mt-2 line-clamp-2 text-lg font-bold leading-tight text-white">{commander.name}</h3>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-300">
-            <span>{sampleCount.toLocaleString()} decks</span>
-            <span className="text-sky-300">{confidenceLabels[commander.confidence_tier] || commander.confidence_tier}</span>
-          </div>
-          {(theme || recommendation) && (
-            <p className="mt-2 line-clamp-1 text-xs text-slate-400">
-              {theme ? theme.label : recommendation.card_name}
-            </p>
-          )}
-        </div>
-        <span className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-          View Chemistry <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-        </span>
+      <CardImage
+        card={commander}
+        alt={commander.name}
+        className="h-full w-full object-cover object-top transition duration-300 group-hover:scale-[1.015]"
+        renderFallback={() => <div className="h-full w-full bg-[linear-gradient(145deg,#15253a,#090f19)]" />}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/15 to-black/10" />
+      <span className="absolute left-2 top-2 bg-black/75 px-1.5 py-0.5 text-xs font-black text-white">#{commander.rank}</span>
+      <div className="absolute inset-x-0 bottom-0 p-2.5">
+        <h3 className="line-clamp-2 text-xs font-bold leading-tight text-white">{commander.name}</h3>
+        <p className="mt-1 text-[10px] font-semibold text-slate-300">{sampleCount.toLocaleString()} decks</p>
       </div>
     </Link>
   );
@@ -180,13 +96,13 @@ function BrowseCommanderCard({ commander, onPreviewEnter, onPreviewLeave }) {
   return (
     <Link
       to={`/commanders/${encodeURIComponent(commander.oracle_id)}`}
-      className="group overflow-hidden rounded-[3px] bg-white/[0.035] transition hover:bg-white/[0.065]"
+      className="group relative aspect-[4/5] overflow-hidden rounded-[3px] bg-[#0b1624] ring-1 ring-white/[0.07] transition hover:ring-white/20"
     >
-      <div className="aspect-[5/7] overflow-hidden bg-[#080e17]" onMouseEnter={() => onPreviewEnter(commander)} onMouseLeave={onPreviewLeave}>
+      <div className="absolute inset-0 overflow-hidden bg-[#080e17]" onMouseEnter={() => onPreviewEnter(commander)} onMouseLeave={onPreviewLeave}>
         <CardImage
           card={commander}
           alt={commander.name}
-          className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.015]"
+          className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.015]"
           renderFallback={() => (
             <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.14),transparent_55%),linear-gradient(180deg,#101827,#090c14)]">
               <span className="text-3xl font-black text-white/15">{commander.name?.charAt(0)}</span>
@@ -194,15 +110,13 @@ function BrowseCommanderCard({ commander, onPreviewEnter, onPreviewLeave }) {
           )}
         />
       </div>
-      <div className="p-3">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="line-clamp-2 text-sm font-bold leading-snug text-white">{commander.name}</h3>
-          <ColorIdentity colors={commander.color_identity || []} />
-        </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[11px]">
-          <span className="font-semibold text-slate-300">{sampleCount.toLocaleString()} decks</span>
-          <span className="text-slate-500">{confidenceLabels[commander.confidence_tier] || commander.confidence_tier}</span>
-        </div>
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
+      {hasLimitedData(commander) && (
+        <span className="absolute right-2 top-2 bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-300">Limited data</span>
+      )}
+      <div className="absolute inset-x-0 bottom-0 p-3">
+        <h3 className="line-clamp-2 text-sm font-bold leading-snug text-white">{commander.name}</h3>
+        <p className="mt-1 text-[10px] font-semibold text-slate-300">{sampleCount.toLocaleString()} decks</p>
       </div>
     </Link>
   );
@@ -219,7 +133,6 @@ export default function CommanderHub() {
     browseLoading,
     browseResults,
     browseTotal,
-    featuredDetails,
     featuredLoading,
     manifest,
     rankedFeatured,
@@ -258,7 +171,7 @@ export default function CommanderHub() {
   return (
     <div className="min-h-screen bg-[#0a0d14] text-white">
       <div className="border-b border-white/10 bg-[#0d1420]">
-        <div className="px-5 py-7 sm:px-6 xl:px-10">
+        <div className="px-5 py-5 sm:px-6 xl:px-10">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">Magic: The Gathering</p>
@@ -270,7 +183,7 @@ export default function CommanderHub() {
           </div>
 
           <form
-            className="mt-6"
+            className="mt-4"
             onSubmit={(event) => {
               event.preventDefault();
               submitSearch();
@@ -289,38 +202,27 @@ export default function CommanderHub() {
         </div>
       </div>
 
-      <div className="space-y-11 px-5 py-8 sm:px-6 xl:px-10">
+      <div className="space-y-9 px-5 py-6 sm:px-6 xl:px-10">
         <section>
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-300">Current leaders</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight text-white">Featured Chemistry</h2>
-            </div>
-            <span className="hidden text-xs text-slate-500 sm:block">Ranked from the current certified corpus</span>
-          </div>
+          <h2 className="mb-4 text-xl font-black tracking-tight text-white">Top 10 Commanders</h2>
 
           {featuredLoading ? (
-            <div className="flex min-h-[330px] items-center justify-center gap-3 border-y border-white/10 text-slate-400">
+            <div className="flex min-h-[180px] items-center justify-center gap-3 border-y border-white/10 text-slate-400">
               <Loader2 className="h-5 w-5 animate-spin text-sky-300" />
-              <span>Loading featured chemistry...</span>
+              <span>Loading commanders...</span>
             </div>
           ) : rankedFeatured.length === 0 ? (
-            <div className="border-y border-white/10 py-12 text-center text-sm text-slate-400">Featured chemistry is unavailable.</div>
+            <div className="border-y border-white/10 py-12 text-center text-sm text-slate-400">Top commanders are unavailable.</div>
           ) : (
-            <div className="grid gap-3 lg:grid-cols-[1.35fr_1fr]">
-              <PrimaryFeaturedProfile
-                commander={rankedFeatured[0]}
-                detail={featuredDetails[rankedFeatured[0].oracle_id]}
-              />
-              <div className="grid gap-3 sm:grid-cols-2">
-                {rankedFeatured.slice(1, 5).map((commander) => (
-                  <SecondaryFeaturedProfile
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5 lg:grid-cols-10">
+              {rankedFeatured.map((commander) => (
+                <TopCommanderCard
                   key={commander.oracle_id}
                   commander={commander}
-                    detail={featuredDetails[commander.oracle_id]}
+                  onPreviewEnter={cardPreview.showPreview}
+                  onPreviewLeave={cardPreview.hidePreview}
                 />
               ))}
-              </div>
             </div>
           )}
         </section>
@@ -329,7 +231,6 @@ export default function CommanderHub() {
           <div className="mb-4 flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-4">
             <div>
               <h2 className="text-2xl font-black tracking-tight text-white">Browse Commanders</h2>
-              <p className="mt-1 text-sm text-slate-400">Find a profile by identity, sample quality, or popularity.</p>
             </div>
             <div className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
               {filteredCommanders.length.toLocaleString()} profiles
