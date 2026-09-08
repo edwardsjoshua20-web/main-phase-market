@@ -7,7 +7,8 @@ const SITE_FILES = [
   'data/site/upcoming-releases.json',
   'data/site/system-health.json',
   'data/site/automation-runs.json',
-  'data/site/pricing-snapshot.json'
+  'data/site/pricing-snapshot.json',
+  'data/mtg/commander-manifest.json'
 ];
 const GAME_FILES = PUBLIC_DATA_GAMES.flatMap((game) => [
   `data/${game}/cards.json`,
