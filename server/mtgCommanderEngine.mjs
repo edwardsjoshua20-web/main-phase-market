@@ -14,7 +14,10 @@ import {
   getCommanderSampleConfidence
 } from './mtgCommanderAnalyticsPolicy.mjs';
 
-const mtgSearchDir = path.join(process.cwd(), 'public', 'data', 'mtg', 'search');
+const mtgSearchDirs = [
+  path.join(process.cwd(), 'public', 'data', 'mtg', 'search'),
+  path.join(process.cwd(), 'public', 'data', 'mtg', 'search-lite')
+];
 const INDEX_VERSION = 7;
 const COMMANDER_CATEGORY_ORDER = [
   'creatures',
@@ -83,7 +86,8 @@ function parseJsonArray(value) {
 }
 
 function loadAllMtgRows() {
-  if (!fs.existsSync(mtgSearchDir)) {
+  const mtgSearchDir = mtgSearchDirs.find((directory) => fs.existsSync(directory));
+  if (!mtgSearchDir) {
     return [];
   }
 

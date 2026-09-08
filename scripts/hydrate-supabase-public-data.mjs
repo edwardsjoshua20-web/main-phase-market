@@ -18,6 +18,33 @@ const GAME_FILES = PUBLIC_DATA_GAMES.flatMap((game) => [
   `data/${game}/mirror-manifest.json`
 ]);
 
+async function listObjects({ supabaseUrl, bucketName, serviceRoleKey, prefix }) {
+  const endpoint = `${String(supabaseUrl).replace(/\/+$/, '')}/storage/v1/object/list/${encodeURIComponent(bucketName)}`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      prefix,
+      limit: 1000,
+      offset: 0,
+      sortBy: { column: 'name', order: 'asc' }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Could not list objects under ${prefix}: ${response.status} ${await response.text()}`);
+  }
+
+  const rows = await response.json();
+  return Array.isArray(rows)
+    ? rows.filter((entry) => String(entry?.name || '').endsWith('.json')).map((entry) => `${prefix}/${entry.name}`)
+    : [];
+}
+
 function writeFile(projectRoot, relativePath, buffer) {
   const targetPath = path.join(projectRoot, 'public', relativePath);
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
@@ -48,32 +75,12 @@ async function downloadIfPresent({ storageBaseUrl, serviceRoleKey, relativePath,
 }
 
 async function listPricingSourceFiles({ supabaseUrl, bucketName, serviceRoleKey }) {
-  const endpoint = `${String(supabaseUrl).replace(/\/+$/, '')}/storage/v1/object/list/${encodeURIComponent(bucketName)}`;
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${serviceRoleKey}`,
-      apikey: serviceRoleKey,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      prefix: 'data/site/pricing-sources',
-      limit: 1000,
-      offset: 0,
-      sortBy: { column: 'name', order: 'asc' }
-    })
+  return listObjects({
+    supabaseUrl,
+    bucketName,
+    serviceRoleKey,
+    prefix: 'data/site/pricing-sources'
   });
-
-  if (!response.ok) {
-    throw new Error(`Could not list pricing-source objects: ${response.status} ${await response.text()}`);
-  }
-
-  const rows = await response.json();
-  return Array.isArray(rows)
-    ? rows
-      .filter((entry) => String(entry?.name || '').endsWith('.json'))
-      .map((entry) => `data/site/pricing-sources/${entry.name}`)
-    : [];
 }
 
 async function main() {
@@ -85,7 +92,17 @@ async function main() {
   }
 
   const pricingFiles = await listPricingSourceFiles(config);
-  const requestedPaths = [...new Set([...SITE_FILES, ...GAME_FILES, ...pricingFiles])];
+  const mtgSearchLiteFiles = await listObjects({
+    ...config,
+    prefix: 'data/mtg/search-lite'
+  });
+  const requestedPaths = [...new Set([
+    ...SITE_FILES,
+    ...GAME_FILES,
+    ...pricingFiles,
+    'data/mtg/search-lite-manifest.json',
+    ...mtgSearchLiteFiles
+  ])];
   const storageBaseUrl = toStorageBaseUrl(config.supabaseUrl, config.bucketName);
   const results = [];
 

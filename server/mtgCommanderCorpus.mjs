@@ -4,7 +4,10 @@ import path from 'node:path';
 import { db } from './db.mjs';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const mtgSearchDir = path.join(process.cwd(), 'public', 'data', 'mtg', 'search');
+const mtgSearchDirs = [
+  path.join(process.cwd(), 'public', 'data', 'mtg', 'search'),
+  path.join(process.cwd(), 'public', 'data', 'mtg', 'search-lite')
+];
 const mtgAliasPath = path.join(process.cwd(), 'server', 'data', 'mtg-name-aliases.json');
 let mtgNameLookup = null;
 let mtgOracleLookup = null;
@@ -58,7 +61,8 @@ function isCloudflareBlockPage(text) {
 }
 
 function buildMtgNameLookup() {
-  if (!fs.existsSync(mtgSearchDir)) {
+  const mtgSearchDir = mtgSearchDirs.find((directory) => fs.existsSync(directory));
+  if (!mtgSearchDir) {
     return new Map();
   }
 
@@ -101,7 +105,8 @@ function buildMtgNameLookup() {
 }
 
 function buildMtgOracleLookup() {
-  if (!fs.existsSync(mtgSearchDir)) {
+  const mtgSearchDir = mtgSearchDirs.find((directory) => fs.existsSync(directory));
+  if (!mtgSearchDir) {
     return new Map();
   }
 
