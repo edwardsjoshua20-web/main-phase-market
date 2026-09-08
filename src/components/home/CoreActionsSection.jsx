@@ -11,9 +11,9 @@ const actions = [
     backgroundPosition: '100% 50%',
   },
   {
-    title: 'Commander Hub',
-    action: 'EXPLORE COMMANDERS →',
-    to: '/CommanderHub',
+    title: 'Deck Chemistry',
+    action: 'EXPLORE CHEMISTRY →',
+    to: '/DeckChemistry',
     backgroundImage: '/images/home-tools/commander-purple-energy.png',
     backgroundPosition: '78% 50%',
   },

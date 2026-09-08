@@ -16,6 +16,7 @@ import MobileMember from './pages/mobile/MobileMember';
 import CommunityDecks from './pages/CommunityDecks';
 import CommanderDetail from './pages/CommanderDetail';
 import CommanderHub from './pages/CommanderHub';
+import DeckChemistry from './pages/DeckChemistry';
 import MobileForum from './pages/mobile/MobileForum';
 import MobileCommunityDecks from './pages/mobile/MobileCommunityDecks';
 import Forum from './pages/Forum';
@@ -31,7 +32,7 @@ import MobileShop from './pages/mobile/MobileShop';
 import MobileDeckBuilder from './pages/mobile/MobileDeckBuilder';
 import MobileBrowse from './pages/mobile/MobileBrowse';
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AppAuthProvider, useAppAuth } from '@/lib/AppAuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -102,6 +103,9 @@ const AuthenticatedApp = () => {
         <Route path="/AdminInventory" element={<AdminInventory />} />
         <Route path="/AdminShippingFulfillment" element={<AdminShippingFulfillment />} />
         <Route path="/set/:game/:setSlug" element={<SetDetail />} />
+        <Route path="/DeckChemistry" element={<LayoutWrapper currentPageName="DeckChemistry"><DeckChemistry /></LayoutWrapper>} />
+        <Route path="/DeckChemistry/magic" element={<LayoutWrapper currentPageName="CommanderHub"><CommanderHub /></LayoutWrapper>} />
+        <Route path="/CommanderHub" element={<Navigate to="/DeckChemistry" replace />} />
         {/* Redirect all other paths to mobile home */}
         <Route path="*" element={<MobileHome />} />
       </Routes>
@@ -131,7 +135,9 @@ const AuthenticatedApp = () => {
       <Route path="/MemberLogin" element={<MemberLogin />} />
       <Route path="/MemberBenefits" element={<LayoutWrapper currentPageName="MemberBenefits"><MemberBenefits /></LayoutWrapper>} />
       <Route path="/CommunityDecks" element={<LayoutWrapper currentPageName="CommunityDecks"><CommunityDecks /></LayoutWrapper>} />
-      <Route path="/CommanderHub" element={<LayoutWrapper currentPageName="CommanderHub"><CommanderHub /></LayoutWrapper>} />
+      <Route path="/DeckChemistry" element={<LayoutWrapper currentPageName="DeckChemistry"><DeckChemistry /></LayoutWrapper>} />
+      <Route path="/DeckChemistry/magic" element={<LayoutWrapper currentPageName="CommanderHub"><CommanderHub /></LayoutWrapper>} />
+      <Route path="/CommanderHub" element={<Navigate to="/DeckChemistry" replace />} />
       <Route path="/commanders/:oracleId" element={<LayoutWrapper currentPageName="CommanderDetail"><CommanderDetail /></LayoutWrapper>} />
       <Route path="/CollectionTracker" element={<LayoutWrapper currentPageName="CollectionTracker"><CollectionTracker /></LayoutWrapper>} />
       <Route path="/PriceAlerts" element={<LayoutWrapper currentPageName="PriceAlerts"><PriceAlerts /></LayoutWrapper>} />

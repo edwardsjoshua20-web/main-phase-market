@@ -190,7 +190,7 @@ export default function Layout({ children, currentPageName }) {
     { label: 'Home', to: '/', pages: ['Home'] },
     { label: 'Shop', to: '/Shop', pages: ['Shop'] },
     { label: 'Deck Builder', to: '/DeckBuilder', pages: ['AdvancedDeckBuilder', 'DeckBuilder'] },
-    { label: 'Commander Hub', to: '/CommanderHub', pages: ['CommanderHub', 'CommanderDetail'], desktopOnly: true },
+    { label: 'Deck Chemistry', to: '/DeckChemistry', pages: ['DeckChemistry', 'CommanderHub', 'CommanderDetail'], desktopOnly: true },
     { label: 'Community', to: '/CommunityDecks', pages: ['CommunityDecks'], desktopOnly: true },
     { label: 'Forum', to: '/Forum', pages: ['Forum', 'ForumThread'], desktopOnly: true }
   ];
