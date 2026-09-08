@@ -13,6 +13,7 @@ import {
 const PROJECT_ROOT = process.cwd();
 const SEARCH_SHARDS_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'search-shards');
 const SEARCH_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'search');
+const SEARCH_LITE_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'search-lite');
 const OUTPUT_PATH = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commanders.json');
 const DETAILS_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commander-details');
 const MANIFEST_PATH = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commander-manifest.json');
@@ -141,7 +142,12 @@ function compareCommanderRows(a, b) {
 
 async function main() {
   const files = collectJsonFiles(SEARCH_DIR);
-  const sourceFiles = files.length > 0 ? files : collectJsonFiles(SEARCH_SHARDS_DIR);
+  const searchShardFiles = collectJsonFiles(SEARCH_SHARDS_DIR);
+  const sourceFiles = files.length > 0
+    ? files
+    : searchShardFiles.length > 0
+      ? searchShardFiles
+      : collectJsonFiles(SEARCH_LITE_DIR);
 
   if (sourceFiles.length === 0) {
     throw new Error('No MTG search files found to build commander data.');
