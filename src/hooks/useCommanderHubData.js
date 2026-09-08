@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { searchMtgCommanders } from '@/lib/mtgCommanderCatalog';
+import { getMtgCommanderPage, searchMtgCommanders } from '@/lib/mtgCommanderCatalog';
+import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 
 export function useCommanderHubData() {
   const [featuredCommanders, setFeaturedCommanders] = useState([]);
+  const [featuredDetails, setFeaturedDetails] = useState({});
   const [browseResults, setBrowseResults] = useState([]);
   const [browseTotal, setBrowseTotal] = useState(0);
+  const [manifest, setManifest] = useState(null);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [browseLoading, setBrowseLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -15,9 +18,28 @@ export function useCommanderHubData() {
 
     async function loadFeatured() {
       try {
-        const payload = await searchMtgCommanders('', { limit: 10, minDeckCount: 1 });
+        const [payload, manifestResponse] = await Promise.all([
+          searchMtgCommanders('', { limit: 10, minDeckCount: 1 }),
+          fetch(getCatalogAssetUrl('mtg', 'commander-manifest.json')).catch(() => null)
+        ]);
         if (!mounted) return;
-        setFeaturedCommanders((payload.results || []).slice(0, 10));
+        const featured = (payload.results || []).slice(0, 10);
+        setFeaturedCommanders(featured);
+
+        if (manifestResponse?.ok) {
+          setManifest(await manifestResponse.json());
+        }
+
+        const details = await Promise.all(
+          featured.slice(0, 5).map(async (commander) => {
+            try {
+              return [commander.oracle_id, await getMtgCommanderPage(commander.oracle_id)];
+            } catch {
+              return [commander.oracle_id, null];
+            }
+          })
+        );
+        if (mounted) setFeaturedDetails(Object.fromEntries(details));
       } finally {
         if (mounted) setFeaturedLoading(false);
       }
@@ -36,7 +58,7 @@ export function useCommanderHubData() {
     const timeoutId = setTimeout(async () => {
       try {
         const payload = await searchMtgCommanders(search, {
-          limit: 1000,
+          limit: 4000,
           minDeckCount: 1
         });
         if (!mounted) return;
@@ -60,8 +82,10 @@ export function useCommanderHubData() {
 
   return {
     featuredCommanders,
+    featuredDetails,
     browseResults,
     browseTotal,
+    manifest,
     featuredLoading,
     browseLoading,
     search,
