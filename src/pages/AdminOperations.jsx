@@ -34,6 +34,7 @@ function getBusinessCoreSummary(sections = {}) {
     { key: 'images', label: 'Image pipelines', status: normalizeStatus(sections.images?.overallStatus) },
     { key: 'pricing', label: 'Pricing', status: normalizeStatus(sections.pricing?.status) },
     { key: 'inventory', label: 'Inventory durability', status: normalizeStatus(sections.inventory?.status) },
+    { key: 'commander', label: 'Deck Chemistry', status: normalizeStatus(sections.commander?.status) },
     { key: 'readiness', label: 'Launch readiness', status: normalizeStatus(sections.readiness?.overallStatus) }
   ];
   const healthy = systems.filter((system) => system.status === 'ok').length;
@@ -319,6 +320,12 @@ export default function AdminOperations() {
           detail: sections.inventory?.diagnostics?.[0] || 'Inventory backup/audit proof is not healthy yet.'
         }
       : null,
+    sections.commander?.status !== 'ok'
+      ? {
+          title: 'Deck Chemistry needs attention',
+          detail: sections.commander?.diagnostics?.[0] || 'Commander analytics are not current yet.'
+        }
+      : null,
     reportFreshnessStatus !== 'ok'
       ? {
           title: 'Hosted report is out of date',
@@ -437,6 +444,13 @@ export default function AdminOperations() {
       primary: sections.inventory?.status === 'ok' ? 'Protected' : 'Needs attention',
       secondary: `Items backed up: ${sections.inventory?.latestBackup?.entityCount ?? 0} • Audit rows: ${sections.inventory?.audit?.mutationRows ?? 0}`,
       tertiary: `Last backup: ${adminOperationsModel.formatDate(sections.inventory?.latestBackup?.createdAt)}`
+    },
+    {
+      title: 'Deck Chemistry',
+      status: sections.commander?.status || 'missing',
+      primary: sections.commander?.status === 'ok' ? 'Fresh' : 'Needs attention',
+      secondary: `${sections.commander?.activeDeckCount ?? 0} observations • ${sections.commander?.uniqueConfigurationCount ?? 0} unique`,
+      tertiary: `Published: ${adminOperationsModel.formatDate(sections.commander?.lastPublicationAt || generatedAt)}`
     },
     {
       title: 'Automations',
@@ -949,6 +963,7 @@ export default function AdminOperations() {
               <SectionCard title="Image pipelines" sectionKey="images" section={sections.images} automationRuns={automationRuns} />
               <SectionCard title="Pricing pipelines" sectionKey="pricing" section={sections.pricing} automationRuns={automationRuns} />
               <SectionCard title="Inventory durability" sectionKey="inventory" section={sections.inventory} automationRuns={automationRuns} />
+              <SectionCard title="Deck Chemistry" sectionKey="commander" section={sections.commander} automationRuns={automationRuns} />
             </div>
           </div>
         </details>

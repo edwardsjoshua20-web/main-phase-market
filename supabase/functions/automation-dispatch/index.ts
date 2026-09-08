@@ -9,6 +9,7 @@ const ALLOWED_JOBS = new Set([
   'image-repair-sync',
   'pricing-refresh',
   'inventory-backup',
+  'commander-chemistry-refresh',
   'system-health-report'
 ]);
 const ALLOWED_TRIGGER_SOURCES = new Set([
@@ -25,7 +26,8 @@ const STALE_ACTIVE_LIMITS_MS: Record<string, number> = {
   'card-backfill-refresh': 2 * 60 * 60 * 1000,
   'catalog-refresh': 2 * 60 * 60 * 1000,
   'image-repair-sync': 6 * 60 * 60 * 1000,
-  'inventory-backup': 30 * 60 * 1000
+  'inventory-backup': 30 * 60 * 1000,
+  'commander-chemistry-refresh': 2 * 60 * 60 * 1000
 };
 
 function getRequiredEnv(name: string) {

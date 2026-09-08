@@ -63,6 +63,9 @@ function buildDueJobs(now: Date): PlannedJob[] {
   if (hour === 15 && isEveryOtherUtcDay(now)) {
     jobs.push({ jobId: 'catalog-refresh', reason: 'every-other-day catalog normalization' });
   }
+  if (hour === 16) {
+    jobs.push({ jobId: 'commander-chemistry-refresh', reason: 'daily Deck Chemistry refresh' });
+  }
   if (hour === 18) {
     jobs.push({ jobId: 'image-repair-sync', reason: 'daily image repair window' });
   }

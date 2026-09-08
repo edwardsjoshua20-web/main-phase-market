@@ -78,9 +78,10 @@ function isCommander(row, commanderOracleIds) {
   return commanderOracleIds.has(row.oracle_id);
 }
 
-function toCommander(row, deckCounts, snapshot) {
+function toCommander(row, deckCounts, uniqueConfigurationCounts, snapshot) {
   const deckCount = Number(deckCounts.get(row.oracle_id) || 0);
-  const sampleConfidence = getCommanderSampleConfidence(deckCount);
+  const uniqueConfigurationCount = Number(uniqueConfigurationCounts.get(row.oracle_id) || 0);
+  const sampleConfidence = getCommanderSampleConfidence(uniqueConfigurationCount);
   return {
     id: row.id,
     oracle_id: row.oracle_id,
@@ -101,6 +102,8 @@ function toCommander(row, deckCounts, snapshot) {
     set_code: row.set_code || '',
     rarity: row.rarity || '',
     deck_count: deckCount,
+    unique_configuration_count: uniqueConfigurationCount,
+    duplicate_observation_count: Math.max(0, deckCount - uniqueConfigurationCount),
     dataset_version: snapshot.datasetVersion,
     analytics_version: COMMANDER_ANALYTICS_VERSION,
     confidence_tier: sampleConfidence.tier,
@@ -149,8 +152,10 @@ async function main() {
   const snapshot = getMtgCommanderPublicSnapshot();
   const commanderOracleIds = new Set(snapshot.indexRows.map((row) => row.oracle_id));
   const deckCounts = new Map();
+  const uniqueConfigurationCounts = new Map();
   for (const row of snapshot.indexRows) {
     deckCounts.set(row.oracle_id, Number(row.deck_count || 0));
+    uniqueConfigurationCounts.set(row.oracle_id, Number(row.unique_configuration_count || 0));
   }
 
   for (const filePath of sourceFiles) {
@@ -164,7 +169,7 @@ async function main() {
         continue;
       }
 
-      const candidate = toCommander(row, deckCounts, snapshot);
+      const candidate = toCommander(row, deckCounts, uniqueConfigurationCounts, snapshot);
       const existing = commandersByOracleId.get(row.oracle_id);
       if (!existing || compareCommanderRows(candidate, existing) < 0) {
         commandersByOracleId.set(row.oracle_id, candidate);
@@ -212,6 +217,15 @@ async function main() {
     sample_thresholds: COMMANDER_SAMPLE_THRESHOLDS,
     generated_at: snapshot.generatedAt,
     active_deck_count: snapshot.activeDeckCount,
+    unique_content_configuration_count: snapshot.uniqueConfigurationCount,
+    duplicate_observation_count: snapshot.duplicateObservationCount,
+    quarantined_count: snapshot.quarantinedCount,
+    retired_count: snapshot.retiredCount,
+    source_replay_failures: snapshot.sourceReplayFailures,
+    last_successful_discovery_time: snapshot.freshness.last_successful_discovery_time || null,
+    last_successful_ingestion_time: snapshot.freshness.last_successful_ingestion_time || null,
+    last_analytics_rebuild_time: snapshot.generatedAt,
+    last_publication_time: snapshot.freshness.last_publication_time || null,
     index_deck_total: snapshot.indexDeckTotal,
     positive_commander_count: snapshot.positiveCommanderCount,
     detail_count: detailCount

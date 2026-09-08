@@ -261,6 +261,8 @@ export function ensureCommanderCorpusTables() {
       validation_notes TEXT,
       source_identity TEXT,
       content_hash TEXT,
+      content_fingerprint TEXT,
+      chemistry_weight REAL NOT NULL DEFAULT 0,
       lifecycle_status TEXT NOT NULL DEFAULT 'quarantined',
       rejection_reason TEXT,
       last_validated_at TEXT,
@@ -282,6 +284,11 @@ export function ensureCommanderCorpusTables() {
 
     CREATE INDEX IF NOT EXISTS idx_mtg_commander_corpus_cards_card
     ON mtg_commander_corpus_cards (card_oracle_id, is_commander);
+
+    CREATE TABLE IF NOT EXISTS mtg_commander_pipeline_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   ensureColumn('mtg_commander_corpus_decks', 'total_cards', 'INTEGER NOT NULL DEFAULT 0');
@@ -290,6 +297,8 @@ export function ensureCommanderCorpusTables() {
   ensureColumn('mtg_commander_corpus_decks', 'validation_notes', 'TEXT');
   ensureColumn('mtg_commander_corpus_decks', 'source_identity', 'TEXT');
   ensureColumn('mtg_commander_corpus_decks', 'content_hash', 'TEXT');
+  ensureColumn('mtg_commander_corpus_decks', 'content_fingerprint', 'TEXT');
+  ensureColumn('mtg_commander_corpus_decks', 'chemistry_weight', 'REAL NOT NULL DEFAULT 0');
   ensureColumn('mtg_commander_corpus_decks', 'lifecycle_status', `TEXT NOT NULL DEFAULT 'quarantined'`);
   ensureColumn('mtg_commander_corpus_decks', 'rejection_reason', 'TEXT');
   ensureColumn('mtg_commander_corpus_decks', 'last_validated_at', 'TEXT');
@@ -335,7 +344,12 @@ export function ensureCommanderCorpusTables() {
 
     CREATE INDEX IF NOT EXISTS idx_mtg_commander_corpus_decks_active
     ON mtg_commander_corpus_decks (lifecycle_status, quality_status, commander_oracle_id);
+
+    CREATE INDEX IF NOT EXISTS idx_mtg_commander_corpus_decks_fingerprint
+    ON mtg_commander_corpus_decks (content_fingerprint, lifecycle_status, quality_status);
   `);
+
+  rebuildCommanderContentFingerprints({ onlyMissing: true });
 }
 
 ensureCommanderCorpusTables();
@@ -380,12 +394,14 @@ const insertDeckStmt = db.prepare(`
     deck_key, source_id, source_name, source_deck_id, source_url, deck_name,
     commander_oracle_id, commander_name, commander_name_normalized, total_cards,
     unresolved_cards, quality_status, validation_notes, source_identity, content_hash,
-    lifecycle_status, rejection_reason, last_validated_at, retired_at, imported_at
+    content_fingerprint, chemistry_weight, lifecycle_status, rejection_reason,
+    last_validated_at, retired_at, imported_at
   ) VALUES (
     @deck_key, @source_id, @source_name, @source_deck_id, @source_url, @deck_name,
     @commander_oracle_id, @commander_name, @commander_name_normalized, @total_cards,
     @unresolved_cards, @quality_status, @validation_notes, @source_identity, @content_hash,
-    @lifecycle_status, @rejection_reason, @last_validated_at, @retired_at, @imported_at
+    @content_fingerprint, @chemistry_weight, @lifecycle_status, @rejection_reason,
+    @last_validated_at, @retired_at, @imported_at
   )
   ON CONFLICT(deck_key) DO UPDATE SET
     source_id = excluded.source_id,
@@ -402,6 +418,8 @@ const insertDeckStmt = db.prepare(`
     validation_notes = excluded.validation_notes,
     source_identity = excluded.source_identity,
     content_hash = excluded.content_hash,
+    content_fingerprint = excluded.content_fingerprint,
+    chemistry_weight = excluded.chemistry_weight,
     lifecycle_status = excluded.lifecycle_status,
     rejection_reason = excluded.rejection_reason,
     last_validated_at = excluded.last_validated_at,
@@ -817,6 +835,102 @@ function buildDeckKey(sourceIdentity) {
   return crypto.createHash('sha1').update(sourceIdentity).digest('hex');
 }
 
+function normalizeFingerprintEntries(entries = []) {
+  const quantities = new Map();
+  for (const entry of entries) {
+    const oracleId = String(entry?.oracle_id || entry?.card_oracle_id || '').trim().toLowerCase();
+    const quantity = Math.max(0, Number(entry?.quantity || 0));
+    if (!oracleId || quantity <= 0) continue;
+    quantities.set(oracleId, (quantities.get(oracleId) || 0) + quantity);
+  }
+  return [...quantities.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
+export function buildCommanderContentFingerprint({ commanders = [], cards = [] } = {}) {
+  const seed = JSON.stringify({
+    commanders: normalizeFingerprintEntries(commanders),
+    cards: normalizeFingerprintEntries(cards)
+  });
+  return crypto.createHash('sha256').update(seed).digest('hex');
+}
+
+export function rebuildCommanderContentFingerprints(options = {}) {
+  const onlyMissing = Boolean(options.onlyMissing);
+  const decks = db.prepare(`
+    SELECT deck_key
+    FROM mtg_commander_corpus_decks
+    ${onlyMissing ? "WHERE content_fingerprint IS NULL OR trim(content_fingerprint) = ''" : ''}
+    ORDER BY deck_key
+  `).all();
+  const selectCards = db.prepare(`
+    SELECT card_oracle_id, quantity, is_commander
+    FROM mtg_commander_corpus_cards
+    WHERE deck_key = ?
+    ORDER BY is_commander DESC, card_oracle_id
+  `);
+  const updateFingerprint = db.prepare(`
+    UPDATE mtg_commander_corpus_decks
+    SET content_fingerprint = ?
+    WHERE deck_key = ?
+  `);
+
+  const update = db.transaction(() => {
+    for (const deck of decks) {
+      const rows = selectCards.all(deck.deck_key);
+      if (rows.length === 0) continue;
+      updateFingerprint.run(buildCommanderContentFingerprint({
+        commanders: rows.filter((row) => Number(row.is_commander) === 1),
+        cards: rows.filter((row) => Number(row.is_commander) === 0)
+      }), deck.deck_key);
+    }
+
+    db.prepare('UPDATE mtg_commander_corpus_decks SET chemistry_weight = 0').run();
+    db.prepare(`
+      UPDATE mtg_commander_corpus_decks
+      SET chemistry_weight = 1
+      WHERE lifecycle_status = 'active'
+        AND quality_status = 'valid'
+        AND content_fingerprint IS NOT NULL
+        AND deck_key = (
+          SELECT MIN(candidate.deck_key)
+          FROM mtg_commander_corpus_decks candidate
+          WHERE candidate.lifecycle_status = 'active'
+            AND candidate.quality_status = 'valid'
+            AND candidate.content_fingerprint = mtg_commander_corpus_decks.content_fingerprint
+        )
+    `).run();
+  });
+  update();
+
+  const summary = db.prepare(`
+    SELECT
+      SUM(CASE WHEN lifecycle_status = 'active' AND quality_status = 'valid' THEN 1 ELSE 0 END) active_observations,
+      SUM(CASE WHEN lifecycle_status = 'active' AND quality_status = 'valid' AND chemistry_weight > 0 THEN 1 ELSE 0 END) unique_configurations
+    FROM mtg_commander_corpus_decks
+  `).get();
+  const activeObservations = Number(summary?.active_observations || 0);
+  const uniqueConfigurations = Number(summary?.unique_configurations || 0);
+  return {
+    updated: decks.length,
+    active_observations: activeObservations,
+    unique_configurations: uniqueConfigurations,
+    duplicate_observations: Math.max(0, activeObservations - uniqueConfigurations)
+  };
+}
+
+export function setCommanderPipelineFreshness(key, value = nowIso()) {
+  db.prepare(`
+    INSERT INTO mtg_commander_pipeline_meta (key, value)
+    VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(String(key), typeof value === 'string' ? value : JSON.stringify(value));
+}
+
+export function getCommanderPipelineFreshness() {
+  return Object.fromEntries(db.prepare('SELECT key, value FROM mtg_commander_pipeline_meta ORDER BY key').all()
+    .map((row) => [row.key, row.value]));
+}
+
 export function classifyCommanderRejectionReason(notes = []) {
   const values = Array.isArray(notes) ? notes : String(notes || '').split(',').filter(Boolean);
   if (values.some((note) => note.startsWith('commander:unresolved'))) return 'unresolved_commander';
@@ -1079,6 +1193,7 @@ function importDeckPayload(sourceRow, payload) {
       if (!isCommanderLikeArchidektFormat(deck.format)) notes.push(`format:${deck.format || 'unknown'}`);
       const qualityStatus = notes.length === 0 ? 'valid' : 'invalid';
       const lifecycleStatus = qualityStatus === 'valid' ? 'active' : 'quarantined';
+      const contentFingerprint = buildCommanderContentFingerprint({ commanders, cards });
 
       const sourceIdentity = buildSourceIdentity(sourceRow, deck, deckIndex);
       const existingDeck = selectDeckBySourceIdentityStmt.get(sourceIdentity);
@@ -1103,6 +1218,8 @@ function importDeckPayload(sourceRow, payload) {
         validation_notes: notes.length ? notes.join(',') : null,
         source_identity: sourceIdentity,
         content_hash: buildContentHash(sourceRow.source_name, deck),
+        content_fingerprint: contentFingerprint,
+        chemistry_weight: 0,
         lifecycle_status: lifecycleStatus,
         rejection_reason: classifyCommanderRejectionReason(notes),
         last_validated_at: importedAt,
@@ -1150,6 +1267,7 @@ function importDeckPayload(sourceRow, payload) {
   });
 
   transaction();
+  rebuildCommanderContentFingerprints();
   return { totalDecks: decks.length, importedDecks, sourceIdentities: importedSourceIdentities };
 }
 
@@ -1204,6 +1322,7 @@ export function retireCommanderSourceDecks(sourceId, reason = 'retired_source') 
     }
   });
   transaction();
+  rebuildCommanderContentFingerprints();
   return retired;
 }
 
@@ -1264,6 +1383,8 @@ export function revalidateStoredCommanderDecks() {
     }
   });
   transaction();
+
+  rebuildCommanderContentFingerprints();
 
   return { checked: rows.length - skippedWithoutCards, active, quarantined, skippedWithoutCards };
 }
@@ -1415,6 +1536,7 @@ export function getCommanderCorpusStatus() {
       COUNT(*) AS deck_count,
       COUNT(DISTINCT commander_oracle_id) AS commander_count,
       SUM(CASE WHEN lifecycle_status = 'active' AND quality_status = 'valid' THEN 1 ELSE 0 END) AS usable_deck_count,
+      SUM(CASE WHEN lifecycle_status = 'active' AND quality_status = 'valid' AND chemistry_weight > 0 THEN 1 ELSE 0 END) AS unique_configuration_count,
       SUM(CASE WHEN lifecycle_status = 'quarantined' THEN 1 ELSE 0 END) AS invalid_deck_count,
       SUM(CASE WHEN lifecycle_status = 'retired' THEN 1 ELSE 0 END) AS retired_deck_count
     FROM mtg_commander_corpus_decks
@@ -1429,9 +1551,13 @@ export function getCommanderCorpusStatus() {
     deck_count: Number(totals?.deck_count || 0),
     commander_count: Number(totals?.commander_count || 0),
     usable_deck_count: Number(totals?.usable_deck_count || 0),
+    unique_configuration_count: Number(totals?.unique_configuration_count || 0),
+    duplicate_observation_count: Math.max(0, Number(totals?.usable_deck_count || 0) - Number(totals?.unique_configuration_count || 0)),
     invalid_deck_count: Number(totals?.invalid_deck_count || 0),
     retired_deck_count: Number(totals?.retired_deck_count || 0),
     card_row_count: Number(cardTotals?.card_row_count || 0),
+    source_replay_failures: sources.filter((source) => source.status === 'error').length,
+    freshness: getCommanderPipelineFreshness(),
     sources: sources.map((source) => ({
       source_id: source.source_id,
       label: source.label,

@@ -53,6 +53,18 @@ async function removeRemoteDetails(config, names) {
   }
 }
 
+async function readRemoteJson(config, objectPath) {
+  const endpoint = `${String(config.supabaseUrl).replace(/\/+$/, '')}/storage/v1/object/${encodeURIComponent(config.bucketName)}/${objectPath.split('/').map(encodeURIComponent).join('/')}`;
+  const response = await fetch(endpoint, {
+    headers: {
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      apikey: config.serviceRoleKey
+    }
+  });
+  if (!response.ok) throw new Error(`Could not verify hosted ${objectPath}: ${response.status} ${await response.text()}`);
+  return response.json();
+}
+
 async function main() {
   const projectRoot = process.cwd();
   const config = readSupabaseUploadConfig(projectRoot);
@@ -61,6 +73,7 @@ async function main() {
   const detailsDir = path.join(projectRoot, 'public', ...DETAIL_PREFIX.split('/'));
   const localNames = fs.readdirSync(detailsDir).filter((name) => name.endsWith('.json')).sort();
   const manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, 'public', 'data', 'mtg', 'commander-manifest.json'), 'utf8'));
+  const localIndex = JSON.parse(fs.readFileSync(path.join(projectRoot, 'public', 'data', 'mtg', 'commanders.json'), 'utf8'));
   if (localNames.length !== Number(manifest.detail_count || 0)) {
     throw new Error(`Local Commander detail count ${localNames.length} does not match manifest ${manifest.detail_count}.`);
   }
@@ -68,14 +81,14 @@ async function main() {
   const localSet = new Set(localNames);
   const remoteBefore = await listRemoteDetails(config);
   const staleNames = remoteBefore.filter((name) => !localSet.has(name));
-  await removeRemoteDetails(config, staleNames);
   await uploadPublicDataSelection({
-    relativePaths: ['data/mtg/commanders.json', DETAIL_PREFIX, 'data/mtg/commander-manifest.json']
+    relativePaths: ['data/mtg/commanders.json', DETAIL_PREFIX]
   }, {
     projectRoot,
     config,
     quietProgress: true
   });
+  await removeRemoteDetails(config, staleNames);
 
   const remoteAfter = await listRemoteDetails(config);
   const remoteSet = new Set(remoteAfter);
@@ -83,6 +96,25 @@ async function main() {
   const extra = remoteAfter.filter((name) => !localSet.has(name));
   if (missing.length > 0 || extra.length > 0 || remoteAfter.length !== localNames.length) {
     throw new Error(`Hosted Commander details disagree with local snapshot: missing=${missing.length}, extra=${extra.length}.`);
+  }
+  const hostedIndex = await readRemoteJson(config, 'data/mtg/commanders.json');
+  if (!Array.isArray(hostedIndex) || hostedIndex.length !== localIndex.length) {
+    throw new Error(`Hosted Commander index count ${Array.isArray(hostedIndex) ? hostedIndex.length : 'invalid'} does not match local index ${localIndex.length}.`);
+  }
+  if (hostedIndex.some((row) => row.dataset_version !== manifest.dataset_version || row.analytics_version !== manifest.analytics_version)) {
+    throw new Error('Hosted Commander index contains a mixed or unexpected dataset version.');
+  }
+
+  await uploadPublicDataSelection({
+    relativePaths: ['data/mtg/commander-manifest.json']
+  }, {
+    projectRoot,
+    config,
+    quietProgress: true
+  });
+  const hostedManifest = await readRemoteJson(config, 'data/mtg/commander-manifest.json');
+  if (hostedManifest.dataset_version !== manifest.dataset_version || hostedManifest.detail_count !== localNames.length) {
+    throw new Error('Hosted Commander manifest did not commit the verified snapshot.');
   }
 
   console.log(JSON.stringify({

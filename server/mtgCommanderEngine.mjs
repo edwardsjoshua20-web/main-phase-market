@@ -2,7 +2,11 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { db } from './db.mjs';
-import { ensureCommanderCorpusTables } from './mtgCommanderCorpus.mjs';
+import {
+  ensureCommanderCorpusTables,
+  getCommanderCorpusStatus,
+  getCommanderPipelineFreshness
+} from './mtgCommanderCorpus.mjs';
 import {
   COMMANDER_ANALYTICS_VERSION,
   COMMANDER_PRESENTABLE_THEME_SLUGS,
@@ -11,7 +15,7 @@ import {
 } from './mtgCommanderAnalyticsPolicy.mjs';
 
 const mtgSearchDir = path.join(process.cwd(), 'public', 'data', 'mtg', 'search');
-const INDEX_VERSION = 6;
+const INDEX_VERSION = 7;
 const COMMANDER_CATEGORY_ORDER = [
   'creatures',
   'instants',
@@ -48,6 +52,7 @@ const COLOR_BITS = {
   G: 16
 };
 const VALID_CORPUS_DECK_SQL = `quality_status = 'valid' AND lifecycle_status = 'active'`;
+const CHEMISTRY_CORPUS_DECK_SQL = `${VALID_CORPUS_DECK_SQL} AND chemistry_weight > 0`;
 
 let ensurePromise = null;
 let cardLookupCache = null;
@@ -338,7 +343,8 @@ function categoryLabel(category) {
 
 function mapCommanderRow(row) {
   if (!row) return null;
-  const sampleConfidence = getCommanderSampleConfidence(row.deck_count);
+  const analyticsSampleSize = Number(row.unique_configuration_count ?? row.deck_count ?? 0);
+  const sampleConfidence = getCommanderSampleConfidence(analyticsSampleSize);
   return {
     oracle_id: row.oracle_id,
     name: row.name,
@@ -351,6 +357,8 @@ function mapCommanderRow(row) {
     released_at: row.released_at || null,
     color_identity: parseJsonArray(row.color_identity_json),
     deck_count: Number(row.deck_count || 0),
+    unique_configuration_count: analyticsSampleSize,
+    duplicate_observation_count: Math.max(0, Number(row.deck_count || 0) - analyticsSampleSize),
     rank: sampleConfidence.ranking_eligible ? Number(row.rank || 0) : null,
     confidence_tier: sampleConfidence.tier,
     analytics_eligible: sampleConfidence.analytics_eligible
@@ -368,7 +376,9 @@ function mapStatRow(row) {
     oracle_text: row.oracle_text || '',
     color_identity: parseJsonArray(row.color_identity_json),
     deck_count: Number(row.deck_count || 0),
+    observation_deck_count: Number(row.observation_deck_count || 0),
     total_commander_decks: Number(row.total_commander_decks || 0),
+    total_commander_observations: Number(row.total_commander_observations || 0),
     inclusion_rate: Number(row.inclusion_rate || 0),
     global_deck_count: Number(row.global_deck_count || 0),
     total_global_decks: Number(row.total_global_decks || 0),
@@ -757,7 +767,8 @@ function ensureCommanderTables() {
       released_at TEXT,
       color_identity_json TEXT NOT NULL,
       color_mask INTEGER NOT NULL DEFAULT 0,
-      deck_count INTEGER NOT NULL DEFAULT 0
+      deck_count INTEGER NOT NULL DEFAULT 0,
+      unique_configuration_count INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_mtg_commander_index_name ON mtg_commander_index (name_normalized);
     CREATE INDEX IF NOT EXISTS idx_mtg_commander_index_decks ON mtg_commander_index (deck_count DESC, name_normalized ASC);
@@ -776,7 +787,9 @@ function ensureCommanderTables() {
       oracle_text TEXT,
       color_identity_json TEXT NOT NULL,
       deck_count INTEGER NOT NULL DEFAULT 0,
+      observation_deck_count INTEGER NOT NULL DEFAULT 0,
       total_commander_decks INTEGER NOT NULL DEFAULT 0,
+      total_commander_observations INTEGER NOT NULL DEFAULT 0,
       inclusion_rate REAL NOT NULL DEFAULT 0,
       global_deck_count INTEGER NOT NULL DEFAULT 0,
       total_global_decks INTEGER NOT NULL DEFAULT 0,
@@ -814,6 +827,9 @@ function ensureCommanderTables() {
 
   ensureColumn('mtg_commander_card_stats', 'released_at', 'TEXT');
   ensureColumn('mtg_commander_card_stats', 'cmc', 'REAL');
+  ensureColumn('mtg_commander_card_stats', 'observation_deck_count', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('mtg_commander_card_stats', 'total_commander_observations', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('mtg_commander_index', 'unique_configuration_count', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('mtg_card_lookup', 'cmc', 'REAL');
 }
 
@@ -836,21 +852,23 @@ const truncateCardLookupStmt = db.prepare(`DELETE FROM mtg_card_lookup`);
 const insertCommanderIndexStmt = db.prepare(`
   INSERT INTO mtg_commander_index (
     oracle_id, name, name_normalized, image_url, image_art_crop, mana_cost, type_line,
-    oracle_text, released_at, color_identity_json, color_mask, deck_count
+    oracle_text, released_at, color_identity_json, color_mask, deck_count, unique_configuration_count
   ) VALUES (
     @oracle_id, @name, @name_normalized, @image_url, @image_art_crop, @mana_cost, @type_line,
-    @oracle_text, @released_at, @color_identity_json, @color_mask, @deck_count
+    @oracle_text, @released_at, @color_identity_json, @color_mask, @deck_count, @unique_configuration_count
   )
 `);
 const insertCommanderStatStmt = db.prepare(`
   INSERT INTO mtg_commander_card_stats (
     commander_oracle_id, commander_name, card_oracle_id, card_name, card_name_lower, image_url,
-    mana_cost, cmc, type_line, oracle_text, color_identity_json, deck_count, total_commander_decks,
+    mana_cost, cmc, type_line, oracle_text, color_identity_json, deck_count, observation_deck_count,
+    total_commander_decks, total_commander_observations,
     inclusion_rate, global_deck_count, total_global_decks, global_inclusion_rate, synergy_score,
     confidence_score, weighted_score, category, released_at
   ) VALUES (
     @commander_oracle_id, @commander_name, @card_oracle_id, @card_name, @card_name_lower, @image_url,
-    @mana_cost, @cmc, @type_line, @oracle_text, @color_identity_json, @deck_count, @total_commander_decks,
+    @mana_cost, @cmc, @type_line, @oracle_text, @color_identity_json, @deck_count, @observation_deck_count,
+    @total_commander_decks, @total_commander_observations,
     @inclusion_rate, @global_deck_count, @total_global_decks, @global_inclusion_rate, @synergy_score,
     @confidence_score, @weighted_score, @category, @released_at
   )
@@ -893,6 +911,14 @@ function rebuildCommanderIndex() {
       GROUP BY commander_oracle_id
     `).all().map((row) => [row.commander_oracle_id, Number(row.deck_count || 0)])
   );
+  const uniqueConfigurationCounts = new Map(
+    db.prepare(`
+      SELECT commander_oracle_id, COUNT(*) AS deck_count
+      FROM mtg_commander_corpus_decks
+      WHERE ${CHEMISTRY_CORPUS_DECK_SQL}
+      GROUP BY commander_oracle_id
+    `).all().map((row) => [row.commander_oracle_id, Number(row.deck_count || 0)])
+  );
 
   const records = [];
   for (const [oracleId, variants] of grouped.entries()) {
@@ -914,7 +940,8 @@ function rebuildCommanderIndex() {
       released_at: primary.released_at || null,
       color_identity_json: JSON.stringify(colors),
       color_mask: computeColorMask(colors),
-      deck_count: deckCounts.get(oracleId) || 0
+      deck_count: deckCounts.get(oracleId) || 0,
+      unique_configuration_count: uniqueConfigurationCounts.get(oracleId) || 0
     });
   }
 
@@ -932,7 +959,11 @@ function rebuildCommanderStats() {
   const rows = loadAllMtgRows();
   const cardLookup = buildCardLookup(rows);
   persistCardLookup(cardLookup);
-  const totalGlobalDecks = Number(countCorpusDecksStmt.get()?.count || 0);
+  const totalGlobalDecks = Number(db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM mtg_commander_corpus_decks
+    WHERE ${CHEMISTRY_CORPUS_DECK_SQL}
+  `).get()?.count || 0);
 
   if (totalGlobalDecks === 0) {
     truncateCommanderStatsStmt.run();
@@ -946,7 +977,7 @@ function rebuildCommanderStats() {
       INNER JOIN mtg_commander_corpus_decks decks
         ON decks.deck_key = cards.deck_key
       WHERE cards.is_commander = 0
-        AND decks.${VALID_CORPUS_DECK_SQL}
+        AND decks.${CHEMISTRY_CORPUS_DECK_SQL}
       GROUP BY card_oracle_id
     `).all().map((row) => [row.card_oracle_id, Number(row.deck_count || 0)])
   );
@@ -955,7 +986,7 @@ function rebuildCommanderStats() {
       SELECT idx.color_mask, COUNT(*) AS deck_count
       FROM mtg_commander_corpus_decks decks
       INNER JOIN mtg_commander_index idx ON idx.oracle_id = decks.commander_oracle_id
-      WHERE decks.${VALID_CORPUS_DECK_SQL}
+      WHERE decks.${CHEMISTRY_CORPUS_DECK_SQL}
       GROUP BY idx.color_mask
     `).all().map((row) => [Number(row.color_mask || 0), Number(row.deck_count || 0)])
   );
@@ -967,7 +998,11 @@ function rebuildCommanderStats() {
   };
 
   const commanderRows = db.prepare(`
-    SELECT commander_oracle_id, commander_name, COUNT(*) AS deck_count
+    SELECT
+      commander_oracle_id,
+      commander_name,
+      SUM(CASE WHEN chemistry_weight > 0 THEN 1 ELSE 0 END) AS deck_count,
+      COUNT(*) AS observation_count
     FROM mtg_commander_corpus_decks
     WHERE ${VALID_CORPUS_DECK_SQL}
     GROUP BY commander_oracle_id, commander_name
@@ -991,6 +1026,15 @@ function rebuildCommanderStats() {
       ON decks.deck_key = cards.deck_key
     WHERE cards.is_commander = 0
       AND decks.commander_oracle_id = ?
+      AND decks.${CHEMISTRY_CORPUS_DECK_SQL}
+    GROUP BY cards.card_oracle_id
+  `);
+  const observationCardCountsStmt = db.prepare(`
+    SELECT cards.card_oracle_id, COUNT(DISTINCT cards.deck_key) AS deck_count
+    FROM mtg_commander_corpus_cards cards
+    INNER JOIN mtg_commander_corpus_decks decks ON decks.deck_key = cards.deck_key
+    WHERE cards.is_commander = 0
+      AND decks.commander_oracle_id = ?
       AND decks.${VALID_CORPUS_DECK_SQL}
     GROUP BY cards.card_oracle_id
   `);
@@ -1000,6 +1044,8 @@ function rebuildCommanderStats() {
     if (totalCommanderDecks <= 0) continue;
 
     const cardRows = cardCountsStmt.all(commander.commander_oracle_id);
+    const observationCounts = new Map(observationCardCountsStmt.all(commander.commander_oracle_id)
+      .map((row) => [row.card_oracle_id, Number(row.deck_count || 0)]));
     const records = [];
 
     for (const row of cardRows) {
@@ -1044,7 +1090,9 @@ function rebuildCommanderStats() {
         oracle_text: cardMeta.oracle_text || '',
         color_identity_json: JSON.stringify(cardMeta.color_identity || []),
         deck_count: deckCount,
+        observation_deck_count: observationCounts.get(row.card_oracle_id) || 0,
         total_commander_decks: totalCommanderDecks,
+        total_commander_observations: Number(commander.observation_count || 0),
         inclusion_rate: inclusionRate,
         global_deck_count: globalDeckCount,
         total_global_decks: totalEligibleDecks,
@@ -1128,13 +1176,13 @@ export function getMtgCommanderPublicSnapshot() {
 
   const readSnapshot = db.transaction(() => {
     const activeDecks = db.prepare(`
-      SELECT deck_key, source_identity, content_hash, commander_oracle_id
+      SELECT deck_key, source_identity, content_hash, content_fingerprint, chemistry_weight, commander_oracle_id
       FROM mtg_commander_corpus_decks
       WHERE ${VALID_CORPUS_DECK_SQL}
       ORDER BY deck_key ASC
     `).all();
     const indexRows = db.prepare(`
-      SELECT oracle_id, deck_count
+      SELECT oracle_id, deck_count, unique_configuration_count
       FROM mtg_commander_index
       ORDER BY oracle_id ASC
     `).all();
@@ -1156,8 +1204,8 @@ export function getMtgCommanderPublicSnapshot() {
           `Commander detail mismatch for ${row.oracle_id}: detail=${payload.total_decks}, index=${row.deck_count}`
         );
       }
-      const sampleConfidence = getCommanderSampleConfidence(row.deck_count);
-      const expectedAverageDeckCount = sampleConfidence.analytics_eligible ? Number(row.deck_count || 0) : 0;
+      const sampleConfidence = getCommanderSampleConfidence(row.unique_configuration_count);
+      const expectedAverageDeckCount = sampleConfidence.analytics_eligible ? Number(row.unique_configuration_count || 0) : 0;
       if (Number(payload.average_deck_profile?.total_decks || 0) !== expectedAverageDeckCount) {
         throw new Error(
           `Commander average-deck mismatch for ${row.oracle_id}: profile=${payload.average_deck_profile?.total_decks}, expected=${expectedAverageDeckCount}`
@@ -1172,17 +1220,19 @@ export function getMtgCommanderPublicSnapshot() {
     `).all();
     if (denominatorRows.some((row) => (
       Number(row.total_global_decks || 0) <= 0
-      || Number(row.total_global_decks || 0) > activeDecks.length
+      || Number(row.total_global_decks || 0) > activeDecks.filter((deck) => Number(deck.chemistry_weight || 0) > 0).length
       || Number(row.global_deck_count || 0) > Number(row.total_global_decks || 0)
     ))) {
       throw new Error('Commander stats contain an invalid color-eligible global baseline.');
     }
 
     const revisionSeed = activeDecks
-      .map((deck) => `${deck.source_identity || deck.deck_key}:${deck.content_hash || ''}:${deck.commander_oracle_id}`)
+      .map((deck) => `${deck.source_identity || deck.deck_key}:${deck.content_fingerprint || ''}:${deck.commander_oracle_id}`)
       .concat(`analytics:${COMMANDER_ANALYTICS_VERSION}`)
       .join('|');
     const datasetVersion = crypto.createHash('sha256').update(revisionSeed).digest('hex').slice(0, 16);
+    const corpusStatus = getCommanderCorpusStatus();
+    const freshness = getCommanderPipelineFreshness();
 
     return {
       datasetVersion,
@@ -1190,6 +1240,12 @@ export function getMtgCommanderPublicSnapshot() {
       sampleThresholds: COMMANDER_SAMPLE_THRESHOLDS,
       generatedAt: new Date().toISOString(),
       activeDeckCount: activeDecks.length,
+      uniqueConfigurationCount: Number(corpusStatus.unique_configuration_count || 0),
+      duplicateObservationCount: Number(corpusStatus.duplicate_observation_count || 0),
+      quarantinedCount: Number(corpusStatus.invalid_deck_count || 0),
+      retiredCount: Number(corpusStatus.retired_deck_count || 0),
+      sourceReplayFailures: Number(corpusStatus.source_replay_failures || 0),
+      freshness,
       indexDeckTotal,
       positiveCommanderCount: positiveRows.length,
       indexRows,
@@ -1388,7 +1444,7 @@ function buildRelatedCommanders(commanderRow, statRows) {
       ON idx.oracle_id = stats.commander_oracle_id
     WHERE stats.card_oracle_id IN (${placeholders})
       AND stats.commander_oracle_id <> @oracleId
-      AND idx.deck_count >= 10
+      AND idx.unique_configuration_count >= 10
       AND idx.color_mask = @colorMask
     GROUP BY idx.oracle_id
     HAVING COUNT(*) >= 2
@@ -1408,7 +1464,7 @@ function buildAverageDeckProfile(oracleId) {
       SELECT COUNT(*) AS count
       FROM mtg_commander_corpus_decks
       WHERE commander_oracle_id = ?
-        AND ${VALID_CORPUS_DECK_SQL}
+        AND ${CHEMISTRY_CORPUS_DECK_SQL}
     `).get(oracleId)?.count || 0
   );
 
@@ -1431,7 +1487,7 @@ function buildAverageDeckProfile(oracleId) {
       ON decks.deck_key = cards.deck_key
     WHERE decks.commander_oracle_id = ?
       AND cards.is_commander = 0
-      AND decks.${VALID_CORPUS_DECK_SQL}
+      AND decks.${CHEMISTRY_CORPUS_DECK_SQL}
     GROUP BY cards.card_oracle_id
   `).all(oracleId);
 
@@ -1488,7 +1544,7 @@ function getCommanderDeckRows(oracleId) {
     SELECT deck_key, deck_name, source_name, source_url
     FROM mtg_commander_corpus_decks
     WHERE commander_oracle_id = ?
-      AND ${VALID_CORPUS_DECK_SQL}
+      AND ${CHEMISTRY_CORPUS_DECK_SQL}
     ORDER BY imported_at DESC, deck_key ASC
   `).all(oracleId);
 }
@@ -1504,7 +1560,7 @@ function getCommanderDeckCards(oracleId) {
       ON decks.deck_key = cards.deck_key
     WHERE decks.commander_oracle_id = ?
       AND cards.is_commander = 0
-      AND decks.${VALID_CORPUS_DECK_SQL}
+      AND decks.${CHEMISTRY_CORPUS_DECK_SQL}
     ORDER BY decks.deck_key ASC
   `).all(oracleId);
 }
@@ -1522,7 +1578,7 @@ function getDeckRowsByCard(oracleId) {
       ON decks.deck_key = cards.deck_key
     WHERE cards.card_oracle_id = ?
       AND cards.is_commander = 0
-      AND decks.${VALID_CORPUS_DECK_SQL}
+      AND decks.${CHEMISTRY_CORPUS_DECK_SQL}
     ORDER BY decks.imported_at DESC, decks.deck_key ASC
   `).all(oracleId);
 }
@@ -1543,7 +1599,7 @@ function getDeckCardsByDeckKeys(deckKeys) {
       ON decks.deck_key = cards.deck_key
     WHERE decks.deck_key IN (${placeholders})
       AND cards.is_commander = 0
-      AND decks.${VALID_CORPUS_DECK_SQL}
+      AND decks.${CHEMISTRY_CORPUS_DECK_SQL}
     ORDER BY decks.deck_key ASC
   `).all(...deckKeys);
 }
@@ -1556,7 +1612,7 @@ function getGlobalCardBaselines() {
       INNER JOIN mtg_commander_corpus_decks decks
         ON decks.deck_key = cards.deck_key
       WHERE cards.is_commander = 0
-        AND decks.${VALID_CORPUS_DECK_SQL}
+        AND decks.${CHEMISTRY_CORPUS_DECK_SQL}
       GROUP BY card_oracle_id
     `).all().map((row) => [row.card_oracle_id, Number(row.deck_count || 0)])
   );
@@ -1565,7 +1621,7 @@ function getGlobalCardBaselines() {
       SELECT idx.color_mask, COUNT(*) AS deck_count
       FROM mtg_commander_corpus_decks decks
       INNER JOIN mtg_commander_index idx ON idx.oracle_id = decks.commander_oracle_id
-      WHERE decks.${VALID_CORPUS_DECK_SQL}
+      WHERE decks.${CHEMISTRY_CORPUS_DECK_SQL}
       GROUP BY idx.color_mask
     `).all().map((row) => [Number(row.color_mask || 0), Number(row.deck_count || 0)])
   );
@@ -1832,7 +1888,7 @@ function getAllValidDeckRows() {
       source_url,
       commander_oracle_id
     FROM mtg_commander_corpus_decks
-    WHERE ${VALID_CORPUS_DECK_SQL}
+    WHERE ${CHEMISTRY_CORPUS_DECK_SQL}
     ORDER BY imported_at DESC, deck_key ASC
   `).all();
 }
@@ -2602,19 +2658,22 @@ export function getMtgCommanderPage(oracleId, options = {}) {
       ? buildSliceStats(commanderRow, slicedDecks, getGlobalCardBaselines())
       : selectCommanderStats(oracleId);
   const commander = mapCommanderRow(commanderRow);
-  const totalDecks = activeMode === 'card'
+  const analyticsSampleSize = activeMode === 'card'
     ? slicedDecks.length
     : activeTheme
       ? slicedDecks.length
-      : Number(statRows[0]?.total_commander_decks || commander.deck_count || 0);
-  const hasLocalData = statRows.length > 0 && totalDecks > 0;
-  const sampleConfidence = getCommanderSampleConfidence(totalDecks);
+      : Number(commander.unique_configuration_count || 0);
+  const totalDecks = activeMode === 'commander' && !activeTheme
+    ? Number(commander.deck_count || 0)
+    : analyticsSampleSize;
+  const hasLocalData = totalDecks > 0;
+  const sampleConfidence = getCommanderSampleConfidence(analyticsSampleSize);
   const hasAnalyticsData = hasLocalData && sampleConfidence.analytics_eligible;
   const topCommanders = activeMode === 'card' && totalDecks > 0 ? buildTopCommanderRows(slicedDecks) : [];
 
   const topSynergyCards = hasAnalyticsData ? buildTopSynergy(statRows) : [];
   const newCards = hasAnalyticsData ? buildNewCards(statRows) : [];
-  const gameChangers = hasAnalyticsData ? buildGameChangers(statRows, totalDecks) : [];
+  const gameChangers = hasAnalyticsData ? buildGameChangers(statRows, analyticsSampleSize) : [];
   const categories = hasAnalyticsData ? buildCategorySections(statRows) : [];
   const relatedCommanders = hasAnalyticsData && activeMode !== 'card' ? buildRelatedCommanders(commanderRow, statRows) : [];
   const averageDeckProfile = hasAnalyticsData ? (
@@ -2639,6 +2698,8 @@ export function getMtgCommanderPage(oracleId, options = {}) {
     theme_options: themeOptions,
     commander,
     total_decks: totalDecks,
+    unique_configuration_count: analyticsSampleSize,
+    duplicate_observation_count: Math.max(0, totalDecks - analyticsSampleSize),
     top_commanders: topCommanders,
     average_deck_profile: averageDeckProfile,
     average_deck_sections: averageDeckSections,

@@ -97,6 +97,22 @@ export const siteAutomationRegistry = [
     purpose: 'Create a durable Supabase snapshot of physical inventory and keep restore/audit proof visible in Operations.'
   },
   {
+    id: 'commander-chemistry-refresh',
+    label: 'Deck Chemistry refresh',
+    cadence: 'daily',
+    owner: 'commander',
+    runnerJob: 'commander-chemistry',
+    script: 'npm run automation:commander-chemistry',
+    commands: [
+      ['node', 'scripts/run-commander-chemistry-refresh.mjs']
+    ],
+    dependsOn: [],
+    blocks: [],
+    readiness: 'Safe to run independently. Discovers bounded Archidekt updates, certifies analytics, and commits one complete public snapshot.',
+    outputs: ['public/data/mtg/commanders.json', 'public/data/mtg/commander-details/*.json', 'public/data/mtg/commander-manifest.json'],
+    purpose: 'Maintain the active Commander corpus and publish duplicate-controlled Deck Chemistry analytics with freshness proof.'
+  },
+  {
     id: 'system-health-report',
     label: 'System health report',
     cadence: 'hourly',
@@ -121,7 +137,8 @@ export const siteAutomationSections = {
   catalogs: ['card-backfill-refresh', 'catalog-refresh'],
   images: ['image-repair-sync'],
   pricing: ['pricing-refresh'],
-  readiness: ['system-health-report']
+  commander: ['commander-chemistry-refresh', 'system-health-report'],
+  readiness: ['commander-chemistry-refresh', 'system-health-report']
 };
 
 export const siteAutomationPipelines = {
@@ -148,6 +165,10 @@ export const siteAutomationPipelines = {
   'inventory-backup': {
     label: 'Inventory backup pipeline',
     steps: ['inventory-backup', 'system-health-report']
+  },
+  'commander-chemistry': {
+    label: 'Deck Chemistry pipeline',
+    steps: ['commander-chemistry-refresh']
   },
   health: {
     label: 'Health pipeline',

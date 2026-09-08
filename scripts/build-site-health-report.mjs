@@ -25,7 +25,8 @@ const AGE_LIMITS_HOURS = {
   pricingSource: 36,
   catalog: 72,
   imageManifest: 48,
-  inventoryBackup: 30
+  inventoryBackup: 30,
+  commanderChemistry: 36
 };
 const STALE_ACTIVE_LIMITS_MS = {
   'system-health-report': 15 * 60 * 1000,
@@ -34,7 +35,8 @@ const STALE_ACTIVE_LIMITS_MS = {
   'card-backfill-refresh': 2 * 60 * 60 * 1000,
   'catalog-refresh': 2 * 60 * 60 * 1000,
   'image-repair-sync': 6 * 60 * 60 * 1000,
-  'inventory-backup': 30 * 60 * 1000
+  'inventory-backup': 30 * 60 * 1000,
+  'commander-chemistry-refresh': 2 * 60 * 60 * 1000
 };
 
 function ensureDir(dirPath) {
@@ -527,6 +529,44 @@ function buildHomepageHealth() {
   };
 }
 
+function buildCommanderChemistryHealth() {
+  const filePath = path.join(PUBLIC_DATA_ROOT, 'mtg', 'commander-manifest.json');
+  const manifest = readJsonIfExists(filePath, null);
+  const stats = getFileStats(filePath);
+  const freshnessAt = manifest?.last_publication_time || manifest?.generated_at || stats?.modifiedAt || null;
+  const freshnessHours = hoursSince(freshnessAt);
+  const stale = freshnessHours != null && freshnessHours > AGE_LIMITS_HOURS.commanderChemistry;
+  const totalsAgree = Boolean(manifest)
+    && Number(manifest.active_deck_count || 0) === Number(manifest.index_deck_total || 0)
+    && Number(manifest.detail_count || 0) === Number(manifest.positive_commander_count || 0);
+
+  return {
+    area: 'commander',
+    status: statusFromChecks({ exists: Boolean(manifest), stale, degraded: Boolean(manifest) && !totalsAgree }),
+    file: stats,
+    datasetVersion: manifest?.dataset_version || null,
+    analyticsVersion: manifest?.analytics_version || null,
+    lastSuccessfulDiscoveryAt: manifest?.last_successful_discovery_time || null,
+    lastSuccessfulIngestionAt: manifest?.last_successful_ingestion_time || null,
+    lastAnalyticsRebuildAt: manifest?.last_analytics_rebuild_time || null,
+    lastPublicationAt: manifest?.last_publication_time || null,
+    freshnessHours,
+    activeDeckCount: Number(manifest?.active_deck_count || 0),
+    uniqueConfigurationCount: Number(manifest?.unique_content_configuration_count || 0),
+    duplicateObservationCount: Number(manifest?.duplicate_observation_count || 0),
+    quarantinedCount: Number(manifest?.quarantined_count || 0),
+    retiredCount: Number(manifest?.retired_count || 0),
+    sourceFailures: Number(manifest?.source_replay_failures || 0),
+    diagnostics: !manifest
+      ? ['Deck Chemistry manifest is missing.']
+      : !totalsAgree
+        ? ['Deck Chemistry manifest totals disagree.']
+        : stale
+          ? ['Deck Chemistry publication is older than the freshness target.']
+          : ['Deck Chemistry dataset is current and internally consistent.']
+  };
+}
+
 async function buildCatalogHealth(checkPublishedObject) {
   const entries = await Promise.all(GAMES.map(async (game) => {
     const cardsPath = resolveDataFile(game, 'cards.json');
@@ -992,6 +1032,7 @@ async function main() {
   const images = await buildImagesHealth(checkPublishedObject);
   const pricing = buildPricingHealth();
   const inventory = await buildInventoryDurabilityHealth();
+  const commander = buildCommanderChemistryHealth();
   const readiness = buildGameReadiness(catalogs, images);
 
   const sections = {
@@ -1000,6 +1041,7 @@ async function main() {
     images,
     pricing,
     inventory,
+    commander,
     readiness
   };
 
@@ -1007,7 +1049,7 @@ async function main() {
 
   const payload = {
     generatedAt: new Date().toISOString(),
-    overallStatus: buildSummary([homepage, catalogs, images, pricing, inventory, readiness]),
+    overallStatus: buildSummary([homepage, catalogs, images, pricing, inventory, commander, readiness]),
     automationLedger: {
       status: ledger.status,
       reason: ledger.reason || null,
@@ -1026,6 +1068,7 @@ async function main() {
     images: images.overallStatus,
     pricing: pricing.status,
     inventory: inventory.status,
+    commander: commander.status,
     readiness: readiness.overallStatus
   }, null, 2));
 }

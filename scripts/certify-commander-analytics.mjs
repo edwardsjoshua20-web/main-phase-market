@@ -16,6 +16,7 @@ import {
 process.env.MPM_DISABLE_COMMANDER_PREWARM = '1';
 
 const ACTIVE_SQL = `decks.quality_status = 'valid' AND decks.lifecycle_status = 'active'`;
+const CHEMISTRY_SQL = `${ACTIVE_SQL} AND decks.chemistry_weight > 0`;
 const EPSILON = 1e-10;
 const REPORT_DIR = path.join(process.cwd(), 'tmp', 'commander-analytics-certification');
 const REQUIRED_NAMES = [
@@ -191,8 +192,11 @@ function markdownReport(report) {
     `- Status: ${report.certification}`,
     `- Dataset: ${report.dataset_version}`,
     `- Analytics version: ${report.analytics_version}`,
-    `- Active decks: ${report.corpus.active_decks}`,
-    `- Active deck-card relationships: ${report.corpus.active_relationships}`,
+    `- Active source observations: ${report.corpus.active_decks}`,
+    `- Unique chemistry configurations: ${report.corpus.unique_configurations}`,
+    `- Duplicate source observations: ${report.corpus.duplicate_observations}`,
+    `- Active observed deck-card relationships: ${report.corpus.active_relationships}`,
+    `- Chemistry deck-card relationships: ${report.corpus.chemistry_relationships}`,
     `- Published commander details: ${report.corpus.commander_details}`,
     `- Stat rows certified: ${report.coverage.stat_rows}`,
     '', '## Sample Policy', '',
@@ -201,9 +205,9 @@ function markdownReport(report) {
     `- Usable (10-19): ${report.sample_distribution.usable} commanders.`,
     `- Strong (20+): ${report.sample_distribution.strong} commanders.`,
     '', '## Representative Commanders', '',
-    '| Commander | Decks | Tier | Top recommendations |',
-    '| --- | ---: | --- | --- |',
-    ...report.representative_commanders.map((row) => `| ${row.commander} | ${row.sample_size} | ${row.confidence_tier} | ${row.top_recommendations.map((card) => `${card.card_name} (${(card.inclusion_rate * 100).toFixed(1)}% / ${(card.global_inclusion_rate * 100).toFixed(1)}%, ${(card.chemistry_score * 100).toFixed(1)})`).join('; ') || 'Suppressed'} |`),
+    '| Commander | Unique configurations | Source observations | Tier | Top recommendations |',
+    '| --- | ---: | ---: | --- | --- |',
+    ...report.representative_commanders.map((row) => `| ${row.commander} | ${row.sample_size} | ${row.source_observations} | ${row.confidence_tier} | ${row.top_recommendations.map((card) => `${card.card_name} (${(card.inclusion_rate * 100).toFixed(1)}% / ${(card.global_inclusion_rate * 100).toFixed(1)}%, ${(card.chemistry_score * 100).toFixed(1)})`).join('; ') || 'Suppressed'} |`),
     '', '## Theme Audit', '',
     '| Theme | Triggered decks | Assessment | Rule |',
     '| --- | ---: | --- | --- |',
@@ -222,7 +226,8 @@ function markdownReport(report) {
 await refreshMtgCommanderEngine();
 const snapshot = getMtgCommanderPublicSnapshot();
 const indexRows = db.prepare('SELECT * FROM mtg_commander_index WHERE deck_count > 0 ORDER BY deck_count DESC, name_normalized ASC').all();
-const activeDeckRows = db.prepare(`SELECT decks.deck_key, decks.commander_oracle_id FROM mtg_commander_corpus_decks decks WHERE ${ACTIVE_SQL} ORDER BY decks.deck_key`).all();
+const activeDeckRows = db.prepare(`SELECT decks.deck_key, decks.commander_oracle_id, decks.content_fingerprint, decks.chemistry_weight FROM mtg_commander_corpus_decks decks WHERE ${ACTIVE_SQL} ORDER BY decks.deck_key`).all();
+const chemistryDeckRows = activeDeckRows.filter((row) => Number(row.chemistry_weight || 0) > 0);
 const activeCardRows = db.prepare(`
   SELECT cards.deck_key, cards.card_oracle_id, cards.card_name, cards.quantity, cards.is_commander
   FROM mtg_commander_corpus_cards cards
@@ -230,21 +235,33 @@ const activeCardRows = db.prepare(`
   WHERE ${ACTIVE_SQL}
   ORDER BY cards.deck_key, cards.card_oracle_id
 `).all();
+const chemistryCardRows = db.prepare(`
+  SELECT cards.deck_key, cards.card_oracle_id, cards.card_name, cards.quantity, cards.is_commander
+  FROM mtg_commander_corpus_cards cards
+  INNER JOIN mtg_commander_corpus_decks decks ON decks.deck_key = cards.deck_key
+  WHERE ${CHEMISTRY_SQL}
+  ORDER BY cards.deck_key, cards.card_oracle_id
+`).all();
 const lookupRows = db.prepare('SELECT * FROM mtg_card_lookup').all();
 const statRows = db.prepare('SELECT * FROM mtg_commander_card_stats ORDER BY commander_oracle_id, weighted_score DESC, deck_count DESC, card_name_lower ASC').all();
 
 assert(activeDeckRows.length > 0, 'Active corpus is empty.');
+assert(chemistryDeckRows.length > 0, 'Unique chemistry corpus is empty.');
 assert(activeCardRows.length > 0, 'Active deck-card corpus is empty.');
 assert(indexRows.length > 0, 'Commander index is empty.');
 assert(snapshot.activeDeckCount === activeDeckRows.length && snapshot.indexDeckTotal === activeDeckRows.length, 'Snapshot/index denominator mismatch.');
+assert(snapshot.uniqueConfigurationCount === chemistryDeckRows.length, 'Snapshot unique-configuration count mismatch.');
+assert(snapshot.duplicateObservationCount === activeDeckRows.length - chemistryDeckRows.length, 'Snapshot duplicate-observation count mismatch.');
 assert(snapshot.analyticsVersion === COMMANDER_ANALYTICS_VERSION, 'Snapshot analytics version mismatch.');
 
 const cardLookup = new Map(lookupRows.map((row) => [row.oracle_id, row]));
 const commanderCounts = new Map();
-const commanderByDeck = new Map(activeDeckRows.map((row) => [row.deck_key, row.commander_oracle_id]));
+const observationCommanderCounts = new Map();
+const commanderByDeck = new Map(chemistryDeckRows.map((row) => [row.deck_key, row.commander_oracle_id]));
+const observationCommanderByDeck = new Map(activeDeckRows.map((row) => [row.deck_key, row.commander_oracle_id]));
 const indexById = new Map(indexRows.map((row) => [row.oracle_id, row]));
 const deckCountsByColorMask = new Map();
-for (const row of activeDeckRows) {
+for (const row of chemistryDeckRows) {
   const mask = Number(indexById.get(row.commander_oracle_id)?.color_mask || 0);
   deckCountsByColorMask.set(mask, (deckCountsByColorMask.get(mask) || 0) + 1);
 }
@@ -256,12 +273,15 @@ const eligibleDeckCount = (cardOracleId) => {
 };
 const globalPresence = new Map();
 const commanderPresence = new Map();
-const decks = new Map(activeDeckRows.map((row) => [row.deck_key, { ...row, cards: [] }]));
-for (const row of activeDeckRows) commanderCounts.set(row.commander_oracle_id, (commanderCounts.get(row.commander_oracle_id) || 0) + 1);
+const decks = new Map(chemistryDeckRows.map((row) => [row.deck_key, { ...row, cards: [] }]));
+for (const row of chemistryDeckRows) commanderCounts.set(row.commander_oracle_id, (commanderCounts.get(row.commander_oracle_id) || 0) + 1);
+for (const row of activeDeckRows) observationCommanderCounts.set(row.commander_oracle_id, (observationCommanderCounts.get(row.commander_oracle_id) || 0) + 1);
 
 const globalSeen = new Set();
 const commanderSeen = new Set();
-for (const row of activeCardRows) {
+const observationCommanderPresence = new Map();
+const observationSeen = new Set();
+for (const row of chemistryCardRows) {
   if (row.is_commander) continue;
   const meta = cardLookup.get(row.card_oracle_id) || {};
   const card = {
@@ -289,6 +309,20 @@ for (const row of activeCardRows) {
   }
 }
 
+for (const row of activeCardRows) {
+  if (row.is_commander) continue;
+  const commanderId = observationCommanderByDeck.get(row.deck_key);
+  if (!commanderId) continue;
+  if (!observationCommanderPresence.has(commanderId)) observationCommanderPresence.set(commanderId, new Map());
+  const counts = observationCommanderPresence.get(commanderId);
+  const key = `${row.deck_key}:${row.card_oracle_id}`;
+  if (observationSeen.has(key)) continue;
+  observationSeen.add(key);
+  counts.set(row.card_oracle_id, (counts.get(row.card_oracle_id) || 0) + 1);
+}
+
+const observationCardCount = (commanderId, cardId) => observationCommanderPresence.get(commanderId)?.get(cardId) || 0;
+
 for (const deck of decks.values()) {
   deck.themes = inferThemes(deck.cards);
   deck.legacyThemes = inferThemes(deck.cards, true);
@@ -302,7 +336,9 @@ for (const row of statRows) {
   const expectedCardDecks = commanderPresence.get(row.commander_oracle_id)?.get(row.card_oracle_id) || 0;
   const expectedGlobalDecks = globalPresence.get(row.card_oracle_id) || 0;
   assert(row.total_commander_decks === expectedCommanderDecks, `Commander denominator mismatch for ${row.commander_name}/${row.card_name}`);
+  assert(row.total_commander_observations === (observationCommanderCounts.get(row.commander_oracle_id) || 0), `Commander observation denominator mismatch for ${row.commander_name}/${row.card_name}`);
   assert(row.deck_count === expectedCardDecks, `Inclusion count mismatch for ${row.commander_name}/${row.card_name}`);
+  assert(row.observation_deck_count === observationCardCount(row.commander_oracle_id, row.card_oracle_id), `Observation inclusion count mismatch for ${row.commander_name}/${row.card_name}`);
   const expectedEligibleDecks = eligibleDeckCount(row.card_oracle_id);
   assert(row.total_global_decks === expectedEligibleDecks, `Color-eligible global denominator mismatch for ${row.commander_name}/${row.card_name}`);
   assert(row.global_deck_count === expectedGlobalDecks, `Global inclusion count mismatch for ${row.commander_name}/${row.card_name}`);
@@ -341,15 +377,18 @@ for (const deck of decks.values()) {
 
 for (const indexRow of indexRows) {
   const count = commanderCounts.get(indexRow.oracle_id) || 0;
-  assert(indexRow.deck_count === count, `Commander index count mismatch for ${indexRow.name}`);
+  const observationCount = observationCommanderCounts.get(indexRow.oracle_id) || 0;
+  assert(indexRow.deck_count === observationCount, `Commander index observation count mismatch for ${indexRow.name}`);
+  assert(indexRow.unique_configuration_count === count, `Commander index unique count mismatch for ${indexRow.name}`);
   const policy = getCommanderSampleConfidence(count);
   tierCounts[policy.tier] += 1;
   const page = getMtgCommanderPage(indexRow.oracle_id);
   pages.set(indexRow.oracle_id, page);
-  assert(page.total_decks === count, `Detail count mismatch for ${indexRow.name}`);
+  assert(page.total_decks === observationCount, `Detail observation count mismatch for ${indexRow.name}`);
+  assert(page.unique_configuration_count === count, `Detail unique count mismatch for ${indexRow.name}`);
   assert(page.sample_confidence.tier === policy.tier, `Confidence tier mismatch for ${indexRow.name}`);
   assert(page.has_analytics_data === policy.analytics_eligible, `Analytics gate mismatch for ${indexRow.name}`);
-  const expectedRank = 1 + indexRows.filter((candidate) => candidate.deck_count > count).length;
+  const expectedRank = 1 + indexRows.filter((candidate) => candidate.deck_count > observationCount).length;
   assert(page.commander.rank === (policy.ranking_eligible ? expectedRank : null), `Ranking gate mismatch for ${indexRow.name}`);
 
   if (!policy.analytics_eligible) {
@@ -394,7 +433,7 @@ for (const indexRow of indexRows) {
 
   const signature = (statsByCommander.get(indexRow.oracle_id) || []).filter((row) => row.weighted_score > 0 && !isBasicLand(row.card_name, row.type_line)).slice(0, 8).map((row) => row.card_oracle_id);
   const expectedRelated = indexRows.map((candidate) => {
-    if (candidate.oracle_id === indexRow.oracle_id || candidate.deck_count < COMMANDER_SAMPLE_THRESHOLDS.usable || candidate.color_mask !== indexRow.color_mask) return null;
+    if (candidate.oracle_id === indexRow.oracle_id || candidate.unique_configuration_count < COMMANDER_SAMPLE_THRESHOLDS.usable || candidate.color_mask !== indexRow.color_mask) return null;
     const candidateCards = new Set((statsByCommander.get(candidate.oracle_id) || []).map((row) => row.card_oracle_id));
     const shared = signature.filter((id) => candidateCards.has(id)).length;
     return shared >= 2 ? { id: candidate.oracle_id, shared, decks: candidate.deck_count, name: candidate.name_normalized } : null;
@@ -408,6 +447,8 @@ if (fs.existsSync(manifestPath)) {
   if (manifest.analytics_version === COMMANDER_ANALYTICS_VERSION) {
     assert(manifest.dataset_version === snapshot.datasetVersion, 'Published manifest dataset version mismatches current analytics snapshot.');
     assert(manifest.active_deck_count === activeDeckRows.length && manifest.detail_count === indexRows.length, 'Published manifest counts mismatch current analytics snapshot.');
+    assert(manifest.unique_content_configuration_count === chemistryDeckRows.length, 'Published manifest unique-configuration count mismatch.');
+    assert(manifest.duplicate_observation_count === activeDeckRows.length - chemistryDeckRows.length, 'Published manifest duplicate-observation count mismatch.');
 
     const publicIndex = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'public', 'data', 'mtg', 'commanders.json'), 'utf8'));
     assert(publicIndex.every((row) => row.dataset_version === snapshot.datasetVersion), 'Commander index contains mixed dataset versions.');
@@ -421,6 +462,8 @@ if (fs.existsSync(manifestPath)) {
       assert(detail.dataset_version === snapshot.datasetVersion, `Commander detail ${fileName} has a mismatched dataset version.`);
       assert(detail.analytics_version === COMMANDER_ANALYTICS_VERSION, `Commander detail ${fileName} has a mismatched analytics version.`);
       assert(detail.sample_confidence?.tier, `Commander detail ${fileName} is missing sample confidence metadata.`);
+      assert(detail.sample_confidence.deck_count === detail.unique_configuration_count, `Commander detail ${fileName} confidence uses source observations instead of unique configurations.`);
+      assert(detail.total_decks === detail.unique_configuration_count + detail.duplicate_observation_count, `Commander detail ${fileName} observation totals are inconsistent.`);
     }
   }
 }
@@ -443,7 +486,8 @@ const representatives = representativeIndexRows.map((row) => {
   return {
     commander: row.name,
     color_identity: parseColors(row.color_identity_json),
-    sample_size: row.deck_count,
+    sample_size: row.unique_configuration_count,
+    source_observations: row.deck_count,
     confidence_tier: page.sample_confidence.tier,
     top_recommendations: page.top_synergy_cards.slice(0, 5).map((card) => ({
       card_name: card.card_name,
@@ -461,7 +505,10 @@ const report = {
   analytics_version: COMMANDER_ANALYTICS_VERSION,
   corpus: {
     active_decks: activeDeckRows.length,
+    unique_configurations: chemistryDeckRows.length,
+    duplicate_observations: activeDeckRows.length - chemistryDeckRows.length,
     active_relationships: activeCardRows.length,
+    chemistry_relationships: chemistryCardRows.length,
     commander_details: indexRows.length
   },
   coverage: {
@@ -484,7 +531,7 @@ const report = {
     suppressed_from_presentation: THEME_DEFINITIONS.filter((theme) => !COMMANDER_PRESENTABLE_THEME_SLUGS.has(theme.slug)).map((theme) => theme.slug)
   },
   findings: {
-    recommendations: 'Deck-presence inclusion, color-eligible active-corpus baseline subtraction, tanh card-support weighting, basic-land omission, deterministic ties, and commander sample gating certified.',
+    recommendations: 'Deck-presence inclusion, color-eligible unique-configuration baseline subtraction, tanh card-support weighting, basic-land omission, deterministic ties, and commander sample gating certified. Source observations remain visible but exact duplicate configurations carry zero additional chemistry weight.',
     related_commanders: 'Exact color identity, usable samples, and at least two shared top-eight signature cards are required; ordering is deterministic.',
     average_deck: 'Synthetic profile built from averaged type totals and weighted top-card sections; it is not an observed deck and is marked synthetic_profile.',
     mana_and_types: 'Commander rows are excluded, lands are excluded from the curve, catalog CMC owns multi-face mana value, and unknown metadata is Other rather than Battle.'

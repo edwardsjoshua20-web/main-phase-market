@@ -1,4 +1,4 @@
-export const COMMANDER_ANALYTICS_VERSION = 3;
+export const COMMANDER_ANALYTICS_VERSION = 4;
 
 export const COMMANDER_PRESENTABLE_THEME_SLUGS = Object.freeze(new Set([
   'mill',

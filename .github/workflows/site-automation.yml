@@ -14,6 +14,7 @@ on:
           - image-repair-sync
           - pricing-refresh
           - inventory-backup
+          - commander-chemistry-refresh
           - system-health-report
       pipeline:
         description: Allowlisted Node automation pipeline
@@ -26,6 +27,7 @@ on:
           - images
           - pricing
           - inventory-backup
+          - commander-chemistry
           - health
       run_id:
         description: Supabase run ledger identifier

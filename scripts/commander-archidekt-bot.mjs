@@ -6,6 +6,7 @@ import {
   getCommanderCorpusStatus,
   loadCommanderSourceManifest,
   processCommanderCorpusSource,
+  setCommanderPipelineFreshness,
   syncCommanderCorpusSources
 } from '../server/mtgCommanderCorpus.mjs';
 
@@ -24,7 +25,10 @@ function parseArgs(argv) {
     startPage: 1,
     maxPage: 200,
     maxQueue: 1500,
-    discoverMode: 'api'
+    discoverMode: 'html',
+    requestDelayMs: 1000,
+    maxRetries: 2,
+    once: false
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -38,7 +42,12 @@ function parseArgs(argv) {
     if (token === '--max-page') args.maxPage = Math.max(1, Number(argv[i + 1]) || args.maxPage);
     if (token === '--max-queue') args.maxQueue = Math.max(1, Number(argv[i + 1]) || args.maxQueue);
     if (token === '--discover-mode') args.discoverMode = String(argv[i + 1] || args.discoverMode);
+    if (token === '--request-delay-ms') args.requestDelayMs = Math.max(500, Number(argv[i + 1]) || args.requestDelayMs);
+    if (token === '--max-retries') args.maxRetries = Math.max(0, Number(argv[i + 1]) || args.maxRetries);
+    if (token === '--once') args.once = true;
   }
+
+  if (args.discoverMode !== 'html') throw new Error('Archidekt discovery supports only the current HTML search path.');
 
   return args;
 }
@@ -107,36 +116,18 @@ async function fetchText(url) {
   return text;
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/json',
-      'User-Agent': 'Mozilla/5.0'
+async function fetchTextWithBackoff(url, args) {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await fetchText(url);
+    } catch (error) {
+      const retryable = error.code === 'RATE_LIMITED' || /\b5\d\d\b/.test(String(error.message || ''));
+      if (!retryable || attempt >= args.maxRetries) throw error;
+      const delay = Math.max(Number(error.retryAfterMs) || 0, args.backoffMs * (attempt + 1));
+      await sleep(delay);
+      attempt += 1;
     }
-  });
-
-  if (response.status === 429) {
-    const retryAfter = Number(response.headers.get('retry-after')) || 0;
-    const retryMs = retryAfter > 0 ? retryAfter * 1000 : 0;
-    const error = new Error(`Fetch failed for ${url}: 429 Too Many Requests`);
-    error.code = 'RATE_LIMITED';
-    error.retryAfterMs = retryMs;
-    throw error;
-  }
-
-  if (!response.ok) {
-    throw new Error(`Fetch failed for ${url}: ${response.status} ${response.statusText}`);
-  }
-
-  const text = await response.text();
-  if (isCloudflareBlockPage(text)) {
-    throw new Error(`Cloudflare blocked access to ${url}`);
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`Fetch failed for ${url}: invalid JSON`);
   }
 }
 
@@ -146,45 +137,17 @@ function extractArchidektDeckUrls(text) {
   return [...new Set([...matches, ...relativeMatches].map(normalizeArchidektDeckUrl).filter(Boolean))];
 }
 
-function extractArchidektDeckUrlsFromApi(payload) {
-  if (!payload) return [];
-  const candidates = [];
-  const rows = Array.isArray(payload?.results)
-    ? payload.results
-    : Array.isArray(payload?.decks)
-      ? payload.decks
-      : Array.isArray(payload?.data)
-        ? payload.data
-        : [];
-
-  for (const row of rows) {
-    const id = row?.id ?? row?.deckId ?? row?.deck_id;
-    if (!id) continue;
-    candidates.push(`https://archidekt.com/decks/${id}`);
-  }
-
-  return [...new Set(candidates.map(normalizeArchidektDeckUrl).filter(Boolean))];
-}
-
 function buildSearchUrls(args, startPage) {
   const urls = [];
   for (let offset = 0; offset < args.pages; offset += 1) {
     const page = startPage + offset;
-    if (args.discoverMode === 'html') {
-      const url = new URL('https://archidekt.com/search/decks');
-      url.searchParams.set('orderBy', args.orderBy);
-      if (page > 1) {
-        url.searchParams.set('page', String(page));
-      }
-      urls.push(url.toString());
-    } else {
-      const url = new URL('https://archidekt.com/api/decks/search/');
-      url.searchParams.set('orderBy', args.orderBy);
-      if (page > 1) {
-        url.searchParams.set('page', String(page));
-      }
-      urls.push(url.toString());
+    const url = new URL('https://archidekt.com/search/decks');
+    url.searchParams.set('deckFormat', '3');
+    url.searchParams.set('orderBy', args.orderBy);
+    if (page > 1) {
+      url.searchParams.set('page', String(page));
     }
+    urls.push(url.toString());
   }
   return urls;
 }
@@ -198,6 +161,16 @@ function toManifestEntry(url) {
   };
 }
 
+function sourceToManifestEntry(source) {
+  if (!source?.location) return null;
+  return {
+    label: source.label || `Archidekt Deck ${String(source.location).split('/').at(-1)}`,
+    source_type: source.source_type,
+    source_name: source.source_name,
+    location: source.location
+  };
+}
+
 function mergeEntries(existingEntries, newEntries) {
   const byLocation = new Map(existingEntries.map((entry) => [entry.location, entry]));
   for (const entry of newEntries) {
@@ -206,6 +179,11 @@ function mergeEntries(existingEntries, newEntries) {
     }
   }
   return [...byLocation.values()].sort((a, b) => String(a.label || '').localeCompare(String(b.label || '')));
+}
+
+function summarizeCorpus(corpus) {
+  const { sources, ...summary } = corpus || {};
+  return summary;
 }
 
 async function discoverEntries(args, corpusStatus) {
@@ -229,7 +207,9 @@ async function discoverEntries(args, corpusStatus) {
   }
 
   const status = readStatus();
-  const startPage = Math.max(1, Number(status?.next_start_page) || args.startPage);
+  const startPage = args.once
+    ? args.startPage
+    : Math.max(1, Number(status?.next_start_page) || args.startPage);
   const urls = buildSearchUrls(args, startPage);
   const discovered = new Set();
   const pageResults = [];
@@ -237,26 +217,17 @@ async function discoverEntries(args, corpusStatus) {
   let retryAfterMs = 0;
   let highestSucceededPage = startPage - 1;
 
-  for (const url of urls) {
+  for (const [index, url] of urls.entries()) {
     try {
-      let deckUrls = [];
-      if (args.discoverMode === 'html') {
-        const text = await fetchText(url);
-        deckUrls = extractArchidektDeckUrls(text);
-      } else {
-        const payload = await fetchJson(url);
-        deckUrls = extractArchidektDeckUrlsFromApi(payload);
-        if (deckUrls.length === 0) {
-          const text = await fetchText(url.replace('/api', ''));
-          deckUrls = extractArchidektDeckUrls(text);
-        }
-      }
+      const text = await fetchTextWithBackoff(url, args);
+      const deckUrls = extractArchidektDeckUrls(text);
       pageResults.push({ url, discovered: deckUrls.length });
       const currentPage = Number(new URL(url).searchParams.get('page') || '1');
       highestSucceededPage = Math.max(highestSucceededPage, currentPage);
       for (const deckUrl of deckUrls) {
         discovered.add(deckUrl);
       }
+      if (index < urls.length - 1) await sleep(args.requestDelayMs);
     } catch (error) {
       if (error.code === 'RATE_LIMITED') {
         rateLimited = true;
@@ -284,7 +255,8 @@ async function discoverEntries(args, corpusStatus) {
   };
 }
 
-async function processQueuedSources(args, corpusStatus) {
+async function processQueuedSources(args, corpusStatus, preferredLocations = []) {
+  const priority = new Map(preferredLocations.map((location, index) => [location, index]));
   const queued = corpusStatus.sources
     .filter((source) => (
       source.source_name === 'archidekt'
@@ -292,10 +264,11 @@ async function processQueuedSources(args, corpusStatus) {
       && source.source_id
       && source.status === 'queued'
     ))
+    .sort((a, b) => (priority.get(a.location) ?? Number.MAX_SAFE_INTEGER) - (priority.get(b.location) ?? Number.MAX_SAFE_INTEGER))
     .slice(0, args.batchSize);
 
   const processed = [];
-  for (const source of queued) {
+  for (const [index, source] of queued.entries()) {
     try {
       processed.push(await processCommanderCorpusSource(source.source_id, {
         downloadsDir: path.join(ingestDir, 'downloads')
@@ -307,15 +280,22 @@ async function processQueuedSources(args, corpusStatus) {
         error: error.message
       });
     }
+    if (index < queued.length - 1) await sleep(args.requestDelayMs);
   }
 
   return processed;
 }
 
-async function tick(args) {
+export async function tick(args) {
   cleanupCommanderCorpusSourceQueue();
   const corpusBefore = getCommanderCorpusStatus();
-  const existing = loadCommanderSourceManifest(manifestPath);
+  const existing = mergeEntries(
+    loadCommanderSourceManifest(manifestPath),
+    corpusBefore.sources
+      .filter((source) => source.source_name === 'archidekt' && source.source_type === 'archidekt_deck')
+      .map(sourceToManifestEntry)
+      .filter(Boolean)
+  );
   const discovery = await discoverEntries(args, corpusBefore);
   const newEntries = discovery.deckUrls.map(toManifestEntry);
   const merged = mergeEntries(existing, newEntries);
@@ -324,8 +304,7 @@ async function tick(args) {
   syncCommanderCorpusSources(merged);
 
   const corpusQueued = getCommanderCorpusStatus();
-  const processed = await processQueuedSources(args, corpusQueued);
-  const corpus = getCommanderCorpusStatus();
+  const processed = await processQueuedSources(args, corpusQueued, discovery.deckUrls);
   const processedSummary = processed.reduce((accumulator, item) => {
     const key = item.skipped
       ? `skipped:${item.skipped_reason || 'unknown'}`
@@ -333,6 +312,16 @@ async function tick(args) {
     accumulator[key] = (accumulator[key] || 0) + 1;
     return accumulator;
   }, {});
+  const discoveryErrors = discovery.pageResults.filter((result) => result.error);
+  const processingErrors = processed.filter((result) => result.status === 'error');
+  const completedAt = new Date().toISOString();
+  if (!discovery.discoveryPaused && discoveryErrors.length === 0) {
+    setCommanderPipelineFreshness('last_successful_discovery_time', completedAt);
+  }
+  if (processingErrors.length === 0) {
+    setCommanderPipelineFreshness('last_successful_ingestion_time', completedAt);
+  }
+  const finalCorpus = getCommanderCorpusStatus();
 
   writeStatus({
     generated_at: new Date().toISOString(),
@@ -348,18 +337,22 @@ async function tick(args) {
     retry_after_ms: discovery.retryAfterMs,
     processed,
     processed_summary: processedSummary,
+    discovery_errors: discoveryErrors.length,
+    processing_errors: processingErrors.length,
     discovery_paused: discovery.discoveryPaused,
     queued_archidekt: discovery.queuedArchidekt,
-    corpus
+    corpus: summarizeCorpus(finalCorpus)
   });
 
   return {
     addedCandidates: Math.max(0, merged.length - existing.length),
     processedCount: processed.length,
-    corpus,
+    corpus: summarizeCorpus(finalCorpus),
     rateLimited: discovery.rateLimited,
     retryAfterMs: discovery.retryAfterMs,
     processedSummary,
+    discoveryErrors: discoveryErrors.length,
+    processingErrors: processingErrors.length,
     discoveryPaused: discovery.discoveryPaused,
     queuedArchidekt: discovery.queuedArchidekt
   };
@@ -373,6 +366,15 @@ async function main() {
   console.log(`[archidekt-bot] polling every ${args.pollMs}ms`);
   console.log(`[archidekt-bot] search pages per tick: ${args.pages}`);
   console.log(`[archidekt-bot] batch size: ${args.batchSize}`);
+
+  if (args.once) {
+    const result = await tick(args);
+    console.log(JSON.stringify(result, null, 2));
+    if (result.rateLimited || result.discoveryErrors > 0 || result.processingErrors > 0) {
+      process.exitCode = 1;
+    }
+    return;
+  }
 
   while (true) {
     try {
