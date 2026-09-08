@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import Database from 'better-sqlite3';
 import { readSupabaseUploadConfig, toObjectKey } from './supabase-public-data-upload.mjs';
 
@@ -15,7 +16,7 @@ function stateConfig(projectRoot = process.cwd()) {
   return {
     ...config,
     bucketName: config.env.MPM_COMMANDER_STATE_BUCKET || 'main-phase-market-automation',
-    objectPath: config.env.MPM_COMMANDER_STATE_OBJECT || 'commander/commander-corpus.db'
+    objectPath: config.env.MPM_COMMANDER_STATE_OBJECT || 'commander/commander-corpus.db.gz'
   };
 }
 
@@ -38,7 +39,8 @@ export async function downloadCommanderCorpusState(destinationPath, options = {}
   if (response.status === 404 && options.allowMissing) return { found: false, config };
   if (!response.ok) throw new Error(`Commander state download failed: ${response.status} ${await response.text()}`);
   fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
-  fs.writeFileSync(destinationPath, Buffer.from(await response.arrayBuffer()));
+  const compressed = Buffer.from(await response.arrayBuffer());
+  fs.writeFileSync(destinationPath, gunzipSync(compressed));
   return { found: true, bytes: fs.statSync(destinationPath).size, config };
 }
 
@@ -46,17 +48,24 @@ export async function uploadCommanderCorpusState(sourcePath, options = {}) {
   const projectRoot = options.projectRoot || process.cwd();
   const config = stateConfig(projectRoot);
   if (!config.supabaseUrl || !config.serviceRoleKey) throw new Error('Supabase Commander state credentials are required.');
+  const source = fs.readFileSync(sourcePath);
+  const compressed = gzipSync(source, { level: 9 });
   const response = await fetch(objectUrl(config), {
     method: 'POST',
     headers: {
       ...authHeaders(config),
-      'Content-Type': 'application/vnd.sqlite3',
+      'Content-Type': 'application/gzip',
       'x-upsert': 'true'
     },
-    body: fs.readFileSync(sourcePath)
+    body: compressed
   });
   if (!response.ok) throw new Error(`Commander state upload failed: ${response.status} ${await response.text()}`);
-  return { bytes: fs.statSync(sourcePath).size, bucketName: config.bucketName, objectPath: config.objectPath };
+  return {
+    bytes: source.length,
+    compressedBytes: compressed.length,
+    bucketName: config.bucketName,
+    objectPath: config.objectPath
+  };
 }
 
 export function exportCommanderCorpusState(sourcePath, destinationPath) {
