@@ -60,7 +60,11 @@ function getFeaturedSignals(commander, detail) {
 }
 
 function getFeaturedSampleCount(commander, detail) {
-  return Number(detail?.sample_confidence?.deck_count ?? commander?.deck_count ?? 0);
+  return Number(detail?.sample_confidence?.deck_count ?? commander?.unique_configuration_count ?? commander?.deck_count ?? 0);
+}
+
+function getBrowseSampleCount(commander) {
+  return Number(commander?.unique_configuration_count ?? commander?.deck_count ?? 0);
 }
 
 function PrimaryFeaturedProfile({ commander, detail }) {
@@ -171,6 +175,8 @@ function FilterSelect({ label, value, onChange, options, disabled = false }) {
 }
 
 function BrowseCommanderCard({ commander, onPreviewEnter, onPreviewLeave }) {
+  const sampleCount = getBrowseSampleCount(commander);
+
   return (
     <Link
       to={`/commanders/${encodeURIComponent(commander.oracle_id)}`}
@@ -194,7 +200,7 @@ function BrowseCommanderCard({ commander, onPreviewEnter, onPreviewLeave }) {
           <ColorIdentity colors={commander.color_identity || []} />
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[11px]">
-          <span className="font-semibold text-slate-300">{Number(commander.deck_count || 0).toLocaleString()} decks</span>
+          <span className="font-semibold text-slate-300">{sampleCount.toLocaleString()} decks</span>
           <span className="text-slate-500">{confidenceLabels[commander.confidence_tier] || commander.confidence_tier}</span>
         </div>
       </div>
@@ -230,13 +236,13 @@ export default function CommanderHub() {
         || (colorFilter === 'colorless' && colors.length === 0)
         || (colorFilter.length === 1 && colors.includes(colorFilter));
       const confidenceMatches = confidenceFilter === 'all' || commander.confidence_tier === confidenceFilter;
-      const deckCountMatches = deckCountFilter === 'all' || Number(commander.deck_count || 0) >= Number(deckCountFilter);
+      const deckCountMatches = deckCountFilter === 'all' || getBrowseSampleCount(commander) >= Number(deckCountFilter);
       return colorMatches && confidenceMatches && deckCountMatches;
     });
 
     if (sortMode === 'az') return [...result].sort((a, b) => a.name.localeCompare(b.name));
     if (sortMode === 'popular') {
-      return [...result].sort((a, b) => Number(b.deck_count || 0) - Number(a.deck_count || 0) || a.name.localeCompare(b.name));
+      return [...result].sort((a, b) => getBrowseSampleCount(b) - getBrowseSampleCount(a) || a.name.localeCompare(b.name));
     }
     return result;
   }, [browseResults, colorFilter, confidenceFilter, deckCountFilter, sortMode]);
