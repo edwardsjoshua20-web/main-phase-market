@@ -132,6 +132,26 @@ async function fetchTextWithBackoff(url, args) {
 }
 
 function extractArchidektDeckUrls(text) {
+  const completeDeckUrls = [];
+  let structuredResultCount = 0;
+  const anchorPattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+  for (const match of String(text || '').matchAll(anchorPattern)) {
+    const attributes = match[1] || '';
+    if (!/deckLink_thumbnail/i.test(attributes)) continue;
+    const deckMatch = attributes.match(/\bhref=["']\/decks\/(\d+)/i);
+    if (!deckMatch) continue;
+    structuredResultCount += 1;
+    const cardCountMatch = String(match[2] || '').match(/\b([\d,]+)\s+cards\b/i);
+    const cardCount = Number(String(cardCountMatch?.[1] || '').replace(/,/g, ''));
+    if (cardCount === 100) {
+      completeDeckUrls.push(`https://archidekt.com/decks/${deckMatch[1]}`);
+    }
+  }
+
+  if (structuredResultCount > 0) {
+    return [...new Set(completeDeckUrls)];
+  }
+
   const matches = text.match(/https?:\/\/archidekt\.com\/decks\/\d+/gi) || [];
   const relativeMatches = [...text.matchAll(/\/decks\/(\d+)/gi)].map((match) => `https://archidekt.com/decks/${match[1]}`);
   return [...new Set([...matches, ...relativeMatches].map(normalizeArchidektDeckUrl).filter(Boolean))];
