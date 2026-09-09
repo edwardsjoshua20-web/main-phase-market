@@ -94,16 +94,16 @@ export function buildCommanderNavSections({
   if (activeMode === 'card') {
     const sections = [];
     if (topCommanders.length > 0) sections.push({ id: 'top-commanders', label: 'Top Commanders' });
-    if (topSynergy.length > 0) sections.push({ id: 'recommended', label: 'Recommended Cards' });
-    if (newCards.length > 0) sections.push({ id: 'new-cards', label: 'New Cards' });
+    if (topSynergy.length > 0) sections.push({ id: 'recommended', label: 'Recommended Chemistry' });
     if (gameChangers.length > 0) sections.push({ id: 'game-changers', label: 'Game Changers' });
+    if (newCards.length > 0) sections.push({ id: 'new-cards', label: 'New Cards' });
     return sections;
   }
 
   const sections = [];
-  if (topSynergy.length > 0) sections.push({ id: 'recommended', label: 'Recommended by Synergy' });
-  if (newCards.length > 0) sections.push({ id: 'new-cards', label: 'New Cards' });
+  if (topSynergy.length > 0) sections.push({ id: 'recommended', label: 'Recommended Chemistry' });
   if (gameChangers.length > 0) sections.push({ id: 'game-changers', label: 'Game Changers' });
+  if (newCards.length > 0) sections.push({ id: 'new-cards', label: 'New Cards' });
   for (const label of ALLOWED_CATEGORY_ORDER) {
     const section = categories.find((entry) => entry.label === label);
     if (section) {

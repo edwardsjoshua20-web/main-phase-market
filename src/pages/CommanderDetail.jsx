@@ -30,34 +30,6 @@ function wholeCardCount(value) {
   return Math.round(numeric);
 }
 
-function titleCaseTheme(theme) {
-  return String(theme || '')
-    .split('-')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-function modeSummary(mode) {
-  const summaries = {
-    commander: 'Commander-led recommendations, theme slices, and category breakdowns.',
-    card: 'Card-centric commander usage plus the shared shell around this card.',
-    'average-deck': 'A synthesized average list built from the active local slice.',
-    decks: 'Raw ingested deck rows for the active local slice.'
-  };
-  return summaries[mode] || '';
-}
-
-function modeTitle(mode) {
-  const titles = {
-    commander: 'As Commander',
-    card: 'As Card',
-    'average-deck': 'Average Deck',
-    decks: 'Decks'
-  };
-  return titles[mode] || 'Commander';
-}
-
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
 
@@ -80,17 +52,17 @@ function TypeBreakdown({ data }) {
   const maxValue = Math.max(...data.map((entry) => entry.value), 1);
 
   return (
-    <div className="mt-4 flex h-full flex-col justify-between gap-3">
+    <div className="mt-3 flex h-full flex-col justify-between gap-2">
       {data.map((entry) => {
         const width = `${Math.max((entry.value / maxValue) * 100, 8)}%`;
 
         return (
-          <div key={entry.name} className="space-y-1.5">
-            <div className="flex items-center justify-between gap-4 text-sm">
+          <div key={entry.name} className="space-y-1">
+            <div className="flex items-center justify-between gap-3 text-xs">
               <span className="font-semibold text-slate-200">{entry.name}</span>
-              <span className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">{wholeCardCount(entry.value)} cards</span>
+              <span className="font-semibold text-slate-500">{wholeCardCount(entry.value)}</span>
             </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-white/5">
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -107,9 +79,11 @@ function TypeBreakdown({ data }) {
 }
 
 function CardTile({ card }) {
+  const chemistryScore = percentText(card.synergy_score);
+
   return (
-    <button type="button" className="text-left">
-      <div className="overflow-hidden rounded-md border border-white/10 bg-slate-950">
+    <button type="button" className="group min-w-0 text-left">
+      <div className="overflow-hidden rounded-[3px] bg-slate-950 ring-1 ring-white/[0.08] transition group-hover:ring-white/20">
         <CardImage
           card={card}
           alt={card.card_name}
@@ -117,22 +91,11 @@ function CardTile({ card }) {
           fallbackClassName="flex aspect-[0.715] items-center justify-center text-xs text-white/25"
         />
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-0 border border-white/10 bg-white/[0.02] text-center">
-        <div className="min-w-0 px-1.5 py-2 sm:px-2">
-          <p className="truncate text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-[10px] sm:tracking-[0.16em]">Decks</p>
-          <p className="mt-1 whitespace-nowrap text-base font-black leading-none text-white sm:text-lg">{card.deck_count || 0}</p>
-        </div>
-        <div className="min-w-0 border-x border-white/10 px-1.5 py-2 sm:px-2">
-          <p className="truncate text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-[10px] sm:tracking-[0.16em]">Inclusion</p>
-          <p className="mt-1 whitespace-nowrap text-sm font-black leading-none text-white sm:text-lg">{percentText(card.inclusion_rate)}</p>
-        </div>
-        <div className="min-w-0 px-1.5 py-2 sm:px-2">
-          <p className="truncate text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-[10px] sm:tracking-[0.16em]">Synergy</p>
-          <p className="mt-1 whitespace-nowrap text-sm font-black leading-none text-orange-300 sm:text-lg">
-            {card.synergy_score >= 0 ? '+' : ''}
-            {percentText(card.synergy_score)}
-          </p>
-        </div>
+      <div className="mt-2 min-w-0">
+        <p className="truncate text-xs font-semibold text-slate-100">{card.card_name}</p>
+        <p className="mt-1 text-xs font-bold text-orange-300">
+          Chemistry {card.synergy_score >= 0 ? '+' : ''}{chemistryScore}
+        </p>
       </div>
     </button>
   );
@@ -262,14 +225,6 @@ export default function CommanderDetail() {
     };
   }, [averageDeckProfile]);
 
-  const activeSliceLabel = useMemo(() => {
-    const modeLabel = modeTitle(activeMode);
-    if (activeTheme) {
-      return `${modeLabel} • ${titleCaseTheme(activeTheme)}`;
-    }
-    return modeLabel;
-  }, [activeMode, activeTheme]);
-
   const modeOptions = useMemo(() => ([
     { id: 'commander', label: 'As Commander', enabled: true },
     { id: 'card', label: 'As Card', enabled: true },
@@ -369,20 +324,20 @@ export default function CommanderDetail() {
 
   return (
     <div className="min-h-screen bg-[#0a0d14] text-white">
-      <div className="px-6 py-8 xl:px-10">
+      <div className="px-5 py-6 sm:px-6 xl:px-10">
         <button
           type="button"
           onClick={() => navigate('/CommanderHub')}
-          className="mb-6 inline-flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-white"
+          className="mb-4 inline-flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           All Commanders
         </button>
 
-        <div ref={contentGridRef} className="grid gap-8 xl:grid-cols-[22rem_minmax(0,1fr)] xl:items-start">
+        <div ref={contentGridRef} className="grid gap-7 xl:grid-cols-[17rem_minmax(0,1fr)] xl:items-start">
           <aside ref={asideRef} className="space-y-5 xl:relative xl:self-start">
-            <div ref={commanderRailRef} className="border border-white/10 bg-white/[0.02] p-5">
-              <div className="overflow-hidden rounded-md border border-white/10 bg-slate-950">
+            <div ref={commanderRailRef} className="border border-white/[0.08] bg-white/[0.015] p-3">
+              <div className="overflow-hidden rounded-[3px] bg-slate-950 ring-1 ring-white/10">
                 <CardImage
                   card={commander}
                   alt={commander.name}
@@ -395,9 +350,9 @@ export default function CommanderDetail() {
                 />
               </div>
 
-              <div className="mt-5">
+              <div className="mt-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Color Identity</p>
-                <div className="mt-3">
+                <div className="mt-2">
                   <ColorIdentity colors={commander.color_identity || []} showLabel />
                 </div>
               </div>
@@ -443,115 +398,84 @@ export default function CommanderDetail() {
             )}
           </aside>
 
-          <main className="space-y-10">
-            <section className="grid gap-6 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
-              <div className="border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                <div className="grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-black/20 p-2">
-                  {modeOptions.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      disabled={!option.enabled}
-                      onClick={() => option.enabled && updateCommanderView({ mode: option.id })}
-                      className={`rounded-lg px-4 py-3 text-center text-base font-bold transition-all duration-150 ${
-                        activeMode === option.id
-                          ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-[0_10px_30px_rgba(37,99,235,0.25)]'
-                          : option.enabled
-                            ? 'bg-white/[0.06] text-white hover:bg-white/[0.1]'
-                            : 'cursor-not-allowed bg-white/[0.04] text-slate-500'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
+          <main className="space-y-9">
+            <section className="border-b border-white/10 pb-6">
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,0.88fr)_minmax(30rem,1.12fr)]">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-300">Commander Profile</p>
+                  <h1 className="mt-2 text-3xl font-black leading-tight tracking-tight text-white">{commander.name}</h1>
+                  <p className="mt-2 text-sm font-semibold text-slate-400">{commander.type_line}</p>
+                  {commander.oracle_text ? (
+                    <p className="mt-4 whitespace-pre-line text-sm leading-6 text-slate-200">{commander.oracle_text}</p>
+                  ) : null}
 
-                <div className="mt-5 rounded-xl border border-orange-400/20 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.15),rgba(249,115,22,0.03)_55%,rgba(0,0,0,0)_100%)] px-4 py-4">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-200/80">Now Viewing</p>
-                    <p className="mt-2 text-lg font-black text-white">{activeSliceLabel}</p>
+                  <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-semibold text-slate-500">
+                    <span>{Number(totalDecks || 0).toLocaleString()} decks analyzed</span>
+                    {commander.rank ? <span>#{commander.rank} by active sample</span> : null}
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">{modeSummary(activeMode)}</p>
-                </div>
 
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                      {activeMode === 'card' ? 'Matching Decks' : 'Decks'}
-                    </p>
-                    <p className="mt-3 text-4xl font-black leading-none text-white">{totalDecks || 0}</p>
-                  </div>
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                      {activeMode === 'card' ? 'Card Rank' : 'Rank'}
-                    </p>
-                    <p className="mt-3 text-4xl font-black leading-none text-white">#{commander.rank || '-'}</p>
-                  </div>
-                </div>
-
-                {themeOptions.length > 0 && (
-                  <div className="mt-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Themes</p>
-                      {activeTheme ? (
-                        <button
-                          type="button"
-                          onClick={() => updateCommanderView({ theme: '' })}
-                          className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500 transition-colors hover:text-white"
-                        >
-                          Clear
-                        </button>
-                      ) : null}
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                  {themeOptions.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
                       {themeOptions.map((theme) => (
                         <button
                           key={theme.slug}
                           type="button"
                           onClick={() => updateCommanderView({ theme: activeTheme === theme.slug ? '' : theme.slug })}
-                          className={`inline-flex items-center justify-between gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition-all duration-150 ${
+                          className={`border px-2.5 py-1.5 text-xs font-semibold transition ${
                             activeTheme === theme.slug
-                              ? 'border-orange-400/50 bg-orange-500/10 text-orange-200 shadow-[0_10px_24px_rgba(249,115,22,0.12)]'
-                              : 'border-white/10 bg-white/10 text-white hover:border-orange-400/40 hover:bg-orange-500/10 hover:text-orange-200'
+                              ? 'border-orange-300/50 bg-orange-400/10 text-orange-200'
+                              : 'border-white/10 bg-white/[0.035] text-slate-300 hover:border-white/20 hover:text-white'
                           }`}
                         >
-                          <span>{theme.label}</span>
-                          <span className="rounded-md bg-black/30 px-1.5 py-0.5 text-[11px] font-black text-slate-200">
-                            {theme.deck_count}
-                          </span>
+                          {theme.label}
                         </button>
                       ))}
+                    </div>
+                  )}
+
+                  <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-white/[0.08] pt-3">
+                    {modeOptions.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        disabled={!option.enabled}
+                        onClick={() => option.enabled && updateCommanderView({ mode: option.id })}
+                        className={`border-b py-1 text-xs font-bold transition ${
+                          activeMode === option.id
+                            ? 'border-orange-300 text-white'
+                            : 'border-transparent text-slate-500 hover:text-slate-200'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {(chartData.typeDistribution.length > 0 || chartData.manaCurve.some((entry) => entry.count > 0)) && (
+                  <div className="grid min-h-[18rem] grid-cols-2 gap-5 border-l border-white/[0.08] pl-5">
+                    <div className="flex min-w-0 flex-col">
+                      <h2 className="text-lg font-black text-white">Type Distribution</h2>
+                      <TypeBreakdown data={chartData.typeDistribution} />
+                    </div>
+
+                    <div className="flex min-w-0 flex-col">
+                      <h2 className="text-lg font-black text-white">Mana Curve</h2>
+                      <div className="mt-3 min-h-[15rem] flex-1">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData.manaCurve} margin={{ top: 6, right: 0, bottom: 0, left: -24 }}>
+                            <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
+                            <XAxis dataKey="mana" stroke="#64748b" tickLine={false} axisLine={false} />
+                            <YAxis stroke="#64748b" tickLine={false} axisLine={false} allowDecimals={false} />
+                            <Tooltip cursor={{ fill: 'rgba(255,255,255,0.035)' }} content={<ChartTooltip />} />
+                            <Bar dataKey="count" fill="#f97316" radius={[2, 2, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
-
-              {(chartData.typeDistribution.length > 0 || chartData.manaCurve.some((entry) => entry.count > 0)) && (
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="flex h-full flex-col rounded-xl border border-white/10 bg-white/[0.02] p-5">
-                    <h2 className="text-2xl font-black text-white">Type Distribution</h2>
-                    <TypeBreakdown data={chartData.typeDistribution} />
-                  </div>
-
-                  <div className="flex h-full flex-col rounded-xl border border-white/10 bg-white/[0.02] p-5">
-                    <h2 className="text-2xl font-black text-white">Mana Curve</h2>
-                    <div className="mt-4 min-h-[18rem] flex-1">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData.manaCurve}>
-                          <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
-                          <XAxis dataKey="mana" stroke="#94a3b8" tickLine={false} axisLine={false} />
-                          <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} allowDecimals={false} />
-                          <Tooltip
-                            cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                            content={<ChartTooltip />}
-                          />
-                          <Bar dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-              )}
             </section>
 
             {!hasLocalData && (
@@ -564,8 +488,8 @@ export default function CommanderDetail() {
 
             {activeMode === 'commander' && topSynergy.length > 0 && (
               <section id="recommended" className="space-y-4">
-                <h2 className="text-2xl font-black tracking-tight text-white">Recommended by Synergy</h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                <h2 className="text-2xl font-black tracking-tight text-white">Recommended Chemistry</h2>
+                <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {topSynergy.map((card) => (
                     <CardTile key={`recommended-${card.oracle_id}-${card.card_name}`} card={card} />
                   ))}
@@ -590,21 +514,10 @@ export default function CommanderDetail() {
 
             {activeMode === 'card' && topSynergy.length > 0 && (
               <section id="recommended" className="space-y-4">
-                <h2 className="text-2xl font-black tracking-tight text-white">Recommended Cards</h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                <h2 className="text-2xl font-black tracking-tight text-white">Recommended Chemistry</h2>
+                <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {topSynergy.map((card) => (
                     <CardTile key={`card-mode-recommended-${card.oracle_id}-${card.card_name}`} card={card} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeMode === 'card' && newCards.length > 0 && (
-              <section id="new-cards" className="space-y-4">
-                <h2 className="text-2xl font-black tracking-tight text-white">New Cards</h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {newCards.map((card) => (
-                    <CardTile key={`card-mode-new-${card.oracle_id}-${card.card_name}`} card={card} />
                   ))}
                 </div>
               </section>
@@ -613,7 +526,7 @@ export default function CommanderDetail() {
             {activeMode === 'card' && gameChangers.length > 0 && (
               <section id="game-changers" className="space-y-4">
                 <h2 className="text-2xl font-black tracking-tight text-white">Game Changers</h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {gameChangers.map((card) => (
                     <CardTile key={`card-mode-changer-${card.oracle_id}-${card.card_name}`} card={card} />
                   ))}
@@ -621,12 +534,12 @@ export default function CommanderDetail() {
               </section>
             )}
 
-            {activeMode === 'commander' && newCards.length > 0 && (
+            {activeMode === 'card' && newCards.length > 0 && (
               <section id="new-cards" className="space-y-4">
                 <h2 className="text-2xl font-black tracking-tight text-white">New Cards</h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {newCards.map((card) => (
-                    <CardTile key={`new-${card.oracle_id}-${card.card_name}`} card={card} />
+                    <CardTile key={`card-mode-new-${card.oracle_id}-${card.card_name}`} card={card} />
                   ))}
                 </div>
               </section>
@@ -635,9 +548,20 @@ export default function CommanderDetail() {
             {activeMode === 'commander' && gameChangers.length > 0 && (
               <section id="game-changers" className="space-y-4">
                 <h2 className="text-2xl font-black tracking-tight text-white">Game Changers</h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {gameChangers.map((card) => (
                     <CardTile key={`changer-${card.oracle_id}-${card.card_name}`} card={card} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {activeMode === 'commander' && newCards.length > 0 && (
+              <section id="new-cards" className="space-y-4">
+                <h2 className="text-2xl font-black tracking-tight text-white">New Cards</h2>
+                <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                  {newCards.map((card) => (
+                    <CardTile key={`new-${card.oracle_id}-${card.card_name}`} card={card} />
                   ))}
                 </div>
               </section>
@@ -646,7 +570,7 @@ export default function CommanderDetail() {
             {activeMode === 'commander' && visibleCategories.map((section) => (
               <section key={section.category} id={`category-${section.category}`} className="space-y-4">
                 <h2 className="text-2xl font-black tracking-tight text-white">{section.label}</h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {section.cards.map((card) => (
                     <CardTile key={`${section.category}-${card.oracle_id}-${card.card_name}`} card={card} />
                   ))}
