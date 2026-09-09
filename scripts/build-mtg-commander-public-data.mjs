@@ -18,6 +18,16 @@ const OUTPUT_PATH = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commanders
 const DETAILS_DIR = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commander-details');
 const MANIFEST_PATH = path.join(PROJECT_ROOT, 'public', 'data', 'mtg', 'commander-manifest.json');
 const HOSTED_PUBLIC_DATA_BASE_URL = 'https://wwvvyrhlybwijqlhubdv.supabase.co/storage/v1/object/public/main-phase-market-public/data';
+const TRUSTED_ARCHETYPE_SLUGS = new Set([
+  'aristocrats',
+  'counters',
+  'tokens',
+  'mill',
+  'reanimator',
+  'lands',
+  'enchantress',
+  'petitioners'
+]);
 
 function normalizeText(value) {
   return String(value || '')
@@ -83,6 +93,13 @@ function toCommander(row, deckCounts, uniqueConfigurationCounts, snapshot) {
   const deckCount = Number(deckCounts.get(row.oracle_id) || 0);
   const uniqueConfigurationCount = Number(uniqueConfigurationCounts.get(row.oracle_id) || 0);
   const sampleConfidence = getCommanderSampleConfidence(uniqueConfigurationCount);
+  const detail = snapshot.details.get(row.oracle_id);
+  const archetypes = !detail?.analytics_suppressed
+    ? (detail?.theme_options || [])
+        .filter((theme) => TRUSTED_ARCHETYPE_SLUGS.has(theme.slug) && Number(theme.deck_count || 0) > 0)
+        .map((theme) => ({ slug: theme.slug, label: theme.label, deck_count: Number(theme.deck_count) }))
+        .sort((a, b) => b.deck_count - a.deck_count || a.label.localeCompare(b.label))
+    : [];
   return {
     id: row.id,
     oracle_id: row.oracle_id,
@@ -109,6 +126,7 @@ function toCommander(row, deckCounts, uniqueConfigurationCounts, snapshot) {
     analytics_version: COMMANDER_ANALYTICS_VERSION,
     confidence_tier: sampleConfidence.tier,
     analytics_eligible: sampleConfidence.analytics_eligible,
+    archetypes,
     legal_commander: Boolean(row.legal_commander),
     can_be_commander: true,
     game: 'magic'
@@ -186,6 +204,23 @@ async function main() {
   const commanders = [...commandersByOracleId.values()].sort(
     (a, b) => Number(b.deck_count || 0) - Number(a.deck_count || 0) || a.name.localeCompare(b.name)
   );
+  const archetypeTotals = new Map();
+  for (const commander of commanders) {
+    for (const archetype of commander.archetypes || []) {
+      const current = archetypeTotals.get(archetype.slug) || {
+        slug: archetype.slug,
+        label: archetype.label,
+        deck_count: 0,
+        profile_count: 0
+      };
+      current.deck_count += Number(archetype.deck_count || 0);
+      current.profile_count += 1;
+      archetypeTotals.set(archetype.slug, current);
+    }
+  }
+  const trendingArchetypes = [...archetypeTotals.values()].sort(
+    (a, b) => b.deck_count - a.deck_count || a.label.localeCompare(b.label)
+  );
   fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, `${JSON.stringify(commanders)}\n`);
 
@@ -234,7 +269,8 @@ async function main() {
     last_publication_time: snapshot.freshness.last_publication_time || null,
     index_deck_total: snapshot.indexDeckTotal,
     positive_commander_count: snapshot.positiveCommanderCount,
-    detail_count: detailCount
+    detail_count: detailCount,
+    trending_archetypes: trendingArchetypes
   })}\n`);
 
   console.log(`Wrote ${commanders.length} commanders and ${detailCount} rich detail pages from snapshot ${snapshot.datasetVersion}`);
