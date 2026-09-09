@@ -216,10 +216,7 @@ export default function CommanderHub() {
       <div className="border-b border-white/10 bg-[#0d1420]">
         <div className="px-5 py-5 sm:px-6 xl:px-10">
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">Magic: The Gathering</p>
-              <h1 className="mt-1 text-3xl font-black tracking-tight text-white md:text-4xl">Deck Chemistry</h1>
-            </div>
+            <h1 className="text-3xl font-black tracking-tight text-white md:text-4xl">Deck Chemistry — Magic: The Gathering</h1>
             <p className="pb-1 text-xs font-medium text-slate-400">
               {Number(profileCount || 0).toLocaleString()} commander profiles <span className="mx-2 text-slate-700">·</span> {formatUpdatedAt(updatedAt)}
             </p>

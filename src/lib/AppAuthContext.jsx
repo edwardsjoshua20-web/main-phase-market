@@ -113,8 +113,8 @@ export const AppAuthProvider = ({ children }) => {
     }
   };
 
-  const navigateToLogin = () => {
-    backend.auth.redirectToLogin(window.location.href);
+  const navigateToLogin = (returnTo = window.location.href) => {
+    backend.auth.redirectToLogin(returnTo);
   };
 
   return (

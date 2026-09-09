@@ -82,7 +82,7 @@ function TypeBreakdown({ data }) {
   );
 }
 
-function CardTile({ card, commerce, canAddToDeck, onAddToDeck }) {
+function CardTile({ card, commerce, onAddToDeck }) {
   const chemistryScore = percentText(card.synergy_score);
   const price = commerce?.pricing?.display_price;
   const availability = commerce?.availability;
@@ -107,11 +107,9 @@ function CardTile({ card, commerce, canAddToDeck, onAddToDeck }) {
           <span className={availability?.inStock ? 'text-cyan-200/80' : 'text-slate-500'}>
             {availability?.inStock ? `In Stock · ${availability.quantity}` : 'Out of Stock'}
           </span>
-          {canAddToDeck ? (
-            <button type="button" onClick={() => onAddToDeck(card)} className="font-semibold text-slate-300 transition hover:text-white">
-              + Add to Deck
-            </button>
-          ) : null}
+          <button type="button" onClick={() => onAddToDeck(card)} className="font-semibold text-slate-300 transition hover:text-white">
+            + Add to Deck
+          </button>
         </div>
       </div>
     </article>
@@ -244,7 +242,7 @@ function CommanderUsageTile({ commander, onOpen }) {
 export default function CommanderDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, isAuthenticated } = useAppAuth();
+  const { user, isAuthenticated, navigateToLogin } = useAppAuth();
   const { oracleId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const contentGridRef = useRef(null);
@@ -252,6 +250,7 @@ export default function CommanderDetail() {
   const commanderRailRef = useRef(null);
   const browseRef = useRef(null);
   const topRef = useRef(null);
+  const resumedDeckActionRef = useRef('');
   const [deckActionCard, setDeckActionCard] = useState(null);
   const [deckActionBusy, setDeckActionBusy] = useState(false);
   const [browseFloat, setBrowseFloat] = useState({
@@ -322,7 +321,29 @@ export default function CommanderDetail() {
     { id: 'card', label: 'As Card', enabled: true }
   ]), []);
 
-  const openDeckAction = (card) => setDeckActionCard(card);
+  const deckActionReturnTo = (action, card) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('deckAction', action);
+    if (card?.oracle_id) params.set('deckCard', card.oracle_id);
+    else params.delete('deckCard');
+    return `${window.location.pathname}?${params.toString()}`;
+  };
+
+  const openDeckAction = (card) => {
+    if (!isAuthenticated) {
+      navigateToLogin(deckActionReturnTo('add', card));
+      return;
+    }
+    setDeckActionCard(card);
+  };
+
+  const buildAroundCommander = () => {
+    if (!isAuthenticated) {
+      navigateToLogin(deckActionReturnTo('build', commander));
+      return;
+    }
+    createDeckAndAdd(`Build Around ${commander.name}`, { ...commander, card_name: commander.name }, true);
+  };
 
   const addToExistingDeck = async (deck) => {
     setDeckActionBusy(true);
@@ -358,6 +379,35 @@ export default function CommanderDetail() {
       setDeckActionBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.email || loading || !commander) return;
+    const action = searchParams.get('deckAction');
+    const cardId = searchParams.get('deckCard') || '';
+    if (!action) return;
+    const actionKey = `${oracleId}:${action}:${cardId}`;
+    if (resumedDeckActionRef.current === actionKey) return;
+    resumedDeckActionRef.current = actionKey;
+
+    const params = new URLSearchParams(searchParams);
+    params.delete('deckAction');
+    params.delete('deckCard');
+    setSearchParams(params, { replace: true });
+
+    if (action === 'add') {
+      const card = commerceCards.find((candidate) => candidate.oracle_id === cardId);
+      if (card) setDeckActionCard(card);
+    } else if (action === 'build') {
+      createDeckAndAdd(`Build Around ${commander.name}`, { ...commander, card_name: commander.name }, true);
+    }
+  }, [commander, commerceCards, isAuthenticated, loading, oracleId, searchParams, setSearchParams, user?.email]);
+
+  useEffect(() => {
+    if (loading || !searchParams.get('theme') || activeTheme) return;
+    const params = new URLSearchParams(searchParams);
+    params.delete('theme');
+    setSearchParams(params, { replace: true });
+  }, [activeTheme, loading, searchParams, setSearchParams]);
 
   function updateCommanderView(next = {}) {
     const params = new URLSearchParams(searchParams);
@@ -439,7 +489,7 @@ export default function CommanderDetail() {
           <p className="text-xl font-semibold">Commander not found.</p>
           <button
             type="button"
-            onClick={() => navigate('/CommanderHub')}
+            onClick={() => navigate('/DeckChemistry/magic')}
             className="mt-4 rounded-xl bg-orange-500 px-4 py-2 font-semibold text-white hover:bg-orange-400"
           >
             Back to Commander Hub
@@ -454,7 +504,7 @@ export default function CommanderDetail() {
       <div className="px-5 py-6 sm:px-6 xl:px-10">
         <button
           type="button"
-          onClick={() => navigate('/CommanderHub')}
+          onClick={() => navigate('/DeckChemistry/magic')}
           className="mb-4 inline-flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -491,11 +541,9 @@ export default function CommanderDetail() {
                     ? `In Stock · ${commerceByOracleId[commander.oracle_id].availability.quantity}`
                     : 'Out of Stock'}
                 </span>
-                {isAuthenticated ? (
-                  <button type="button" disabled={deckActionBusy} onClick={() => createDeckAndAdd(`Build Around ${commander.name}`, { ...commander, card_name: commander.name }, true)} className="text-right font-semibold text-orange-200 transition hover:text-white disabled:opacity-50">
-                    Build Around This Commander
-                  </button>
-                ) : null}
+                <button type="button" disabled={deckActionBusy} onClick={buildAroundCommander} className="text-right font-semibold text-orange-200 transition hover:text-white disabled:opacity-50">
+                  Build Around This Commander
+                </button>
               </div>
             </div>
 
@@ -633,7 +681,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">Recommended Chemistry</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {topSynergy.map((card) => (
-                    <CardTile key={`recommended-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
+                    <CardTile key={`recommended-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -659,7 +707,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">Recommended Chemistry</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {topSynergy.map((card) => (
-                    <CardTile key={`card-mode-recommended-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
+                    <CardTile key={`card-mode-recommended-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -670,7 +718,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">Game Changers</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {gameChangers.map((card) => (
-                    <CardTile key={`card-mode-changer-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
+                    <CardTile key={`card-mode-changer-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -681,7 +729,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">New Cards</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {newCards.map((card) => (
-                    <CardTile key={`card-mode-new-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
+                    <CardTile key={`card-mode-new-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -692,7 +740,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">Game Changers</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {gameChangers.map((card) => (
-                    <CardTile key={`changer-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
+                    <CardTile key={`changer-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -703,7 +751,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">New Cards</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {newCards.map((card) => (
-                    <CardTile key={`new-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
+                    <CardTile key={`new-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -714,7 +762,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">{section.label}</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {section.cards.map((card) => (
-                    <CardTile key={`${section.category}-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
+                    <CardTile key={`${section.category}-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>

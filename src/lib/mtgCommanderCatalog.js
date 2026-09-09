@@ -2,9 +2,10 @@ import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 
 const API_BASE = '/api/local/mtg/commanders';
 const HOSTED_COMMANDERS_URL = getCatalogAssetUrl('mtg', 'commanders.json');
-const HOSTED_COMMANDER_DETAIL_SCHEMA = 'commander-views-v2';
+const HOSTED_COMMANDER_DETAIL_SCHEMA = 'commander-views-v3';
 
 const hostedCommanderCache = {
+  key: '',
   promise: null,
   value: null
 };
@@ -73,13 +74,21 @@ function matchesHostedColors(commander, colors) {
   return selectedColors.every((color) => commanderColors.has(color));
 }
 
-async function loadHostedCommanders() {
-  if (hostedCommanderCache.value) {
+async function loadHostedCommanders(datasetVersion = '') {
+  const cacheKey = String(datasetVersion || 'current');
+  if (hostedCommanderCache.key === cacheKey && hostedCommanderCache.value) {
     return hostedCommanderCache.value;
   }
 
+  if (hostedCommanderCache.key !== cacheKey) {
+    hostedCommanderCache.key = cacheKey;
+    hostedCommanderCache.promise = null;
+    hostedCommanderCache.value = null;
+  }
+
   if (!hostedCommanderCache.promise) {
-    hostedCommanderCache.promise = fetch(HOSTED_COMMANDERS_URL).then(async (response) => {
+    const url = `${HOSTED_COMMANDERS_URL}?dataset=${encodeURIComponent(cacheKey)}`;
+    hostedCommanderCache.promise = fetch(url, { cache: 'no-store' }).then(async (response) => {
       if (!response.ok) {
         throw new Error(`Failed to load hosted commander data: ${response.status}`);
       }
@@ -105,7 +114,7 @@ export async function searchMtgCommanders(query, options = {}) {
     const limit = Math.max(1, Math.min(Number(options.limit) || 120, 4000));
     const minDeckCount = Math.max(0, Number(options.minDeckCount) || 0);
     const colors = Array.isArray(options.colors) ? options.colors : [];
-    const commanders = await loadHostedCommanders();
+    const commanders = await loadHostedCommanders(options.datasetVersion);
     const rankedCommanders = commanders
       .map((commander) => ({ commander, score: scoreHostedCommander(commander, normalizedQuery) }))
       .filter(({ commander, score }) => score > 0 && Number(commander.deck_count || 0) >= minDeckCount && matchesHostedColors(commander, colors))
@@ -144,17 +153,20 @@ export async function getMtgCommanderPage(oracleId, options = {}) {
   if (isHostedWithoutLocalApi()) {
     const detailsUrl = `${getCatalogAssetUrl('mtg', `commander-details/${encodeURIComponent(oracleId)}.json`)}?schema=${HOSTED_COMMANDER_DETAIL_SCHEMA}`;
     try {
-      const response = await fetch(detailsUrl);
+      const response = await fetch(detailsUrl, { cache: 'no-store' });
       if (response.ok) {
         const payload = await response.json();
         const requestedTheme = normalizeText(options.theme).replace(/\s+/g, '-');
         const selectedView = options.mode === 'card' ? payload?.card_view : payload;
         const themeSlice = requestedTheme ? selectedView?.theme_slices?.[requestedTheme] : null;
-        return themeSlice || selectedView || payload;
+        const usableThemeSlice = themeSlice?.active_theme === requestedTheme
+          && themeSlice?.has_analytics_data === true
+          && themeSlice?.sample_confidence?.analytics_eligible === true;
+        return usableThemeSlice ? themeSlice : (selectedView || payload);
       }
     } catch {}
 
-    const commanders = await loadHostedCommanders();
+    const commanders = await loadHostedCommanders(options.datasetVersion);
     const commander = commanders.find((item) => item.oracle_id === oracleId) || null;
     const relatedCommanders = commander
       ? commanders

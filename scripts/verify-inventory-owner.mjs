@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {
   applyInventoryDecrease,
   buildInventoryIdentityKey,
@@ -35,5 +36,15 @@ assert.throws(() => applyInventoryDecrease(bronze, 5), /Insufficient inventory/)
 assert.equal(applyInventoryDecrease(bronze, 3, { operationId: 'order-1', appliedOperationIds: ['order-1'] }).quantity, 4);
 assert.equal(findInventoryMatch({ game: 'magic', name: 'Bronze Sword', set_code: 'TST', card_number: '001', lang: 'en' }, [bronze])?.id, 'card-1');
 assert.equal(findInventoryMatch({ game: 'magic', name: 'Bronze Sword', set_code: 'TST', card_number: '002' }, [bronze]), null);
+
+const cardCommerceSource = fs.readFileSync('supabase/functions/get-card-commerce/index.ts', 'utf8');
+for (const canonicalField of ['oracle_id', 'catalog_oracle_id', 'scryfall_oracle_id']) {
+  assert.match(
+    cardCommerceSource,
+    new RegExp(`data->>${canonicalField}\\.eq\\.`),
+    `Card commerce must query canonical ${canonicalField} values directly.`
+  );
+}
+assert.match(cardCommerceSource, /listings\.reduce\([\s\S]*availableQuantity/, 'Card commerce must aggregate stock across matching printings.');
 
 console.log('Inventory owner verification passed.');

@@ -43,11 +43,17 @@ Deno.serve(async (req) => {
 
     if (oracleIds.length === 0) return jsonResponse({ availabilityByOracleId: {} });
 
+    const identityFilters = oracleIds.flatMap((id) => [
+      `data->>oracle_id.eq.${id}`,
+      `data->>catalog_oracle_id.eq.${id}`,
+      `data->>scryfall_oracle_id.eq.${id}`,
+      `data->>description.ilike.*${id}*`
+    ]);
     const params = new URLSearchParams({
       select: 'data,id',
       entity_name: 'eq.Card',
       'data->>status': 'eq.active',
-      or: `(${oracleIds.map((id) => `data->>description.ilike.*${id}*`).join(',')})`
+      or: `(${identityFilters.join(',')})`
     });
     const rows = await restRequest(`/rest/v1/app_entities?${params.toString()}`);
     const grouped = new Map<string, Record<string, unknown>[]>();

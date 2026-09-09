@@ -17,17 +17,17 @@ export function useCommanderHubData() {
 
     async function loadFeatured() {
       try {
-        const [payload, manifestResponse] = await Promise.all([
-          searchMtgCommanders('', { limit: 10, minDeckCount: 1 }),
-          fetch(getCatalogAssetUrl('mtg', 'commander-manifest.json')).catch(() => null)
-        ]);
+        const manifestResponse = await fetch(getCatalogAssetUrl('mtg', 'commander-manifest.json'), { cache: 'no-store' }).catch(() => null);
+        const nextManifest = manifestResponse?.ok ? await manifestResponse.json() : null;
+        const payload = await searchMtgCommanders('', {
+          limit: 10,
+          minDeckCount: 1,
+          datasetVersion: nextManifest?.dataset_version
+        });
         if (!mounted) return;
         const featured = (payload.results || []).slice(0, 10);
         setFeaturedCommanders(featured);
-
-        if (manifestResponse?.ok) {
-          setManifest(await manifestResponse.json());
-        }
+        if (nextManifest) setManifest(nextManifest);
       } finally {
         if (mounted) setFeaturedLoading(false);
       }
@@ -47,7 +47,8 @@ export function useCommanderHubData() {
       try {
         const payload = await searchMtgCommanders(search, {
           limit: 4000,
-          minDeckCount: 1
+          minDeckCount: 1,
+          datasetVersion: manifest?.dataset_version
         });
         if (!mounted) return;
         setBrowseResults(payload.results || []);
@@ -61,7 +62,7 @@ export function useCommanderHubData() {
       mounted = false;
       clearTimeout(timeoutId);
     };
-  }, [search, searchRequestId]);
+  }, [manifest?.dataset_version, search, searchRequestId]);
 
   const rankedFeatured = useMemo(
     () => featuredCommanders.map((commander, index) => ({ ...commander, rank: index + 1 })),

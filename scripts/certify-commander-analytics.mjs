@@ -175,10 +175,9 @@ function inferThemes(cards, includeLegacyTutorSignal = false) {
 function expectedThemeSummary(decks) {
   const counts = new Map(THEME_DEFINITIONS.map((theme) => [theme.slug, 0]));
   for (const deck of decks) for (const slug of deck.themes) counts.set(slug, (counts.get(slug) || 0) + 1);
-  const minimumDeckCount = decks.length >= 8 ? 2 : 1;
   return THEME_DEFINITIONS.filter((theme) => COMMANDER_PRESENTABLE_THEME_SLUGS.has(theme.slug))
     .map((theme) => ({ ...theme, deck_count: counts.get(theme.slug) || 0, prevalence: decks.length ? (counts.get(theme.slug) || 0) / decks.length : 0 }))
-    .filter((theme) => theme.deck_count >= minimumDeckCount)
+    .filter((theme) => getCommanderSampleConfidence(theme.deck_count).analytics_eligible)
     .sort((a, b) => ((b.priority * 1000 + b.deck_count * 10 + b.prevalence) - (a.priority * 1000 + a.deck_count * 10 + a.prevalence)) || b.deck_count - a.deck_count || a.label.localeCompare(b.label))
     .slice(0, 4);
 }
@@ -533,12 +532,18 @@ if (fs.existsSync(manifestPath)) {
         const slice = detail.card_view?.theme_slices?.[theme.slug];
         assert(slice?.active_mode === 'card', `Commander detail ${fileName} As Card theme ${theme.slug} has the wrong mode.`);
         assert(slice?.active_theme === theme.slug, `Commander detail ${fileName} As Card theme ${theme.slug} has the wrong theme.`);
+        assert(slice?.has_analytics_data === true, `Commander detail ${fileName} exposed suppressed As Card theme ${theme.slug}.`);
+        assert(slice?.sample_confidence?.analytics_eligible === true, `Commander detail ${fileName} exposed uncertified As Card theme ${theme.slug}.`);
+        assert(Number(slice?.average_deck_profile?.total_decks || 0) === Number(theme.deck_count || 0), `Commander detail ${fileName} As Card theme ${theme.slug} has no usable published slice.`);
       }
       for (const theme of detail.theme_options || []) {
         const slice = detail.theme_slices?.[theme.slug];
         assert(slice, `Commander detail ${fileName} is missing published theme slice ${theme.slug}.`);
         assert(slice.active_theme === theme.slug, `Commander detail ${fileName} published the wrong active theme for ${theme.slug}.`);
         assert(slice.total_decks === theme.deck_count, `Commander detail ${fileName} theme count mismatch for ${theme.slug}.`);
+        assert(slice.has_analytics_data === true, `Commander detail ${fileName} exposed suppressed theme ${theme.slug}.`);
+        assert(slice.sample_confidence?.analytics_eligible === true, `Commander detail ${fileName} exposed uncertified theme ${theme.slug}.`);
+        assert(Number(slice.average_deck_profile?.total_decks || 0) === Number(theme.deck_count || 0), `Commander detail ${fileName} theme ${theme.slug} has no usable published slice.`);
         assert(slice.dataset_version === undefined && slice.analytics_version === undefined, `Commander detail ${fileName} duplicated snapshot metadata inside ${theme.slug}.`);
       }
     }

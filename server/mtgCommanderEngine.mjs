@@ -1849,7 +1849,6 @@ function inferDeckThemes(deck) {
 function buildThemeSummary(decks) {
   const counts = new Map(COMMANDER_THEME_DEFINITIONS.map((theme) => [theme.slug, 0]));
   const totalDecks = decks.length;
-  const minimumDeckCount = totalDecks >= 8 ? 2 : 1;
 
   for (const deck of decks) {
     for (const slug of inferDeckThemes(deck)) {
@@ -1864,7 +1863,7 @@ function buildThemeSummary(decks) {
       deck_count: Number(counts.get(theme.slug) || 0),
       prevalence: totalDecks > 0 ? Number(counts.get(theme.slug) || 0) / totalDecks : 0
     }))
-    .filter((theme) => theme.deck_count >= minimumDeckCount)
+    .filter((theme) => getCommanderSampleConfidence(theme.deck_count).analytics_eligible)
     .sort((a, b) => {
       const aScore = (a.priority || 0) * 1000 + a.deck_count * 10 + a.prevalence;
       const bScore = (b.priority || 0) * 1000 + b.deck_count * 10 + b.prevalence;
