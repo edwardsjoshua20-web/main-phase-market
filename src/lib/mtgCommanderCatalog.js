@@ -2,6 +2,7 @@ import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 
 const API_BASE = '/api/local/mtg/commanders';
 const HOSTED_COMMANDERS_URL = getCatalogAssetUrl('mtg', 'commanders.json');
+const HOSTED_COMMANDER_DETAIL_SCHEMA = 'theme-slices-v1';
 
 const hostedCommanderCache = {
   promise: null,
@@ -141,7 +142,7 @@ export async function searchMtgCommanders(query, options = {}) {
 
 export async function getMtgCommanderPage(oracleId, options = {}) {
   if (isHostedWithoutLocalApi()) {
-    const detailsUrl = getCatalogAssetUrl('mtg', `commander-details/${encodeURIComponent(oracleId)}.json`);
+    const detailsUrl = `${getCatalogAssetUrl('mtg', `commander-details/${encodeURIComponent(oracleId)}.json`)}?schema=${HOSTED_COMMANDER_DETAIL_SCHEMA}`;
     try {
       const response = await fetch(detailsUrl);
       if (response.ok) {
