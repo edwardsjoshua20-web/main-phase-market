@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, ArrowUp, Loader2, Plus } from 'lucide-react';
 import { ResponsiveContainer, Tooltip, XAxis, YAxis, BarChart, Bar, CartesianGrid } from 'recharts';
+import { toast } from 'sonner';
 import CardImage from '@/components/cards/CardImage';
-import ColorIdentity from '@/components/commander/ColorIdentity';
+import { ManaCost } from '@/components/lib/MtgSymbolText';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useCommanderDetailPage } from '@/hooks/useCommanderDetailPage';
+import { useCommanderCommerce } from '@/hooks/useCommanderCommerce';
+import { useAppAuth } from '@/lib/AppAuthContext';
+import { deckBuilderOwner } from '@/services/deckBuilderOwner';
 
 const TYPE_COLORS = {
   Land: '#d4a017',
@@ -52,16 +58,13 @@ function TypeBreakdown({ data }) {
   const maxValue = Math.max(...data.map((entry) => entry.value), 1);
 
   return (
-    <div className="mt-3 flex h-full flex-col justify-between gap-2">
+    <div className="mt-3 flex h-full flex-col justify-between gap-2.5">
       {data.map((entry) => {
         const width = `${Math.max((entry.value / maxValue) * 100, 8)}%`;
 
         return (
-          <div key={entry.name} className="space-y-1">
-            <div className="flex items-center justify-between gap-3 text-xs">
-              <span className="font-semibold text-slate-200">{entry.name}</span>
-              <span className="font-semibold text-slate-500">{wholeCardCount(entry.value)}</span>
-            </div>
+          <div key={entry.name} className="grid grid-cols-[6.5rem_minmax(0,1fr)_2rem] items-center gap-2.5">
+            <span className="truncate text-xs font-semibold text-slate-200">{entry.name}</span>
             <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
               <div
                 className="h-full rounded-full"
@@ -71,6 +74,7 @@ function TypeBreakdown({ data }) {
                 }}
               />
             </div>
+            <span className="text-right text-xs font-semibold tabular-nums text-slate-400">{wholeCardCount(entry.value)}</span>
           </div>
         );
       })}
@@ -78,11 +82,13 @@ function TypeBreakdown({ data }) {
   );
 }
 
-function CardTile({ card }) {
+function CardTile({ card, commerce, canAddToDeck, onAddToDeck }) {
   const chemistryScore = percentText(card.synergy_score);
+  const price = commerce?.pricing?.display_price;
+  const availability = commerce?.availability;
 
   return (
-    <button type="button" className="group min-w-0 text-left">
+    <article className="group min-w-0 text-left">
       <div className="overflow-hidden rounded-[3px] bg-slate-950 ring-1 ring-white/[0.08] transition group-hover:ring-white/20">
         <CardImage
           card={card}
@@ -93,12 +99,76 @@ function CardTile({ card }) {
       </div>
       <div className="mt-2 min-w-0">
         <p className="truncate text-xs font-semibold text-slate-100">{card.card_name}</p>
-        <p className="mt-1 text-xs font-bold text-orange-300">
-          Chemistry {card.synergy_score >= 0 ? '+' : ''}{chemistryScore}
-        </p>
+        <div className="mt-1 flex items-center justify-between gap-2 text-xs font-bold">
+          <span className="text-orange-300">Chemistry {card.synergy_score >= 0 ? '+' : ''}{chemistryScore}</span>
+          {formatPrice(price) ? <span className={priceClassName(price)}>{formatPrice(price)}</span> : null}
+        </div>
+        <div className="mt-1.5 flex min-h-5 items-center justify-between gap-2 text-[11px]">
+          <span className={availability?.inStock ? 'text-cyan-200/80' : 'text-slate-500'}>
+            {availability?.inStock ? `In Stock · ${availability.quantity}` : 'Out of Stock'}
+          </span>
+          {canAddToDeck ? (
+            <button type="button" onClick={() => onAddToDeck(card)} className="font-semibold text-slate-300 transition hover:text-white">
+              + Add to Deck
+            </button>
+          ) : null}
+        </div>
       </div>
-    </button>
+    </article>
   );
+}
+
+function AddToDeckDialog({ card, decks, open, onOpenChange, onAdd, onCreate, busy }) {
+  const [newDeckName, setNewDeckName] = useState('');
+
+  useEffect(() => {
+    if (open) setNewDeckName(card ? `${card.card_name || card.name} Deck` : '');
+  }, [card, open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md border-white/10 bg-[#101722] text-white sm:rounded-[4px]">
+        <DialogHeader>
+          <DialogTitle>Add {card?.card_name || card?.name || 'card'} to Deck</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-1 border-y border-white/[0.08] py-2">
+          {decks.length > 0 ? decks.map((deck) => (
+            <button
+              key={deck.id}
+              type="button"
+              disabled={busy}
+              onClick={() => onAdd(deck)}
+              className="flex w-full items-center justify-between px-2 py-2 text-left text-sm text-slate-200 transition hover:bg-white/[0.05] hover:text-white disabled:opacity-50"
+            >
+              <span className="truncate font-semibold">{deck.name}</span>
+              <span className="ml-3 text-xs text-slate-500">{(deck.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)} cards</span>
+            </button>
+          )) : <p className="px-2 py-3 text-sm text-slate-400">No Commander decks yet.</p>}
+        </div>
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Create New Deck</p>
+          <div className="mt-2 flex gap-2">
+            <input value={newDeckName} onChange={(event) => setNewDeckName(event.target.value)} className="min-w-0 flex-1 border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/40" aria-label="New deck name" />
+            <button type="button" disabled={busy || !newDeckName.trim()} onClick={() => onCreate(newDeckName.trim())} className="inline-flex items-center gap-1 bg-cyan-600 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50">
+              <Plus className="h-4 w-4" /> Create
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function formatPrice(value) {
+  const price = Number(value);
+  return Number.isFinite(price) && price > 0 ? `$${price.toFixed(2)}` : '';
+}
+
+function priceClassName(value) {
+  const price = Number(value);
+  if (price >= 20) return 'text-violet-300';
+  if (price >= 10) return 'text-amber-300';
+  return 'text-cyan-300';
 }
 
 function AverageDeckCardTile({ card }) {
@@ -173,12 +243,17 @@ function CommanderUsageTile({ commander, onOpen }) {
 
 export default function CommanderDetail() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user, isAuthenticated } = useAppAuth();
   const { oracleId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const contentGridRef = useRef(null);
   const asideRef = useRef(null);
   const commanderRailRef = useRef(null);
   const browseRef = useRef(null);
+  const topRef = useRef(null);
+  const [deckActionCard, setDeckActionCard] = useState(null);
+  const [deckActionBusy, setDeckActionBusy] = useState(false);
   const [browseFloat, setBrowseFloat] = useState({
     mode: 'normal',
     width: 0,
@@ -205,6 +280,23 @@ export default function CommanderDetail() {
     loading
   } = useCommanderDetailPage({ oracleId, searchParams });
 
+  const commerceCards = useMemo(() => {
+    const cards = [
+      commander ? { ...commander, card_name: commander.name } : null,
+      ...topSynergy,
+      ...newCards,
+      ...gameChangers,
+      ...visibleCategories.flatMap((section) => section.cards || [])
+    ].filter(Boolean);
+    return [...new Map(cards.map((card) => [card.oracle_id, card])).values()];
+  }, [commander, gameChangers, newCards, topSynergy, visibleCategories]);
+  const { commerceByOracleId } = useCommanderCommerce(commerceCards);
+  const { data: compatibleDecks = [] } = useQuery({
+    queryKey: ['cardlists', user?.email, 'magic', 'commander'],
+    queryFn: () => deckBuilderOwner.listUserDecks(user.email, { game: 'magic', format: 'commander' }),
+    enabled: Boolean(isAuthenticated && user?.email && deckActionCard)
+  });
+
   const chartData = useMemo(() => {
     const typeDistribution = (averageDeckProfile?.type_distribution || []).map((entry, index) => ({
       name: entry.name,
@@ -227,10 +319,45 @@ export default function CommanderDetail() {
 
   const modeOptions = useMemo(() => ([
     { id: 'commander', label: 'As Commander', enabled: true },
-    { id: 'card', label: 'As Card', enabled: true },
-    { id: 'average-deck', label: 'Average Deck', enabled: true },
-    { id: 'decks', label: 'Decks', enabled: true }
+    { id: 'card', label: 'As Card', enabled: true }
   ]), []);
+
+  const openDeckAction = (card) => setDeckActionCard(card);
+
+  const addToExistingDeck = async (deck) => {
+    setDeckActionBusy(true);
+    try {
+      const commerceCard = commerceByOracleId[deckActionCard.oracle_id]?.card || deckActionCard;
+      const result = await deckBuilderOwner.addCardToDeck(deck, commerceCard);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ['cardlists', user?.email] });
+      toast.success(`${deckActionCard.card_name || deckActionCard.name} added to ${deck.name}`);
+      setDeckActionCard(null);
+    } catch (error) {
+      toast.error(error?.message || 'Could not add card to deck');
+    } finally {
+      setDeckActionBusy(false);
+    }
+  };
+
+  const createDeckAndAdd = async (name, card = deckActionCard, asCommander = false) => {
+    setDeckActionBusy(true);
+    try {
+      const commerceCard = commerceByOracleId[card.oracle_id]?.card || card;
+      const deck = await deckBuilderOwner.createDeckWithCard({ userEmail: user.email, name, card: commerceCard, asCommander });
+      await queryClient.invalidateQueries({ queryKey: ['cardlists', user?.email] });
+      setDeckActionCard(null);
+      if (asCommander) navigate(`/AdvancedDeckBuilder?deck=${encodeURIComponent(deck.id)}`);
+      else toast.success(`${card.card_name || card.name} added to ${deck.name}`);
+    } catch (error) {
+      toast.error(error?.message || 'Could not create deck');
+    } finally {
+      setDeckActionBusy(false);
+    }
+  };
 
   function updateCommanderView(next = {}) {
     const params = new URLSearchParams(searchParams);
@@ -350,11 +477,25 @@ export default function CommanderDetail() {
                 />
               </div>
 
-              <div className="mt-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Color Identity</p>
-                <div className="mt-2">
-                  <ColorIdentity colors={commander.color_identity || []} showLabel />
-                </div>
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <ManaCost manaCost={commander.mana_cost} />
+                {formatPrice(commerceByOracleId[commander.oracle_id]?.pricing?.display_price) ? (
+                  <span className={`text-sm font-bold ${priceClassName(commerceByOracleId[commander.oracle_id]?.pricing?.display_price)}`}>
+                    {formatPrice(commerceByOracleId[commander.oracle_id]?.pricing?.display_price)}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+                <span className={commerceByOracleId[commander.oracle_id]?.availability?.inStock ? 'text-cyan-200/80' : 'text-slate-500'}>
+                  {commerceByOracleId[commander.oracle_id]?.availability?.inStock
+                    ? `In Stock · ${commerceByOracleId[commander.oracle_id].availability.quantity}`
+                    : 'Out of Stock'}
+                </span>
+                {isAuthenticated ? (
+                  <button type="button" disabled={deckActionBusy} onClick={() => createDeckAndAdd(`Build Around ${commander.name}`, { ...commander, card_name: commander.name }, true)} className="text-right font-semibold text-orange-200 transition hover:text-white disabled:opacity-50">
+                    Build Around This Commander
+                  </button>
+                ) : null}
               </div>
             </div>
 
@@ -392,6 +533,13 @@ export default function CommanderDetail() {
                         {section.label}
                       </a>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                      className="flex w-full items-center gap-2 border-t border-white/[0.08] pt-3 text-left text-sm font-semibold text-slate-400 transition-colors hover:text-white"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" /> Back to Top
+                    </button>
                   </div>
                 </div>
               </>
@@ -399,20 +547,14 @@ export default function CommanderDetail() {
           </aside>
 
           <main className="space-y-9">
-            <section className="border-b border-white/10 pb-6">
+            <section ref={topRef} className="scroll-mt-24 border-b border-white/10 pb-6">
               <div className="grid gap-6 lg:grid-cols-[minmax(0,0.88fr)_minmax(30rem,1.12fr)]">
                 <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-300">Commander Profile</p>
-                  <h1 className="mt-2 text-3xl font-black leading-tight tracking-tight text-white">{commander.name}</h1>
+                  <h1 className="text-3xl font-black leading-tight tracking-tight text-white">{commander.name}</h1>
                   <p className="mt-2 text-sm font-semibold text-slate-400">{commander.type_line}</p>
                   {commander.oracle_text ? (
                     <p className="mt-4 whitespace-pre-line text-sm leading-6 text-slate-200">{commander.oracle_text}</p>
                   ) : null}
-
-                  <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-semibold text-slate-500">
-                    <span>{Number(totalDecks || 0).toLocaleString()} decks analyzed</span>
-                    {commander.rank ? <span>#{commander.rank} by active sample</span> : null}
-                  </div>
 
                   {themeOptions.length > 0 && (
                     <div className="mt-4 flex flex-wrap gap-2">
@@ -453,7 +595,7 @@ export default function CommanderDetail() {
                 </div>
 
                 {(chartData.typeDistribution.length > 0 || chartData.manaCurve.some((entry) => entry.count > 0)) && (
-                  <div className="grid min-h-[18rem] grid-cols-2 gap-5 border-l border-white/[0.08] pl-5">
+                  <div className="grid min-h-[17rem] grid-cols-2 gap-5 border-l border-white/[0.08] pl-5">
                     <div className="flex min-w-0 flex-col">
                       <h2 className="text-lg font-black text-white">Type Distribution</h2>
                       <TypeBreakdown data={chartData.typeDistribution} />
@@ -461,14 +603,14 @@ export default function CommanderDetail() {
 
                     <div className="flex min-w-0 flex-col">
                       <h2 className="text-lg font-black text-white">Mana Curve</h2>
-                      <div className="mt-3 min-h-[15rem] flex-1">
+                      <div className="mt-3 min-h-[14rem] flex-1">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData.manaCurve} margin={{ top: 6, right: 0, bottom: 0, left: -24 }}>
+                          <BarChart data={chartData.manaCurve} margin={{ top: 18, right: 0, bottom: 0, left: -24 }}>
                             <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
                             <XAxis dataKey="mana" stroke="#64748b" tickLine={false} axisLine={false} />
                             <YAxis stroke="#64748b" tickLine={false} axisLine={false} allowDecimals={false} />
                             <Tooltip cursor={{ fill: 'rgba(255,255,255,0.035)' }} content={<ChartTooltip />} />
-                            <Bar dataKey="count" fill="#f97316" radius={[2, 2, 0, 0]} />
+                            <Bar dataKey="count" fill="#f97316" radius={[2, 2, 0, 0]} label={{ position: 'top', fill: '#94a3b8', fontSize: 10 }} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -491,7 +633,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">Recommended Chemistry</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {topSynergy.map((card) => (
-                    <CardTile key={`recommended-${card.oracle_id}-${card.card_name}`} card={card} />
+                    <CardTile key={`recommended-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -517,7 +659,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">Recommended Chemistry</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {topSynergy.map((card) => (
-                    <CardTile key={`card-mode-recommended-${card.oracle_id}-${card.card_name}`} card={card} />
+                    <CardTile key={`card-mode-recommended-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -528,7 +670,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">Game Changers</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {gameChangers.map((card) => (
-                    <CardTile key={`card-mode-changer-${card.oracle_id}-${card.card_name}`} card={card} />
+                    <CardTile key={`card-mode-changer-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -539,7 +681,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">New Cards</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {newCards.map((card) => (
-                    <CardTile key={`card-mode-new-${card.oracle_id}-${card.card_name}`} card={card} />
+                    <CardTile key={`card-mode-new-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -550,7 +692,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">Game Changers</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {gameChangers.map((card) => (
-                    <CardTile key={`changer-${card.oracle_id}-${card.card_name}`} card={card} />
+                    <CardTile key={`changer-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -561,7 +703,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">New Cards</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {newCards.map((card) => (
-                    <CardTile key={`new-${card.oracle_id}-${card.card_name}`} card={card} />
+                    <CardTile key={`new-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -572,7 +714,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">{section.label}</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {section.cards.map((card) => (
-                    <CardTile key={`${section.category}-${card.oracle_id}-${card.card_name}`} card={card} />
+                    <CardTile key={`${section.category}-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} canAddToDeck={isAuthenticated} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>
@@ -658,6 +800,15 @@ export default function CommanderDetail() {
           </main>
         </div>
       </div>
+      <AddToDeckDialog
+        card={deckActionCard}
+        decks={compatibleDecks}
+        open={Boolean(deckActionCard)}
+        onOpenChange={(open) => !open && setDeckActionCard(null)}
+        onAdd={addToExistingDeck}
+        onCreate={(name) => createDeckAndAdd(name)}
+        busy={deckActionBusy}
+      />
     </div>
   );
 }

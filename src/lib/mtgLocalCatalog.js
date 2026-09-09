@@ -985,6 +985,28 @@ export async function getMtgPrintingsByOracleId(oracleId) {
     .map((row) => formatResult(row, englishImageIndexes));
 }
 
+export async function getMtgPreferredPrintingsByOracleIds(oracleIds = []) {
+  const requestedIds = new Set((Array.isArray(oracleIds) ? oracleIds : []).map(String).filter(Boolean));
+  if (requestedIds.size === 0) return [];
+
+  const representativeRows = await loadAllLiteBuckets()
+    .then((rows) => rows.filter((row) => requestedIds.has(String(row.oracle_id || ''))))
+    .catch(() => []);
+  const staticRows = await loadIndexedPrintingsForExactMatches(representativeRows).catch(() => []);
+  const mergedRows = staticRows.length > 0
+    ? mergePrintingDetailsWithRepresentatives(staticRows, representativeRows)
+    : representativeRows;
+  const englishImageIndexes = buildEnglishImageIndexes(mergedRows);
+  const preferredByOracleId = new Map();
+
+  for (const row of [...mergedRows].sort(compareExactPrintings)) {
+    if (!requestedIds.has(String(row.oracle_id || '')) || preferredByOracleId.has(row.oracle_id)) continue;
+    preferredByOracleId.set(row.oracle_id, formatResult(row, englishImageIndexes));
+  }
+
+  return [...preferredByOracleId.values()];
+}
+
 export async function getMtgCatalogManifest() {
   return loadManifest();
 }

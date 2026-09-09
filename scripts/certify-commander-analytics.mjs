@@ -12,6 +12,7 @@ import {
   COMMANDER_SAMPLE_THRESHOLDS,
   getCommanderSampleConfidence
 } from '../server/mtgCommanderAnalyticsPolicy.mjs';
+import { isCommanderGameChanger } from '../server/mtgCommanderGameChangers.mjs';
 
 process.env.MPM_DISABLE_COMMANDER_PREWARM = '1';
 
@@ -463,6 +464,10 @@ for (const indexRow of indexRows) {
 
   const expectedTop = topRecommendations(statsByCommander.get(indexRow.oracle_id) || []).map((row) => row.card_oracle_id);
   assert(JSON.stringify(page.top_synergy_cards.map((row) => row.oracle_id)) === JSON.stringify(expectedTop), `Recommendation ordering mismatch for ${indexRow.name}`);
+  const expectedGameChangers = (statsByCommander.get(indexRow.oracle_id) || [])
+    .filter((row) => Number(row.deck_count || 0) > 0 && isCommanderGameChanger(row.card_name))
+    .map((row) => row.card_oracle_id);
+  assert(JSON.stringify(page.game_changers.map((row) => row.oracle_id)) === JSON.stringify(expectedGameChangers), `Official Game Changers mismatch for ${indexRow.name}`);
   const commanderDecks = [...decks.values()].filter((deck) => deck.commander_oracle_id === indexRow.oracle_id);
   const expectedThemes = expectedThemeSummary(commanderDecks);
   assert(JSON.stringify(page.theme_options.map((theme) => [theme.slug, theme.deck_count])) === JSON.stringify(expectedThemes.map((theme) => [theme.slug, theme.deck_count])), `Theme summary mismatch for ${indexRow.name}`);
@@ -486,6 +491,7 @@ for (const indexRow of indexRows) {
     assertAverageProfileMatches(themePage, themeDecks, `${indexRow.name}/${theme.slug}`);
     const expectedThemeTop = topRecommendations(expectedSliceRecommendations(themeDecks)).map((row) => row.card_oracle_id);
     assert(JSON.stringify(themePage.top_synergy_cards.map((row) => row.oracle_id)) === JSON.stringify(expectedThemeTop), `Theme recommendation ordering mismatch for ${indexRow.name}/${theme.slug}`);
+    assert(themePage.game_changers.every((row) => isCommanderGameChanger(row.card_name)), `Unofficial Game Changer leaked into ${indexRow.name}/${theme.slug}`);
   }
 
   const signature = (statsByCommander.get(indexRow.oracle_id) || []).filter((row) => row.weighted_score > 0 && !isBasicLand(row.card_name, row.type_line)).slice(0, 8).map((row) => row.card_oracle_id);

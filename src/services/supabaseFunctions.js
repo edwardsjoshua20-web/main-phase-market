@@ -16,6 +16,7 @@ const actionFunctionMap = {
   finalizeCheckoutSession: 'finalize-checkout-session',
   getShippingRates: 'get-shipping-rates',
   getOrderStatus: 'get-order-status',
+  getCardCommerce: 'get-card-commerce',
   sendProductRequest: 'send-product-request'
 };
 

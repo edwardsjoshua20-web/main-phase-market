@@ -25,6 +25,7 @@ import { allowsAnyNumberOfCopies, getEffectiveDeckCopyLimit } from '@/lib/deckCo
 import { toast } from 'sonner';
 import { calculateDeckValue } from '@/services/pricing/pricingPipeline';
 import { searchOwner } from '@/services/search/searchOwner';
+import { deckBuilderOwner } from '@/services/deckBuilderOwner';
 
 const DECK_FORMATS_BY_GAME = {
   magic: {
@@ -466,44 +467,12 @@ export default function AdvancedDeckBuilder() {
   });
 
   const addCardToDeck = (card, qty = 1) => saveDeckChange((currentDeck) => {
-
-    if (normalizeDeckFormatKey(currentDeck.deck_format) === 'commander') {
-      const isBasicLand = card.type?.toLowerCase().includes('basic');
-      const currentItem = currentDeck.items?.find(i => i.product_id === card.id);
-      if (currentItem && !isBasicLand && !allowsAnyNumberOfCopies(card)) {
-        toast.error('Commander: Only 1 of each non-land card allowed');
-        return null;
-      }
+    const change = deckBuilderOwner.buildCardAddition(currentDeck, card, { quantity: qty, game: selectedGame });
+    if (!change.ok) {
+      toast.error(change.message);
+      return null;
     }
-
-    const existing = currentDeck.items?.find(i => i.product_id === card.id);
-    const existingIndex = currentDeck.items?.findIndex(i => i.product_id === card.id) ?? -1;
-    const updatedItems = existing
-      ? currentDeck.items.map(i => i.product_id === card.id ? { ...i, quantity: (i.quantity || 1) + qty } : i)
-      : [...(currentDeck.items || []), {
-          product_id: card.id,
-          product_name: card.name,
-          product_image: getCardImageUrl(card),
-          image_url: card.image_url || null,
-          english_image_url: card.english_image_url || null,
-          image_small: card.image_small || null,
-          fallback_image_url: card.fallback_image_url || null,
-          price: card.price || 0,
-          product_type: selectedGame,
-          type: card.type,
-          quantity: qty,
-          mana_cost: card.mana_cost || '',
-          cmc: card.cmc ?? 0,
-          oracle_text: card.oracle_text || '',
-          oracle_id: card.oracle_id || null,
-          set_code: card.set_code || '',
-        }];
-
-    const newCost = calculateDeckValue(updatedItems);
-    return {
-      updates: { items: updatedItems, estimated_cost: newCost },
-      undo: { kind: 'restore_cards', cards: [{ product_id: card.id, item: existing ? { ...existing } : null, index: existingIndex < 0 ? currentDeck.items.length : existingIndex }] },
-    };
+    return change;
   }, {
     label: `Added ${qty} ${card.name}`,
     successMessage: () => `Added ${card.name}`,

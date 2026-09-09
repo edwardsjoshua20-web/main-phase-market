@@ -65,6 +65,64 @@ export const inventoryOwner = {
   findInventoryMatch,
   findStoreStockMatch,
 
+  summarizeCatalogCardAvailability(catalogItem = {}, inventoryRows = []) {
+    const target = normalizeInventoryIdentity({ ...catalogItem, game: catalogItem.game || 'magic' });
+    const matches = (Array.isArray(inventoryRows) ? inventoryRows : []).filter((row) => {
+      const identity = normalizeInventoryIdentity(row);
+      if (target.game && identity.game && target.game !== identity.game) return false;
+      if (target.canonicalCardId && identity.canonicalCardId) return target.canonicalCardId === identity.canonicalCardId;
+      return Boolean(target.name && identity.name === target.name);
+    });
+    const sellable = matches.filter((row) => getInventoryStockState(row).status === 'active');
+    const quantity = sellable.reduce((sum, row) => sum + getInventoryStockState(row).availableQuantity, 0);
+    const pricedListing = sellable.find((row) => getInventoryStockState(row).inStock && row.display_price != null)
+      || sellable.find((row) => row.display_price != null)
+      || null;
+    return { inStock: quantity > 0, quantity, listing: pricedListing, matchingListingCount: sellable.length };
+  },
+
+  async getCatalogCardAvailability(catalogItem = {}) {
+    const oracleId = String(catalogItem.oracle_id || catalogItem.catalog_oracle_id || '').trim();
+    const name = String(catalogItem.name || catalogItem.product_name || catalogItem.card_name || '').trim();
+    const filter = oracleId
+      ? { description: { $regex: `Oracle ID:\\s*${oracleId}`, $options: 'i' }, status: 'active' }
+      : { name, status: 'active' };
+    const rows = await this.filterCardListings(filter, '-created_date', 100);
+    return this.summarizeCatalogCardAvailability(catalogItem, rows);
+  },
+
+  async getCatalogCardsAvailability(catalogItems = []) {
+    const items = Array.isArray(catalogItems) ? catalogItems : [];
+    const byOracleId = new Map(items
+      .map((item) => [String(item?.oracle_id || item?.catalog_oracle_id || '').trim().toLowerCase(), item])
+      .filter(([oracleId]) => oracleId));
+    if (byOracleId.size === 0) return {};
+
+    try {
+      const response = await backend.actions.invoke('getCardCommerce', {
+        oracleIds: [...byOracleId.keys()]
+      });
+      const summaries = response?.data?.availabilityByOracleId || response?.availabilityByOracleId || {};
+      return Object.fromEntries([...byOracleId.keys()].map((oracleId) => {
+        const summary = summaries[oracleId] || {};
+        return [oracleId, {
+          inStock: Boolean(summary.inStock),
+          quantity: normalizeInventoryQuantity(summary.quantity),
+          matchingListingCount: normalizeInventoryQuantity(summary.matchingListingCount),
+          listing: null,
+          pricing: summary.pricing || null
+        }];
+      }));
+    } catch (error) {
+      if (import.meta.env?.PROD) throw error;
+      const entries = await Promise.all([...byOracleId.entries()].map(async ([oracleId, item]) => [
+        oracleId,
+        await this.getCatalogCardAvailability(item)
+      ]));
+      return Object.fromEntries(entries);
+    }
+  },
+
   normalizeCardListing,
   normalizeProductListing,
 

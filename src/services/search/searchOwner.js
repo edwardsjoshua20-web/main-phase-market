@@ -1,7 +1,7 @@
 import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 import { searchFabCatalog, searchFabCatalogAdvanced } from '@/lib/fabLocalCatalog';
 import { searchLorcanaCatalog, searchLorcanaCatalogAdvanced } from '@/lib/lorcanaLocalCatalog';
-import { browseMtgCatalog, getMtgPrintingsByOracleId, searchMtgCatalog, searchMtgCatalogAdvanced, searchMtgCatalogSuggestions } from '@/lib/mtgLocalCatalog';
+import { browseMtgCatalog, getMtgPreferredPrintingsByOracleIds, getMtgPrintingsByOracleId, searchMtgCatalog, searchMtgCatalogAdvanced, searchMtgCatalogSuggestions } from '@/lib/mtgLocalCatalog';
 import { searchOnePieceCatalog, searchOnePieceCatalogAdvanced } from '@/lib/onePieceLocalCatalog';
 import { searchPokemonCatalog, searchPokemonCatalogAdvanced } from '@/lib/pokemonLocalCatalog';
 import { searchStarWarsCatalog, searchStarWarsCatalogAdvanced } from '@/lib/starwarsLocalCatalog';
@@ -334,6 +334,10 @@ export const searchOwner = {
 
   async getMagicPrintingsByOracleId(oracleId) {
     return getMtgPrintingsByOracleId(oracleId);
+  },
+
+  async getMagicPreferredPrintingsByOracleIds(oracleIds) {
+    return getMtgPreferredPrintingsByOracleIds(oracleIds);
   },
 
   async searchSets({ query, game, products = [], limit = 100 } = {}) {

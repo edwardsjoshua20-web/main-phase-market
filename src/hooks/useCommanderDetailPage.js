@@ -13,7 +13,7 @@ export function useCommanderDetailPage({ oracleId, searchParams }) {
   useEffect(() => {
     let mounted = true;
     const requestedTheme = searchParams.get('theme') || '';
-    const requestedMode = searchParams.get('mode') || 'commander';
+    const requestedMode = searchParams.get('mode') === 'card' ? 'card' : 'commander';
 
     async function load() {
       setLoading(true);

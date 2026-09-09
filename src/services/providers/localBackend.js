@@ -616,6 +616,10 @@ function createHostedEntityClient(entityName) {
       params.set('select', '*');
       params.set('entity_name', `eq.${encodeHostedFilterValue(entityName)}`);
       params.set('order', 'created_date.desc');
+      if (entityName === 'Card' && filter?.description?.$regex) {
+        const oracleId = String(filter.description.$regex).match(/[a-f0-9-]{8,}/i)?.[0];
+        if (oracleId) params.set('data->>description', `ilike.*${oracleId}*`);
+      }
 
       const rows = await supabaseRequest(`/rest/v1/app_entities?${params.toString()}`, {
         auth: !requiresHostedSessionForEntityRead(entityName)

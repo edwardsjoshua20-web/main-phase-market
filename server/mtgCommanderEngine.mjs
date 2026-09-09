@@ -13,6 +13,7 @@ import {
   COMMANDER_SAMPLE_THRESHOLDS,
   getCommanderSampleConfidence
 } from './mtgCommanderAnalyticsPolicy.mjs';
+import { isCommanderGameChanger } from './mtgCommanderGameChangers.mjs';
 
 const mtgSearchDirs = [
   path.join(process.cwd(), 'public', 'data', 'mtg', 'search'),
@@ -1401,15 +1402,10 @@ function buildNewCards(statRows) {
     .map(mapStatRow);
 }
 
-function buildGameChangers(statRows, totalDecks) {
-  const maxDeckCount = Math.max(2, Math.min(12, Math.floor(totalDecks * 0.45)));
-
+function buildGameChangers(statRows) {
   return statRows
-    .filter((row) => !shouldOmitFromRecommendations(row))
-    .filter((row) => Number(row.weighted_score || 0) > 0)
-    .filter((row) => Number(row.deck_count || 0) >= 2)
-    .filter((row) => Number(row.deck_count || 0) <= maxDeckCount)
-    .slice(0, 15)
+    .filter((row) => Number(row.deck_count || 0) > 0)
+    .filter((row) => isCommanderGameChanger(row.card_name))
     .map(mapStatRow);
 }
 
@@ -2681,7 +2677,7 @@ export function getMtgCommanderPage(oracleId, options = {}) {
 
   const topSynergyCards = hasAnalyticsData ? buildTopSynergy(statRows) : [];
   const newCards = hasAnalyticsData ? buildNewCards(statRows) : [];
-  const gameChangers = hasAnalyticsData ? buildGameChangers(statRows, analyticsSampleSize) : [];
+  const gameChangers = hasAnalyticsData ? buildGameChangers(statRows) : [];
   const categories = hasAnalyticsData ? buildCategorySections(statRows) : [];
   const relatedCommanders = hasAnalyticsData && activeMode !== 'card' ? buildRelatedCommanders(commanderRow, statRows) : [];
   const averageDeckProfile = hasAnalyticsData ? (
