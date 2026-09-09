@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Loader2, Search } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import CardImage from '@/components/cards/CardImage';
 import { CardHoverPreview, useCardHoverPreview } from '@/components/cards/CardPresentation';
@@ -73,11 +73,12 @@ function TopCommanderCard({ commander, onPreviewEnter, onPreviewLeave }) {
   );
 }
 
-function FilterSelect({ label, value, onChange, options, disabled = false }) {
+function FilterSelect({ label, value, onChange, options, disabled = false, selectRef }) {
   return (
     <label className="relative min-w-[150px] flex-1 sm:flex-none">
       <span className="sr-only">{label}</span>
       <select
+        ref={selectRef}
         value={value}
         onChange={(event) => onChange?.(event.target.value)}
         disabled={disabled}
@@ -125,12 +126,14 @@ function BrowseCommanderCard({ commander, onPreviewEnter, onPreviewLeave }) {
 export default function CommanderHub() {
   const cardPreview = useCardHoverPreview();
   const browseSectionRef = useRef(null);
+  const archetypeSelectRef = useRef(null);
   const [colorFilter, setColorFilter] = useState('all');
   const [archetypeFilter, setArchetypeFilter] = useState('all');
   const [confidenceFilter, setConfidenceFilter] = useState('all');
   const [deckCountFilter, setDeckCountFilter] = useState('all');
   const [sortMode, setSortMode] = useState('rank');
   const [visibleCount, setVisibleCount] = useState(48);
+  const [featuredPage, setFeaturedPage] = useState(0);
   const {
     browseLoading,
     browseResults,
@@ -169,6 +172,9 @@ export default function CommanderHub() {
   }, [search, colorFilter, archetypeFilter, confidenceFilter, deckCountFilter, sortMode]);
 
   const visibleCommanders = filteredCommanders.slice(0, visibleCount);
+  const featuredPageSize = 6;
+  const featuredPageCount = Math.max(1, Math.ceil(rankedFeatured.length / featuredPageSize));
+  const visibleFeatured = rankedFeatured.slice(featuredPage * featuredPageSize, (featuredPage + 1) * featuredPageSize);
   const profileCount = manifest?.positive_commander_count || browseTotal || browseResults.length;
   const updatedAt = manifest?.last_publication_time || manifest?.generated_at;
   const trendingArchetypes = manifest?.trending_archetypes || [];
@@ -178,8 +184,31 @@ export default function CommanderHub() {
   ];
 
   const selectArchetype = (slug) => {
+    const archetypeMatches = browseResults.filter((commander) => (
+      (commander.archetypes || []).some((archetype) => archetype.slug === slug)
+    ));
+    const compatibleMatches = archetypeMatches.some((commander) => {
+      const colors = commander.color_identity || [];
+      const colorMatches = colorFilter === 'all'
+        || (colorFilter === 'multicolor' && colors.length > 1)
+        || (colorFilter === 'colorless' && colors.length === 0)
+        || (colorFilter.length === 1 && colors.includes(colorFilter));
+      const confidenceMatches = confidenceFilter === 'all' || commander.confidence_tier === confidenceFilter;
+      const deckCountMatches = deckCountFilter === 'all' || getBrowseSampleCount(commander) >= Number(deckCountFilter);
+      return colorMatches && confidenceMatches && deckCountMatches;
+    });
+
+    if (!compatibleMatches) {
+      setColorFilter('all');
+      setConfidenceFilter('all');
+      setDeckCountFilter('all');
+    }
+    if (archetypeMatches.length === 0 && search.trim()) setSearch('');
     setArchetypeFilter(slug);
-    requestAnimationFrame(() => browseSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    requestAnimationFrame(() => {
+      browseSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      requestAnimationFrame(() => archetypeSelectRef.current?.focus({ preventScroll: true }));
+    });
   };
 
   return (
@@ -219,7 +248,31 @@ export default function CommanderHub() {
       <div className="space-y-9 px-5 py-6 sm:px-6 xl:px-10">
         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div>
-            <h2 className="mb-4 text-xl font-black tracking-tight text-white">Popular Right Now</h2>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-xl font-black tracking-tight text-white">Popular Right Now</h2>
+              {rankedFeatured.length > featuredPageSize && (
+                <div className="flex items-center gap-1" aria-label="Top 10 commander navigation">
+                  <button
+                    type="button"
+                    aria-label="Previous Top 10 commanders"
+                    disabled={featuredPage === 0}
+                    onClick={() => setFeaturedPage((current) => Math.max(0, current - 1))}
+                    className="flex h-8 w-8 items-center justify-center text-slate-400 transition hover:bg-white/[0.045] hover:text-white disabled:cursor-default disabled:opacity-25"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next Top 10 commanders"
+                    disabled={featuredPage >= featuredPageCount - 1}
+                    onClick={() => setFeaturedPage((current) => Math.min(featuredPageCount - 1, current + 1))}
+                    className="flex h-8 w-8 items-center justify-center text-slate-400 transition hover:bg-white/[0.045] hover:text-white disabled:cursor-default disabled:opacity-25"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </div>
 
             {featuredLoading ? (
               <div className="flex min-h-[180px] items-center justify-center gap-3 border-y border-white/10 text-slate-400">
@@ -230,7 +283,7 @@ export default function CommanderHub() {
               <div className="border-y border-white/10 py-12 text-center text-sm text-slate-400">Popular commanders are unavailable.</div>
             ) : (
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-                {rankedFeatured.slice(0, 6).map((commander) => (
+                {visibleFeatured.map((commander) => (
                   <TopCommanderCard
                     key={commander.oracle_id}
                     commander={commander}
@@ -250,9 +303,14 @@ export default function CommanderHub() {
                   key={archetype.slug}
                   type="button"
                   onClick={() => selectArchetype(archetype.slug)}
-                  className="group flex w-full items-center justify-between gap-3 px-1 py-2.5 text-left transition hover:bg-white/[0.035]"
+                  aria-pressed={archetypeFilter === archetype.slug}
+                  className={`group flex w-full items-center justify-between gap-3 border-l-2 px-2 py-2.5 text-left transition ${
+                    archetypeFilter === archetype.slug
+                      ? 'border-sky-300 bg-sky-300/[0.07]'
+                      : 'border-transparent hover:bg-white/[0.035]'
+                  }`}
                 >
-                  <span className="text-sm font-semibold text-slate-200 group-hover:text-white">{archetype.label}</span>
+                  <span className={`text-sm font-semibold group-hover:text-white ${archetypeFilter === archetype.slug ? 'text-white' : 'text-slate-200'}`}>{archetype.label}</span>
                   <span className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
                     {Number(archetype.deck_count || 0).toLocaleString()} decks
                     <ChevronRight className="h-3.5 w-3.5 text-sky-300/70 transition-transform group-hover:translate-x-0.5" />
@@ -275,7 +333,7 @@ export default function CommanderHub() {
 
           <div className="mb-5 flex flex-wrap gap-2">
             <FilterSelect label="Color identity" value={colorFilter} onChange={setColorFilter} options={colorFilters} />
-            <FilterSelect label="Archetype" value={archetypeFilter} onChange={setArchetypeFilter} options={archetypeOptions} />
+            <FilterSelect label="Archetype" value={archetypeFilter} onChange={setArchetypeFilter} options={archetypeOptions} selectRef={archetypeSelectRef} />
             <FilterSelect label="Confidence" value={confidenceFilter} onChange={setConfidenceFilter} options={confidenceFilters} />
             <FilterSelect label="Deck count" value={deckCountFilter} onChange={setDeckCountFilter} options={deckCountFilters} />
             <FilterSelect
