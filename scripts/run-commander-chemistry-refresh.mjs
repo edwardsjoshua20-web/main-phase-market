@@ -73,12 +73,29 @@ function setFreshness(values) {
   }
 }
 
+function certifyCorpusStorage() {
+  const database = new Database(statePath);
+  try {
+    database.exec('REINDEX');
+    const integrity = database.pragma('integrity_check');
+    const failures = integrity.filter((row) => row.integrity_check !== 'ok');
+    if (failures.length > 0) {
+      throw new Error(`Commander corpus integrity check failed: ${failures[0].integrity_check}`);
+    }
+    database.pragma('wal_checkpoint(TRUNCATE)');
+  } finally {
+    database.close();
+  }
+}
+
 async function uploadFilteredCommanderState() {
+  certifyCorpusStorage();
   exportCommanderCorpusState(statePath, uploadStatePath);
   return uploadCommanderCorpusState(uploadStatePath);
 }
 
 await downloadCommanderCorpusState(statePath);
+certifyCorpusStorage();
 const before = readCorpusCounts();
 const previousDatasetVersion = fs.existsSync(manifestPath)
   ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')).dataset_version || null
@@ -95,7 +112,6 @@ runNode('scripts/commander-archidekt-bot.mjs', [
   '--max-retries', '2'
 ]);
 runNode('scripts/certify-commander-ingestion.mjs');
-runNode('scripts/certify-commander-analytics.mjs');
 runNode('scripts/build-mtg-commander-public-data.mjs');
 runNode('scripts/certify-commander-analytics.mjs');
 
