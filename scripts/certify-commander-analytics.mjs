@@ -328,6 +328,68 @@ for (const deck of decks.values()) {
   deck.legacyThemes = inferThemes(deck.cards, true);
 }
 
+function assertAverageProfileMatches(page, sourceDecks, label) {
+  const typeTotals = new Map();
+  const manaTotals = new Map();
+  let totalCards = 0;
+
+  for (const deck of sourceDecks) {
+    for (const card of deck.cards) {
+      const type = classifyType(card.type);
+      typeTotals.set(type, (typeTotals.get(type) || 0) + card.quantity);
+      totalCards += card.quantity;
+      const cardManaValue = manaValue(card);
+      if (type !== 'Land' && cardManaValue !== null) {
+        const bucket = Math.min(cardManaValue, 7);
+        manaTotals.set(bucket, (manaTotals.get(bucket) || 0) + card.quantity);
+      }
+    }
+  }
+
+  const profile = page.average_deck_profile;
+  assert(profile.total_decks === sourceDecks.length, `Average profile denominator mismatch for ${label}`);
+  nearlyEqual(profile.average_cards, Number((totalCards / sourceDecks.length).toFixed(1)), `Average card count ${label}`);
+  const publishedTypes = new Map(profile.type_distribution.map((entry) => [entry.name, entry.total_quantity]));
+  for (const [type, total] of typeTotals) {
+    assert(publishedTypes.get(type) === total, `Type total mismatch for ${label}/${type}`);
+  }
+  assert(publishedTypes.size === typeTotals.size, `Type category coverage mismatch for ${label}`);
+  const publishedMana = new Map(profile.mana_curve.map((entry) => [entry.bucket, entry.total_quantity]));
+  for (let bucket = 0; bucket <= 7; bucket += 1) {
+    assert((publishedMana.get(bucket) || 0) === (manaTotals.get(bucket) || 0), `Mana curve mismatch for ${label}/${bucket === 7 ? '7+' : bucket}`);
+  }
+}
+
+function expectedSliceRecommendations(sourceDecks) {
+  const presence = new Map();
+  for (const deck of sourceDecks) {
+    for (const card of deck.cards) presence.set(card.oracle_id, (presence.get(card.oracle_id) || 0) + 1);
+  }
+  return [...presence.entries()]
+    .map(([cardId, deckCount]) => {
+      const card = cardLookup.get(cardId);
+      if (!card) return null;
+      const inclusion = deckCount / sourceDecks.length;
+      const eligibleDecks = eligibleDeckCount(cardId);
+      const globalCount = globalPresence.get(cardId) || 0;
+      const globalInclusion = eligibleDecks > 0 ? globalCount / eligibleDecks : 0;
+      const synergy = inclusion - globalInclusion;
+      return {
+        card_oracle_id: cardId,
+        card_name: card.name,
+        type_line: card.type_line,
+        deck_count: deckCount,
+        weighted_score: synergy * Math.tanh(deckCount / 20)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (
+      b.weighted_score - a.weighted_score
+      || b.deck_count - a.deck_count
+      || normalizeText(a.card_name).localeCompare(normalizeText(b.card_name))
+    ));
+}
+
 const statsByCommander = new Map();
 for (const row of statRows) {
   if (!statsByCommander.has(row.commander_oracle_id)) statsByCommander.set(row.commander_oracle_id, []);
@@ -404,32 +466,27 @@ for (const indexRow of indexRows) {
   const commanderDecks = [...decks.values()].filter((deck) => deck.commander_oracle_id === indexRow.oracle_id);
   const expectedThemes = expectedThemeSummary(commanderDecks);
   assert(JSON.stringify(page.theme_options.map((theme) => [theme.slug, theme.deck_count])) === JSON.stringify(expectedThemes.map((theme) => [theme.slug, theme.deck_count])), `Theme summary mismatch for ${indexRow.name}`);
-
-  const typeTotals = new Map();
-  const manaTotals = new Map();
-  let totalCards = 0;
-  for (const deck of commanderDecks) {
-    for (const card of deck.cards) {
-      const type = classifyType(card.type);
-      typeTotals.set(type, (typeTotals.get(type) || 0) + card.quantity);
-      totalCards += card.quantity;
-      const cardManaValue = manaValue(card);
-      if (type !== 'Land' && cardManaValue !== null) {
-        const bucket = Math.min(cardManaValue, 7);
-        manaTotals.set(bucket, (manaTotals.get(bucket) || 0) + card.quantity);
-      }
-    }
-  }
-  assert(page.average_deck_profile.total_decks === count, `Average profile denominator mismatch for ${indexRow.name}`);
-  nearlyEqual(page.average_deck_profile.average_cards, Number((totalCards / count).toFixed(1)), `Average card count ${indexRow.name}`);
+  assertAverageProfileMatches(page, commanderDecks, indexRow.name);
   assert(page.average_deck_profile.average_cards > 90 && page.average_deck_profile.average_cards <= 100, `Average profile has an implausible deck size for ${indexRow.name}`);
-  for (const entry of page.average_deck_profile.type_distribution) {
-    assert(entry.total_quantity === (typeTotals.get(entry.name) || 0), `Type total mismatch for ${indexRow.name}/${entry.name}`);
-  }
-  for (const entry of page.average_deck_profile.mana_curve) {
-    assert(entry.total_quantity === (manaTotals.get(entry.bucket) || 0), `Mana curve mismatch for ${indexRow.name}/${entry.mana}`);
-  }
   assert(page.average_deck_kind === 'synthetic_profile', `Average-deck provenance missing for ${indexRow.name}`);
+
+  for (const theme of page.theme_options) {
+    const themeDecks = commanderDecks.filter((deck) => deck.themes.includes(theme.slug));
+    const themePage = getMtgCommanderPage(indexRow.oracle_id, { theme: theme.slug });
+    const themePolicy = getCommanderSampleConfidence(themeDecks.length);
+    assert(themePage.active_theme === theme.slug, `Active theme mismatch for ${indexRow.name}/${theme.slug}`);
+    assert(themePage.total_decks === themeDecks.length, `Theme denominator mismatch for ${indexRow.name}/${theme.slug}`);
+    assert(themePage.sample_confidence.tier === themePolicy.tier, `Theme confidence mismatch for ${indexRow.name}/${theme.slug}`);
+    assert(themePage.has_analytics_data === themePolicy.analytics_eligible, `Theme analytics gate mismatch for ${indexRow.name}/${theme.slug}`);
+    if (!themePolicy.analytics_eligible) {
+      assert(themePage.top_synergy_cards.length === 0, `Recommendations leaked through theme sample gate for ${indexRow.name}/${theme.slug}`);
+      assert(themePage.average_deck_profile.total_decks === 0, `Average profile leaked through theme sample gate for ${indexRow.name}/${theme.slug}`);
+      continue;
+    }
+    assertAverageProfileMatches(themePage, themeDecks, `${indexRow.name}/${theme.slug}`);
+    const expectedThemeTop = topRecommendations(expectedSliceRecommendations(themeDecks)).map((row) => row.card_oracle_id);
+    assert(JSON.stringify(themePage.top_synergy_cards.map((row) => row.oracle_id)) === JSON.stringify(expectedThemeTop), `Theme recommendation ordering mismatch for ${indexRow.name}/${theme.slug}`);
+  }
 
   const signature = (statsByCommander.get(indexRow.oracle_id) || []).filter((row) => row.weighted_score > 0 && !isBasicLand(row.card_name, row.type_line)).slice(0, 8).map((row) => row.card_oracle_id);
   const expectedRelated = indexRows.map((candidate) => {
@@ -464,6 +521,13 @@ if (fs.existsSync(manifestPath)) {
       assert(detail.sample_confidence?.tier, `Commander detail ${fileName} is missing sample confidence metadata.`);
       assert(detail.sample_confidence.deck_count === detail.unique_configuration_count, `Commander detail ${fileName} confidence uses source observations instead of unique configurations.`);
       assert(detail.total_decks === detail.unique_configuration_count + detail.duplicate_observation_count, `Commander detail ${fileName} observation totals are inconsistent.`);
+      for (const theme of detail.theme_options || []) {
+        const slice = detail.theme_slices?.[theme.slug];
+        assert(slice, `Commander detail ${fileName} is missing published theme slice ${theme.slug}.`);
+        assert(slice.active_theme === theme.slug, `Commander detail ${fileName} published the wrong active theme for ${theme.slug}.`);
+        assert(slice.total_decks === theme.deck_count, `Commander detail ${fileName} theme count mismatch for ${theme.slug}.`);
+        assert(slice.dataset_version === undefined && slice.analytics_version === undefined, `Commander detail ${fileName} duplicated snapshot metadata inside ${theme.slug}.`);
+      }
     }
   }
 }

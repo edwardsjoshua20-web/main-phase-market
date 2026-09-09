@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  getMtgCommanderPage,
   getMtgCommanderPublicSnapshot,
   refreshMtgCommanderEngine
 } from '../server/mtgCommanderEngine.mjs';
@@ -236,9 +237,16 @@ async function main() {
       if (commander.deck_count <= 0) continue;
       const payload = snapshot.details.get(commander.oracle_id);
       if (!payload?.has_local_data) continue;
+      const themeSlices = Object.fromEntries(
+        (payload.theme_options || []).map((theme) => [
+          theme.slug,
+          getMtgCommanderPage(commander.oracle_id, { theme: theme.slug })
+        ])
+      );
       const outputPath = path.join(DETAILS_DIR, `${commander.oracle_id}.json`);
       fs.writeFileSync(outputPath, `${JSON.stringify(makeHostedPayload({
         ...payload,
+        theme_slices: themeSlices,
         dataset_version: snapshot.datasetVersion,
         analytics_version: COMMANDER_ANALYTICS_VERSION
       }))}\n`);

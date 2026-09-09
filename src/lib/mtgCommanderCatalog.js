@@ -145,7 +145,10 @@ export async function getMtgCommanderPage(oracleId, options = {}) {
     try {
       const response = await fetch(detailsUrl);
       if (response.ok) {
-        return response.json();
+        const payload = await response.json();
+        const requestedTheme = normalizeText(options.theme).replace(/\s+/g, '-');
+        const themeSlice = requestedTheme ? payload?.theme_slices?.[requestedTheme] : null;
+        return themeSlice || payload;
       }
     } catch {}
 

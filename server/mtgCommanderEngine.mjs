@@ -1526,7 +1526,7 @@ function buildAverageDeckProfile(oracleId) {
       total_quantity: Number(typeTotals.get(label) || 0),
       average_count: Number(((typeTotals.get(label) || 0) / totalDecks).toFixed(1))
     }))
-    .filter((entry) => entry.average_count > 0);
+    .filter((entry) => entry.total_quantity > 0);
 
   const manaCurve = Array.from({ length: 8 }, (_, index) => ({
     mana: index === 7 ? '7+' : String(index),
@@ -2485,7 +2485,11 @@ function buildSliceStats(commanderRow, decks, globalCardBaselines) {
       };
     })
     .filter(Boolean)
-    .sort((a, b) => Number(b.weighted_score || 0) - Number(a.weighted_score || 0));
+    .sort((a, b) => (
+      Number(b.weighted_score || 0) - Number(a.weighted_score || 0)
+      || Number(b.deck_count || 0) - Number(a.deck_count || 0)
+      || String(a.card_name_lower || '').localeCompare(String(b.card_name_lower || ''))
+    ));
 }
 
 function buildAverageDeckProfileFromDecks(decks) {
@@ -2528,7 +2532,7 @@ function buildAverageDeckProfileFromDecks(decks) {
       total_quantity: Number(typeTotals.get(label) || 0),
       average_count: Number(((typeTotals.get(label) || 0) / deckCount).toFixed(1))
     }))
-    .filter((entry) => entry.average_count > 0);
+    .filter((entry) => entry.total_quantity > 0);
 
   const manaCurve = Array.from({ length: 8 }, (_, index) => ({
     mana: index === 7 ? '7+' : String(index),
