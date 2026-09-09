@@ -527,6 +527,13 @@ if (fs.existsSync(manifestPath)) {
       assert(detail.sample_confidence?.tier, `Commander detail ${fileName} is missing sample confidence metadata.`);
       assert(detail.sample_confidence.deck_count === detail.unique_configuration_count, `Commander detail ${fileName} confidence uses source observations instead of unique configurations.`);
       assert(detail.total_decks === detail.unique_configuration_count + detail.duplicate_observation_count, `Commander detail ${fileName} observation totals are inconsistent.`);
+      assert(detail.card_view?.active_mode === 'card', `Commander detail ${fileName} is missing its As Card view.`);
+      assert(detail.card_view?.commander?.oracle_id === detail.commander?.oracle_id, `Commander detail ${fileName} As Card identity mismatch.`);
+      for (const theme of detail.card_view?.theme_options || []) {
+        const slice = detail.card_view?.theme_slices?.[theme.slug];
+        assert(slice?.active_mode === 'card', `Commander detail ${fileName} As Card theme ${theme.slug} has the wrong mode.`);
+        assert(slice?.active_theme === theme.slug, `Commander detail ${fileName} As Card theme ${theme.slug} has the wrong theme.`);
+      }
       for (const theme of detail.theme_options || []) {
         const slice = detail.theme_slices?.[theme.slug];
         assert(slice, `Commander detail ${fileName} is missing published theme slice ${theme.slug}.`);

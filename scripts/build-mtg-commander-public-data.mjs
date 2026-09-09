@@ -159,6 +159,28 @@ function compareCommanderRows(a, b) {
   return String(a.name || '').localeCompare(String(b.name || ''));
 }
 
+function compactHostedCardView(payload) {
+  if (!payload) return null;
+  return {
+    has_local_data: payload.has_local_data,
+    has_analytics_data: payload.has_analytics_data,
+    sample_confidence: payload.sample_confidence,
+    analytics_suppressed: payload.analytics_suppressed,
+    active_mode: payload.active_mode,
+    active_theme: payload.active_theme,
+    theme_options: payload.theme_options,
+    commander: payload.commander,
+    total_decks: payload.total_decks,
+    unique_configuration_count: payload.unique_configuration_count,
+    duplicate_observation_count: payload.duplicate_observation_count,
+    top_commanders: payload.top_commanders,
+    average_deck_profile: payload.average_deck_profile,
+    top_synergy_cards: payload.top_synergy_cards,
+    new_cards: payload.new_cards,
+    game_changers: payload.game_changers
+  };
+}
+
 async function main() {
   const files = collectJsonFiles(SEARCH_DIR);
   const searchShardFiles = collectJsonFiles(SEARCH_SHARDS_DIR);
@@ -243,10 +265,18 @@ async function main() {
           getMtgCommanderPage(commander.oracle_id, { theme: theme.slug })
         ])
       );
+      const cardView = getMtgCommanderPage(commander.oracle_id, { mode: 'card' });
+      const cardThemeSlices = Object.fromEntries(
+        (cardView?.theme_options || []).map((theme) => [
+          theme.slug,
+          compactHostedCardView(getMtgCommanderPage(commander.oracle_id, { mode: 'card', theme: theme.slug }))
+        ])
+      );
       const outputPath = path.join(DETAILS_DIR, `${commander.oracle_id}.json`);
       fs.writeFileSync(outputPath, `${JSON.stringify(makeHostedPayload({
         ...payload,
         theme_slices: themeSlices,
+        card_view: cardView ? { ...compactHostedCardView(cardView), theme_slices: cardThemeSlices } : null,
         dataset_version: snapshot.datasetVersion,
         analytics_version: COMMANDER_ANALYTICS_VERSION
       }))}\n`);

@@ -2,7 +2,7 @@ import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 
 const API_BASE = '/api/local/mtg/commanders';
 const HOSTED_COMMANDERS_URL = getCatalogAssetUrl('mtg', 'commanders.json');
-const HOSTED_COMMANDER_DETAIL_SCHEMA = 'theme-slices-v1';
+const HOSTED_COMMANDER_DETAIL_SCHEMA = 'commander-views-v2';
 
 const hostedCommanderCache = {
   promise: null,
@@ -148,8 +148,9 @@ export async function getMtgCommanderPage(oracleId, options = {}) {
       if (response.ok) {
         const payload = await response.json();
         const requestedTheme = normalizeText(options.theme).replace(/\s+/g, '-');
-        const themeSlice = requestedTheme ? payload?.theme_slices?.[requestedTheme] : null;
-        return themeSlice || payload;
+        const selectedView = options.mode === 'card' ? payload?.card_view : payload;
+        const themeSlice = requestedTheme ? selectedView?.theme_slices?.[requestedTheme] : null;
+        return themeSlice || selectedView || payload;
       }
     } catch {}
 
