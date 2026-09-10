@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, BookOpen, ExternalLink, Layers, Search } from 'lucide-react';
+import { ArrowRight, ExternalLink, Layers, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CardImage from '@/components/cards/CardImage';
 import { gameKnowledgeOwner } from '@/services/knowledge/gameKnowledgeOwner';
@@ -48,6 +48,14 @@ function EmptyState({ title, body, to = '/Encyclopedia', action = 'Back to Encyc
 }
 
 function GameLogo({ game }) {
+  if (game.id === 'magic') {
+    return (
+      <span className="text-sm font-black uppercase tracking-[0.18em] text-white">
+        Magic: The Gathering
+      </span>
+    );
+  }
+
   return <img src={game.logoSrc} alt={game.label} loading="lazy" className={`h-auto w-auto object-contain ${game.logoClassName}`} />;
 }
 
@@ -57,7 +65,7 @@ function GameIdentityMark({ game }) {
   }
 
   return (
-    <div className="flex max-h-14 items-center justify-start opacity-90 md:justify-end">
+    <div className="flex h-12 max-w-[190px] items-center justify-start overflow-hidden opacity-90 md:justify-end">
       <GameLogo game={game} />
     </div>
   );
@@ -68,11 +76,11 @@ function GameHero({ game, eyebrow = 'TCG Encyclopedia' }) {
 
   return (
     <section className={`bg-gradient-to-br ${game.tintClassName} text-white`}>
-      <SectionShell className={`grid gap-4 py-5 md:items-center md:py-6 ${showIdentityMark ? 'md:grid-cols-[minmax(0,1fr)_220px]' : ''}`}>
+      <SectionShell className={`grid gap-4 py-4 md:items-center md:py-5 ${showIdentityMark ? 'md:grid-cols-[minmax(0,1fr)_220px]' : ''}`}>
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/58">{eyebrow}</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">{game.label}</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/74">{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
+          <h1 className="mt-1.5 text-3xl font-black tracking-tight md:text-4xl">{game.label}</h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-white/74">{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
         </div>
         {showIdentityMark ? (
           <div className="flex min-h-10 items-center justify-start md:justify-end">
@@ -194,87 +202,83 @@ function EncyclopediaLanding() {
   );
 }
 
-function GameLanding({ game }) {
+function updateBrowseParams(searchParams, setSearchParams, updates = {}) {
+  const next = new URLSearchParams(searchParams);
+  Object.entries(updates).forEach(([key, value]) => {
+    const normalized = String(value || '').trim();
+    if (!normalized || (key === 'sort' && normalized === 'newest') || (key === 'page' && normalized === '1')) {
+      next.delete(key);
+      return;
+    }
+    next.set(key, normalized);
+  });
+  setSearchParams(next, { replace: true });
+}
+
+function SetBrowser({ game, title = 'Sets' }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const isMagic = game.id === 'magic';
-  const rules = gameKnowledgeOwner.getRulesTopics(game.id);
   const { data: sets = [], isLoading } = useQuery({
-    queryKey: [isMagic ? 'encyclopedia-sets' : 'encyclopedia-sets-preview', game.id],
-    queryFn: () => gameKnowledgeOwner.listSets(game.id, { limit: isMagic ? 0 : 8 }),
+    queryKey: ['encyclopedia-sets', game.id],
+    queryFn: () => gameKnowledgeOwner.listSets(game.id, { limit: 0 }),
     staleTime: 60_000
   });
-  const magicQuery = isMagic ? searchParams.get('q') || '' : '';
-  const magicSortMode = isMagic && searchParams.get('sort') === 'oldest' ? 'oldest' : 'newest';
-  const magicSets = useMemo(() => {
-    if (!isMagic) return sets;
-    return sortSets(filterSetsByQuery(sets, magicQuery), magicSortMode);
-  }, [isMagic, magicQuery, magicSortMode, sets]);
-  const magicTotalPages = Math.max(1, Math.ceil(magicSets.length / SETS_PER_PAGE));
-  const magicCurrentPage = clampPage(searchParams.get('page') || '1', magicTotalPages);
-  const displaySets = isMagic ? magicSets.slice((magicCurrentPage - 1) * SETS_PER_PAGE, magicCurrentPage * SETS_PER_PAGE) : sets;
+  const query = searchParams.get('q') || '';
+  const sortMode = searchParams.get('sort') === 'oldest' ? 'oldest' : 'newest';
+  const filteredSets = useMemo(() => sortSets(filterSetsByQuery(sets, query), sortMode), [query, sets, sortMode]);
+  const totalPages = Math.max(1, Math.ceil(filteredSets.length / SETS_PER_PAGE));
+  const currentPage = clampPage(searchParams.get('page') || '1', totalPages);
+  const displaySets = filteredSets.slice((currentPage - 1) * SETS_PER_PAGE, currentPage * SETS_PER_PAGE);
+  const handleBrowseChange = (updates = {}) => updateBrowseParams(searchParams, setSearchParams, updates);
 
-  const updateMagicBrowseParams = (updates = {}) => {
-    const next = new URLSearchParams(searchParams);
-    Object.entries(updates).forEach(([key, value]) => {
-      const normalized = String(value || '').trim();
-      if (!normalized || (key === 'sort' && normalized === 'newest') || (key === 'page' && normalized === '1')) {
-        next.delete(key);
-        return;
-      }
-      next.set(key, normalized);
-    });
-    setSearchParams(next, { replace: true });
-  };
+  return (
+    <div className="min-w-0">
+      <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="text-2xl font-black tracking-tight">{title}</h2>
+          <p className="mt-1 text-sm text-slate-600">{filteredSets.length} set{filteredSets.length === 1 ? '' : 's'} visible.</p>
+        </div>
+        <div className="flex w-full flex-col gap-2 sm:flex-row md:max-w-xl">
+          <label className="flex min-w-0 flex-1 items-center gap-2 border border-slate-300 bg-white px-3 py-2">
+            <Search className="h-4 w-4 text-slate-400" />
+            <input
+              value={query}
+              onChange={(event) => handleBrowseChange({ q: event.target.value, page: 1 })}
+              placeholder="Search set name or code"
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+            />
+          </label>
+          <select
+            value={sortMode}
+            onChange={(event) => handleBrowseChange({ sort: event.target.value, page: 1 })}
+            className="border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none"
+          >
+            <option value="newest">Newest to oldest</option>
+            <option value="oldest">Oldest to newest</option>
+          </select>
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="py-10 text-sm font-semibold text-slate-500">Loading sets...</div>
+      ) : displaySets.length === 0 ? (
+        <div className="border-b border-slate-200 py-10 text-sm font-semibold text-slate-500">No sets match that search.</div>
+      ) : (
+        <div className="divide-y divide-slate-200">{displaySets.map((set) => <SetRow key={set.id} set={set} />)}</div>
+      )}
+      {!isLoading && <SetPagination currentPage={currentPage} totalPages={totalPages} onPageChange={(page) => handleBrowseChange({ page })} />}
+    </div>
+  );
+}
+
+function GameLanding({ game }) {
+  const rules = gameKnowledgeOwner.getRulesTopics(game.id);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <GameHero game={game} />
       <SectionShell className="grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0">
-          <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-2xl font-black tracking-tight">Sets</h2>
-              {isMagic && <p className="mt-1 text-sm text-slate-600">{magicSets.length} set{magicSets.length === 1 ? '' : 's'} visible.</p>}
-            </div>
-            {isMagic ? (
-              <div className="flex w-full flex-col gap-2 sm:flex-row md:max-w-xl">
-                <label className="flex min-w-0 flex-1 items-center gap-2 border border-slate-300 bg-white px-3 py-2">
-                  <Search className="h-4 w-4 text-slate-400" />
-                  <input
-                    value={magicQuery}
-                    onChange={(event) => updateMagicBrowseParams({ q: event.target.value, page: 1 })}
-                    placeholder="Search set name or code"
-                    className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                  />
-                </label>
-                <select
-                  value={magicSortMode}
-                  onChange={(event) => updateMagicBrowseParams({ sort: event.target.value, page: 1 })}
-                  className="border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none"
-                >
-                  <option value="newest">Newest to oldest</option>
-                  <option value="oldest">Oldest to newest</option>
-                </select>
-              </div>
-            ) : (
-              <Link to={`/Encyclopedia/${game.routeKey}/sets`}>
-                <Button variant="outline" className="rounded border-slate-300 text-slate-900 hover:bg-slate-100">View all sets</Button>
-              </Link>
-            )}
-          </div>
-          {isLoading ? (
-            <div className="py-10 text-sm font-semibold text-slate-500">Loading sets...</div>
-          ) : displaySets.length === 0 ? (
-            <div className="border-b border-slate-200 py-10 text-sm font-semibold text-slate-500">No sets match that search.</div>
-          ) : (
-            <div className="divide-y divide-slate-200">{displaySets.map((set) => <SetRow key={set.id} set={set} />)}</div>
-          )}
-          {isMagic && !isLoading && (
-            <SetPagination currentPage={magicCurrentPage} totalPages={magicTotalPages} onPageChange={(page) => updateMagicBrowseParams({ page })} />
-          )}
-        </div>
+        <SetBrowser game={game} />
         <aside className="min-w-0">
-          <h2 className="text-2xl font-black tracking-tight">Rules Topics</h2>
+          <h2 className="text-2xl font-black tracking-tight">Rules / How to Play</h2>
           <div className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
             {rules.map((topic) => (
               <Link key={topic.slug} to={topic.path} className="block py-4 hover:bg-white">
@@ -283,12 +287,6 @@ function GameLanding({ game }) {
               </Link>
             ))}
           </div>
-          <div className="mt-7 border-t border-slate-200 pt-4">
-            <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Card Source</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-700">{game.cardSource}</p>
-            <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{game.sourceLimitations}</p>
-          </div>
-          <SourceList sources={game.sourceRefs} className="mt-7" />
         </aside>
       </SectionShell>
     </main>
@@ -296,49 +294,11 @@ function GameLanding({ game }) {
 }
 
 function SetListPage({ game }) {
-  const [query, setQuery] = useState('');
-  const [sortMode, setSortMode] = useState('newest');
-  const { data: sets = [], isLoading } = useQuery({
-    queryKey: ['encyclopedia-sets', game.id],
-    queryFn: () => gameKnowledgeOwner.listSets(game.id, { limit: 0 }),
-    staleTime: 60_000
-  });
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const visible = q ? sets.filter((set) => `${set.name} ${set.setCode}`.toLowerCase().includes(q)) : sets;
-    return [...visible].sort((a, b) => {
-      if (sortMode === 'oldest') return String(a.releaseDate || '').localeCompare(String(b.releaseDate || ''));
-      if (sortMode === 'name') return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
-      return String(b.releaseDate || '').localeCompare(String(a.releaseDate || ''));
-    });
-  }, [query, sets, sortMode]);
-
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <GameHero game={game} eyebrow="Encyclopedia sets" />
       <SectionShell className="py-8">
-        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight">All Sets</h2>
-            <p className="mt-1 text-sm text-slate-600">{filtered.length} set{filtered.length === 1 ? '' : 's'} visible.</p>
-          </div>
-          <div className="flex w-full flex-col gap-2 sm:flex-row md:max-w-xl">
-            <label className="flex min-w-0 flex-1 items-center gap-2 border border-slate-300 bg-white px-3 py-2">
-              <Search className="h-4 w-4 text-slate-400" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter sets" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
-            </label>
-            <select value={sortMode} onChange={(event) => setSortMode(event.target.value)} className="border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none">
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="name">Name</option>
-            </select>
-          </div>
-        </div>
-        {isLoading ? (
-          <div className="py-10 text-sm font-semibold text-slate-500">Loading sets...</div>
-        ) : (
-          <div className="divide-y divide-slate-200">{filtered.map((set) => <SetRow key={set.id} set={set} />)}</div>
-        )}
+        <SetBrowser game={game} title="All Sets" />
       </SectionShell>
     </main>
   );
@@ -422,12 +382,57 @@ function sortFilterValues(values = []) {
   return [...values].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }));
 }
 
-function CardGalleryTile({ card, setTotal }) {
+function gameCardDetailParam(gameId) {
+  if (gameId === 'magic') return 'oracle_id';
+  if (gameId === 'pokemon') return 'pokemon_id';
+  if (gameId === 'yugioh') return 'yugioh_id';
+  if (gameId === 'lorcana') return 'lorcana_id';
+  if (gameId === 'onepiece') return 'onepiece_id';
+  if (gameId === 'flesh_and_blood') return 'fab_id';
+  if (gameId === 'starwars') return 'starwars_id';
+  return 'id';
+}
+
+function canonicalIdPart(card = {}) {
+  const parts = String(card.canonicalId || '').split(':').filter(Boolean);
+  return parts.length > 1 ? parts[1] : '';
+}
+
+function cardDetailIdentity(card = {}, game = {}) {
+  const raw = card.raw || {};
+  if (game.id === 'magic') return raw.oracle_id || card.oracle_id || card.id || card.routeId;
+  if (game.id === 'pokemon') return card.printingId || card.api_id || raw.id || card.id || card.routeId;
+  if (game.id === 'yugioh') return raw.id || card.api_id || canonicalIdPart(card) || card.printingId || card.id || card.routeId;
+  if (game.id === 'lorcana') return card.printingId || card.api_id || raw.id || card.id || card.routeId;
+  if (game.id === 'onepiece') return card.printingId || card.api_id || raw.id || card.id || card.routeId;
+  if (game.id === 'starwars') return card.printingId || raw.uuid || card.api_id || card.id || card.routeId;
+  if (game.id === 'flesh_and_blood') return card.printingId || raw.unique_id || card.api_id || card.id || card.routeId;
+  return card.api_id || raw.id || card.printingId || card.id || card.routeId;
+}
+
+function buildCanonicalCardDetailPath(card = {}, game = {}, detail = null, returnTo = '') {
+  const params = new URLSearchParams();
+  const identity = cardDetailIdentity(card, game);
+  if (identity) params.set(gameCardDetailParam(game.id), identity);
+  const setCode = card.set_code || detail?.setCode || detail?.set?.code || '';
+  if (setCode) params.set('set', setCode);
+  if (card.name) params.set('search', card.name);
+  if (returnTo) {
+    params.set('returnTo', returnTo);
+    params.set('returnLabel', `Back to ${detail?.name || 'set'}`);
+  }
+  return `${createPageUrl('CardDetail')}?${params.toString()}`;
+}
+
+function CardGalleryTile({ card, setTotal, game, detail }) {
+  const location = useLocation();
   const collectorNumber = card.collector_number || card.card_number || card.number || '';
   const metadata = [collectorNumber, setTotal].filter(Boolean).join(' / ');
+  const returnTo = `${location.pathname}${location.search}`;
+  const detailPath = buildCanonicalCardDetailPath(card, game, detail, returnTo);
 
   return (
-    <Link to={card.encyclopediaPath} className="group block min-w-0">
+    <Link to={detailPath} state={{ returnTo, returnLabel: `Back to ${detail?.name || 'set'}` }} className="group block min-w-0">
       <div className="aspect-[63/88] overflow-hidden bg-slate-100 shadow-sm ring-1 ring-slate-200 transition group-hover:-translate-y-0.5 group-hover:shadow-lg group-hover:ring-slate-300">
         <CardImage card={card} alt={card.name} className="h-full w-full object-contain" fallbackClassName="flex h-full w-full items-center justify-center px-3 text-center text-xs font-semibold text-slate-500" />
       </div>
@@ -534,7 +539,7 @@ function SetDetailPage({ game, setSlug }) {
             {detail.cardCatalog?.printingLabel && <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{detail.cardCatalog.printingLabel}</p>}
           </div>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(138px,1fr))] gap-x-4 gap-y-7 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(176px,1fr))]">
-            {visibleCards.map((card) => <CardGalleryTile key={card.id} card={card} setTotal={setCards.length} />)}
+            {visibleCards.map((card) => <CardGalleryTile key={card.id} card={card} setTotal={setCards.length} game={game} detail={detail} />)}
           </div>
           {visibleCards.length === 0 && (
             <div className="border-y border-slate-200 py-12 text-center text-sm font-semibold text-slate-500">No cards match those set filters.</div>
@@ -550,7 +555,7 @@ function SetDetailPage({ game, setSlug }) {
   );
 }
 
-function CardDetailPage({ game, setSlug, cardId }) {
+function EncyclopediaCardRedirect({ game, setSlug, cardId }) {
   const { data, isLoading } = useQuery({
     queryKey: ['encyclopedia-set-card', game.id, setSlug, cardId],
     queryFn: () => gameKnowledgeOwner.resolveSetCard(game.id, setSlug, cardId),
@@ -558,67 +563,20 @@ function CardDetailPage({ game, setSlug, cardId }) {
   });
   if (isLoading) return <LoadingState />;
   if (!data) return <EmptyState title="Card not found" body="The card could not be resolved inside that set." to={`/Encyclopedia/${game.routeKey}/sets/${setSlug}`} action="Back to set" />;
-
-  const { card, detail, printings } = data;
-  return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
-      <GameHero game={game} eyebrow="Encyclopedia card" />
-      <SectionShell className="grid gap-8 py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="min-w-0">
-          <div className="bg-white p-3 shadow-sm">
-            <CardImage card={card} alt={card.name} className="aspect-[63/88] w-full object-contain" fallbackClassName="flex aspect-[63/88] w-full items-center justify-center bg-slate-100 px-4 text-center text-sm font-semibold text-slate-500" />
-          </div>
-        </div>
-        <div className="min-w-0">
-          <Link to={`/Encyclopedia/${game.routeKey}/sets/${detail.slug}`} className="text-sm font-bold text-slate-500 hover:text-slate-950">{detail.name}</Link>
-          <h1 className="mt-2 text-4xl font-black tracking-tight">{card.name}</h1>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {card.fields.map((field) => (
-              <div key={field.label} className="border-t border-slate-200 pt-3">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{field.label}</p>
-                <p className="mt-1 font-semibold text-slate-950">{field.value}</p>
-              </div>
-            ))}
-          </div>
-          {card.textBlocks.length > 0 && (
-            <div className="mt-8 divide-y divide-slate-200 border-y border-slate-200">
-              {card.textBlocks.map((block) => (
-                <div key={block.title} className="py-4">
-                  <h2 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">{block.title}</h2>
-                  <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{block.text}</p>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="mt-8">
-            <h2 className="text-2xl font-black tracking-tight">Printings and Availability</h2>
-            <p className="mt-1 text-sm text-slate-600">Browse printings and MainPhase availability.</p>
-            <div className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
-              {printings.slice(0, 24).map((printing, index) => (
-                <div key={`${printing.id || printing.searchIdentity || printing.name}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-bold text-slate-950">{printing.name || card.name}</p>
-                    <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
-                      {[printing.setLabel, printing.numberLabel, printing.rarity, printing.variantLabel].filter(Boolean).join(' / ')}
-                    </p>
-                  </div>
-                  <p className={`text-sm font-black ${printing.inStock ? 'text-emerald-700' : 'text-slate-500'}`}>
-                    {printing.inStock ? `In stock${printing.priceLabel ? ` / $${printing.priceLabel}` : ''}` : 'Known printing'}
-                  </p>
-                </div>
-              ))}
-              {printings.length === 0 && <p className="py-4 text-sm text-slate-600">No additional printings were resolved.</p>}
-            </div>
-          </div>
-        </div>
-      </SectionShell>
-    </main>
-  );
+  const { card, detail } = data;
+  const returnTo = `/Encyclopedia/${game.routeKey}/sets/${detail.slug}`;
+  return <Navigate to={buildCanonicalCardDetailPath(card, game, detail, returnTo)} replace />;
 }
 
 function RulesPage({ game, topicSlug }) {
   const topics = gameKnowledgeOwner.getRulesTopics(game.id);
   const topic = topicSlug ? gameKnowledgeOwner.getRulesTopic(game.id, topicSlug) : null;
+  const article = topic?.article || null;
+  const relatedTopics = (topic?.relatedTopics || [])
+    .map((slug) => gameKnowledgeOwner.getRulesTopic(game.id, slug))
+    .filter(Boolean)
+    .slice(0, 6);
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <GameHero game={game} eyebrow="Encyclopedia rules" />
@@ -626,14 +584,51 @@ function RulesPage({ game, topicSlug }) {
         <div className="min-w-0">
           {topic ? (
             <>
+              <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                <Link to={`/Encyclopedia/${game.routeKey}`} className="hover:text-slate-900">{game.shortLabel || game.label}</Link>
+                <span>/</span>
+                <Link to={`/Encyclopedia/${game.routeKey}/rules`} className="hover:text-slate-900">Rules</Link>
+              </div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Rules topic</p>
               <h2 className="mt-2 text-3xl font-black tracking-tight">{topic.title}</h2>
-              <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">{topic.summary}</p>
-              <SourceList sources={topic.sources} className="mt-8" />
+              <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">{article?.introduction || topic.summary}</p>
+              <div className="mt-8 space-y-8">
+                {(article?.sections || []).map((section) => (
+                  <section key={section.heading} className="border-t border-slate-200 pt-5">
+                    <h3 className="text-xl font-black tracking-tight text-slate-950">{section.heading}</h3>
+                    <div className="mt-3 space-y-3">
+                      {(section.body || []).map((paragraph, index) => (
+                        <p key={`${section.heading}-${index}`} className="text-sm leading-7 text-slate-700">{paragraph}</p>
+                      ))}
+                    </div>
+                    {section.example && (
+                      <p className="mt-4 border-l-2 border-slate-300 pl-4 text-sm font-semibold leading-6 text-slate-700">{section.example}</p>
+                    )}
+                  </section>
+                ))}
+              </div>
+              {relatedTopics.length > 0 && (
+                <div className="mt-8 border-t border-slate-200 pt-5">
+                  <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Related Topics</h3>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {relatedTopics.map((entry) => (
+                      <Link key={entry.slug} to={entry.path} className="border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:border-slate-400">
+                        {entry.title}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <SourceList sources={topic.sources} className="mt-8 border-t border-slate-200 pt-5" />
             </>
           ) : (
             <>
-              <h2 className="text-3xl font-black tracking-tight">Rules Topics</h2>
+              <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                <Link to={`/Encyclopedia/${game.routeKey}`} className="hover:text-slate-900">{game.shortLabel || game.label}</Link>
+                <span>/</span>
+                <span>Rules</span>
+              </div>
+              <h2 className="text-3xl font-black tracking-tight">Rules / How to Play</h2>
               <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200">
                 {topics.map((entry) => (
                   <Link key={entry.slug} to={entry.path} className="block py-4 hover:bg-white">
@@ -645,12 +640,9 @@ function RulesPage({ game, topicSlug }) {
             </>
           )}
         </div>
-        <aside className="h-fit border border-slate-200 bg-white p-5 shadow-sm">
-          <BookOpen className="h-6 w-6 text-slate-700" />
-          <h2 className="mt-3 text-lg font-black tracking-tight">Authority Boundary</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            MainPhase stores source-attributed summaries only. Official publisher documents remain the authority for event and judge rulings.
-          </p>
+        <aside className="h-fit border-y border-slate-200 py-5">
+          <h2 className="text-lg font-black tracking-tight">{game.shortLabel || game.label} Rules</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Browse learning topics for play, deck construction, and common table interactions.</p>
         </aside>
       </SectionShell>
     </main>
@@ -667,7 +659,7 @@ export default function Encyclopedia() {
   const segments = location.pathname.split('/').filter(Boolean);
   const section = segments[2] || '';
   const topicSlug = section === 'rules' ? segments[3] : '';
-  if (params.cardId && params.setSlug) return <CardDetailPage game={game} setSlug={params.setSlug} cardId={params.cardId} />;
+  if (params.cardId && params.setSlug) return <EncyclopediaCardRedirect game={game} setSlug={params.setSlug} cardId={params.cardId} />;
   if (params.setSlug) return <SetDetailPage game={game} setSlug={params.setSlug} />;
   if (section === 'sets') return <SetListPage game={game} />;
   if (section === 'rules') return <RulesPage game={game} topicSlug={topicSlug} />;

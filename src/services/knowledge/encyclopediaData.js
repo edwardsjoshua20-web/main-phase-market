@@ -142,6 +142,54 @@ export const ENCYCLOPEDIA_GAMES = Object.freeze([
   }
 ]);
 
+const GAME_RULE_LABELS = Object.freeze({
+  magic: 'Magic',
+  pokemon: 'Pokemon TCG',
+  yugioh: 'Yu-Gi-Oh!',
+  lorcana: 'Disney Lorcana',
+  flesh_and_blood: 'Flesh and Blood',
+  onepiece: 'One Piece TCG',
+  starwars: 'Star Wars Unlimited'
+});
+
+function topicTerms(terms = []) {
+  const visible = terms.filter(Boolean).slice(0, 5);
+  if (visible.length === 0) return 'the printed terms on the card or current official rules entry';
+  return visible.join(', ');
+}
+
+function buildDefaultRuleArticle(gameId, title, summary, options = {}) {
+  const gameName = GAME_RULE_LABELS[gameId] || 'this game';
+  const terms = topicTerms(options.officialTerms || []);
+  return {
+    introduction: `${summary} This page explains how ${title.toLowerCase()} functions during an ordinary ${gameName} game and how to connect the topic to real card text without turning the quick reference into a judge call.`,
+    sections: [
+      {
+        heading: 'What It Controls',
+        body: [
+          `${title} matters because it defines what players are allowed to do, what the game checks, or how a visible object changes the table state.`,
+          `When reading a card or resolving a play, start with the official words connected to this topic: ${terms}. Those terms tell you which rule family to apply before you look for exceptions in card text.`
+        ]
+      },
+      {
+        heading: 'Table Sequence',
+        body: [
+          `Use the current game state first: identify the active player or turn point, confirm the relevant card type or zone, then apply costs, choices, targets, and effects in the order required by the rules.`,
+          `If two effects appear to compete, keep them tied to the step, window, or action that created them. That habit prevents shortcut mistakes and helps players explain what is happening cleanly.`
+        ],
+        example: `Example: when a card refers to ${terms.split(', ')[0]}, check that condition before applying broader assumptions from memory or from another game.`
+      },
+      {
+        heading: 'Deck And Event Context',
+        body: [
+          `Deck construction, legality, and event procedure can change how this topic is used in organized play, especially when a format document or rules update narrows the available card pool.`,
+          `For tournaments, use this reference as a play aid and follow the linked publisher resource for the current official document, update, or floor-rules version.`
+        ]
+      }
+    ]
+  };
+}
+
 function ruleTopic(gameId, sectionId, topicId, title, summary, sourceLabels, options = {}) {
   return {
     gameId,
@@ -155,17 +203,29 @@ function ruleTopic(gameId, sectionId, topicId, title, summary, sourceLabels, opt
     version: options.version || 'Official page verified September 10, 2026',
     relatedTopics: options.relatedTopics || [],
     relatedMechanics: options.relatedMechanics || [],
-    relatedCardTypes: options.relatedCardTypes || []
+    relatedCardTypes: options.relatedCardTypes || [],
+    article: options.article || buildDefaultRuleArticle(gameId, title, summary, options)
   };
 }
 
 export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
   magic: [
+    ruleTopic('magic', 'game-flow', 'objective-and-setup', 'Objective and Setup', 'Magic games begin with decks, opening hands, life totals, mulligans, and a shared goal: reduce opponents to a losing condition while obeying format rules.', ['Magic rules page'], { officialTerms: ['Starting life total', 'Opening hand', 'Mulligan'], relatedTopics: ['turn-structure', 'deck-construction'] }),
     ruleTopic('magic', 'turns', 'turn-structure', 'Turn Structure', 'Phases and steps organize priority, actions, combat, and cleanup. Use this as a map to official Comprehensive Rules timing.', ['Magic rules page'], { officialTerms: ['Beginning phase', 'Precombat main phase', 'Combat phase', 'Ending phase'], relatedTopics: ['priority-and-stack', 'combat'] }),
     ruleTopic('magic', 'timing', 'priority-and-stack', 'Priority and the Stack', 'Spells and most abilities use the stack. Players receive priority before objects resolve, which is the core timing model for responses.', ['Magic rules page'], { officialTerms: ['Priority', 'Stack', 'Resolve'], relatedTopics: ['turn-structure'] }),
+    ruleTopic('magic', 'timing', 'state-based-actions', 'State-Based Actions', 'State-based actions are automatic game checks that handle lethal damage, zero loyalty, illegal attachments, losing conditions, and similar cleanup before a player gets priority.', ['Magic rules page'], { officialTerms: ['State-based action', 'Lethal damage', 'Legend rule'], relatedTopics: ['priority-and-stack'] }),
+    ruleTopic('magic', 'timing', 'triggered-abilities', 'Triggered Abilities', 'Triggered abilities use words such as when, whenever, or at and are put onto the stack at the next appropriate point.', ['Magic rules page'], { officialTerms: ['Triggered ability', 'Intervening if', 'Stack'], relatedTopics: ['priority-and-stack'] }),
+    ruleTopic('magic', 'timing', 'replacement-effects', 'Replacement Effects', 'Replacement and prevention effects modify events before they happen instead of waiting to trigger afterward.', ['Magic rules page'], { officialTerms: ['Replacement effect', 'Prevention effect', 'Instead'], relatedTopics: ['triggered-abilities'] }),
     ruleTopic('magic', 'objects', 'card-types-and-zones', 'Card Types and Zones', 'Card types, supertypes, subtypes, and zones determine what an object is and where game rules can find it.', ['Magic rules page'], { officialTerms: ['Card type', 'Zone', 'Object'], relatedCardTypes: ['Artifact', 'Creature', 'Enchantment', 'Instant', 'Land', 'Planeswalker', 'Sorcery'] }),
+    ruleTopic('magic', 'objects', 'mana-and-costs', 'Mana and Costs', 'Mana, alternative costs, additional costs, reductions, and restrictions determine whether a spell or ability can be paid for legally.', ['Magic rules page'], { officialTerms: ['Mana', 'Mana cost', 'Additional cost', 'Alternative cost'], relatedTopics: ['priority-and-stack'] }),
+    ruleTopic('magic', 'objects', 'keywords', 'Keywords', 'Keyword abilities compress repeated rules text into named abilities such as flying, haste, trample, ward, equip, and many set-specific mechanics.', ['Magic rules page'], { officialTerms: ['Keyword ability', 'Evergreen keyword', 'Keyword action'], relatedTopics: ['card-types-and-zones'] }),
     ruleTopic('magic', 'combat', 'combat', 'Combat', 'Combat moves through beginning of combat, declare attackers, declare blockers, combat damage, and end of combat timing.', ['Magic rules page'], { officialTerms: ['Declare attackers', 'Declare blockers', 'Combat damage'], relatedTopics: ['turn-structure'] }),
-    ruleTopic('magic', 'formats', 'commander', 'Commander Context', 'Commander uses Magic rules plus format-specific deck construction, color identity, and commander-zone behavior.', ['Magic rules page'], { officialTerms: ['Commander', 'Color identity', 'Command zone'], relatedTopics: ['card-types-and-zones'] })
+    ruleTopic('magic', 'deck-building', 'deck-construction', 'Deck Construction', 'Deck construction depends on format minimums, copy limits, banned lists, sideboards, and card legality.', ['Magic rules page'], { officialTerms: ['Constructed deck', 'Sideboard', 'Card limit'], relatedTopics: ['formats', 'commander'] }),
+    ruleTopic('magic', 'formats', 'formats', 'Formats', 'Magic formats define card pools, deck size, rotation, banned and restricted lists, and event expectations.', ['Magic rules page'], { officialTerms: ['Standard', 'Modern', 'Legacy', 'Vintage', 'Pioneer'], relatedTopics: ['deck-construction'] }),
+    ruleTopic('magic', 'formats', 'commander', 'Commander Context', 'Commander uses Magic rules plus format-specific deck construction, color identity, and commander-zone behavior.', ['Magic rules page'], { officialTerms: ['Commander', 'Color identity', 'Command zone'], relatedTopics: ['card-types-and-zones', 'deck-construction'] }),
+    ruleTopic('magic', 'multiplayer', 'multiplayer', 'Multiplayer', 'Multiplayer games add turn order, range, attacking choices, and player-leaving-game rules beyond a two-player duel.', ['Magic rules page'], { officialTerms: ['Multiplayer game', 'Active player', 'Attack multiple players'], relatedTopics: ['combat', 'commander'] }),
+    ruleTopic('magic', 'rules-management', 'layers-and-continuous-effects', 'Layers and Continuous Effects', 'Continuous effects are applied through the layer system so type, color, ability, power, toughness, and control changes resolve consistently.', ['Magic rules page'], { officialTerms: ['Continuous effect', 'Layer', 'Dependency'], relatedTopics: ['replacement-effects', 'card-types-and-zones'] }),
+    ruleTopic('magic', 'rules-management', 'copies-and-tokens', 'Copies and Tokens', 'Copy effects and tokens use rules for copiable values, creation, characteristics, and what happens when tokens leave the battlefield.', ['Magic rules page'], { officialTerms: ['Copy', 'Token', 'Copiable values'], relatedTopics: ['card-types-and-zones'] })
   ],
   pokemon: [
     ruleTopic('pokemon', 'game-flow', 'setup', 'Setup', 'Players prepare decks, prizes, Active Pokemon, Benched Pokemon, and opening hands according to official Pokemon TCG rules.', ['Play Pokemon rules and formats'], { officialTerms: ['Active Pokemon', 'Bench', 'Prize Cards'], relatedTopics: ['active-pokemon', 'bench', 'prize-cards'] }),

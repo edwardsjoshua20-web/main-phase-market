@@ -74,6 +74,16 @@ const pageFile = fs.readFileSync(path.join(repoRoot, 'src/pages/Encyclopedia.jsx
 assert(pageFile.includes('gameKnowledgeOwner'), 'Encyclopedia page must consume gameKnowledgeOwner');
 assert(pageFile.includes('createPageUrl') && pageFile.includes('Shop'), 'Encyclopedia must expose Shop/listing paths without owning commerce');
 assert(pageFile.includes('filterOptions') && pageFile.includes('Show more cards'), 'Encyclopedia set detail must expose set search, filters, and capped rendering');
+assert(!pageFile.includes('View all sets'), 'Game landings must not gate the set browser behind View all sets');
+assert(!pageFile.includes('function CardDetailPage'), 'Duplicate Encyclopedia card detail page must not be active');
+assert(pageFile.includes('EncyclopediaCardRedirect') && pageFile.includes('<Navigate'), 'Legacy Encyclopedia card URLs must redirect to canonical CardDetail');
+assert(pageFile.includes('returnTo') && pageFile.includes('returnLabel'), 'Encyclopedia card routes must preserve return context');
+assert(pageFile.includes('Rules / How to Play'), 'Rules section must use public how-to-play labeling');
+assert(!pageFile.includes('Authority Boundary'), 'Rules page must not render the internal authority-boundary box');
+assert(!/catalog-backed|Search owner|source-attributed summaries|Complete local card|MainPhase Search owner/i.test(pageFile), 'Public Encyclopedia UI contains internal owner/catalog wording');
+
+const cardDetailFile = fs.readFileSync(path.join(repoRoot, 'src/pages/CardDetail.jsx'), 'utf8');
+assert(cardDetailFile.includes('getPreferredBackLink') && cardDetailFile.includes('returnTo') && cardDetailFile.includes('returnLabel'), 'Canonical CardDetail must honor Encyclopedia return context');
 
 const encyclopediaManifest = readJson('public/data/encyclopedia/manifest.json');
 assert(encyclopediaManifest?.games, 'Encyclopedia public data manifest is missing games');
@@ -148,6 +158,11 @@ for (const game of ENCYCLOPEDIA_GAMES) {
     assert(sampleShard.cards.some((card) => card.image_url), `${game.id} sample shard has no images`);
   }
 
+  if (game.id === 'magic') {
+    const symbolSets = sets.filter((set) => set.set_code && (set.image_url || set.icon_svg_uri || set.set_icon_svg_uri));
+    assert(symbolSets.length >= Math.min(20, sets.length), 'Magic sets must expose real set symbols from canonical set metadata');
+  }
+
   for (const topic of ENCYCLOPEDIA_RULE_TOPICS[game.id] || []) {
     assert(topic.slug && topic.title && topic.summary, `${game.id} has incomplete rules topic metadata`);
     assert(topic.gameId && topic.sectionId && topic.topicId, `${game.id}:${topic.slug} missing structured topic IDs`);
@@ -157,10 +172,19 @@ for (const game of ENCYCLOPEDIA_GAMES) {
     for (const label of topic.sourceLabels) {
       assert(knownLabels.has(label), `${game.id}:${topic.slug} references unknown source ${label}`);
     }
+    assert(topic.article?.introduction && topic.article.introduction.split(/\s+/).length >= 24, `${game.id}:${topic.slug} has a thin rules introduction`);
+    assert(Array.isArray(topic.article?.sections) && topic.article.sections.length >= 3, `${game.id}:${topic.slug} rules article is missing hierarchy`);
+    const articleText = [
+      topic.article?.introduction,
+      ...(topic.article?.sections || []).flatMap((section) => [section.heading, ...(section.body || []), section.example || ''])
+    ].join(' ');
+    assert(articleText.split(/\s+/).filter(Boolean).length >= 110, `${game.id}:${topic.slug} rules article is too thin`);
+    assert((topic.article?.sections || []).every((section) => section.heading && Array.isArray(section.body) && section.body.length >= 2), `${game.id}:${topic.slug} has malformed rule hierarchy`);
   }
 }
 
 assert(ENCYCLOPEDIA_GAMES.length === 7, `Expected 7 games, found ${ENCYCLOPEDIA_GAMES.length}`);
+assert((ENCYCLOPEDIA_RULE_TOPICS.magic || []).length >= 15, 'Magic rules hierarchy is incomplete');
 assert((ENCYCLOPEDIA_RULE_TOPICS.pokemon || []).length >= 15, 'Pokemon rules hierarchy is incomplete');
 assert((ENCYCLOPEDIA_RULE_TOPICS.yugioh || []).length >= 15, 'Yu-Gi-Oh rules hierarchy is incomplete');
 assert((ENCYCLOPEDIA_RULE_TOPICS.lorcana || []).length >= 13, 'Lorcana rules hierarchy is incomplete');

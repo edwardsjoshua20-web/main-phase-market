@@ -103,6 +103,39 @@ function buildBackToStarWarsSearchUrl(searchTerm) {
   return `${createPageUrl('Shop')}?type=single_card&search=${encodeURIComponent(searchTerm || '')}&game=starwars${advancedParams}`;
 }
 
+function safeInternalReturnPath(value) {
+  if (!value) return '';
+  try {
+    const resolved = new URL(value, window.location.origin);
+    if (resolved.origin !== window.location.origin) return '';
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  } catch {
+    return '';
+  }
+}
+
+function getPreferredBackLink(defaultUrl, defaultLabel = 'Back to Search') {
+  const urlParams = new URLSearchParams(window.location.search);
+  const returnTo = safeInternalReturnPath(urlParams.get('returnTo'));
+  const returnLabel = String(urlParams.get('returnLabel') || '').trim();
+  return {
+    to: returnTo || defaultUrl,
+    label: returnTo && returnLabel ? returnLabel : defaultLabel
+  };
+}
+
+function DetailBackButton({ defaultUrl, defaultLabel = 'Back to Search' }) {
+  const backLink = getPreferredBackLink(defaultUrl, defaultLabel);
+  return (
+    <Link to={backLink.to}>
+      <Button variant="ghost" className="mb-6 -ml-2">
+        <ChevronLeft className="w-4 h-4 mr-1" />
+        {backLink.label}
+      </Button>
+    </Link>
+  );
+}
+
 function OracleText({ text }) {
   return <SharedMtgSymbolText text={text} />;
 }
@@ -429,12 +462,7 @@ export default function CardDetail() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="w-full px-4 py-8">
-          <Link to={backToSearchUrl}>
-            <Button variant="ghost" className="mb-6 -ml-2">
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Back to Search
-            </Button>
-          </Link>
+          <DetailBackButton defaultUrl={backToSearchUrl} />
 
           <div className={detailGridClass}>
             <div className={detailMediaPanelClass}>
@@ -673,12 +701,7 @@ export default function CardDetail() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="w-full px-4 py-8">
-          <Link to={backToSearchUrl}>
-            <Button variant="ghost" className="mb-6 -ml-2">
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Back to Search
-            </Button>
-          </Link>
+          <DetailBackButton defaultUrl={backToSearchUrl} />
 
           <div className={detailGridClass}>
             <div className={detailMediaPanelClass}>
@@ -840,12 +863,7 @@ export default function CardDetail() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="w-full px-4 py-8">
-          <Link to={backToSearchUrl}>
-            <Button variant="ghost" className="mb-6 -ml-2">
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Back to Search
-            </Button>
-          </Link>
+          <DetailBackButton defaultUrl={backToSearchUrl} />
 
           <div className={detailGridClass}>
             <div className={detailMediaPanelClass}>
@@ -990,12 +1008,7 @@ export default function CardDetail() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="w-full px-4 py-8">
-          <Link to={backToSearchUrl}>
-            <Button variant="ghost" className="mb-6 -ml-2">
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Back to Search
-            </Button>
-          </Link>
+          <DetailBackButton defaultUrl={backToSearchUrl} />
 
           <div className={detailGridClass}>
             <div className={detailMediaPanelClass}>
@@ -1119,12 +1132,7 @@ export default function CardDetail() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="w-full px-4 py-8">
-          <Link to={backToSearchUrl}>
-            <Button variant="ghost" className="mb-6 -ml-2">
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Back to Search
-            </Button>
-          </Link>
+          <DetailBackButton defaultUrl={backToSearchUrl} />
 
           <div className={detailGridClass}>
             <div className={detailMediaPanelClass}>
@@ -1306,12 +1314,7 @@ export default function CardDetail() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="w-full px-4 py-8">
-          <Link to={backToSearchUrl}>
-            <Button variant="ghost" className="mb-6 -ml-2">
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Back to Search
-            </Button>
-          </Link>
+          <DetailBackButton defaultUrl={backToSearchUrl} />
 
           <div className={detailGridClass}>
             <div className="self-start space-y-4">
@@ -1569,12 +1572,7 @@ export default function CardDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="w-full px-4 py-8">
-        <Link to={backToSearchUrl}>
-          <Button variant="ghost" className="mb-6 -ml-2">
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            Back to Search
-          </Button>
-        </Link>
+        <DetailBackButton defaultUrl={backToSearchUrl} />
 
         <div className={detailGridClass}>
           <div className={detailMediaPanelClass}>
