@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, BookOpen, ExternalLink, Layers, PackageSearch, Search, ShoppingBag } from 'lucide-react';
+import { ArrowRight, BookOpen, ExternalLink, Layers, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import CardImage from '@/components/cards/CardImage';
@@ -233,22 +233,99 @@ function SetListPage({ game }) {
   );
 }
 
-function CardRow({ card }) {
+const SET_FILTERS_BY_GAME = {
+  magic: [
+    { key: 'color', label: 'Color' },
+    { key: 'type', label: 'Type' },
+    { key: 'rarity', label: 'Rarity' },
+    { key: 'mana_value', label: 'Mana Value' }
+  ],
+  pokemon: [
+    { key: 'type', label: 'Type' },
+    { key: 'stage', label: 'Stage' },
+    { key: 'category', label: 'Category' },
+    { key: 'rarity', label: 'Rarity' }
+  ],
+  yugioh: [
+    { key: 'type', label: 'Card Type' },
+    { key: 'subtype', label: 'Subtype' },
+    { key: 'attribute', label: 'Attribute' },
+    { key: 'level', label: 'Level / Rank / Link' }
+  ],
+  lorcana: [
+    { key: 'ink', label: 'Ink' },
+    { key: 'type', label: 'Category' },
+    { key: 'cost', label: 'Cost' },
+    { key: 'rarity', label: 'Rarity' }
+  ],
+  flesh_and_blood: [
+    { key: 'class', label: 'Class' },
+    { key: 'talent', label: 'Talent' },
+    { key: 'type', label: 'Card Type' },
+    { key: 'pitch', label: 'Pitch' }
+  ],
+  onepiece: [
+    { key: 'color', label: 'Color' },
+    { key: 'category', label: 'Category' },
+    { key: 'cost', label: 'Cost' },
+    { key: 'rarity', label: 'Rarity' }
+  ],
+  starwars: [
+    { key: 'aspect', label: 'Aspect' },
+    { key: 'type', label: 'Card Type' },
+    { key: 'arena', label: 'Arena' },
+    { key: 'cost', label: 'Cost' }
+  ]
+};
+
+function firstArrayValue(value) {
+  return Array.isArray(value) ? value.filter(Boolean).join(', ') : value;
+}
+
+function cardFilterValue(card = {}, key) {
+  const raw = card.raw || {};
+  const filters = card.filterValues || {};
+  const direct = firstArrayValue(filters[key]);
+  if (direct) return String(direct);
+
+  if (key === 'color') return firstArrayValue(raw.colors || raw.color_identity || raw.colorsProduced) || (card.game === 'magic' ? 'Colorless' : '');
+  if (key === 'type') return filters.type || raw.frameType || raw.category || raw.supertype || raw.type || raw.type_text || String(card.type_line || '').split('/')[0].trim();
+  if (key === 'category') return filters.category || raw.category || raw.supertype || String(card.type_line || '').split('/')[0].trim();
+  if (key === 'subtype') return filters.subtype || raw.race || raw.subtype || (raw.subtypes || [])[0] || '';
+  if (key === 'attribute') return filters.attribute || raw.attribute || '';
+  if (key === 'level') return raw.linkval || raw.level || raw.rank || '';
+  if (key === 'mana_value') return raw.cmc ?? raw.mana_value ?? raw.manaValue ?? '';
+  if (key === 'cost') return raw.cost ?? raw.mana_cost ?? raw.resource_cost ?? '';
+  if (key === 'ink') return filters.ink || raw.ink || '';
+  if (key === 'stage') return filters.stage || (raw.subtypes || [])[0] || '';
+  if (key === 'class') return filters.class || (raw.types || [])[0] || raw.class || '';
+  if (key === 'talent') return raw.talent || raw.talents?.[0] || raw.color || '';
+  if (key === 'pitch') return filters.pitch || raw.pitch || '';
+  if (key === 'aspect') return filters.aspect || (raw.aspects || [])[0] || '';
+  if (key === 'arena') return filters.arena || raw.arena || '';
+  if (key === 'rarity') return card.rarity || card.rarities?.[0] || raw.rarity || '';
+  return '';
+}
+
+function sortFilterValues(values = []) {
+  return [...values].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+function CardGalleryTile({ card }) {
   const rarity = Array.isArray(card.rarities) && card.rarities.length > 1
     ? `${card.rarities.length} rarities`
     : formatCardMetadataLabel(card.rarity || card.rarities?.[0] || '');
   return (
-    <Link to={card.encyclopediaPath} className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 py-3 hover:bg-white">
-      <div className="aspect-[63/88] overflow-hidden bg-slate-100">
-        <CardImage card={card} alt={card.name} className="h-full w-full object-contain" fallbackClassName="flex h-full w-full items-center justify-center px-1 text-center text-[10px] font-semibold text-slate-500" />
+    <Link to={card.encyclopediaPath} className="group block min-w-0">
+      <div className="aspect-[63/88] overflow-hidden bg-slate-100 shadow-sm ring-1 ring-slate-200 transition group-hover:-translate-y-0.5 group-hover:shadow-lg group-hover:ring-slate-300">
+        <CardImage card={card} alt={card.name} className="h-full w-full object-contain" fallbackClassName="flex h-full w-full items-center justify-center px-3 text-center text-xs font-semibold text-slate-500" />
       </div>
-      <div className="min-w-0">
-        <p className="truncate font-bold text-slate-950">{card.name}</p>
-        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
-          {[card.collector_number, rarity, card.type_line].filter(Boolean).join(' / ')}
+      <div className="mt-2 min-w-0">
+        <p className="truncate text-sm font-bold leading-5 text-slate-950">{card.name}</p>
+        <p className="mt-0.5 truncate text-xs font-semibold leading-4 text-slate-500">
+          {[card.collector_number, rarity].filter(Boolean).join(' / ')}
         </p>
       </div>
-      <ArrowRight className="h-4 w-4 text-slate-400" />
     </Link>
   );
 }
@@ -270,22 +347,24 @@ function SetDetailPage({ game, setSlug }) {
   });
 
   const setCards = detail?.setCards || [];
+  const filterConfig = SET_FILTERS_BY_GAME[game.id] || [];
   const filterOptions = useMemo(() => {
     const next = {};
     setCards.forEach((card) => {
-      Object.entries(card.filterValues || {}).forEach(([key, value]) => {
+      filterConfig.forEach(({ key }) => {
+        const value = cardFilterValue(card, key);
         if (!value) return;
         if (!next[key]) next[key] = new Set();
-        next[key].add(value);
+        next[key].add(String(value));
       });
     });
-    return Object.fromEntries(Object.entries(next).map(([key, values]) => [key, [...values].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }))]));
-  }, [setCards]);
+    return Object.fromEntries(Object.entries(next).map(([key, values]) => [key, sortFilterValues(values)]));
+  }, [filterConfig, setCards]);
   const filteredCards = useMemo(() => {
     const q = query.trim().toLowerCase();
     return setCards.filter((card) => {
       if (q && !`${card.name} ${card.subtitle || ''} ${card.collector_number || ''} ${card.type_line || ''}`.toLowerCase().includes(q)) return false;
-      return Object.entries(activeFilters).every(([key, value]) => !value || String(card.filterValues?.[key] || '') === String(value));
+      return Object.entries(activeFilters).every(([key, value]) => !value || String(cardFilterValue(card, key)) === String(value));
     });
   }, [activeFilters, query, setCards]);
   const visibleCards = filteredCards.slice(0, visibleLimit);
@@ -296,57 +375,59 @@ function SetDetailPage({ game, setSlug }) {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <GameHero game={game} eyebrow="Encyclopedia set" />
-      <SectionShell className="grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <SectionShell className="py-8">
         <div className="min-w-0">
-          <div className="border-b border-slate-200 pb-5">
+          <div className="flex flex-col gap-5 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{detail.setCode || game.shortLabel}</p>
             <h2 className="mt-2 text-3xl font-black tracking-tight">{detail.name}</h2>
             <p className="mt-2 text-sm text-slate-600">
               {detail.cardCatalog?.knownLabel || `${setCards.length} known cards`} in collector order.
             </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link to={detail.legacySetPath}>
+                <Button variant="outline" className="rounded border-slate-300 bg-white text-slate-900 hover:bg-slate-100">Retail set page</Button>
+              </Link>
+              <Link to={createPageUrl('Shop') + `?type=single_card&game=${encodeURIComponent(game.searchGame)}&search=${encodeURIComponent(detail.name)}`}>
+                <Button className="rounded bg-slate-900 text-white hover:bg-slate-800">
+                  {detail.availability?.activeListingCount > 0 ? `Shop ${detail.availability.activeListingCount} listing${detail.availability.activeListingCount === 1 ? '' : 's'}` : 'Shop this set'}
+                </Button>
+              </Link>
+            </div>
           </div>
-          <div className="flex flex-col gap-3 border-b border-slate-200 py-4">
-            <label className="flex items-center gap-2 border border-slate-300 bg-white px-3 py-2">
+          <div className="flex flex-col gap-3 border-b border-slate-200 py-4 lg:flex-row lg:items-center">
+            <label className="flex min-w-0 flex-1 items-center gap-2 border border-slate-300 bg-white px-3 py-2">
               <Search className="h-4 w-4 text-slate-400" />
               <input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleLimit(120); }} placeholder="Search this set" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
             </label>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {Object.entries(filterOptions).slice(0, 4).map(([key, values]) => (
+            <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:w-[680px] lg:grid-cols-4">
+              {filterConfig.filter(({ key }) => filterOptions[key]?.length > 0).map(({ key, label }) => (
                 <select key={key} value={activeFilters[key] || ''} onChange={(event) => { setActiveFilters((current) => ({ ...current, [key]: event.target.value })); setVisibleLimit(120); }} className="min-w-0 border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none">
-                  <option value="">{fieldLabel(key)}</option>
-                  {values.map((value) => <option key={value} value={value}>{value}</option>)}
+                  <option value="">{label || fieldLabel(key)}</option>
+                  {filterOptions[key].map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
               ))}
             </div>
           </div>
-          <div className="divide-y divide-slate-200">{visibleCards.map((card) => <CardRow key={card.id} card={card} />)}</div>
+          <div className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <p className="text-sm font-semibold text-slate-600">
+              Showing {visibleCards.length} of {filteredCards.length} card{filteredCards.length === 1 ? '' : 's'}
+            </p>
+            {detail.cardCatalog?.printingLabel && <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{detail.cardCatalog.printingLabel}</p>}
+          </div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(138px,1fr))] gap-x-4 gap-y-7 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(176px,1fr))]">
+            {visibleCards.map((card) => <CardGalleryTile key={card.id} card={card} />)}
+          </div>
+          {visibleCards.length === 0 && (
+            <div className="border-y border-slate-200 py-12 text-center text-sm font-semibold text-slate-500">No cards match those set filters.</div>
+          )}
           {visibleCards.length < filteredCards.length && (
-            <Button variant="outline" onClick={() => setVisibleLimit((current) => current + 120)} className="mt-4 w-full rounded border-slate-300 text-slate-900 hover:bg-slate-100">
+            <Button variant="outline" onClick={() => setVisibleLimit((current) => current + 120)} className="mt-8 w-full rounded border-slate-300 bg-white text-slate-900 hover:bg-slate-100">
               Show more cards
             </Button>
           )}
         </div>
-        <aside className="h-fit border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center bg-slate-100 text-slate-700">
-              {detail.availability?.activeListingCount > 0 ? <ShoppingBag className="h-5 w-5" /> : <PackageSearch className="h-5 w-5" />}
-            </div>
-            <div>
-              <h2 className="text-lg font-black tracking-tight">Store Context</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-600">
-                {detail.availability?.activeListingCount > 0
-                  ? `${detail.availability.activeListingCount} active listing${detail.availability.activeListingCount === 1 ? '' : 's'} available.`
-                  : 'No active store listings are attached to this set.'}
-              </p>
-            </div>
-          </div>
-          <Link to={detail.legacySetPath}>
-            <Button variant="outline" className="mt-5 w-full rounded border-slate-300 text-slate-900 hover:bg-slate-100">Open retail set page</Button>
-          </Link>
-          <Link to={createPageUrl('Shop') + `?type=single_card&game=${encodeURIComponent(game.searchGame)}&search=${encodeURIComponent(detail.name)}`}>
-            <Button className="mt-3 w-full rounded bg-slate-900 text-white hover:bg-slate-800">Shop this set</Button>
-          </Link>
-        </aside>
       </SectionShell>
     </main>
   );
