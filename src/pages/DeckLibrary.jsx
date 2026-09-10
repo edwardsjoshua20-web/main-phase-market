@@ -51,8 +51,8 @@ function DeckEntry({ deck, game, onOpen }) {
   const artworkCard = (deck.items || []).find((item) => getCardImageUrl(item));
   const status = getDeckStatus(deck);
   return (
-    <article className="group grid min-h-[68px] grid-cols-[92px_minmax(0,1fr)_auto] overflow-hidden bg-white/[0.018] transition-colors hover:bg-white/[0.04]">
-      <div className="relative bg-[#08111d]">
+    <article className="group grid min-h-[68px] grid-cols-[92px_minmax(0,1fr)_auto] overflow-hidden transition-colors hover:bg-white/[0.025]">
+      <div className="relative bg-[#07111d]">
         {artwork ? <img src={artwork} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_24%]" onError={(event) => handleCardImageError(event, artworkCard || {})} /> : <div className="absolute inset-0 bg-[#132033]" />}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#0d1724]/45" />
       </div>
@@ -152,15 +152,15 @@ export default function DeckLibrary() {
         {loadingDecks ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-cyan-300" /></div> : (
           <div className="columns-1 gap-3 md:columns-2 xl:columns-3">
             {GAMES.map((game) => (
-              <section key={game.id} className="mb-6 min-w-0 break-inside-avoid md:mb-7">
+              <section key={game.id} className="mb-7 min-w-0 break-inside-avoid">
                 <div className="flex min-h-[54px] items-center justify-between gap-3 border-b border-slate-700/65 border-t border-cyan-300/25 bg-white/[0.035] px-2.5 py-2.5">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-24 shrink-0 items-center">
-                      <img src={game.logoSrc} alt="" className={`max-h-8 max-w-24 object-contain object-left ${game.logoClass}`} />
+                    <div className="flex h-10 w-28 shrink-0 items-center">
+                      <img src={game.logoSrc} alt="" className={`max-h-9 max-w-28 object-contain object-left ${game.logoClass}`} />
                     </div>
-                    <h3 className="truncate text-[13px] font-bold text-slate-50">{game.label}</h3>
+                    <h3 className="truncate text-sm font-extrabold text-slate-50">{game.label}</h3>
                   </div>
-                  <button type="button" onClick={() => beginCreate(game)} className="inline-flex h-7 shrink-0 items-center gap-1 border border-transparent px-1.5 text-[9px] font-semibold text-slate-400 transition-colors hover:border-slate-600/60 hover:bg-slate-800/55 hover:text-slate-100"><Plus size={11} /> New Deck</button>
+                  <button type="button" onClick={() => beginCreate(game)} className="inline-flex h-7 shrink-0 items-center gap-1 border border-transparent px-1.5 text-[9px] font-semibold text-slate-500 transition-colors hover:border-slate-600/60 hover:bg-slate-800/55 hover:text-slate-200"><Plus size={11} /> New Deck</button>
                 </div>
                 {groupedDecks[game.id]?.length ? <div className="divide-y divide-slate-700/35">{groupedDecks[game.id].map((deck) => <DeckEntry key={deck.id} deck={deck} game={game} onOpen={openDeck} />)}</div> : <div className="flex min-h-[68px] items-center px-1 text-[11px] text-slate-500">No saved decks for this game.</div>}
               </section>
