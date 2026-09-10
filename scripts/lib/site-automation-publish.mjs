@@ -49,7 +49,8 @@ function buildPublishSelection(pipelineId) {
           'data/mtg/search-lite',
           'data/mtg/search-lite-manifest.json',
           'data/mtg/printing-index',
-          'data/mtg/printing-index-manifest.json'
+          'data/mtg/printing-index-manifest.json',
+          'data/encyclopedia'
         ]
       };
     case 'images':

@@ -4,6 +4,7 @@ import { listingOwner } from '@/services/listing/listingOwner';
 import { getReleaseState, getReleaseStateLabel } from '@/services/releases/releaseState';
 import { enrichCatalogResultsWithInventory } from '@/services/search/searchCore';
 import { fetchJsonWithEmbeddedFallback, getEmbeddedUpcomingReleasesManifest } from '@/services/siteStaticSnapshots';
+import { fetchSetCardShard } from './setCardShardService';
 
 const GAME_ROUTE_ALIASES = {
   mtg: 'magic',
@@ -456,6 +457,7 @@ function normalizeGenericSetCards(rows = [], detail = {}) {
 }
 
 function normalizeSetCards(rows = [], detail = {}) {
+  if (rows.some((card) => card?.encyclopediaCard)) return rows;
   if (detail.game === 'yugioh') return normalizeYugiohSetCards(rows, detail);
   if (detail.game === 'fab') return normalizeFabSetCards(rows, detail);
   if (detail.game === 'magic') return normalizeMagicSetCards(rows, detail);
@@ -552,9 +554,12 @@ export async function resolveSetDetail({ game, setSlug }) {
   }
 
   try {
-    const catalogCards = routeGame === 'magic'
-      ? await getMtgSetCards(detail.setCode, detail.name)
-      : await fetchCatalogCards(routeGame);
+    const shard = await fetchSetCardShard(routeGame, slug);
+    const catalogCards = shard?.cards?.length
+      ? shard.cards
+      : routeGame === 'magic'
+        ? await getMtgSetCards(detail.setCode, detail.name)
+        : await fetchCatalogCards(routeGame);
     setCards = enrichCatalogResultsWithInventory(normalizeSetCards(catalogCards, detail), allListings);
   } catch {
     setCards = [];

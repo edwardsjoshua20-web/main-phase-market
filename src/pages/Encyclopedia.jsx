@@ -172,6 +172,11 @@ function GameLanding({ game }) {
               </Link>
             ))}
           </div>
+          <div className="mt-7 border-t border-slate-200 pt-4">
+            <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Catalog Source</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{game.cardSource}</p>
+            <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{game.sourceLimitations}</p>
+          </div>
           <SourceList sources={game.sourceRefs} className="mt-7" />
         </aside>
       </SectionShell>
@@ -181,6 +186,7 @@ function GameLanding({ game }) {
 
 function SetListPage({ game }) {
   const [query, setQuery] = useState('');
+  const [sortMode, setSortMode] = useState('newest');
   const { data: sets = [], isLoading } = useQuery({
     queryKey: ['encyclopedia-sets', game.id],
     queryFn: () => gameKnowledgeOwner.listSets(game.id, { limit: 0 }),
@@ -188,9 +194,13 @@ function SetListPage({ game }) {
   });
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return sets;
-    return sets.filter((set) => `${set.name} ${set.setCode}`.toLowerCase().includes(q));
-  }, [query, sets]);
+    const visible = q ? sets.filter((set) => `${set.name} ${set.setCode}`.toLowerCase().includes(q)) : sets;
+    return [...visible].sort((a, b) => {
+      if (sortMode === 'oldest') return String(a.releaseDate || '').localeCompare(String(b.releaseDate || ''));
+      if (sortMode === 'name') return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+      return String(b.releaseDate || '').localeCompare(String(a.releaseDate || ''));
+    });
+  }, [query, sets, sortMode]);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -201,10 +211,17 @@ function SetListPage({ game }) {
             <h2 className="text-2xl font-black tracking-tight">All Sets</h2>
             <p className="mt-1 text-sm text-slate-600">{filtered.length} set{filtered.length === 1 ? '' : 's'} visible.</p>
           </div>
-          <label className="flex w-full items-center gap-2 border border-slate-300 bg-white px-3 py-2 md:max-w-sm">
-            <Search className="h-4 w-4 text-slate-400" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter sets" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
-          </label>
+          <div className="flex w-full flex-col gap-2 sm:flex-row md:max-w-xl">
+            <label className="flex min-w-0 flex-1 items-center gap-2 border border-slate-300 bg-white px-3 py-2">
+              <Search className="h-4 w-4 text-slate-400" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter sets" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+            </label>
+            <select value={sortMode} onChange={(event) => setSortMode(event.target.value)} className="border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none">
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="name">Name</option>
+            </select>
+          </div>
         </div>
         {isLoading ? (
           <div className="py-10 text-sm font-semibold text-slate-500">Loading sets...</div>
@@ -236,16 +253,46 @@ function CardRow({ card }) {
   );
 }
 
+function fieldLabel(key) {
+  return String(key || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function SetDetailPage({ game, setSlug }) {
+  const [query, setQuery] = useState('');
+  const [activeFilters, setActiveFilters] = useState({});
+  const [visibleLimit, setVisibleLimit] = useState(120);
   const { data: detail, isLoading } = useQuery({
     queryKey: ['encyclopedia-set-detail', game.id, setSlug],
     queryFn: () => gameKnowledgeOwner.resolveSet(game.id, setSlug),
     staleTime: 60_000
   });
+
+  const setCards = detail?.setCards || [];
+  const filterOptions = useMemo(() => {
+    const next = {};
+    setCards.forEach((card) => {
+      Object.entries(card.filterValues || {}).forEach(([key, value]) => {
+        if (!value) return;
+        if (!next[key]) next[key] = new Set();
+        next[key].add(value);
+      });
+    });
+    return Object.fromEntries(Object.entries(next).map(([key, values]) => [key, [...values].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }))]));
+  }, [setCards]);
+  const filteredCards = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return setCards.filter((card) => {
+      if (q && !`${card.name} ${card.subtitle || ''} ${card.collector_number || ''} ${card.type_line || ''}`.toLowerCase().includes(q)) return false;
+      return Object.entries(activeFilters).every(([key, value]) => !value || String(card.filterValues?.[key] || '') === String(value));
+    });
+  }, [activeFilters, query, setCards]);
+  const visibleCards = filteredCards.slice(0, visibleLimit);
+
   if (isLoading) return <LoadingState />;
   if (!detail) return <EmptyState title="Set not found" body="The local catalog could not resolve that set." to={`/Encyclopedia/${game.routeKey}/sets`} action="Back to sets" />;
 
-  const setCards = detail.setCards || [];
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <GameHero game={game} eyebrow="Encyclopedia set" />
@@ -258,7 +305,26 @@ function SetDetailPage({ game, setSlug }) {
               {detail.cardCatalog?.knownLabel || `${setCards.length} known cards`} in collector order.
             </p>
           </div>
-          <div className="divide-y divide-slate-200">{setCards.map((card) => <CardRow key={card.id} card={card} />)}</div>
+          <div className="flex flex-col gap-3 border-b border-slate-200 py-4">
+            <label className="flex items-center gap-2 border border-slate-300 bg-white px-3 py-2">
+              <Search className="h-4 w-4 text-slate-400" />
+              <input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleLimit(120); }} placeholder="Search this set" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+            </label>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {Object.entries(filterOptions).slice(0, 4).map(([key, values]) => (
+                <select key={key} value={activeFilters[key] || ''} onChange={(event) => { setActiveFilters((current) => ({ ...current, [key]: event.target.value })); setVisibleLimit(120); }} className="min-w-0 border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none">
+                  <option value="">{fieldLabel(key)}</option>
+                  {values.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              ))}
+            </div>
+          </div>
+          <div className="divide-y divide-slate-200">{visibleCards.map((card) => <CardRow key={card.id} card={card} />)}</div>
+          {visibleCards.length < filteredCards.length && (
+            <Button variant="outline" onClick={() => setVisibleLimit((current) => current + 120)} className="mt-4 w-full rounded border-slate-300 text-slate-900 hover:bg-slate-100">
+              Show more cards
+            </Button>
+          )}
         </div>
         <aside className="h-fit border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-start gap-3">
@@ -316,6 +382,16 @@ function CardDetailPage({ game, setSlug, cardId }) {
               </div>
             ))}
           </div>
+          {card.textBlocks.length > 0 && (
+            <div className="mt-8 divide-y divide-slate-200 border-y border-slate-200">
+              {card.textBlocks.map((block) => (
+                <div key={block.title} className="py-4">
+                  <h2 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">{block.title}</h2>
+                  <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{block.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="mt-8">
             <h2 className="text-2xl font-black tracking-tight">Printings and Availability</h2>
             <p className="mt-1 text-sm text-slate-600">Resolved through the Search owner, then enriched where MainPhase listings are available.</p>
@@ -325,7 +401,7 @@ function CardDetailPage({ game, setSlug, cardId }) {
                   <div className="min-w-0">
                     <p className="truncate font-bold text-slate-950">{printing.name || card.name}</p>
                     <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
-                      {[printing.setLabel, printing.numberLabel, printing.rarity].filter(Boolean).join(' / ')}
+                      {[printing.setLabel, printing.numberLabel, printing.rarity, printing.variantLabel].filter(Boolean).join(' / ')}
                     </p>
                   </div>
                   <p className={`text-sm font-black ${printing.inStock ? 'text-emerald-700' : 'text-slate-500'}`}>

@@ -55,6 +55,7 @@ function normalizeCard(card = {}, gameMeta, setSlug = '') {
 }
 
 function collectFieldValues(card = {}) {
+  if (Array.isArray(card.fields) && card.fields.length > 0) return card.fields;
   const raw = card.raw || {};
   return [
     { label: 'Set', value: card.set_name || raw.set_name || raw.setName },
@@ -97,6 +98,17 @@ function normalizePrintings(printings = []) {
     priceLabel: Number(printing.listingSellPrice || printing.sell_price || printing.price || 0) > 0
       ? Number(printing.listingSellPrice || printing.sell_price || printing.price).toFixed(2)
       : ''
+  }));
+}
+
+function normalizeKnownVariants(card = {}) {
+  const variants = Array.isArray(card.raw?.variants) ? card.raw.variants : [];
+  return variants.map((printing) => ({
+    ...printing,
+    name: printing.name || card.name,
+    setLabel: cleanText(printing.setName || printing.set_name || card.set_name),
+    numberLabel: cleanText(printing.number || printing.collector_number || printing.card_number || card.collector_number),
+    priceLabel: Number(printing.price || 0) > 0 ? Number(printing.price).toFixed(2) : ''
   }));
 }
 
@@ -169,7 +181,7 @@ export const gameKnowledgeOwner = {
       const oracleId = card.raw?.oracle_id || card.oracle_id;
       if (detail.gameMeta.id === 'magic' && oracleId) {
         printings = await searchOwner.getMagicPrintingsByOracleId(oracleId);
-      } else {
+      } else if (!card.encyclopediaCard) {
         printings = await searchOwner.searchCanonicalPrintings(card.name, detail.gameMeta.searchGame, { limit: 80 });
       }
     } catch {
@@ -180,9 +192,13 @@ export const gameKnowledgeOwner = {
       detail,
       card: {
         ...card,
-        fields: collectFieldValues(card)
+        fields: collectFieldValues(card),
+        textBlocks: Array.isArray(card.textBlocks) ? card.textBlocks : [],
+        tags: Array.isArray(card.tags) ? card.tags : []
       },
-      printings: normalizePrintings(printings)
+      printings: detail.gameMeta.id === 'magic' || !card.encyclopediaCard
+        ? normalizePrintings(printings)
+        : normalizeKnownVariants(card)
     };
   }
 };

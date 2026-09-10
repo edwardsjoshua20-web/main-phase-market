@@ -39,13 +39,14 @@ export const siteAutomationRegistry = [
     runnerJob: 'catalog',
     script: 'npm run automation:catalog',
     commands: [
-      ['node', 'scripts/run-catalog-refresh.mjs']
+      ['node', 'scripts/run-catalog-refresh.mjs'],
+      ['npm', 'run', 'encyclopedia:data']
     ],
     dependsOn: ['card-backfill-refresh'],
     blocks: ['image-repair-sync', 'pricing-refresh'],
     readiness: 'Best after card backfill. This produces normalized cards and sets used by storefront, images, and pricing.',
-    outputs: ['public/data/*/cards.json', 'public/data/*/sets.json'],
-    purpose: 'Refresh local card catalogs and normalized set data for all supported games.'
+    outputs: ['public/data/*/cards.json', 'public/data/*/sets.json', 'public/data/encyclopedia/**/*.json'],
+    purpose: 'Refresh local card catalogs, normalized set data, and encyclopedia set-card shards for all supported games.'
   },
   {
     id: 'image-repair-sync',
