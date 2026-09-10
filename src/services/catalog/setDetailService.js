@@ -109,6 +109,8 @@ function imageFor(row = {}) {
     row.promo_image_url,
     row.key_art,
     row.set_logo,
+    row.icon_svg_uri,
+    row.set_icon_svg_uri,
     row.images?.logo,
     row.images?.symbol,
     row.images?.icon,

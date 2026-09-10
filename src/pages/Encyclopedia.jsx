@@ -1,13 +1,23 @@
 import React, { useMemo, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, BookOpen, ExternalLink, Layers, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import CardImage from '@/components/cards/CardImage';
 import { formatCardMetadataLabel } from '@/components/cards/CardPresentation';
 import { gameKnowledgeOwner } from '@/services/knowledge/gameKnowledgeOwner';
 import { createPageUrl } from '@/utils';
+
+const SETS_PER_PAGE = 24;
+const LANDING_COPY_BY_GAME = {
+  magic: 'Browse sets, cards, and rules.',
+  pokemon: 'Browse sets, cards, and play topics.',
+  yugioh: 'Browse sets, cards, and duel rules.',
+  lorcana: 'Browse sets, cards, and rules.',
+  flesh_and_blood: 'Browse sets, cards, and game rules.',
+  onepiece: 'Browse sets, cards, and play rules.',
+  starwars: 'Browse sets, cards, and rules.'
+};
 
 function SectionShell({ children, className = '' }) {
   return <section className={`mx-auto w-full max-w-[1480px] px-4 ${className}`}>{children}</section>;
@@ -42,22 +52,34 @@ function GameLogo({ game }) {
   return <img src={game.logoSrc} alt={game.label} loading="lazy" className={`h-auto w-auto object-contain ${game.logoClassName}`} />;
 }
 
+function GameIdentityMark({ game }) {
+  if (game.id === 'magic') {
+    return (
+      <div className="flex items-center gap-3 text-white/86">
+        <span className="flex h-10 w-10 items-center justify-center border border-white/20 bg-white/10 text-sm font-black leading-none">MTG</span>
+        <span className="text-sm font-black uppercase tracking-[0.18em] text-white/72">Magic</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex max-h-14 items-center justify-start opacity-90 md:justify-end">
+      <GameLogo game={game} />
+    </div>
+  );
+}
+
 function GameHero({ game, eyebrow = 'TCG Encyclopedia' }) {
   return (
     <section className={`bg-gradient-to-br ${game.tintClassName} text-white`}>
-      <SectionShell className="grid gap-8 py-9 md:grid-cols-[minmax(0,1fr)_360px] md:items-center md:py-11">
+      <SectionShell className="grid gap-4 py-5 md:grid-cols-[minmax(0,1fr)_220px] md:items-center md:py-6">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/62">{eyebrow}</p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight md:text-5xl">{game.label}</h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-white/76">{game.catalogStatus}</p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {game.focus.map((item) => (
-              <Badge key={item} className="rounded bg-white/10 text-white hover:bg-white/10">{item}</Badge>
-            ))}
-          </div>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/58">{eyebrow}</p>
+          <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">{game.label}</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/74">{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
         </div>
-        <div className="flex min-h-28 items-center justify-start md:justify-end">
-          <GameLogo game={game} />
+        <div className="flex min-h-10 items-center justify-start md:justify-end">
+          <GameIdentityMark game={game} />
         </div>
       </SectionShell>
     </section>
@@ -82,18 +104,55 @@ function SourceList({ sources = [], className = '' }) {
 
 function SetRow({ set }) {
   return (
-    <Link to={set.path} className="grid grid-cols-[54px_minmax(0,1fr)_auto] items-center gap-4 py-3 hover:bg-white">
-      <div className="flex h-12 w-12 items-center justify-center bg-slate-100">
-        {set.imageUrl ? <img src={set.imageUrl} alt="" className="max-h-full max-w-full object-contain" /> : <Layers className="h-5 w-5 text-slate-400" />}
+    <Link to={set.path} className="grid grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-4 py-3 hover:bg-white">
+      <div className="flex h-10 w-10 items-center justify-center bg-white">
+        {set.imageUrl ? <img src={set.imageUrl} alt="" className="max-h-8 max-w-8 object-contain" /> : <Layers className="h-5 w-5 text-slate-400" />}
       </div>
       <div className="min-w-0">
         <p className="truncate font-bold text-slate-950">{set.name}</p>
         <p className="mt-0.5 text-xs font-semibold text-slate-500">
-          {[set.setCode, set.releaseDate].filter(Boolean).join(' / ') || 'Catalog set'}
+          {[set.setCode, set.releaseDate].filter(Boolean).join(' · ') || 'Set'}
         </p>
       </div>
       <ArrowRight className="h-4 w-4 text-slate-400" />
     </Link>
+  );
+}
+
+function filterSetsByQuery(sets = [], query = '') {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return sets;
+  return sets.filter((set) => `${set.name} ${set.setCode}`.toLowerCase().includes(normalized));
+}
+
+function sortSets(sets = [], sortMode = 'newest') {
+  return [...sets].sort((a, b) => {
+    if (sortMode === 'oldest') return String(a.releaseDate || '').localeCompare(String(b.releaseDate || ''));
+    if (sortMode === 'name') return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+    return String(b.releaseDate || '').localeCompare(String(a.releaseDate || ''));
+  });
+}
+
+function clampPage(value, totalPages) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.min(parsed, totalPages);
+}
+
+function SetPagination({ currentPage, totalPages, onPageChange }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm font-semibold text-slate-600">Page {currentPage} of {totalPages}</p>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)} className="rounded border-slate-300 bg-white text-slate-900 hover:bg-slate-100 disabled:opacity-45">
+          Previous
+        </Button>
+        <Button type="button" variant="outline" disabled={currentPage >= totalPages} onClick={() => onPageChange(currentPage + 1)} className="rounded border-slate-300 bg-white text-slate-900 hover:bg-slate-100 disabled:opacity-45">
+          Next
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -103,10 +162,10 @@ function EncyclopediaLanding() {
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <section className="bg-slate-950 text-white">
         <SectionShell className="py-10 md:py-12">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/60">MainPhase knowledge foundation</p>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/60">MainPhase reference</p>
           <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight md:text-5xl">TCG Encyclopedia</h1>
           <p className="mt-4 max-w-3xl text-base leading-7 text-white/74">
-            Shared catalog, set, card, pricing, stock, and rules context for MainPhase Market features.
+            Browse trading card sets, cards, rules, and MainPhase availability across supported games.
           </p>
         </SectionShell>
       </section>
@@ -120,7 +179,7 @@ function EncyclopediaLanding() {
                   <GameLogo game={game} />
                 </div>
                 <h2 className="mt-4 text-xl font-black tracking-tight">{game.label}</h2>
-                <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{game.catalogStatus}</p>
+                <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
               </div>
               <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-sm font-bold text-slate-900">
                 <span>{game.rulesCount} rule topics</span>
@@ -135,31 +194,82 @@ function EncyclopediaLanding() {
 }
 
 function GameLanding({ game }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isMagic = game.id === 'magic';
   const rules = gameKnowledgeOwner.getRulesTopics(game.id);
   const { data: sets = [], isLoading } = useQuery({
-    queryKey: ['encyclopedia-sets-preview', game.id],
-    queryFn: () => gameKnowledgeOwner.listSets(game.id, { limit: 8 }),
+    queryKey: [isMagic ? 'encyclopedia-sets' : 'encyclopedia-sets-preview', game.id],
+    queryFn: () => gameKnowledgeOwner.listSets(game.id, { limit: isMagic ? 0 : 8 }),
     staleTime: 60_000
   });
+  const magicQuery = isMagic ? searchParams.get('q') || '' : '';
+  const magicSortMode = isMagic && searchParams.get('sort') === 'oldest' ? 'oldest' : 'newest';
+  const magicSets = useMemo(() => {
+    if (!isMagic) return sets;
+    return sortSets(filterSetsByQuery(sets, magicQuery), magicSortMode);
+  }, [isMagic, magicQuery, magicSortMode, sets]);
+  const magicTotalPages = Math.max(1, Math.ceil(magicSets.length / SETS_PER_PAGE));
+  const magicCurrentPage = clampPage(searchParams.get('page') || '1', magicTotalPages);
+  const displaySets = isMagic ? magicSets.slice((magicCurrentPage - 1) * SETS_PER_PAGE, magicCurrentPage * SETS_PER_PAGE) : sets;
+
+  const updateMagicBrowseParams = (updates = {}) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, value]) => {
+      const normalized = String(value || '').trim();
+      if (!normalized || (key === 'sort' && normalized === 'newest') || (key === 'page' && normalized === '1')) {
+        next.delete(key);
+        return;
+      }
+      next.set(key, normalized);
+    });
+    setSearchParams(next, { replace: true });
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <GameHero game={game} />
       <SectionShell className="grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-4">
+          <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="text-2xl font-black tracking-tight">Sets</h2>
-              <p className="mt-1 text-sm text-slate-600">Catalog-backed set browsing through the MainPhase Search owner.</p>
+              {isMagic && <p className="mt-1 text-sm text-slate-600">{magicSets.length} set{magicSets.length === 1 ? '' : 's'} visible.</p>}
             </div>
-            <Link to={`/Encyclopedia/${game.routeKey}/sets`}>
-              <Button variant="outline" className="rounded border-slate-300 text-slate-900 hover:bg-slate-100">View all sets</Button>
-            </Link>
+            {isMagic ? (
+              <div className="flex w-full flex-col gap-2 sm:flex-row md:max-w-xl">
+                <label className="flex min-w-0 flex-1 items-center gap-2 border border-slate-300 bg-white px-3 py-2">
+                  <Search className="h-4 w-4 text-slate-400" />
+                  <input
+                    value={magicQuery}
+                    onChange={(event) => updateMagicBrowseParams({ q: event.target.value, page: 1 })}
+                    placeholder="Search set name or code"
+                    className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                  />
+                </label>
+                <select
+                  value={magicSortMode}
+                  onChange={(event) => updateMagicBrowseParams({ sort: event.target.value, page: 1 })}
+                  className="border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none"
+                >
+                  <option value="newest">Newest to oldest</option>
+                  <option value="oldest">Oldest to newest</option>
+                </select>
+              </div>
+            ) : (
+              <Link to={`/Encyclopedia/${game.routeKey}/sets`}>
+                <Button variant="outline" className="rounded border-slate-300 text-slate-900 hover:bg-slate-100">View all sets</Button>
+              </Link>
+            )}
           </div>
           {isLoading ? (
             <div className="py-10 text-sm font-semibold text-slate-500">Loading sets...</div>
+          ) : displaySets.length === 0 ? (
+            <div className="border-b border-slate-200 py-10 text-sm font-semibold text-slate-500">No sets match that search.</div>
           ) : (
-            <div className="divide-y divide-slate-200">{sets.map((set) => <SetRow key={set.id} set={set} />)}</div>
+            <div className="divide-y divide-slate-200">{displaySets.map((set) => <SetRow key={set.id} set={set} />)}</div>
+          )}
+          {isMagic && !isLoading && (
+            <SetPagination currentPage={magicCurrentPage} totalPages={magicTotalPages} onPageChange={(page) => updateMagicBrowseParams({ page })} />
           )}
         </div>
         <aside className="min-w-0">
@@ -173,7 +283,7 @@ function GameLanding({ game }) {
             ))}
           </div>
           <div className="mt-7 border-t border-slate-200 pt-4">
-            <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Catalog Source</h3>
+            <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Card Source</h3>
             <p className="mt-2 text-sm leading-6 text-slate-700">{game.cardSource}</p>
             <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{game.sourceLimitations}</p>
           </div>
@@ -370,7 +480,7 @@ function SetDetailPage({ game, setSlug }) {
   const visibleCards = filteredCards.slice(0, visibleLimit);
 
   if (isLoading) return <LoadingState />;
-  if (!detail) return <EmptyState title="Set not found" body="The local catalog could not resolve that set." to={`/Encyclopedia/${game.routeKey}/sets`} action="Back to sets" />;
+  if (!detail) return <EmptyState title="Set not found" body="That set is not available in the Encyclopedia yet." to={`/Encyclopedia/${game.routeKey}/sets`} action="Back to sets" />;
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -475,7 +585,7 @@ function CardDetailPage({ game, setSlug, cardId }) {
           )}
           <div className="mt-8">
             <h2 className="text-2xl font-black tracking-tight">Printings and Availability</h2>
-            <p className="mt-1 text-sm text-slate-600">Resolved through the Search owner, then enriched where MainPhase listings are available.</p>
+            <p className="mt-1 text-sm text-slate-600">Browse printings and MainPhase availability.</p>
             <div className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
               {printings.slice(0, 24).map((printing, index) => (
                 <div key={`${printing.id || printing.searchIdentity || printing.name}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-3">
@@ -486,7 +596,7 @@ function CardDetailPage({ game, setSlug, cardId }) {
                     </p>
                   </div>
                   <p className={`text-sm font-black ${printing.inStock ? 'text-emerald-700' : 'text-slate-500'}`}>
-                    {printing.inStock ? `In stock${printing.priceLabel ? ` / $${printing.priceLabel}` : ''}` : 'Catalog'}
+                    {printing.inStock ? `In stock${printing.priceLabel ? ` / $${printing.priceLabel}` : ''}` : 'Known printing'}
                   </p>
                 </div>
               ))}
@@ -546,7 +656,7 @@ export default function Encyclopedia() {
   if (!params.game) return <EncyclopediaLanding />;
 
   const game = gameKnowledgeOwner.getGame(params.game);
-  if (!game) return <EmptyState title="Game not found" body="That game is not part of the MainPhase Encyclopedia foundation yet." />;
+  if (!game) return <EmptyState title="Game not found" body="That game is not available in the MainPhase Encyclopedia yet." />;
   const segments = location.pathname.split('/').filter(Boolean);
   const section = segments[2] || '';
   const topicSlug = section === 'rules' ? segments[3] : '';

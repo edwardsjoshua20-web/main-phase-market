@@ -329,8 +329,12 @@ async function main() {
       set_name: row.set_name,
       set_type: row.set_type,
       released_at: row.released_at,
+      set_icon_svg_uri: card.set_icon_svg_uri || card.icon_svg_uri || null,
+      scryfall_uri: card.set_uri || null,
       card_count: 0
     };
+    if (!currentSet.set_icon_svg_uri) currentSet.set_icon_svg_uri = card.set_icon_svg_uri || card.icon_svg_uri || null;
+    if (!currentSet.scryfall_uri) currentSet.scryfall_uri = card.set_uri || null;
     currentSet.card_count += 1;
     sets.set(setKey, currentSet);
   });

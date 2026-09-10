@@ -10,13 +10,13 @@ export const ENCYCLOPEDIA_GAMES = Object.freeze([
     logoClassName: 'max-h-12 max-w-[180px]',
     accent: '#8b5cf6',
     tintClassName: 'from-violet-950 via-slate-950 to-amber-950',
-    catalogStatus: 'Complete local card and set catalog foundation through the MainPhase catalog/search owners.',
-    cardSource: 'Scryfall bulk/catalog source mirrored into MainPhase MTG catalog indexes.',
-    sourceLimitations: 'Magic set detail uses the MainPhase MTG search-lite and printing indexes; source legality and Oracle identity remain Scryfall-derived.',
+    catalogStatus: 'Browse Magic sets, cards, and rules.',
+    cardSource: 'Magic card and set information follows Scryfall and official Wizards resources.',
+    sourceLimitations: 'Set pages preserve release dates, set codes, collector numbers, and Oracle identity where available.',
     ruleStatus: 'Foundational rules topics with official Comprehensive Rules attribution.',
     sourceRefs: [
       { label: 'Magic rules page', url: 'https://magic.wizards.com/en/rules', freshness: 'Official page verified September 10, 2026' },
-      { label: 'Scryfall bulk/catalog source', url: 'https://scryfall.com/docs/api/bulk-data', freshness: 'Catalog ingestion source used by MainPhase build scripts' }
+      { label: 'Scryfall card data', url: 'https://scryfall.com/docs/api/bulk-data', freshness: 'Primary Magic data reference' }
     ],
     focus: ['Sets', 'Collector order', 'Oracle printings', 'Rules topics', 'Store availability']
   },
@@ -31,9 +31,9 @@ export const ENCYCLOPEDIA_GAMES = Object.freeze([
     logoClassName: 'max-h-14 max-w-[180px]',
     accent: '#f59e0b',
     tintClassName: 'from-blue-950 via-slate-950 to-yellow-950',
-    catalogStatus: 'Local public catalog and set data available; rules coverage is source-attributed and intentionally summarized.',
-    cardSource: 'PokemonTCG.io-compatible local public catalog preserved by MainPhase automation.',
-    sourceLimitations: 'Last automation preserved the local source because the live Pokemon index was unavailable; some future releases may lag until the source refresh succeeds.',
+    catalogStatus: 'Browse Pokemon sets, cards, and play topics.',
+    cardSource: 'Pokemon card and set information follows PokemonTCG.io-compatible data and official Play Pokemon resources.',
+    sourceLimitations: 'Set pages preserve available set names, codes, release dates, and card numbering.',
     ruleStatus: 'Foundational legality and play topics linked to official Play Pokemon resources.',
     sourceRefs: [
       { label: 'Play Pokemon rules and formats', url: 'https://play.pokemon.com/en-us/resources/rules/?category=tcg', freshness: 'Official page verified September 10, 2026' }
@@ -51,8 +51,8 @@ export const ENCYCLOPEDIA_GAMES = Object.freeze([
     logoClassName: 'max-h-12 max-w-[180px]',
     accent: '#a78bfa',
     tintClassName: 'from-purple-950 via-slate-950 to-stone-950',
-    catalogStatus: 'Local public catalog and set data available; set card membership is normalized from official-database-derived printings.',
-    cardSource: 'YGOPRODeck API local public catalog with card_sets printings.',
+    catalogStatus: 'Browse Yu-Gi-Oh! sets, cards, and duel rules.',
+    cardSource: 'Yu-Gi-Oh! card and set information follows YGOPRODeck data and official Konami resources.',
     sourceLimitations: 'Set membership and variants come from card_sets entries; official tournament legality still belongs to current Konami lists.',
     ruleStatus: 'Foundational duel, deck construction, and policy topics linked to official Konami resources.',
     sourceRefs: [
@@ -71,9 +71,9 @@ export const ENCYCLOPEDIA_GAMES = Object.freeze([
     logoClassName: 'max-h-14 max-w-[190px]',
     accent: '#38bdf8',
     tintClassName: 'from-sky-950 via-slate-950 to-fuchsia-950',
-    catalogStatus: 'Local public catalog and set data available; rules coverage points to Ravensburger documents.',
-    cardSource: 'Lorcast API local public catalog.',
-    sourceLimitations: 'Catalog fields are limited to the Lorcast public card/search model mirrored by MainPhase.',
+    catalogStatus: 'Browse Disney Lorcana sets, cards, and rules.',
+    cardSource: 'Disney Lorcana card and set information follows Lorcast data and official Ravensburger resources.',
+    sourceLimitations: 'Set pages show the card fields available through the Lorcast model.',
     ruleStatus: 'Foundational quick start, comprehensive, and tournament rules topics with official resources.',
     sourceRefs: [
       { label: 'Disney Lorcana resources', url: 'https://www.disneylorcana.com/en-GB/resources/', freshness: 'Official page verified September 10, 2026' }
@@ -91,9 +91,9 @@ export const ENCYCLOPEDIA_GAMES = Object.freeze([
     logoClassName: 'max-h-12 max-w-[180px]',
     accent: '#ef4444',
     tintClassName: 'from-red-950 via-slate-950 to-zinc-950',
-    catalogStatus: 'Local public catalog and set data available; printings are normalized by set ID.',
-    cardSource: 'the-fab-cube English card JSON local public mirror.',
-    sourceLimitations: 'FAB printings, foiling, and legality reflect the mirrored source snapshot; event policy should be checked against official FAB policy pages.',
+    catalogStatus: 'Browse Flesh and Blood sets, cards, and game rules.',
+    cardSource: 'Flesh and Blood card information follows the-fab-cube English card data and official FAB resources.',
+    sourceLimitations: 'Printings, foiling, and legality reflect available card data; event policy should be checked against official FAB policy pages.',
     ruleStatus: 'Foundational game concepts, turn structure, combat, and policy topics linked to the official rules site.',
     sourceRefs: [
       { label: 'Flesh and Blood rules and policy', url: 'https://rules.fabtcg.com/en/', freshness: 'Official page verified September 10, 2026' }
@@ -111,9 +111,9 @@ export const ENCYCLOPEDIA_GAMES = Object.freeze([
     logoClassName: 'max-h-12 max-w-[180px] brightness-0 invert',
     accent: '#f97316',
     tintClassName: 'from-orange-950 via-slate-950 to-cyan-950',
-    catalogStatus: 'Local public catalog and set data available; rules coverage links to the official Bandai rules hub.',
-    cardSource: 'punk-records One Piece English card catalog local public mirror.',
-    sourceLimitations: 'The current source manifest records missing candidate cards; catalog pages show represented cards only.',
+    catalogStatus: 'Browse One Piece sets, cards, and play rules.',
+    cardSource: 'One Piece card information follows punk-records English card data and official Bandai resources.',
+    sourceLimitations: 'Set pages show represented cards from the available English card data.',
     ruleStatus: 'Foundational play guide, comprehensive rules, tournament rules, and FAQ source links.',
     sourceRefs: [
       { label: 'One Piece Card Game rules', url: 'https://en.onepiece-cardgame.com/rules/', freshness: 'Official page verified September 10, 2026' }
@@ -131,9 +131,9 @@ export const ENCYCLOPEDIA_GAMES = Object.freeze([
     logoClassName: 'max-h-14 max-w-[170px] brightness-0 invert',
     accent: '#22d3ee',
     tintClassName: 'from-cyan-950 via-slate-950 to-stone-950',
-    catalogStatus: 'Local public catalog and set data available; rules coverage links to official FFG/Star Wars Unlimited resources.',
-    cardSource: 'SWU API export local public catalog.',
-    sourceLimitations: 'Variants and rulings reflect the exported SWU API snapshot mirrored by MainPhase.',
+    catalogStatus: 'Browse Star Wars Unlimited sets, cards, and rules.',
+    cardSource: 'Star Wars Unlimited card and set information follows SWU API data and official game resources.',
+    sourceLimitations: 'Variants and rulings reflect the available SWU API export.',
     ruleStatus: 'Foundational getting started, formats, and rules topics with official resources.',
     sourceRefs: [
       { label: 'Star Wars Unlimited how to play', url: 'https://starwarsunlimited.com/how-to-play', freshness: 'Official page verified September 10, 2026' }

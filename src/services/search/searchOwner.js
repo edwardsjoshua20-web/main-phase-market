@@ -232,7 +232,7 @@ function normalizeSetResult(set, game, products = []) {
     id: set.id || setCode || setName,
     name: setName,
     set_code: String(setCode || '').toUpperCase(),
-    image_url: set.images?.logo || set.logo || set.image_url || null,
+    image_url: set.icon_svg_uri || set.set_icon_svg_uri || set.images?.symbol || set.images?.logo || set.logo || set.image_url || null,
     release_date: set.releaseDate || set.released_at || set.tcg_date || null,
     game: searchGame,
     inStock: Boolean(listedProduct && stockState.inStock),
