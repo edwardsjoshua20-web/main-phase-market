@@ -17,7 +17,10 @@ export function useCommanderCommerce(cards = []) {
   const query = useQuery({
     queryKey: ['commander-card-commerce', identityKey],
     enabled: uniqueCards.length > 0,
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     queryFn: async () => {
       const printings = await searchOwner.getMagicPreferredPrintingsByOracleIds(uniqueCards.map((card) => card.oracle_id));
       const printingByOracleId = new Map(printings.map((printing) => [printing.oracle_id, printing]));
