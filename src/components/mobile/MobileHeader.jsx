@@ -19,7 +19,7 @@ import {
   Home,
   Star,
   SquareStack,
-  MessagesSquare,
+  BookOpen,
   Crown
 } from 'lucide-react';
 import { brandAssets } from '@/config/appAssets';
@@ -92,8 +92,8 @@ export default function MobileHeader({
               <button onClick={() => goTo('/MobileCommunityDecks')} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-200 hover:bg-gray-800 hover:text-white transition-colors text-left">
                 <SquareStack className="w-4 h-4" /> Community Decks
               </button>
-              <button onClick={() => goTo('/MobileForum')} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-200 hover:bg-gray-800 hover:text-white transition-colors text-left">
-                <MessagesSquare className="w-4 h-4" /> Forum
+              <button onClick={() => goTo('/Encyclopedia')} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-200 hover:bg-gray-800 hover:text-white transition-colors text-left">
+                <BookOpen className="w-4 h-4" /> TCG Encyclopedia
               </button>
 
               <p className="text-xs font-bold text-gray-500 uppercase tracking-widest px-2 mt-4 mb-2">Utility</p>
