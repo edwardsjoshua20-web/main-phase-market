@@ -4,6 +4,7 @@ import { restRequest } from '../_shared/rest.ts';
 import { resolvePricingState } from '../../../src/services/pricing/pricingCore.js';
 
 const MAX_ORACLE_IDS = 200;
+const QUERY_CHUNK_SIZE = 20;
 const ORACLE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function normalizeText(value: unknown) {
@@ -51,6 +52,48 @@ function availableQuantity(listing: Record<string, unknown>) {
   return Math.max(0, Number.isFinite(quantity) ? quantity - (Number.isFinite(reserved) ? reserved : 0) : 0);
 }
 
+function chunks<T>(values: T[], size: number) {
+  const result: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    result.push(values.slice(index, index + size));
+  }
+  return result;
+}
+
+async function fetchInventoryRowsForOracleIds(oracleIds: string[], nameByOracleId: Map<string, string>) {
+  const rowById = new Map<string, Record<string, unknown>>();
+
+  for (const oracleIdChunk of chunks(oracleIds, QUERY_CHUNK_SIZE)) {
+    const identityFilters = oracleIdChunk.flatMap((id) => [
+      `data->>oracle_id.eq.${id}`,
+      `data->>catalog_oracle_id.eq.${id}`,
+      `data->>scryfall_oracle_id.eq.${id}`,
+      `data->>description.ilike.*${id}*`
+    ]);
+    for (const name of new Set(oracleIdChunk.map((id) => nameByOracleId.get(id)).filter(Boolean))) {
+      const literal = postgrestIlikeLiteral(String(name));
+      if (literal) {
+        identityFilters.push(`data->>name.ilike.*${literal}*`);
+        identityFilters.push(`data->>product_name.ilike.*${literal}*`);
+      }
+    }
+
+    const params = new URLSearchParams({
+      select: 'data,id',
+      entity_name: 'eq.Card',
+      'data->>status': 'eq.active',
+      or: `(${identityFilters.join(',')})`
+    });
+    const rows = await restRequest(`/rest/v1/app_entities?${params.toString()}`);
+    for (const row of Array.isArray(rows) ? rows : []) {
+      const rowId = String((row as Record<string, unknown>)?.id || '');
+      rowById.set(rowId || JSON.stringify(row), row as Record<string, unknown>);
+    }
+  }
+
+  return [...rowById.values()];
+}
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -76,26 +119,7 @@ Deno.serve(async (req) => {
 
     if (oracleIds.length === 0) return jsonResponse({ availabilityByOracleId: {} });
 
-    const identityFilters = oracleIds.flatMap((id) => [
-      `data->>oracle_id.eq.${id}`,
-      `data->>catalog_oracle_id.eq.${id}`,
-      `data->>scryfall_oracle_id.eq.${id}`,
-      `data->>description.ilike.*${id}*`
-    ]);
-    for (const name of new Set([...nameByOracleId.values()])) {
-      const literal = postgrestIlikeLiteral(name);
-      if (literal) {
-        identityFilters.push(`data->>name.ilike.*${literal}*`);
-        identityFilters.push(`data->>product_name.ilike.*${literal}*`);
-      }
-    }
-    const params = new URLSearchParams({
-      select: 'data,id',
-      entity_name: 'eq.Card',
-      'data->>status': 'eq.active',
-      or: `(${identityFilters.join(',')})`
-    });
-    const rows = await restRequest(`/rest/v1/app_entities?${params.toString()}`);
+    const rows = await fetchInventoryRowsForOracleIds(oracleIds, nameByOracleId);
     const grouped = new Map<string, Record<string, unknown>[]>();
 
     for (const rawRow of Array.isArray(rows) ? rows : []) {
