@@ -4,6 +4,25 @@ import { inventoryOwner } from '@/services/inventory/inventoryOwner';
 import { pricingOwner } from '@/services/pricing/pricingOwner';
 import { searchOwner } from '@/services/search/searchOwner';
 
+const PRINTING_LOOKUP_TIMEOUT_MS = 2500;
+
+function commerceCatalogCard(card = {}) {
+  return {
+    ...card,
+    name: card.name || card.card_name,
+    game: card.game || 'magic'
+  };
+}
+
+function withTimeout(promise, fallback, timeoutMs = PRINTING_LOOKUP_TIMEOUT_MS) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      setTimeout(() => resolve(fallback), timeoutMs);
+    })
+  ]).catch(() => fallback);
+}
+
 export function useCommanderCommerce(cards = []) {
   const uniqueCards = useMemo(() => {
     const byOracleId = new Map();
@@ -22,14 +41,14 @@ export function useCommanderCommerce(cards = []) {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     queryFn: async () => {
-      const printings = await searchOwner.getMagicPreferredPrintingsByOracleIds(uniqueCards.map((card) => card.oracle_id));
+      const fallbackCatalogCards = uniqueCards.map(commerceCatalogCard);
+      const [availabilityByOracleId, printings] = await Promise.all([
+        inventoryOwner.getCatalogCardsAvailability(fallbackCatalogCards),
+        withTimeout(searchOwner.getMagicPreferredPrintingsByOracleIds(uniqueCards.map((card) => card.oracle_id)), [])
+      ]);
       const printingByOracleId = new Map(printings.map((printing) => [printing.oracle_id, printing]));
-      const catalogCards = uniqueCards.map((card) => (
-        printingByOracleId.get(card.oracle_id) || { ...card, name: card.card_name, game: 'magic' }
-      ));
-      const availabilityByOracleId = await inventoryOwner.getCatalogCardsAvailability(catalogCards);
       const entries = uniqueCards.map((card) => {
-        const catalogCard = printingByOracleId.get(card.oracle_id) || { ...card, name: card.card_name, game: 'magic' };
+        const catalogCard = printingByOracleId.get(card.oracle_id) || commerceCatalogCard(card);
         const availability = availabilityByOracleId[card.oracle_id] || {
           inStock: false,
           quantity: 0,
