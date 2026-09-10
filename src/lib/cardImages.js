@@ -1,9 +1,10 @@
-import { getPublicAssetUrl } from '@/config/publicAssetUrls';
+import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 
 function cleanUrl(value) {
   const url = String(value || '').trim();
   if (!url || url === 'null' || url === 'undefined') return null;
-  if (/^\/?data\//i.test(url)) return getPublicAssetUrl(url.replace(/^\/+/, ''));
+  const catalogPath = url.replace(/^\/+/, '').match(/^data\/([^/]+)\/(.+)$/i);
+  if (catalogPath) return getCatalogAssetUrl(catalogPath[1], catalogPath[2]);
   return url;
 }
 
