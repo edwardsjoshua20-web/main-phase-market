@@ -44,7 +44,7 @@ function stockStatus(availability, commerceLoading) {
     };
   }
 
-  if (commerceLoading || !availability) {
+  if (!availability) {
     return {
       className: 'text-slate-400',
       label: 'Checking Stock'
@@ -319,8 +319,8 @@ export default function CommanderDetail() {
     ].filter(Boolean);
     return [...new Map(cards.map((card) => [card.oracle_id, card])).values()];
   }, [commander, gameChangers, newCards, topSynergy, visibleCategories]);
-  const { commerceByOracleId, loadingCommerce, fetchingCommerce } = useCommanderCommerce(commerceCards);
-  const commerceLoading = loadingCommerce || fetchingCommerce;
+  const { commerceByOracleId, loadingCommerce } = useCommanderCommerce(commerceCards);
+  const commerceLoading = loadingCommerce;
   const commanderStock = stockStatus(commerceByOracleId[commander?.oracle_id]?.availability, commerceLoading);
   const { data: compatibleDecks = [] } = useQuery({
     queryKey: ['cardlists', user?.email, 'magic', 'commander'],

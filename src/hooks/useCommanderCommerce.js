@@ -5,6 +5,7 @@ import { pricingOwner } from '@/services/pricing/pricingOwner';
 import { searchOwner } from '@/services/search/searchOwner';
 
 const PRINTING_LOOKUP_TIMEOUT_MS = 2500;
+const COMMERCE_QUERY_VERSION = 'v3';
 
 function commerceCatalogCard(card = {}) {
   return {
@@ -34,7 +35,7 @@ export function useCommanderCommerce(cards = []) {
   const identityKey = uniqueCards.map((card) => card.oracle_id).sort().join(',');
 
   const query = useQuery({
-    queryKey: ['commander-card-commerce', identityKey],
+    queryKey: ['commander-card-commerce', COMMERCE_QUERY_VERSION, identityKey],
     enabled: uniqueCards.length > 0,
     staleTime: 0,
     refetchOnMount: 'always',
