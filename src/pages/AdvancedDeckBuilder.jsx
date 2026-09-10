@@ -166,6 +166,17 @@ function estimateCompactSectionHeight(section) {
   return headerAllowance + rowAllowance + sectionGapAllowance;
 }
 
+function isTextEditingTarget(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  const editable = target.closest('input, textarea, select, [contenteditable="true"]');
+  if (!editable) return false;
+  if (editable instanceof HTMLInputElement) {
+    return !['button', 'checkbox', 'color', 'file', 'radio', 'range', 'reset', 'submit'].includes(editable.type);
+  }
+  return true;
+}
+
 export default function AdvancedDeckBuilder() {
   const cardPreview = useCardHoverPreview();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1089,6 +1100,60 @@ export default function AdvancedDeckBuilder() {
     toast.success(`Undid: ${entry.label}`);
   });
 
+  const undoLatestHistory = () => {
+    const latest = activeDeckRef.current?.change_history?.[0];
+    if (!latest?.undo) {
+      toast.error('No recent reversible deck change');
+      return false;
+    }
+    undoHistoryEntry(latest);
+    return true;
+  };
+
+  useEffect(() => {
+    const handleDeckShortcuts = (event) => {
+      if (event.defaultPrevented || event.repeat || isTextEditingTarget(event.target)) return;
+
+      const key = String(event.key || '').toLowerCase();
+      const hasModifier = event.ctrlKey || event.metaKey;
+      if (!hasModifier) return;
+
+      const isUndo = key === 'z' && !event.shiftKey;
+      const isRedo = (key === 'z' && event.shiftKey) || (key === 'y' && event.ctrlKey);
+      if (!isUndo && !isRedo) return;
+
+      const modalOpen = Boolean(
+        showSetModal
+        || showFormatChangeModal
+        || showImportModal
+        || landCompletionDeck
+        || showPlaytester
+        || showSimulationResults
+        || searchResults.length > 0
+        || (searching && searchQuery.length >= 2)
+      );
+      if (modalOpen) return;
+
+      if (isUndo && activeDeckRef.current?.change_history?.[0]?.undo) {
+        event.preventDefault();
+        undoLatestHistory();
+      }
+    };
+
+    window.addEventListener('keydown', handleDeckShortcuts);
+    return () => window.removeEventListener('keydown', handleDeckShortcuts);
+  }, [
+    landCompletionDeck,
+    searchQuery.length,
+    searchResults.length,
+    searching,
+    showFormatChangeModal,
+    showImportModal,
+    showPlaytester,
+    showSetModal,
+    showSimulationResults,
+  ]);
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -1131,7 +1196,7 @@ export default function AdvancedDeckBuilder() {
       {/* Top Bar */}
       <div className={`bg-gray-800 border-b border-gray-700 sticky top-0 z-40 ${isCompactLayout ? '' : 'ml-[200px]'}`}>
         <div className="max-w-full px-3 py-1.5">
-          <div className="flex items-start justify-between gap-4">
+          <div className={`flex items-start justify-between gap-4 ${isCompactLayout ? 'flex-col' : ''}`}>
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
                 <h1 className="truncate text-lg font-bold leading-5 text-white">
@@ -1157,7 +1222,7 @@ export default function AdvancedDeckBuilder() {
                 </>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className={`flex shrink-0 items-center gap-1.5 ${isCompactLayout ? 'w-full max-w-full flex-wrap justify-start' : ''}`}>
               {activeDeck && (
                 <>
                   <Button
@@ -1177,6 +1242,16 @@ export default function AdvancedDeckBuilder() {
                   </Button>
                   <Button size="sm" variant="outline" className="h-7 rounded-sm border-slate-600/70 bg-slate-700/50 px-2 text-[11px] text-slate-200 hover:bg-slate-700" onClick={() => setShowImportModal(true)}>
                     <DownloadCloud className="w-3 h-3 mr-1" />Import
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    title="Undo Ctrl+Z"
+                    className="h-7 rounded-sm border-slate-600/70 bg-slate-700/50 px-2 text-[11px] text-slate-200 hover:bg-slate-700 disabled:opacity-45"
+                    onClick={undoLatestHistory}
+                    disabled={!activeDeck.change_history?.[0]?.undo}
+                  >
+                    <RotateCcw className="w-3 h-3 mr-1" />Undo
                   </Button>
                   <Button
                     size="sm"
@@ -1275,6 +1350,44 @@ export default function AdvancedDeckBuilder() {
                 </div>
               </div>
 
+              {isCommanderFormat && (
+                <div className="overflow-hidden rounded-lg border border-amber-500/40 bg-gray-800">
+                  <div className="flex items-center justify-between border-b border-gray-700 px-4 py-3">
+                    <h3 className="text-sm font-semibold text-amber-200">Commander</h3>
+                    <span className="text-xs text-gray-400">{commanderDeckItem ? 'Pinned' : 'Empty'}</span>
+                  </div>
+                  {commanderDeckItem ? (
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <div className="h-16 w-12 shrink-0 overflow-hidden rounded bg-gray-700">
+                        <CardImage
+                          card={commanderDeckItem}
+                          alt={commanderDeckItem.product_name}
+                          className="h-full w-full object-cover"
+                          renderFallback={() => (
+                            <div className="flex h-full w-full items-center justify-center px-1 text-center text-[10px] text-gray-400">
+                              {commanderDeckItem.product_name}
+                            </div>
+                          )}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-white">{commanderDeckItem.product_name}</p>
+                        <p className="truncate text-xs text-gray-400">{commanderDeckItem.type || commanderDeckItem.type_line || 'Card'}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setShowSetModal(commanderDeckItem); fetchCardVariants(commanderDeckItem.product_name); }}
+                        className="h-8 shrink-0 rounded bg-purple-700 px-2 text-[11px] font-semibold text-white hover:bg-purple-600"
+                      >
+                        Printing
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="px-4 py-5 text-sm text-gray-400">Set a card as commander to pin it here.</div>
+                  )}
+                </div>
+              )}
+
               {compactDeckGroups.map((group) => (
                 <div key={group.label} className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
@@ -1303,6 +1416,13 @@ export default function AdvancedDeckBuilder() {
                           <p className="text-xs text-gray-400 truncate">{item.type || 'Card'}</p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => { setShowSetModal(item); fetchCardVariants(item.product_name); }}
+                            className="h-7 rounded bg-purple-700 px-2 text-[10px] font-semibold text-white hover:bg-purple-600"
+                          >
+                            Printing
+                          </button>
                           <button
                             onClick={() => changeQty(item.product_id, (item.quantity || 1) - 1)}
                             className="w-7 h-7 rounded bg-gray-700 hover:bg-gray-600 text-white flex items-center justify-center"

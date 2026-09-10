@@ -578,7 +578,7 @@ export default function DeckStackView({
               <section>
                 <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">Recovery</h3>
                 <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">History:</strong> view recent changes</p>
-                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Undo:</strong> reverse supported recent actions</p>
+                <p className="text-[11px] leading-5 text-slate-300"><strong className="text-white">Undo:</strong> Ctrl/Cmd + Z reverses the latest supported deck action</p>
               </section>
               <section>
                 <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">Cards</h3>
