@@ -61,6 +61,7 @@ import { ensurePokemonSearchIndex, searchPokemonAdvancedIndex, searchPokemonInde
 import { ensureStarWarsSearchIndex, searchStarWarsAdvancedIndex, searchStarWarsIndex } from './starwarsSearchIndex.mjs';
 import { ensureYugiohSearchIndex, searchYugiohAdvancedIndex, searchYugiohIndex } from './yugiohSearchIndex.mjs';
 import { resolveRuntimeSiteDataRoot } from '../scripts/lib/runtime-site-data-paths.mjs';
+import { installCardstachePublicApi } from './cardstachePublicApi.mjs';
 
 const envFileValues = (() => {
   const parseEnvFile = (filePath) => {
@@ -1142,6 +1143,7 @@ app.use((req, res, next) => {
   next();
 });
 
+installCardstachePublicApi(app);
 app.use(express.json({ limit: '25mb' }));
 
 function startOptionalWarmups() {

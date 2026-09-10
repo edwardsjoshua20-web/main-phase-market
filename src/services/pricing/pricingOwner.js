@@ -2,7 +2,7 @@ import {
   applyPricingProjection,
   assertSellPriceAvailable,
   resolvePricingState
-} from '@/services/pricing/pricingCore';
+} from './pricingCore.js';
 
 export const pricingOwner = {
   resolvePricingState,

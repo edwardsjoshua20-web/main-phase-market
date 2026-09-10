@@ -98,6 +98,7 @@
     "search:verify": "node scripts/verify-search-owner.mjs",
     "search:runtime:verify": "node scripts/verify-search-runtime.mjs",
     "search:certify": "node scripts/certify-card-search.mjs",
+    "cardstache:api:verify": "node scripts/verify-cardstache-public-api.mjs",
     "listing:verify": "node scripts/verify-listing-owner.mjs",
     "deck:modular:verify": "node scripts/verify-deck-modular-workflow.mjs",
     "deck:library:seed": "node scripts/seed-deck-library-examples.mjs"
