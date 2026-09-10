@@ -152,10 +152,15 @@ export default function DeckLibrary() {
         {loadingDecks ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-cyan-300" /></div> : (
           <div className="columns-1 gap-3 md:columns-2 xl:columns-3">
             {GAMES.map((game) => (
-              <section key={game.id} className="mb-3 min-w-0 break-inside-avoid">
-                <div className="flex min-h-[52px] items-center justify-between gap-3 border-b border-slate-700/50 px-1 py-2">
-                  <div className="flex min-w-0 items-center gap-2.5"><div className="flex h-8 w-20 shrink-0 items-center"><img src={game.logoSrc} alt="" className={`max-h-7 max-w-20 object-contain object-left ${game.logoClass}`} /></div><h3 className="truncate text-xs font-semibold text-slate-100">{game.label}</h3></div>
-                  <button type="button" onClick={() => beginCreate(game)} className="inline-flex h-7 shrink-0 items-center gap-1 px-1.5 text-[9px] font-semibold text-slate-300 hover:bg-slate-700/40 hover:text-white"><Plus size={11} /> New Deck</button>
+              <section key={game.id} className="mb-6 min-w-0 break-inside-avoid md:mb-7">
+                <div className="flex min-h-[54px] items-center justify-between gap-3 border-b border-slate-700/65 border-t border-cyan-300/25 bg-white/[0.035] px-2.5 py-2.5">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-9 w-24 shrink-0 items-center">
+                      <img src={game.logoSrc} alt="" className={`max-h-8 max-w-24 object-contain object-left ${game.logoClass}`} />
+                    </div>
+                    <h3 className="truncate text-[13px] font-bold text-slate-50">{game.label}</h3>
+                  </div>
+                  <button type="button" onClick={() => beginCreate(game)} className="inline-flex h-7 shrink-0 items-center gap-1 border border-transparent px-1.5 text-[9px] font-semibold text-slate-400 transition-colors hover:border-slate-600/60 hover:bg-slate-800/55 hover:text-slate-100"><Plus size={11} /> New Deck</button>
                 </div>
                 {groupedDecks[game.id]?.length ? <div className="divide-y divide-slate-700/35">{groupedDecks[game.id].map((deck) => <DeckEntry key={deck.id} deck={deck} game={game} onOpen={openDeck} />)}</div> : <div className="flex min-h-[68px] items-center px-1 text-[11px] text-slate-500">No saved decks for this game.</div>}
               </section>
