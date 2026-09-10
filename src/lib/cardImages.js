@@ -46,6 +46,14 @@ function getUuidCandidate(card) {
   );
 }
 
+function getScryfallStaticImageUrl(cardId, size) {
+  const id = cleanUrl(cardId);
+  if (!id) return null;
+  const match = id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  if (!match) return null;
+  return `https://cards.scryfall.io/${size}/front/${id[0]}/${id[1]}/${id}.jpg`;
+}
+
 function isMagicCard(card) {
   const game = String(card?.game || card?.product_type || '').trim().toLowerCase();
   if (game === 'magic' || game === 'mtg') {
@@ -99,6 +107,9 @@ export function getCardImageCandidates(card) {
     card.fallback_image_url,
     card.source_image_url,
     card.raw_image_url,
+    scryfallId ? getScryfallStaticImageUrl(scryfallId, 'normal') : null,
+    scryfallId ? getScryfallStaticImageUrl(scryfallId, 'large') : null,
+    scryfallId ? getScryfallStaticImageUrl(scryfallId, 'small') : null,
     scryfallId ? `https://api.scryfall.com/cards/${scryfallId}?format=image&version=normal` : null,
     scryfallId ? `https://api.scryfall.com/cards/${scryfallId}?format=image&version=large` : null,
     scryfallId ? `https://api.scryfall.com/cards/${scryfallId}?format=image&version=small` : null
