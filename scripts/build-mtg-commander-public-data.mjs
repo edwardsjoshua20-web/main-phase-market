@@ -181,6 +181,26 @@ function compactHostedCardView(payload) {
   };
 }
 
+function isCertifiedThemeSlice(slice, theme) {
+  return slice?.active_theme === theme.slug
+    && slice?.has_analytics_data === true
+    && slice?.sample_confidence?.analytics_eligible === true
+    && Number(slice?.average_deck_profile?.total_decks || 0) === Number(theme.deck_count || 0);
+}
+
+function buildCertifiedThemeSlices(commanderOracleId, themeOptions = [], options = {}) {
+  const entries = [];
+  for (const theme of themeOptions) {
+    const slice = getMtgCommanderPage(commanderOracleId, { ...options, theme: theme.slug });
+    const hostedSlice = options.mode === 'card' ? compactHostedCardView(slice) : slice;
+    if (!isCertifiedThemeSlice(hostedSlice, theme)) {
+      throw new Error(`Theme slice ${commanderOracleId}/${theme.slug} is not certified for publication.`);
+    }
+    entries.push([theme.slug, hostedSlice]);
+  }
+  return Object.fromEntries(entries);
+}
+
 async function main() {
   const files = collectJsonFiles(SEARCH_DIR);
   const searchShardFiles = collectJsonFiles(SEARCH_SHARDS_DIR);
@@ -259,19 +279,9 @@ async function main() {
       if (commander.deck_count <= 0) continue;
       const payload = snapshot.details.get(commander.oracle_id);
       if (!payload?.has_local_data) continue;
-      const themeSlices = Object.fromEntries(
-        (payload.theme_options || []).map((theme) => [
-          theme.slug,
-          getMtgCommanderPage(commander.oracle_id, { theme: theme.slug })
-        ])
-      );
+      const themeSlices = buildCertifiedThemeSlices(commander.oracle_id, payload.theme_options || []);
       const cardView = getMtgCommanderPage(commander.oracle_id, { mode: 'card' });
-      const cardThemeSlices = Object.fromEntries(
-        (cardView?.theme_options || []).map((theme) => [
-          theme.slug,
-          compactHostedCardView(getMtgCommanderPage(commander.oracle_id, { mode: 'card', theme: theme.slug }))
-        ])
-      );
+      const cardThemeSlices = buildCertifiedThemeSlices(commander.oracle_id, cardView?.theme_options || [], { mode: 'card' });
       const outputPath = path.join(DETAILS_DIR, `${commander.oracle_id}.json`);
       fs.writeFileSync(outputPath, `${JSON.stringify(makeHostedPayload({
         ...payload,

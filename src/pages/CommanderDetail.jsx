@@ -169,6 +169,16 @@ function priceClassName(value) {
   return 'text-cyan-300';
 }
 
+function commanderBrowsePath(searchParams) {
+  const params = new URLSearchParams(searchParams);
+  params.delete('mode');
+  params.delete('theme');
+  params.delete('deckAction');
+  params.delete('deckCard');
+  const query = params.toString();
+  return `/DeckChemistry/magic${query ? `?${query}` : ''}`;
+}
+
 function AverageDeckCardTile({ card }) {
   return (
     <button type="button" className="text-left">
@@ -320,6 +330,8 @@ export default function CommanderDetail() {
     { id: 'commander', label: 'As Commander', enabled: true },
     { id: 'card', label: 'As Card', enabled: true }
   ]), []);
+
+  const allCommandersPath = useMemo(() => commanderBrowsePath(searchParams), [searchParams]);
 
   const deckActionReturnTo = (action, card) => {
     const params = new URLSearchParams(searchParams);
@@ -489,7 +501,7 @@ export default function CommanderDetail() {
           <p className="text-xl font-semibold">Commander not found.</p>
           <button
             type="button"
-            onClick={() => navigate('/DeckChemistry/magic')}
+            onClick={() => navigate(allCommandersPath)}
             className="mt-4 rounded-xl bg-orange-500 px-4 py-2 font-semibold text-white hover:bg-orange-400"
           >
             Back to Commander Hub
@@ -504,7 +516,7 @@ export default function CommanderDetail() {
       <div className="px-5 py-6 sm:px-6 xl:px-10">
         <button
           type="button"
-          onClick={() => navigate('/DeckChemistry/magic')}
+          onClick={() => navigate(allCommandersPath)}
           className="mb-4 inline-flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />

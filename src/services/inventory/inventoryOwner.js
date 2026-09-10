@@ -100,7 +100,11 @@ export const inventoryOwner = {
 
     try {
       const response = await backend.actions.invoke('getCardCommerce', {
-        oracleIds: [...byOracleId.keys()]
+        oracleIds: [...byOracleId.keys()],
+        cards: [...byOracleId.entries()].map(([oracleId, item]) => ({
+          oracleId,
+          name: item?.name || item?.product_name || item?.card_name || ''
+        }))
       });
       const summaries = response?.data?.availabilityByOracleId || response?.availabilityByOracleId || {};
       return Object.fromEntries([...byOracleId.keys()].map((oracleId) => {

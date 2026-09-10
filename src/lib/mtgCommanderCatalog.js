@@ -74,6 +74,28 @@ function matchesHostedColors(commander, colors) {
   return selectedColors.every((color) => commanderColors.has(color));
 }
 
+function getCertifiedThemeOptions(payload) {
+  const options = Array.isArray(payload?.theme_options) ? payload.theme_options : [];
+  if (!payload?.theme_slices || typeof payload.theme_slices !== 'object') return options;
+
+  return options.filter((theme) => {
+    const slug = String(theme?.slug || '').trim();
+    const slice = payload.theme_slices[slug];
+    return slice?.active_theme === slug
+      && slice?.has_analytics_data === true
+      && slice?.sample_confidence?.analytics_eligible === true
+      && Number(slice?.average_deck_profile?.total_decks || 0) === Number(theme?.deck_count || 0);
+  });
+}
+
+function withCertifiedThemeOptions(payload) {
+  if (!payload || typeof payload !== 'object') return payload;
+  return {
+    ...payload,
+    theme_options: getCertifiedThemeOptions(payload)
+  };
+}
+
 async function loadHostedCommanders(datasetVersion = '') {
   const cacheKey = String(datasetVersion || 'current');
   if (hostedCommanderCache.key === cacheKey && hostedCommanderCache.value) {
@@ -157,12 +179,14 @@ export async function getMtgCommanderPage(oracleId, options = {}) {
       if (response.ok) {
         const payload = await response.json();
         const requestedTheme = normalizeText(options.theme).replace(/\s+/g, '-');
-        const selectedView = options.mode === 'card' ? payload?.card_view : payload;
+        const selectedView = withCertifiedThemeOptions(options.mode === 'card' ? payload?.card_view : payload);
         const themeSlice = requestedTheme ? selectedView?.theme_slices?.[requestedTheme] : null;
         const usableThemeSlice = themeSlice?.active_theme === requestedTheme
           && themeSlice?.has_analytics_data === true
           && themeSlice?.sample_confidence?.analytics_eligible === true;
-        return usableThemeSlice ? themeSlice : (selectedView || payload);
+        return usableThemeSlice
+          ? { ...withCertifiedThemeOptions(themeSlice), theme_options: selectedView.theme_options || [] }
+          : (selectedView || withCertifiedThemeOptions(payload));
       }
     } catch {}
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import CardImage from '@/components/cards/CardImage';
@@ -47,12 +47,13 @@ function hasLimitedData(commander) {
   return ['low', 'insufficient'].includes(commander?.confidence_tier);
 }
 
-function TopCommanderCard({ commander, onPreviewEnter, onPreviewLeave }) {
+function TopCommanderCard({ commander, detailTo, onOpenDetail, onPreviewEnter, onPreviewLeave }) {
   const sampleCount = getBrowseSampleCount(commander);
 
   return (
     <Link
-      to={`/commanders/${encodeURIComponent(commander.oracle_id)}`}
+      to={detailTo(commander)}
+      onClick={onOpenDetail}
       className="group relative aspect-[5/7] overflow-hidden rounded-[3px] bg-[#0b1624] ring-1 ring-white/10 transition hover:ring-sky-300/45"
       onMouseEnter={() => onPreviewEnter(commander)}
       onMouseLeave={onPreviewLeave}
@@ -91,12 +92,13 @@ function FilterSelect({ label, value, onChange, options, disabled = false, selec
   );
 }
 
-function BrowseCommanderCard({ commander, onPreviewEnter, onPreviewLeave }) {
+function BrowseCommanderCard({ commander, detailTo, onOpenDetail, onPreviewEnter, onPreviewLeave }) {
   const sampleCount = getBrowseSampleCount(commander);
 
   return (
     <Link
-      to={`/commanders/${encodeURIComponent(commander.oracle_id)}`}
+      to={detailTo(commander)}
+      onClick={onOpenDetail}
       className="group relative aspect-[4/5] overflow-hidden rounded-[3px] bg-[#0b1624] ring-1 ring-white/[0.07] transition hover:ring-white/20"
     >
       <div className="absolute inset-0 overflow-hidden bg-[#080e17]" onMouseEnter={() => onPreviewEnter(commander)} onMouseLeave={onPreviewLeave}>
@@ -127,12 +129,17 @@ export default function CommanderHub() {
   const cardPreview = useCardHoverPreview();
   const browseSectionRef = useRef(null);
   const archetypeSelectRef = useRef(null);
-  const [colorFilter, setColorFilter] = useState('all');
-  const [archetypeFilter, setArchetypeFilter] = useState('all');
-  const [confidenceFilter, setConfidenceFilter] = useState('all');
-  const [deckCountFilter, setDeckCountFilter] = useState('all');
-  const [sortMode, setSortMode] = useState('rank');
-  const [visibleCount, setVisibleCount] = useState(48);
+  const didMountBrowseResetRef = useRef(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialParamsRef = useRef(null);
+  if (!initialParamsRef.current) initialParamsRef.current = new URLSearchParams(searchParams);
+  const initialParams = initialParamsRef.current;
+  const [colorFilter, setColorFilter] = useState(initialParams.get('color') || 'all');
+  const [archetypeFilter, setArchetypeFilter] = useState(initialParams.get('archetype') || 'all');
+  const [confidenceFilter, setConfidenceFilter] = useState(initialParams.get('confidence') || 'all');
+  const [deckCountFilter, setDeckCountFilter] = useState(initialParams.get('decks') || 'all');
+  const [sortMode, setSortMode] = useState(initialParams.get('sort') || 'rank');
+  const [visibleCount, setVisibleCount] = useState(Math.max(48, Number(initialParams.get('visible')) || 48));
   const [featuredPage, setFeaturedPage] = useState(0);
   const {
     browseLoading,
@@ -145,6 +152,13 @@ export default function CommanderHub() {
     setSearch,
     submitSearch
   } = useCommanderHubData();
+
+  const compareSingleColorDepth = (a, b) => {
+    if (colorFilter.length !== 1) return 0;
+    const aDepth = (a.color_identity || []).length;
+    const bDepth = (b.color_identity || []).length;
+    return aDepth - bDepth;
+  };
 
   const filteredCommanders = useMemo(() => {
     const result = browseResults.filter((commander) => {
@@ -160,16 +174,59 @@ export default function CommanderHub() {
       return colorMatches && archetypeMatches && confidenceMatches && deckCountMatches;
     });
 
-    if (sortMode === 'az') return [...result].sort((a, b) => a.name.localeCompare(b.name));
+    if (sortMode === 'az') return [...result].sort((a, b) => compareSingleColorDepth(a, b) || a.name.localeCompare(b.name));
     if (sortMode === 'popular') {
-      return [...result].sort((a, b) => getBrowseSampleCount(b) - getBrowseSampleCount(a) || a.name.localeCompare(b.name));
+      return [...result].sort((a, b) => compareSingleColorDepth(a, b) || getBrowseSampleCount(b) - getBrowseSampleCount(a) || a.name.localeCompare(b.name));
     }
-    return result;
+    return [...result].sort((a, b) => compareSingleColorDepth(a, b));
   }, [browseResults, colorFilter, archetypeFilter, confidenceFilter, deckCountFilter, sortMode]);
 
   useEffect(() => {
+    if (!didMountBrowseResetRef.current) {
+      didMountBrowseResetRef.current = true;
+      return;
+    }
     setVisibleCount(48);
   }, [search, colorFilter, archetypeFilter, confidenceFilter, deckCountFilter, sortMode]);
+
+  useEffect(() => {
+    const initialSearch = initialParams.get('q') || '';
+    if (initialSearch) setSearch(initialSearch);
+  }, [setSearch]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search.trim()) params.set('q', search.trim());
+    if (colorFilter !== 'all') params.set('color', colorFilter);
+    if (archetypeFilter !== 'all') params.set('archetype', archetypeFilter);
+    if (confidenceFilter !== 'all') params.set('confidence', confidenceFilter);
+    if (deckCountFilter !== 'all') params.set('decks', deckCountFilter);
+    if (sortMode !== 'rank') params.set('sort', sortMode);
+    if (visibleCount > 48) params.set('visible', String(visibleCount));
+    setSearchParams(params, { replace: true });
+  }, [archetypeFilter, colorFilter, confidenceFilter, deckCountFilter, search, setSearchParams, sortMode, visibleCount]);
+
+  useEffect(() => {
+    if (browseLoading) return;
+    const savedScroll = Number(sessionStorage.getItem('commanderBrowseScroll') || 0);
+    if (!savedScroll) return;
+    sessionStorage.removeItem('commanderBrowseScroll');
+    requestAnimationFrame(() => window.scrollTo({ top: savedScroll, behavior: 'auto' }));
+  }, [browseLoading]);
+
+  const rememberBrowseScroll = () => {
+    sessionStorage.setItem('commanderBrowseScroll', String(window.scrollY || 0));
+  };
+
+  const detailTo = (commander) => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('deckAction');
+    params.delete('deckCard');
+    params.delete('mode');
+    params.delete('theme');
+    const query = params.toString();
+    return `/commanders/${encodeURIComponent(commander.oracle_id)}${query ? `?${query}` : ''}`;
+  };
 
   const visibleCommanders = filteredCommanders.slice(0, visibleCount);
   const featuredPageSize = 6;
@@ -284,6 +341,8 @@ export default function CommanderHub() {
                   <TopCommanderCard
                     key={commander.oracle_id}
                     commander={commander}
+                    detailTo={detailTo}
+                    onOpenDetail={rememberBrowseScroll}
                     onPreviewEnter={cardPreview.showPreview}
                     onPreviewLeave={cardPreview.hidePreview}
                   />
@@ -362,6 +421,8 @@ export default function CommanderHub() {
                 <BrowseCommanderCard
                   key={commander.oracle_id}
                   commander={commander}
+                  detailTo={detailTo}
+                  onOpenDetail={rememberBrowseScroll}
                   onPreviewEnter={cardPreview.showPreview}
                   onPreviewLeave={cardPreview.hidePreview}
                 />

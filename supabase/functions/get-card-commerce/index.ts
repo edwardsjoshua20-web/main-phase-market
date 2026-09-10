@@ -6,6 +6,20 @@ import { resolvePricingState } from '../../../src/services/pricing/pricingCore.j
 const MAX_ORACLE_IDS = 200;
 const ORACLE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function normalizeText(value: unknown) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function postgrestIlikeLiteral(value: string) {
+  return normalizeText(value).replace(/\s+/g, '*');
+}
+
 function normalizeEntityRow(row: Record<string, unknown>) {
   const data = row?.data && typeof row.data === 'object'
     ? row.data as Record<string, unknown>
@@ -13,14 +27,22 @@ function normalizeEntityRow(row: Record<string, unknown>) {
   return { ...data, id: String(data.id || row.id || '') };
 }
 
-function listingOracleId(listing: Record<string, unknown>, requestedIds: string[]) {
+function listingOracleId(listing: Record<string, unknown>, requestedIds: string[], nameByOracleId: Map<string, string>) {
   const direct = String(
     listing.oracle_id || listing.catalog_oracle_id || listing.scryfall_oracle_id || ''
   ).trim().toLowerCase();
   if (requestedIds.includes(direct)) return direct;
 
   const description = String(listing.description || '').toLowerCase();
-  return requestedIds.find((id) => description.includes(id)) || '';
+  const descriptionMatch = requestedIds.find((id) => description.includes(id));
+  if (descriptionMatch) return descriptionMatch;
+
+  const listingName = normalizeText(listing.name || listing.product_name || listing.card_name);
+  if (!listingName) return '';
+  return requestedIds.find((id) => {
+    const cardName = nameByOracleId.get(id);
+    return Boolean(cardName && listingName === cardName);
+  }) || '';
 }
 
 function availableQuantity(listing: Record<string, unknown>) {
@@ -35,11 +57,22 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
+    const requestedCards = Array.isArray(payload?.cards) ? payload.cards : [];
+    const nameByOracleId = new Map<string, string>();
     const oracleIds = [...new Set(
       (Array.isArray(payload?.oracleIds) ? payload.oracleIds : [])
+        .concat(requestedCards.map((card: Record<string, unknown>) => card?.oracleId || card?.oracle_id))
         .map((value: unknown) => String(value || '').trim().toLowerCase())
         .filter((value: string) => ORACLE_ID_PATTERN.test(value))
     )].slice(0, MAX_ORACLE_IDS);
+
+    for (const card of requestedCards) {
+      const oracleId = String(card?.oracleId || card?.oracle_id || '').trim().toLowerCase();
+      const name = normalizeText(card?.name || card?.card_name || card?.product_name);
+      if (ORACLE_ID_PATTERN.test(oracleId) && name) {
+        nameByOracleId.set(oracleId, name);
+      }
+    }
 
     if (oracleIds.length === 0) return jsonResponse({ availabilityByOracleId: {} });
 
@@ -49,6 +82,13 @@ Deno.serve(async (req) => {
       `data->>scryfall_oracle_id.eq.${id}`,
       `data->>description.ilike.*${id}*`
     ]);
+    for (const name of new Set([...nameByOracleId.values()])) {
+      const literal = postgrestIlikeLiteral(name);
+      if (literal) {
+        identityFilters.push(`data->>name.ilike.*${literal}*`);
+        identityFilters.push(`data->>product_name.ilike.*${literal}*`);
+      }
+    }
     const params = new URLSearchParams({
       select: 'data,id',
       entity_name: 'eq.Card',
@@ -60,7 +100,7 @@ Deno.serve(async (req) => {
 
     for (const rawRow of Array.isArray(rows) ? rows : []) {
       const listing = normalizeEntityRow(rawRow as Record<string, unknown>);
-      const oracleId = listingOracleId(listing, oracleIds);
+      const oracleId = listingOracleId(listing, oracleIds, nameByOracleId);
       if (!oracleId) continue;
       grouped.set(oracleId, [...(grouped.get(oracleId) || []), listing]);
     }
