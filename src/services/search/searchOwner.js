@@ -221,7 +221,7 @@ function mergeFilterOptions(optionSets) {
 function normalizeSetResult(set, game, products = []) {
   const searchGame = canonicalGame(game);
   const setCode = set.code || set.set_code || set.ptcgoCode || set.id || '';
-  const setName = set.name || set.set_name || 'Unknown Set';
+  const setName = set.name || set.set_name || set.setName || set.title || 'Unknown Set';
   const listedProduct = products.find((product) =>
     product.product_type === 'booster_box' &&
     String(product.set_name || '').toLowerCase() === String(setName || '').toLowerCase()

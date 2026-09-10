@@ -22,6 +22,7 @@ import MobileCommunityDecks from './pages/mobile/MobileCommunityDecks';
 import Forum from './pages/Forum';
 import ForumThread from './pages/ForumThread';
 import RulesReference from './pages/RulesReference';
+import Encyclopedia from './pages/Encyclopedia';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminInventory from './pages/AdminInventory';
 import AdminOperations from './pages/AdminOperations';
@@ -100,6 +101,13 @@ const AuthenticatedApp = () => {
         <Route path="/MobileCommunityDecks" element={<MobileCommunityDecks />} />
         <Route path="/ForumThread" element={<ForumThread />} />
         <Route path="/MobileRules" element={<RulesReference />} />
+        <Route path="/Encyclopedia" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+        <Route path="/Encyclopedia/:game" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+        <Route path="/Encyclopedia/:game/sets" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+        <Route path="/Encyclopedia/:game/sets/:setSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+        <Route path="/Encyclopedia/:game/sets/:setSlug/cards/:cardId" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+        <Route path="/Encyclopedia/:game/rules" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+        <Route path="/Encyclopedia/:game/rules/:topicSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
         <Route path="/AdminInventory" element={<AdminInventory />} />
         <Route path="/AdminShippingFulfillment" element={<AdminShippingFulfillment />} />
         <Route path="/set/:game/:setSlug" element={<SetDetail />} />
@@ -148,6 +156,13 @@ const AuthenticatedApp = () => {
       <Route path="/Forum" element={<LayoutWrapper currentPageName="Forum"><Forum /></LayoutWrapper>} />
       <Route path="/ForumThread" element={<LayoutWrapper currentPageName="ForumThread"><ForumThread /></LayoutWrapper>} />
       <Route path="/RulesReference" element={<LayoutWrapper currentPageName="RulesReference"><RulesReference /></LayoutWrapper>} />
+      <Route path="/Encyclopedia" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+      <Route path="/Encyclopedia/:game" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+      <Route path="/Encyclopedia/:game/sets" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+      <Route path="/Encyclopedia/:game/sets/:setSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+      <Route path="/Encyclopedia/:game/sets/:setSlug/cards/:cardId" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+      <Route path="/Encyclopedia/:game/rules" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+      <Route path="/Encyclopedia/:game/rules/:topicSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
       <Route path="/set/:game/:setSlug" element={<LayoutWrapper currentPageName="SetDetail"><SetDetail /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>

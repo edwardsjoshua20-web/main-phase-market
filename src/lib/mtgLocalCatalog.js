@@ -760,6 +760,7 @@ function formatResult(row, englishImageIndexes = null) {
     lang: row.lang || 'unknown',
     set_name: row.set_name || 'Unknown Set',
     set_code: row.set_code || 'UNK',
+    collector_number: row.collector_number || '',
     card_number: row.collector_number || '',
     rarity: row.rarity || '',
     image_url: displayImageUrl,
@@ -946,6 +947,27 @@ export async function browseMtgCatalog(limit = 100) {
       .filter((row) => hasDisplayableImage(row, englishImageIndexes))
       .sort(compareExactPrintings)
       .slice(0, safeLimit)
+      .map((row) => formatResult(row, englishImageIndexes));
+  } catch {
+    return [];
+  }
+}
+
+export async function getMtgSetCards(setCode, setName = '') {
+  const normalizedSetCode = String(setCode || '').trim().toUpperCase();
+  const normalizedSetName = normalizeText(setName);
+  if (!normalizedSetCode && !normalizedSetName) return [];
+
+  try {
+    const rows = await loadAllLiteBuckets();
+    const englishImageIndexes = buildEnglishImageIndexes(rows);
+    return rows
+      .filter((row) => {
+        if (normalizedSetCode && String(row.set_code || '').toUpperCase() === normalizedSetCode) return true;
+        return normalizedSetName && normalizeText(row.set_name || '') === normalizedSetName;
+      })
+      .filter((row) => hasDisplayableImage(row, englishImageIndexes))
+      .sort(compareCollector)
       .map((row) => formatResult(row, englishImageIndexes));
   } catch {
     return [];

@@ -1,0 +1,401 @@
+import React, { useMemo, useState } from 'react';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowRight, BookOpen, ExternalLink, Layers, PackageSearch, Search, ShoppingBag } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import CardImage from '@/components/cards/CardImage';
+import { formatCardMetadataLabel } from '@/components/cards/CardPresentation';
+import { gameKnowledgeOwner } from '@/services/knowledge/gameKnowledgeOwner';
+import { createPageUrl } from '@/utils';
+
+function SectionShell({ children, className = '' }) {
+  return <section className={`mx-auto w-full max-w-[1480px] px-4 ${className}`}>{children}</section>;
+}
+
+function LoadingState() {
+  return (
+    <main className="min-h-screen bg-slate-50">
+      <div className="mx-auto flex min-h-[420px] w-full max-w-[1480px] items-center justify-center px-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
+      </div>
+    </main>
+  );
+}
+
+function EmptyState({ title, body, to = '/Encyclopedia', action = 'Back to Encyclopedia' }) {
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-950">
+      <SectionShell className="py-16">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Encyclopedia</p>
+        <h1 className="mt-3 text-3xl font-black tracking-tight">{title}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{body}</p>
+        <Link to={to}>
+          <Button className="mt-6 rounded bg-slate-900 text-white hover:bg-slate-800">{action}</Button>
+        </Link>
+      </SectionShell>
+    </main>
+  );
+}
+
+function GameLogo({ game }) {
+  return <img src={game.logoSrc} alt={game.label} loading="lazy" className={`h-auto w-auto object-contain ${game.logoClassName}`} />;
+}
+
+function GameHero({ game, eyebrow = 'TCG Encyclopedia' }) {
+  return (
+    <section className={`bg-gradient-to-br ${game.tintClassName} text-white`}>
+      <SectionShell className="grid gap-8 py-9 md:grid-cols-[minmax(0,1fr)_360px] md:items-center md:py-11">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/62">{eyebrow}</p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight md:text-5xl">{game.label}</h1>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-white/76">{game.catalogStatus}</p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {game.focus.map((item) => (
+              <Badge key={item} className="rounded bg-white/10 text-white hover:bg-white/10">{item}</Badge>
+            ))}
+          </div>
+        </div>
+        <div className="flex min-h-28 items-center justify-start md:justify-end">
+          <GameLogo game={game} />
+        </div>
+      </SectionShell>
+    </section>
+  );
+}
+
+function SourceList({ sources = [], className = '' }) {
+  return (
+    <div className={className}>
+      <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Sources</h3>
+      <div className="mt-3 space-y-3">
+        {sources.map((source) => (
+          <a key={source.url} href={source.url} target="_blank" rel="noreferrer" className="block border-t border-slate-200 pt-3 text-sm font-bold text-slate-900 hover:text-slate-600">
+            <span className="inline-flex items-center gap-2">{source.label}<ExternalLink className="h-3.5 w-3.5" /></span>
+            <span className="mt-1 block text-xs font-semibold text-slate-500">{source.freshness}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SetRow({ set }) {
+  return (
+    <Link to={set.path} className="grid grid-cols-[54px_minmax(0,1fr)_auto] items-center gap-4 py-3 hover:bg-white">
+      <div className="flex h-12 w-12 items-center justify-center bg-slate-100">
+        {set.imageUrl ? <img src={set.imageUrl} alt="" className="max-h-full max-w-full object-contain" /> : <Layers className="h-5 w-5 text-slate-400" />}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate font-bold text-slate-950">{set.name}</p>
+        <p className="mt-0.5 text-xs font-semibold text-slate-500">
+          {[set.setCode, set.releaseDate].filter(Boolean).join(' / ') || 'Catalog set'}
+        </p>
+      </div>
+      <ArrowRight className="h-4 w-4 text-slate-400" />
+    </Link>
+  );
+}
+
+function EncyclopediaLanding() {
+  const games = gameKnowledgeOwner.listGames();
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-950">
+      <section className="bg-slate-950 text-white">
+        <SectionShell className="py-10 md:py-12">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/60">MainPhase knowledge foundation</p>
+          <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight md:text-5xl">TCG Encyclopedia</h1>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-white/74">
+            Shared catalog, set, card, pricing, stock, and rules context for MainPhase Market features.
+          </p>
+        </SectionShell>
+      </section>
+
+      <SectionShell className="py-8">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {games.map((game) => (
+            <Link key={game.id} to={`/Encyclopedia/${game.routeKey}`} className="group flex min-h-[210px] flex-col justify-between border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400 hover:shadow-md">
+              <div>
+                <div className={`flex h-20 items-center justify-start bg-gradient-to-br ${game.tintClassName} px-4`}>
+                  <GameLogo game={game} />
+                </div>
+                <h2 className="mt-4 text-xl font-black tracking-tight">{game.label}</h2>
+                <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{game.catalogStatus}</p>
+              </div>
+              <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-sm font-bold text-slate-900">
+                <span>{game.rulesCount} rule topics</span>
+                <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+              </div>
+            </Link>
+          ))}
+        </div>
+      </SectionShell>
+    </main>
+  );
+}
+
+function GameLanding({ game }) {
+  const rules = gameKnowledgeOwner.getRulesTopics(game.id);
+  const { data: sets = [], isLoading } = useQuery({
+    queryKey: ['encyclopedia-sets-preview', game.id],
+    queryFn: () => gameKnowledgeOwner.listSets(game.id, { limit: 8 }),
+    staleTime: 60_000
+  });
+
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-950">
+      <GameHero game={game} />
+      <SectionShell className="grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-4">
+            <div>
+              <h2 className="text-2xl font-black tracking-tight">Sets</h2>
+              <p className="mt-1 text-sm text-slate-600">Catalog-backed set browsing through the MainPhase Search owner.</p>
+            </div>
+            <Link to={`/Encyclopedia/${game.routeKey}/sets`}>
+              <Button variant="outline" className="rounded border-slate-300 text-slate-900 hover:bg-slate-100">View all sets</Button>
+            </Link>
+          </div>
+          {isLoading ? (
+            <div className="py-10 text-sm font-semibold text-slate-500">Loading sets...</div>
+          ) : (
+            <div className="divide-y divide-slate-200">{sets.map((set) => <SetRow key={set.id} set={set} />)}</div>
+          )}
+        </div>
+        <aside className="min-w-0">
+          <h2 className="text-2xl font-black tracking-tight">Rules Topics</h2>
+          <div className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
+            {rules.map((topic) => (
+              <Link key={topic.slug} to={topic.path} className="block py-4 hover:bg-white">
+                <p className="font-bold text-slate-950">{topic.title}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{topic.summary}</p>
+              </Link>
+            ))}
+          </div>
+          <SourceList sources={game.sourceRefs} className="mt-7" />
+        </aside>
+      </SectionShell>
+    </main>
+  );
+}
+
+function SetListPage({ game }) {
+  const [query, setQuery] = useState('');
+  const { data: sets = [], isLoading } = useQuery({
+    queryKey: ['encyclopedia-sets', game.id],
+    queryFn: () => gameKnowledgeOwner.listSets(game.id, { limit: 0 }),
+    staleTime: 60_000
+  });
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sets;
+    return sets.filter((set) => `${set.name} ${set.setCode}`.toLowerCase().includes(q));
+  }, [query, sets]);
+
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-950">
+      <GameHero game={game} eyebrow="Encyclopedia sets" />
+      <SectionShell className="py-8">
+        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-2xl font-black tracking-tight">All Sets</h2>
+            <p className="mt-1 text-sm text-slate-600">{filtered.length} set{filtered.length === 1 ? '' : 's'} visible.</p>
+          </div>
+          <label className="flex w-full items-center gap-2 border border-slate-300 bg-white px-3 py-2 md:max-w-sm">
+            <Search className="h-4 w-4 text-slate-400" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter sets" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+          </label>
+        </div>
+        {isLoading ? (
+          <div className="py-10 text-sm font-semibold text-slate-500">Loading sets...</div>
+        ) : (
+          <div className="divide-y divide-slate-200">{filtered.map((set) => <SetRow key={set.id} set={set} />)}</div>
+        )}
+      </SectionShell>
+    </main>
+  );
+}
+
+function CardRow({ card }) {
+  const rarity = Array.isArray(card.rarities) && card.rarities.length > 1
+    ? `${card.rarities.length} rarities`
+    : formatCardMetadataLabel(card.rarity || card.rarities?.[0] || '');
+  return (
+    <Link to={card.encyclopediaPath} className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 py-3 hover:bg-white">
+      <div className="aspect-[63/88] overflow-hidden bg-slate-100">
+        <CardImage card={card} alt={card.name} className="h-full w-full object-contain" fallbackClassName="flex h-full w-full items-center justify-center px-1 text-center text-[10px] font-semibold text-slate-500" />
+      </div>
+      <div className="min-w-0">
+        <p className="truncate font-bold text-slate-950">{card.name}</p>
+        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+          {[card.collector_number, rarity, card.type_line].filter(Boolean).join(' / ')}
+        </p>
+      </div>
+      <ArrowRight className="h-4 w-4 text-slate-400" />
+    </Link>
+  );
+}
+
+function SetDetailPage({ game, setSlug }) {
+  const { data: detail, isLoading } = useQuery({
+    queryKey: ['encyclopedia-set-detail', game.id, setSlug],
+    queryFn: () => gameKnowledgeOwner.resolveSet(game.id, setSlug),
+    staleTime: 60_000
+  });
+  if (isLoading) return <LoadingState />;
+  if (!detail) return <EmptyState title="Set not found" body="The local catalog could not resolve that set." to={`/Encyclopedia/${game.routeKey}/sets`} action="Back to sets" />;
+
+  const setCards = detail.setCards || [];
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-950">
+      <GameHero game={game} eyebrow="Encyclopedia set" />
+      <SectionShell className="grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0">
+          <div className="border-b border-slate-200 pb-5">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{detail.setCode || game.shortLabel}</p>
+            <h2 className="mt-2 text-3xl font-black tracking-tight">{detail.name}</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              {detail.cardCatalog?.knownLabel || `${setCards.length} known cards`} in collector order.
+            </p>
+          </div>
+          <div className="divide-y divide-slate-200">{setCards.map((card) => <CardRow key={card.id} card={card} />)}</div>
+        </div>
+        <aside className="h-fit border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center bg-slate-100 text-slate-700">
+              {detail.availability?.activeListingCount > 0 ? <ShoppingBag className="h-5 w-5" /> : <PackageSearch className="h-5 w-5" />}
+            </div>
+            <div>
+              <h2 className="text-lg font-black tracking-tight">Store Context</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                {detail.availability?.activeListingCount > 0
+                  ? `${detail.availability.activeListingCount} active listing${detail.availability.activeListingCount === 1 ? '' : 's'} available.`
+                  : 'No active store listings are attached to this set.'}
+              </p>
+            </div>
+          </div>
+          <Link to={detail.legacySetPath}>
+            <Button variant="outline" className="mt-5 w-full rounded border-slate-300 text-slate-900 hover:bg-slate-100">Open retail set page</Button>
+          </Link>
+          <Link to={createPageUrl('Shop') + `?type=single_card&game=${encodeURIComponent(game.searchGame)}&search=${encodeURIComponent(detail.name)}`}>
+            <Button className="mt-3 w-full rounded bg-slate-900 text-white hover:bg-slate-800">Shop this set</Button>
+          </Link>
+        </aside>
+      </SectionShell>
+    </main>
+  );
+}
+
+function CardDetailPage({ game, setSlug, cardId }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['encyclopedia-set-card', game.id, setSlug, cardId],
+    queryFn: () => gameKnowledgeOwner.resolveSetCard(game.id, setSlug, cardId),
+    staleTime: 60_000
+  });
+  if (isLoading) return <LoadingState />;
+  if (!data) return <EmptyState title="Card not found" body="The card could not be resolved inside that set." to={`/Encyclopedia/${game.routeKey}/sets/${setSlug}`} action="Back to set" />;
+
+  const { card, detail, printings } = data;
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-950">
+      <GameHero game={game} eyebrow="Encyclopedia card" />
+      <SectionShell className="grid gap-8 py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="min-w-0">
+          <div className="bg-white p-3 shadow-sm">
+            <CardImage card={card} alt={card.name} className="aspect-[63/88] w-full object-contain" fallbackClassName="flex aspect-[63/88] w-full items-center justify-center bg-slate-100 px-4 text-center text-sm font-semibold text-slate-500" />
+          </div>
+        </div>
+        <div className="min-w-0">
+          <Link to={`/Encyclopedia/${game.routeKey}/sets/${detail.slug}`} className="text-sm font-bold text-slate-500 hover:text-slate-950">{detail.name}</Link>
+          <h1 className="mt-2 text-4xl font-black tracking-tight">{card.name}</h1>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {card.fields.map((field) => (
+              <div key={field.label} className="border-t border-slate-200 pt-3">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{field.label}</p>
+                <p className="mt-1 font-semibold text-slate-950">{field.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8">
+            <h2 className="text-2xl font-black tracking-tight">Printings and Availability</h2>
+            <p className="mt-1 text-sm text-slate-600">Resolved through the Search owner, then enriched where MainPhase listings are available.</p>
+            <div className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
+              {printings.slice(0, 24).map((printing, index) => (
+                <div key={`${printing.id || printing.searchIdentity || printing.name}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-bold text-slate-950">{printing.name || card.name}</p>
+                    <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                      {[printing.setLabel, printing.numberLabel, printing.rarity].filter(Boolean).join(' / ')}
+                    </p>
+                  </div>
+                  <p className={`text-sm font-black ${printing.inStock ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    {printing.inStock ? `In stock${printing.priceLabel ? ` / $${printing.priceLabel}` : ''}` : 'Catalog'}
+                  </p>
+                </div>
+              ))}
+              {printings.length === 0 && <p className="py-4 text-sm text-slate-600">No additional printings were resolved.</p>}
+            </div>
+          </div>
+        </div>
+      </SectionShell>
+    </main>
+  );
+}
+
+function RulesPage({ game, topicSlug }) {
+  const topics = gameKnowledgeOwner.getRulesTopics(game.id);
+  const topic = topicSlug ? gameKnowledgeOwner.getRulesTopic(game.id, topicSlug) : null;
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-950">
+      <GameHero game={game} eyebrow="Encyclopedia rules" />
+      <SectionShell className="grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0">
+          {topic ? (
+            <>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Rules topic</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight">{topic.title}</h2>
+              <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">{topic.summary}</p>
+              <SourceList sources={topic.sources} className="mt-8" />
+            </>
+          ) : (
+            <>
+              <h2 className="text-3xl font-black tracking-tight">Rules Topics</h2>
+              <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200">
+                {topics.map((entry) => (
+                  <Link key={entry.slug} to={entry.path} className="block py-4 hover:bg-white">
+                    <p className="font-bold text-slate-950">{entry.title}</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">{entry.summary}</p>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <aside className="h-fit border border-slate-200 bg-white p-5 shadow-sm">
+          <BookOpen className="h-6 w-6 text-slate-700" />
+          <h2 className="mt-3 text-lg font-black tracking-tight">Authority Boundary</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            MainPhase stores source-attributed summaries only. Official publisher documents remain the authority for event and judge rulings.
+          </p>
+        </aside>
+      </SectionShell>
+    </main>
+  );
+}
+
+export default function Encyclopedia() {
+  const params = useParams();
+  const location = useLocation();
+  if (!params.game) return <EncyclopediaLanding />;
+
+  const game = gameKnowledgeOwner.getGame(params.game);
+  if (!game) return <EmptyState title="Game not found" body="That game is not part of the MainPhase Encyclopedia foundation yet." />;
+  const segments = location.pathname.split('/').filter(Boolean);
+  const section = segments[2] || '';
+  const topicSlug = section === 'rules' ? segments[3] : '';
+  if (params.cardId && params.setSlug) return <CardDetailPage game={game} setSlug={params.setSlug} cardId={params.cardId} />;
+  if (params.setSlug) return <SetDetailPage game={game} setSlug={params.setSlug} />;
+  if (section === 'sets') return <SetListPage game={game} />;
+  if (section === 'rules') return <RulesPage game={game} topicSlug={topicSlug} />;
+  return <GameLanding game={game} />;
+}

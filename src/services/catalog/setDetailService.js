@@ -1,4 +1,5 @@
 import { getCatalogAssetUrl, getSiteAssetUrl } from '@/config/publicAssetUrls';
+import { getMtgSetCards } from '@/lib/mtgLocalCatalog';
 import { listingOwner } from '@/services/listing/listingOwner';
 import { getReleaseState, getReleaseStateLabel } from '@/services/releases/releaseState';
 import { enrichCatalogResultsWithInventory } from '@/services/search/searchCore';
@@ -551,7 +552,9 @@ export async function resolveSetDetail({ game, setSlug }) {
   }
 
   try {
-    const catalogCards = await fetchCatalogCards(routeGame);
+    const catalogCards = routeGame === 'magic'
+      ? await getMtgSetCards(detail.setCode, detail.name)
+      : await fetchCatalogCards(routeGame);
     setCards = enrichCatalogResultsWithInventory(normalizeSetCards(catalogCards, detail), allListings);
   } catch {
     setCards = [];
