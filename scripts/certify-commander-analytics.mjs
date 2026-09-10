@@ -454,10 +454,18 @@ for (const indexRow of indexRows) {
   assert(page.commander.rank === (policy.ranking_eligible ? expectedRank : null), `Ranking gate mismatch for ${indexRow.name}`);
 
   if (!policy.analytics_eligible) {
-    for (const key of ['top_synergy_cards', 'new_cards', 'game_changers', 'categories', 'related_commanders', 'average_deck_sections', 'theme_options']) {
+    for (const key of ['top_synergy_cards', 'related_commanders', 'average_deck_sections', 'theme_options']) {
       assert(Array.isArray(page[key]) && page[key].length === 0, `${key} leaked through sample gate for ${indexRow.name}`);
     }
-    assert(page.average_deck_profile.total_decks === 0, `Average profile leaked through sample gate for ${indexRow.name}`);
+    assert((page.observed_cards || []).every((row) => row.observed_only === true && row.synergy_score === null), `Observed cards exposed Chemistry for ${indexRow.name}`);
+    assert((page.categories || []).every((section) => (section.cards || []).every((row) => row.observed_only === true && row.synergy_score === null)), `Observed categories exposed Chemistry for ${indexRow.name}`);
+    assert((page.game_changers || []).every((row) => row.observed_only === true && row.synergy_score === null), `Observed Game Changers exposed Chemistry for ${indexRow.name}`);
+    if (policy.tier === 'low') {
+      assert(page.average_deck_profile.total_decks === count, `Low-confidence factual average profile missing for ${indexRow.name}`);
+    } else {
+      assert(page.average_deck_profile.total_decks === 0, `Insufficient profile leaked average profile for ${indexRow.name}`);
+    }
+    assert((page.observed_cards || []).length > 0 || (page.categories || []).length > 0 || (page.deck_rows || []).length > 0, `Low-data page is materially blank for ${indexRow.name}`);
     continue;
   }
 
@@ -484,7 +492,11 @@ for (const indexRow of indexRows) {
     assert(themePage.has_analytics_data === themePolicy.analytics_eligible, `Theme analytics gate mismatch for ${indexRow.name}/${theme.slug}`);
     if (!themePolicy.analytics_eligible) {
       assert(themePage.top_synergy_cards.length === 0, `Recommendations leaked through theme sample gate for ${indexRow.name}/${theme.slug}`);
-      assert(themePage.average_deck_profile.total_decks === 0, `Average profile leaked through theme sample gate for ${indexRow.name}/${theme.slug}`);
+      if (themePolicy.tier === 'low') {
+        assert(themePage.average_deck_profile.total_decks === themeDecks.length, `Low-confidence theme factual average profile missing for ${indexRow.name}/${theme.slug}`);
+      } else {
+        assert(themePage.average_deck_profile.total_decks === 0, `Insufficient theme average profile leaked for ${indexRow.name}/${theme.slug}`);
+      }
       continue;
     }
     assertAverageProfileMatches(themePage, themeDecks, `${indexRow.name}/${theme.slug}`);

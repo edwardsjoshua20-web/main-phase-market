@@ -176,6 +176,7 @@ function compactHostedCardView(payload) {
     top_commanders: payload.top_commanders,
     average_deck_profile: payload.average_deck_profile,
     top_synergy_cards: payload.top_synergy_cards,
+    observed_cards: payload.observed_cards,
     new_cards: payload.new_cards,
     game_changers: payload.game_changers
   };

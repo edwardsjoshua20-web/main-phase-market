@@ -45,6 +45,7 @@ export function useCommanderDetailPage({ oracleId, searchParams }) {
         categories: pageState.categories,
         gameChangers: pageState.gameChangers,
         newCards: pageState.newCards,
+        observedCards: pageState.observedCards,
         topCommanders: pageState.topCommanders,
         topSynergy: pageState.topSynergy
       }),

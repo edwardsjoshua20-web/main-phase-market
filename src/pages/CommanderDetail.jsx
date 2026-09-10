@@ -30,6 +30,14 @@ function percentText(value) {
   return `${pct.toFixed(1)}%`;
 }
 
+function observedText(card) {
+  const count = Number(card?.deck_count || 0);
+  const total = Number(card?.total_commander_decks || 0);
+  if (count > 0 && total > 0) return `Observed ${count}/${total} decks`;
+  if (count > 0) return `Observed ${count} decks`;
+  return 'Observed card';
+}
+
 function wholeCardCount(value) {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return 0;
@@ -104,7 +112,8 @@ function TypeBreakdown({ data }) {
 }
 
 function CardTile({ card, commerce, commerceLoading, onAddToDeck }) {
-  const chemistryScore = percentText(card.synergy_score);
+  const hasChemistryScore = card.synergy_score !== null && card.synergy_score !== undefined && Number.isFinite(Number(card.synergy_score));
+  const chemistryScore = hasChemistryScore ? percentText(card.synergy_score) : '';
   const price = commerce?.pricing?.display_price;
   const availability = commerce?.availability;
   const stock = stockStatus(availability, commerceLoading);
@@ -122,7 +131,9 @@ function CardTile({ card, commerce, commerceLoading, onAddToDeck }) {
       <div className="mt-2 min-w-0">
         <p className="truncate text-xs font-semibold text-slate-100">{card.card_name}</p>
         <div className="mt-1 flex items-center justify-between gap-2 text-xs font-bold">
-          <span className="text-orange-300">Chemistry {card.synergy_score >= 0 ? '+' : ''}{chemistryScore}</span>
+          <span className={hasChemistryScore ? 'text-orange-300' : 'text-slate-400'}>
+            {hasChemistryScore ? `Chemistry ${card.synergy_score >= 0 ? '+' : ''}${chemistryScore}` : observedText(card)}
+          </span>
           {formatPrice(price) ? <span className={priceClassName(price)}>{formatPrice(price)}</span> : null}
         </div>
         <div className="mt-1.5 flex min-h-5 items-center justify-between gap-2 text-[11px]">
@@ -292,6 +303,7 @@ export default function CommanderDetail() {
   const {
     commander,
     topSynergy,
+    observedCards,
     newCards,
     gameChangers,
     categories,
@@ -304,6 +316,8 @@ export default function CommanderDetail() {
     activeMode,
     totalDecks,
     hasLocalData,
+    sampleConfidence,
+    analyticsSuppressed,
     navSections,
     visibleCategories,
     loading
@@ -313,12 +327,13 @@ export default function CommanderDetail() {
     const cards = [
       commander ? { ...commander, card_name: commander.name } : null,
       ...topSynergy,
+      ...observedCards,
       ...newCards,
       ...gameChangers,
       ...visibleCategories.flatMap((section) => section.cards || [])
     ].filter(Boolean);
     return [...new Map(cards.map((card) => [card.oracle_id, card])).values()];
-  }, [commander, gameChangers, newCards, topSynergy, visibleCategories]);
+  }, [commander, gameChangers, newCards, observedCards, topSynergy, visibleCategories]);
   const { commerceByOracleId, loadingCommerce } = useCommanderCommerce(commerceCards);
   const commerceLoading = loadingCommerce;
   const commanderStock = stockStatus(commerceByOracleId[commander?.oracle_id]?.availability, commerceLoading);
@@ -653,6 +668,12 @@ export default function CommanderDetail() {
                     </div>
                   )}
 
+                  {analyticsSuppressed && sampleConfidence?.label ? (
+                    <p className="mt-4 inline-flex border border-orange-300/20 bg-orange-400/10 px-2.5 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-orange-200">
+                      {sampleConfidence.label}
+                    </p>
+                  ) : null}
+
                   <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-white/[0.08] pt-3">
                     {modeOptions.map((option) => (
                       <button
@@ -749,6 +770,17 @@ export default function CommanderDetail() {
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {gameChangers.map((card) => (
                     <CardTile key={`card-mode-changer-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {activeMode === 'commander' && observedCards.length > 0 && (
+              <section id="observed" className="space-y-4">
+                <h2 className="text-2xl font-black tracking-tight text-white">Observed Cards</h2>
+                <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                  {observedCards.map((card) => (
+                    <CardTile key={`observed-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} />
                   ))}
                 </div>
               </section>

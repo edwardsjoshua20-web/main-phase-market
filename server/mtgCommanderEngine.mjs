@@ -1210,7 +1210,9 @@ export function getMtgCommanderPublicSnapshot() {
         );
       }
       const sampleConfidence = getCommanderSampleConfidence(row.unique_configuration_count);
-      const expectedAverageDeckCount = sampleConfidence.analytics_eligible ? Number(row.unique_configuration_count || 0) : 0;
+      const expectedAverageDeckCount = sampleConfidence.analytics_eligible || sampleConfidence.tier === 'low'
+        ? Number(row.unique_configuration_count || 0)
+        : 0;
       if (Number(payload.average_deck_profile?.total_decks || 0) !== expectedAverageDeckCount) {
         throw new Error(
           `Commander average-deck mismatch for ${row.oracle_id}: profile=${payload.average_deck_profile?.total_decks}, expected=${expectedAverageDeckCount}`
@@ -1387,6 +1389,30 @@ function buildTopSynergy(statRows) {
     .map(mapStatRow);
 }
 
+function mapObservedCard(row) {
+  const card = mapStatRow(row);
+  return {
+    ...card,
+    observed_only: true,
+    synergy_score: null,
+    confidence_score: null,
+    weighted_score: null
+  };
+}
+
+function buildObservedCards(statRows, limit = 20) {
+  return [...statRows]
+    .filter((row) => !shouldOmitFromRecommendations(row))
+    .filter((row) => Number(row.deck_count || 0) > 0)
+    .sort((a, b) => (
+      Number(b.deck_count || 0) - Number(a.deck_count || 0)
+      || Number(b.inclusion_rate || 0) - Number(a.inclusion_rate || 0)
+      || String(a.card_name_lower || a.card_name || '').localeCompare(String(b.card_name_lower || b.card_name || ''))
+    ))
+    .slice(0, limit)
+    .map(mapObservedCard);
+}
+
 function buildNewCards(statRows) {
   return [...statRows]
     .filter((row) => !shouldOmitFromRecommendations(row))
@@ -1407,6 +1433,55 @@ function buildGameChangers(statRows) {
     .filter((row) => Number(row.deck_count || 0) > 0)
     .filter((row) => isCommanderGameChanger(row.card_name))
     .map(mapStatRow);
+}
+
+function buildObservedGameChangers(statRows) {
+  return statRows
+    .filter((row) => Number(row.deck_count || 0) > 0)
+    .filter((row) => isCommanderGameChanger(row.card_name))
+    .map(mapObservedCard);
+}
+
+function buildObservedNewCards(statRows) {
+  return [...statRows]
+    .filter((row) => !shouldOmitFromRecommendations(row))
+    .filter((row) => Number(row.deck_count || 0) > 0)
+    .filter((row) => row.released_at)
+    .sort((a, b) => {
+      const dateCompare = String(b.released_at || '').localeCompare(String(a.released_at || ''));
+      if (dateCompare !== 0) return dateCompare;
+      return Number(b.deck_count || 0) - Number(a.deck_count || 0)
+        || String(a.card_name_lower || a.card_name || '').localeCompare(String(b.card_name_lower || b.card_name || ''));
+    })
+    .slice(0, 15)
+    .map(mapObservedCard);
+}
+
+function buildObservedCategorySections(statRows) {
+  const grouped = new Map();
+
+  for (const row of statRows) {
+    if (shouldOmitFromRecommendations(row) || Number(row.deck_count || 0) <= 0) continue;
+    const card = mapObservedCard(row);
+    if (!COMMANDER_CATEGORY_ORDER.includes(card.category)) continue;
+    if (!grouped.has(card.category)) {
+      grouped.set(card.category, []);
+    }
+    grouped.get(card.category).push(card);
+  }
+
+  return COMMANDER_CATEGORY_ORDER
+    .filter((category) => grouped.has(category))
+    .map((category) => ({
+      category,
+      label: categoryLabel(category),
+      cards: grouped.get(category)
+        .sort((a, b) => (
+          Number(b.deck_count || 0) - Number(a.deck_count || 0)
+          || String(a.card_name || '').localeCompare(String(b.card_name || ''))
+        ))
+        .slice(0, 15)
+    }));
 }
 
 function buildRelatedCommanders(commanderRow, statRows) {
@@ -2675,18 +2750,25 @@ export function getMtgCommanderPage(oracleId, options = {}) {
   const topCommanders = activeMode === 'card' && totalDecks > 0 ? buildTopCommanderRows(slicedDecks) : [];
 
   const topSynergyCards = hasAnalyticsData ? buildTopSynergy(statRows) : [];
-  const newCards = hasAnalyticsData ? buildNewCards(statRows) : [];
-  const gameChangers = hasAnalyticsData ? buildGameChangers(statRows) : [];
-  const categories = hasAnalyticsData ? buildCategorySections(statRows) : [];
+  const observedCards = hasLocalData && !hasAnalyticsData ? buildObservedCards(statRows) : [];
+  const newCards = hasAnalyticsData
+    ? buildNewCards(statRows)
+    : sampleConfidence.tier === 'low'
+      ? buildObservedNewCards(statRows)
+      : [];
+  const gameChangers = hasAnalyticsData ? buildGameChangers(statRows) : buildObservedGameChangers(statRows);
+  const categories = hasAnalyticsData ? buildCategorySections(statRows) : buildObservedCategorySections(statRows);
   const relatedCommanders = hasAnalyticsData && activeMode !== 'card' ? buildRelatedCommanders(commanderRow, statRows) : [];
   const averageDeckProfile = hasAnalyticsData ? (
     activeMode === 'card' || activeTheme ? buildAverageDeckProfileFromDecks(slicedDecks) : buildAverageDeckProfile(oracleId)
-  ) : {
-    total_decks: 0,
-    average_cards: 0,
-    type_distribution: [],
-    mana_curve: []
-  };
+  ) : sampleConfidence.tier === 'low'
+    ? buildAverageDeckProfileFromDecks(slicedDecks)
+    : {
+        total_decks: 0,
+        average_cards: 0,
+        type_distribution: [],
+        mana_curve: []
+      };
   const averageDeckSections = hasAnalyticsData ? buildAverageDeckSections(statRows, averageDeckProfile) : [];
   const deckRows = hasLocalData ? buildDeckModeRows(activeTheme ? slicedDecks : baseDecks) : [];
 
@@ -2708,6 +2790,7 @@ export function getMtgCommanderPage(oracleId, options = {}) {
     average_deck_sections: averageDeckSections,
     deck_rows: deckRows,
     top_synergy_cards: topSynergyCards,
+    observed_cards: observedCards,
     new_cards: newCards,
     game_changers: gameChangers,
     categories,

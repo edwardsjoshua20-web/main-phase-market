@@ -24,6 +24,7 @@ export function createEmptyCommanderPageState() {
   return {
     commander: null,
     topSynergy: [],
+    observedCards: [],
     newCards: [],
     gameChangers: [],
     categories: [],
@@ -47,6 +48,7 @@ export function normalizeCommanderPagePayload(pagePayload) {
   return {
     commander: pagePayload?.commander || null,
     topSynergy: pagePayload?.top_synergy_cards || [],
+    observedCards: pagePayload?.observed_cards || [],
     newCards: pagePayload?.new_cards || [],
     gameChangers: pagePayload?.game_changers || [],
     categories: pagePayload?.categories || [],
@@ -77,6 +79,7 @@ export function buildCommanderNavSections({
   categories,
   gameChangers,
   newCards,
+  observedCards,
   topCommanders,
   topSynergy
 }) {
@@ -102,6 +105,7 @@ export function buildCommanderNavSections({
 
   const sections = [];
   if (topSynergy.length > 0) sections.push({ id: 'recommended', label: 'Recommended Chemistry' });
+  if (observedCards.length > 0) sections.push({ id: 'observed', label: 'Observed Cards' });
   if (gameChangers.length > 0) sections.push({ id: 'game-changers', label: 'Game Changers' });
   if (newCards.length > 0) sections.push({ id: 'new-cards', label: 'New Cards' });
   for (const label of ALLOWED_CATEGORY_ORDER) {
