@@ -44,5 +44,9 @@ export function useCommanderCommerce(cards = []) {
     }
   });
 
-  return { commerceByOracleId: query.data || {}, loadingCommerce: query.isLoading };
+  return {
+    commerceByOracleId: query.data || {},
+    loadingCommerce: query.isLoading,
+    fetchingCommerce: query.isFetching
+  };
 }
