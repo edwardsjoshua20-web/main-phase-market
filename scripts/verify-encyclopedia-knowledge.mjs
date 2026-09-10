@@ -27,6 +27,11 @@ const MTG_REPRESENTATIVE_SETS = [
   { code: 'CMM', slug: 'commander-masters', minCards: 250 },
   { code: 'SLD', slug: 'secret-lair-drop', minCards: 100 }
 ];
+const MTG_DEDUPE_SAMPLE_SETS = [
+  { code: 'FIN', slug: 'final-fantasy' },
+  { code: 'TRK', slug: 'star-trek' },
+  { code: 'TDM', slug: 'tarkir-dragonstorm' }
+];
 
 function assert(condition, message) {
   if (!condition) failures.push(message);
@@ -46,6 +51,16 @@ function compareCollector(left = '', right = '') {
 function isCollectorOrdered(cards = []) {
   for (let index = 1; index < cards.length; index += 1) {
     if (compareCollector(cards[index - 1].collector_number, cards[index].collector_number) > 0) return false;
+  }
+  return true;
+}
+
+function hasUniqueGallerySlots(cards = []) {
+  const seen = new Set();
+  for (const card of cards) {
+    const key = `${card.set_code || ''}:${card.collector_number || card.card_number || card.number || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
   }
   return true;
 }
@@ -101,6 +116,16 @@ for (const game of ENCYCLOPEDIA_GAMES) {
       assert(cards.every((card) => card.encyclopediaCard === true), `magic:${expectedSet.code} shard cards must be marked as encyclopedia cards`);
       assert(cards.some((card) => card.image_url), `magic:${expectedSet.code} shard has no card images`);
       assert(isCollectorOrdered(cards), `magic:${expectedSet.code} shard is not in collector order`);
+      assert(hasUniqueGallerySlots(cards), `magic:${expectedSet.code} shard has duplicate gallery slots`);
+      assert(cards.some((card) => card.representativeLanguage === 'en' || card.raw?.lang === 'en'), `magic:${expectedSet.code} shard has no English representative cards`);
+    }
+    for (const expectedSet of MTG_DEDUPE_SAMPLE_SETS) {
+      const shard = readJson(`public/data/encyclopedia/magic/sets/${expectedSet.slug}.json`);
+      const cards = Array.isArray(shard?.cards) ? shard.cards : [];
+      assert(shard?.set?.code === expectedSet.code, `magic:${expectedSet.code} dedupe sample shard code mismatch`);
+      assert(cards.length > 0, `magic:${expectedSet.code} dedupe sample has no cards`);
+      assert(hasUniqueGallerySlots(cards), `magic:${expectedSet.code} dedupe sample has duplicate gallery slots`);
+      assert(cards.every((card) => Number(card.printingCount || card.raw?.galleryPrintingCount || 1) >= 1), `magic:${expectedSet.code} dedupe sample lacks source printing counts`);
     }
   } else {
     const cards = readJson(`public/data/${game.assetGame}/cards.json`);

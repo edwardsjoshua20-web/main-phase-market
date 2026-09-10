@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, BookOpen, ExternalLink, Layers, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CardImage from '@/components/cards/CardImage';
-import { formatCardMetadataLabel } from '@/components/cards/CardPresentation';
 import { gameKnowledgeOwner } from '@/services/knowledge/gameKnowledgeOwner';
 import { createPageUrl } from '@/utils';
 
@@ -423,10 +422,10 @@ function sortFilterValues(values = []) {
   return [...values].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }));
 }
 
-function CardGalleryTile({ card }) {
-  const rarity = Array.isArray(card.rarities) && card.rarities.length > 1
-    ? `${card.rarities.length} rarities`
-    : formatCardMetadataLabel(card.rarity || card.rarities?.[0] || '');
+function CardGalleryTile({ card, setTotal }) {
+  const collectorNumber = card.collector_number || card.card_number || card.number || '';
+  const metadata = [collectorNumber, setTotal].filter(Boolean).join(' / ');
+
   return (
     <Link to={card.encyclopediaPath} className="group block min-w-0">
       <div className="aspect-[63/88] overflow-hidden bg-slate-100 shadow-sm ring-1 ring-slate-200 transition group-hover:-translate-y-0.5 group-hover:shadow-lg group-hover:ring-slate-300">
@@ -435,7 +434,7 @@ function CardGalleryTile({ card }) {
       <div className="mt-2 min-w-0">
         <p className="truncate text-sm font-bold leading-5 text-slate-950">{card.name}</p>
         <p className="mt-0.5 truncate text-xs font-semibold leading-4 text-slate-500">
-          {[card.collector_number, rarity].filter(Boolean).join(' / ')}
+          {metadata}
         </p>
       </div>
     </Link>
@@ -535,7 +534,7 @@ function SetDetailPage({ game, setSlug }) {
             {detail.cardCatalog?.printingLabel && <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{detail.cardCatalog.printingLabel}</p>}
           </div>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(138px,1fr))] gap-x-4 gap-y-7 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(176px,1fr))]">
-            {visibleCards.map((card) => <CardGalleryTile key={card.id} card={card} />)}
+            {visibleCards.map((card) => <CardGalleryTile key={card.id} card={card} setTotal={setCards.length} />)}
           </div>
           {visibleCards.length === 0 && (
             <div className="border-y border-slate-200 py-12 text-center text-sm font-semibold text-slate-500">No cards match those set filters.</div>

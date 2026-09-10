@@ -185,10 +185,28 @@ function buildPokemonCards(cards, sets) {
 }
 
 function buildMagicCards(printings) {
-  const bySet = new Map();
+  const bySetAndSlot = new Map();
   for (const card of printings) {
     const setCode = clean(card.set_code).toUpperCase();
-    if (!setCode) continue;
+    const collectorNumber = clean(card.collector_number);
+    if (!setCode || !collectorNumber) continue;
+    const slotKey = `${setCode}:${collectorNumber}`;
+    if (!bySetAndSlot.has(slotKey)) bySetAndSlot.set(slotKey, []);
+    bySetAndSlot.get(slotKey).push(card);
+  }
+
+  const bySet = new Map();
+  for (const [slotKey, slotPrintings] of bySetAndSlot.entries()) {
+    const [setCode] = slotKey.split(':');
+    const sortedPrintings = [...slotPrintings].sort((left, right) => {
+      const leftEnglish = clean(left.lang).toLowerCase() === 'en' ? 0 : 1;
+      const rightEnglish = clean(right.lang).toLowerCase() === 'en' ? 0 : 1;
+      if (leftEnglish !== rightEnglish) return leftEnglish - rightEnglish;
+      const dateSort = clean(left.released_at).localeCompare(clean(right.released_at));
+      if (dateSort !== 0) return dateSort;
+      return clean(left.id).localeCompare(clean(right.id));
+    });
+    const card = sortedPrintings[0];
     const image = clean(card.image_normal);
     const out = {
       encyclopediaCard: true,
@@ -204,6 +222,10 @@ function buildMagicCards(printings) {
       image_small: image || null,
       type_line: '',
       tags: [card.rarity, card.lang].filter(Boolean),
+      printingCount: slotPrintings.length,
+      gallerySlotKey: slotKey,
+      representativeLanguage: clean(card.lang),
+      availableLanguages: [...new Set(slotPrintings.map((printing) => clean(printing.lang)).filter(Boolean))].sort(),
       fields: [
         field('Language', card.lang),
         field('Number', card.collector_number),
@@ -218,9 +240,13 @@ function buildMagicCards(printings) {
       },
       raw: {
         oracle_id: card.oracle_id || '',
+        lang: card.lang || '',
+        language: card.lang || '',
         released_at: card.released_at || '',
         finishes: card.finishes || [],
         prices: card.prices || {},
+        galleryPrintingCount: slotPrintings.length,
+        availableLanguages: [...new Set(slotPrintings.map((printing) => clean(printing.lang)).filter(Boolean))].sort(),
         variants: []
       }
     };
@@ -637,7 +663,7 @@ function main() {
       writeJson(path.join(setRoot, `${set.slug}.json`), payload);
       setCount += 1;
       cardCount += setCards.length;
-      variantCount += setCards.reduce((total, card) => total + Math.max(1, card.raw?.variants?.length || 0), 0);
+      variantCount += setCards.reduce((total, card) => total + (Number(card.printingCount || card.raw?.galleryPrintingCount) || Math.max(1, card.raw?.variants?.length || 0)), 0);
     }
 
     const sampleSet = sampleSetWithCards(normalizedSets, bySet);
