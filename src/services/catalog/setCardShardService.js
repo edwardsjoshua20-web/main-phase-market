@@ -39,7 +39,7 @@ function normalizeShardCard(card = {}) {
 export async function fetchSetCardShard(game, setSlug) {
   const shardGame = ROUTE_TO_ENCYCLOPEDIA_GAME[game];
   const slug = cleanText(setSlug);
-  if (!shardGame || !slug || shardGame === 'magic') return null;
+  if (!shardGame || !slug) return null;
 
   const cacheKey = `${shardGame}:${slug}`;
   if (shardCache.has(cacheKey)) return shardCache.get(cacheKey);

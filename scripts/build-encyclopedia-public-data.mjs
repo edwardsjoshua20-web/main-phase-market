@@ -7,6 +7,7 @@ const OUT_ROOT = path.join(PUBLIC_DATA, 'encyclopedia');
 const GENERATED_AT = new Date().toISOString();
 
 const GAMES = [
+  { id: 'magic', label: 'Magic: The Gathering', sourceDir: 'mtg', setCode: (set) => set.set_code || set.code || set.name },
   { id: 'pokemon', label: 'Pokemon TCG', sourceDir: 'pokemon', setCode: (set) => set.id || set.ptcgoCode || set.name },
   { id: 'yugioh', label: 'Yu-Gi-Oh!', sourceDir: 'yugioh', setCode: (set) => set.set_code || set.set_name },
   { id: 'lorcana', label: 'Disney Lorcana', sourceDir: 'lorcana', setCode: (set) => set.code || set.name },
@@ -16,6 +17,7 @@ const GAMES = [
 ];
 
 const CARD_SOURCE_LABELS = {
+  magic: 'Scryfall bulk-data local public printing index',
   pokemon: 'PokemonTCG.io-compatible local public catalog',
   yugioh: 'YGOPRODeck API local public catalog',
   lorcana: 'Lorcast API local public catalog',
@@ -99,6 +101,20 @@ function variant(entry) {
   }));
 }
 
+function expandCompactRow(row, fields = []) {
+  if (!Array.isArray(row)) return row || {};
+  const expanded = Object.fromEntries(fields.map((fieldName, index) => [fieldName, row[index]]));
+  expanded.prices = {
+    usd: expanded.usd ?? null,
+    usd_foil: expanded.usd_foil ?? null,
+    usd_etched: expanded.usd_etched ?? null
+  };
+  delete expanded.usd;
+  delete expanded.usd_foil;
+  delete expanded.usd_etched;
+  return expanded;
+}
+
 function setBase(game, set) {
   const rawCode = clean(game.setCode(set));
   const name = clean(set.name || set.set_name || rawCode);
@@ -164,6 +180,52 @@ function buildPokemonCards(cards, sets) {
     };
     if (!bySet.has(setId)) bySet.set(setId, []);
     bySet.get(setId).push(out);
+  }
+  return bySet;
+}
+
+function buildMagicCards(printings) {
+  const bySet = new Map();
+  for (const card of printings) {
+    const setCode = clean(card.set_code).toUpperCase();
+    if (!setCode) continue;
+    const image = clean(card.image_normal);
+    const out = {
+      encyclopediaCard: true,
+      id: card.id,
+      canonicalId: card.oracle_id ? `magic:${card.oracle_id}` : `magic:${card.id}`,
+      printingId: card.id,
+      name: htmlDecode(card.name),
+      number: clean(card.collector_number),
+      collector_number: clean(card.collector_number),
+      card_number: clean(card.collector_number),
+      rarity: clean(card.rarity),
+      image_url: image || null,
+      image_small: image || null,
+      type_line: '',
+      tags: [card.rarity, card.lang].filter(Boolean),
+      fields: [
+        field('Language', card.lang),
+        field('Number', card.collector_number),
+        field('Rarity', card.rarity),
+        field('Released', card.released_at),
+        field('Finishes', card.finishes)
+      ].filter(Boolean),
+      textBlocks: [],
+      filterValues: {
+        rarity: card.rarity || '',
+        language: card.lang || ''
+      },
+      raw: {
+        oracle_id: card.oracle_id || '',
+        released_at: card.released_at || '',
+        finishes: card.finishes || [],
+        prices: card.prices || {},
+        variants: []
+      }
+    };
+    if (!bySet.has(setCode)) bySet.set(setCode, []);
+    bySet.get(setCode).push(out);
   }
   return bySet;
 }
@@ -513,6 +575,7 @@ function buildFilters(cards) {
 }
 
 function builderFor(gameId) {
+  if (gameId === 'magic') return buildMagicCards;
   if (gameId === 'pokemon') return buildPokemonCards;
   if (gameId === 'yugioh') return buildYugiohCards;
   if (gameId === 'lorcana') return buildLorcanaCards;
@@ -537,8 +600,11 @@ function main() {
 
   for (const game of GAMES) {
     const sets = readJson(`${game.sourceDir}/sets.json`, []);
-    const cards = readJson(`${game.sourceDir}/cards.json`, []);
-    const sourceManifest = readJson(`${game.sourceDir}/cards-manifest.json`, {});
+    const printingManifest = game.id === 'magic' ? readJson('mtg/printing-index-manifest.json', {}) : {};
+    const cards = game.id === 'magic'
+      ? Object.values(printingManifest.shards || {}).flatMap((shard) => readJson(`mtg/${shard.file}`, []).map((row) => expandCompactRow(row, printingManifest.fields || [])))
+      : readJson(`${game.sourceDir}/cards.json`, []);
+    const sourceManifest = game.id === 'magic' ? printingManifest : readJson(`${game.sourceDir}/cards-manifest.json`, {});
     const normalizedSets = sets.map((set) => ({ ...setBase(game, set), game: game.id }));
     const bySet = builderFor(game.id)(cards, sets);
     const setRoot = path.join(OUT_ROOT, game.id, 'sets');

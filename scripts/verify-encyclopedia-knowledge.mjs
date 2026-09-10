@@ -15,6 +15,18 @@ const requiredRoutes = [
 ];
 
 const failures = [];
+const MTG_REPRESENTATIVE_SETS = [
+  { code: 'LEA', slug: 'limited-edition-alpha', minCards: 250 },
+  { code: 'LEB', slug: 'limited-edition-beta', minCards: 250 },
+  { code: '2ED', slug: 'unlimited-edition', minCards: 250 },
+  { code: 'ARN', slug: 'arabian-nights', minCards: 70 },
+  { code: 'ATQ', slug: 'antiquities', minCards: 70 },
+  { code: 'INV', slug: 'invasion', minCards: 250 },
+  { code: 'RTR', slug: 'return-to-ravnica', minCards: 250 },
+  { code: 'FDN', slug: 'foundations', minCards: 250 },
+  { code: 'CMM', slug: 'commander-masters', minCards: 250 },
+  { code: 'SLD', slug: 'secret-lair-drop', minCards: 100 }
+];
 
 function assert(condition, message) {
   if (!condition) failures.push(message);
@@ -25,6 +37,17 @@ function readJson(relativePath) {
   assert(fs.existsSync(absolute), `${relativePath} is missing`);
   if (!fs.existsSync(absolute)) return [];
   return JSON.parse(fs.readFileSync(absolute, 'utf8'));
+}
+
+function compareCollector(left = '', right = '') {
+  return String(left || '').localeCompare(String(right || ''), undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function isCollectorOrdered(cards = []) {
+  for (let index = 1; index < cards.length; index += 1) {
+    if (compareCollector(cards[index - 1].collector_number, cards[index].collector_number) > 0) return false;
+  }
+  return true;
 }
 
 const routeFile = fs.readFileSync(path.join(repoRoot, 'src/App.jsx'), 'utf8');
@@ -59,8 +82,26 @@ for (const game of ENCYCLOPEDIA_GAMES) {
   if (game.id === 'magic') {
     const manifest = readJson('public/data/mtg/manifest.json');
     const liteManifest = readJson('public/data/mtg/search-lite-manifest.json');
+    const printingManifest = readJson('public/data/mtg/printing-index-manifest.json');
+    const magicManifestEntry = encyclopediaManifest.games.magic;
     assert(Number(manifest.imported_cards || manifest.total_cards_seen || 0) > 0, 'magic has no manifest card count');
     assert(Object.keys(liteManifest.buckets || {}).length > 0, 'magic has no search-lite buckets');
+    assert(Object.keys(printingManifest.shards || {}).length > 0, 'magic has no printing-index shards');
+    assert(magicManifestEntry, 'magic missing encyclopedia generated manifest entry');
+    assert(Number(magicManifestEntry.setCount || 0) > 0, 'magic has no encyclopedia set shards');
+    assert(Number(magicManifestEntry.encyclopediaCardCount || 0) > 0, 'magic has no encyclopedia card rows');
+    for (const expectedSet of MTG_REPRESENTATIVE_SETS) {
+      const shard = readJson(`public/data/encyclopedia/magic/sets/${expectedSet.slug}.json`);
+      assert(shard?.game === 'magic', `magic:${expectedSet.code} sample shard has wrong game`);
+      assert(shard?.set?.code === expectedSet.code, `magic:${expectedSet.code} shard code mismatch`);
+      assert(Array.isArray(shard?.cards), `magic:${expectedSet.code} shard has no cards array`);
+      const cards = Array.isArray(shard?.cards) ? shard.cards : [];
+      assert(cards.length >= expectedSet.minCards, `magic:${expectedSet.code} shard is incomplete: ${cards.length} cards`);
+      assert(cards.every((card) => card.id && card.name && card.card_number && card.set_code === expectedSet.code), `magic:${expectedSet.code} shard has incomplete card identity`);
+      assert(cards.every((card) => card.encyclopediaCard === true), `magic:${expectedSet.code} shard cards must be marked as encyclopedia cards`);
+      assert(cards.some((card) => card.image_url), `magic:${expectedSet.code} shard has no card images`);
+      assert(isCollectorOrdered(cards), `magic:${expectedSet.code} shard is not in collector order`);
+    }
   } else {
     const cards = readJson(`public/data/${game.assetGame}/cards.json`);
     assert(Array.isArray(cards) && cards.length > 0, `${game.id} has no public cards`);

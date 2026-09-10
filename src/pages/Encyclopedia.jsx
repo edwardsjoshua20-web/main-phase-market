@@ -54,12 +54,7 @@ function GameLogo({ game }) {
 
 function GameIdentityMark({ game }) {
   if (game.id === 'magic') {
-    return (
-      <div className="flex items-center gap-3 text-white/86">
-        <span className="flex h-10 w-10 items-center justify-center border border-white/20 bg-white/10 text-sm font-black leading-none">MTG</span>
-        <span className="text-sm font-black uppercase tracking-[0.18em] text-white/72">Magic</span>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -70,17 +65,21 @@ function GameIdentityMark({ game }) {
 }
 
 function GameHero({ game, eyebrow = 'TCG Encyclopedia' }) {
+  const showIdentityMark = game.id !== 'magic';
+
   return (
     <section className={`bg-gradient-to-br ${game.tintClassName} text-white`}>
-      <SectionShell className="grid gap-4 py-5 md:grid-cols-[minmax(0,1fr)_220px] md:items-center md:py-6">
+      <SectionShell className={`grid gap-4 py-5 md:items-center md:py-6 ${showIdentityMark ? 'md:grid-cols-[minmax(0,1fr)_220px]' : ''}`}>
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/58">{eyebrow}</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">{game.label}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-white/74">{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
         </div>
-        <div className="flex min-h-10 items-center justify-start md:justify-end">
-          <GameIdentityMark game={game} />
-        </div>
+        {showIdentityMark ? (
+          <div className="flex min-h-10 items-center justify-start md:justify-end">
+            <GameIdentityMark game={game} />
+          </div>
+        ) : null}
       </SectionShell>
     </section>
   );
@@ -103,8 +102,11 @@ function SourceList({ sources = [], className = '' }) {
 }
 
 function SetRow({ set }) {
+  const location = useLocation();
+  const returnTo = `${location.pathname}${location.search}`;
+
   return (
-    <Link to={set.path} className="grid grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-4 py-3 hover:bg-white">
+    <Link to={set.path} state={{ encyclopediaReturnTo: returnTo }} className="grid grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-4 py-3 hover:bg-white">
       <div className="flex h-10 w-10 items-center justify-center bg-white">
         {set.imageUrl ? <img src={set.imageUrl} alt="" className="max-h-8 max-w-8 object-contain" /> : <Layers className="h-5 w-5 text-slate-400" />}
       </div>
@@ -447,9 +449,11 @@ function fieldLabel(key) {
 }
 
 function SetDetailPage({ game, setSlug }) {
+  const location = useLocation();
   const [query, setQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState({});
   const [visibleLimit, setVisibleLimit] = useState(120);
+  const returnTo = location.state?.encyclopediaReturnTo || `/Encyclopedia/${game.routeKey}`;
   const { data: detail, isLoading } = useQuery({
     queryKey: ['encyclopedia-set-detail', game.id, setSlug],
     queryFn: () => gameKnowledgeOwner.resolveSet(game.id, setSlug),
@@ -489,11 +493,15 @@ function SetDetailPage({ game, setSlug }) {
         <div className="min-w-0">
           <div className="flex flex-col gap-5 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{detail.setCode || game.shortLabel}</p>
-            <h2 className="mt-2 text-3xl font-black tracking-tight">{detail.name}</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              {detail.cardCatalog?.knownLabel || `${setCards.length} known cards`} in collector order.
-            </p>
+              <Link to={returnTo} className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-slate-500 hover:text-slate-900">
+                <span aria-hidden="true">&larr;</span>
+                {game.shortLabel || game.label} Sets
+              </Link>
+              <p className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{detail.setCode || game.shortLabel}</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight">{detail.name}</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                {detail.cardCatalog?.knownLabel || `${setCards.length} known cards`} in collector order.
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link to={detail.legacySetPath}>

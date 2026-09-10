@@ -1,6 +1,10 @@
+import { getPublicAssetUrl } from '@/config/publicAssetUrls';
+
 function cleanUrl(value) {
   const url = String(value || '').trim();
-  return url && url !== 'null' && url !== 'undefined' ? url : null;
+  if (!url || url === 'null' || url === 'undefined') return null;
+  if (/^\/?data\//i.test(url)) return getPublicAssetUrl(url.replace(/^\/+/, ''));
+  return url;
 }
 
 function extractUuidFromText(value) {
