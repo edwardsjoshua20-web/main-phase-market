@@ -29,7 +29,7 @@ const MAGIC_REFERENCE_GROUP_LABELS = {
 };
 
 function SectionShell({ children, className = '' }) {
-  return <section className={`mx-auto w-full max-w-[100vw] overflow-x-hidden px-4 2xl:max-w-[1480px] ${className}`}>{children}</section>;
+  return <section className={`mx-auto box-border w-full max-w-[100vw] overflow-x-hidden px-4 2xl:max-w-[1480px] ${className}`}>{children}</section>;
 }
 
 function LoadingState() {
@@ -722,13 +722,13 @@ function LessonVisual({ visual }) {
 
 function ArticleBody({ article }) {
   return (
-    <div className="mt-8 space-y-8">
+    <div className="mt-8 min-w-0 max-w-full space-y-8 overflow-x-hidden">
       {(article?.sections || []).map((section) => (
-        <section key={section.heading} className="border-t border-slate-200 pt-5">
+        <section key={section.heading} className="min-w-0 max-w-full border-t border-slate-200 pt-5">
           <h3 className="text-xl font-black tracking-tight text-slate-950">{section.heading}</h3>
           <div className="mt-3 space-y-3">
             {(section.body || []).map((paragraph, index) => (
-              <p key={`${section.heading}-${index}`} className="break-words text-sm leading-7 text-slate-700">{paragraph}</p>
+              <p key={`${section.heading}-${index}`} className="w-full max-w-full break-words text-sm leading-7 text-slate-700">{paragraph}</p>
             ))}
           </div>
           {section.example && (
@@ -876,7 +876,7 @@ function RulesPage({ game, topicSlug }) {
     .slice(0, 6);
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
+    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
       <GameHero game={game} eyebrow="Encyclopedia rules" />
       <SectionShell className="grid min-w-0 gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 max-w-full break-words">
