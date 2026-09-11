@@ -238,13 +238,17 @@ function buildMagicLearnArticle(title, options = {}) {
     terminology: terms,
     sections: options.sections || [
       {
-        heading: 'The Core Idea',
+        heading: 'What This Means',
         body: options.core || []
       },
       {
-        heading: 'How It Works At The Table',
-        body: options.steps || [],
+        heading: 'What You Do At The Table',
+        body: options.physical || options.steps || [],
         example: options.example
+      },
+      {
+        heading: 'How It Works In The Rules',
+        body: options.rules || options.steps || []
       },
       {
         heading: 'Beginner Checks',
@@ -284,7 +288,7 @@ function magicLearnLesson(order, topicId, title, summary, options = {}) {
 function buildMagicReferenceArticle(title, summary, options = {}) {
   const terms = topicTerms(options.officialTerms || []);
   return {
-    introduction: options.introduction || `${summary} This reference page keeps the concept searchable for real table questions while staying short enough to use during a game.`,
+    introduction: options.introduction || `${summary} Use this when a table question turns on ${terms}, timing, zones, costs, or how multiple effects interact.`,
     terminology: options.officialTerms || [],
     sections: options.sections || [
       {
@@ -347,7 +351,7 @@ function ruleTopic(gameId, sectionId, topicId, title, summary, sourceLabels, opt
     summary,
     officialTerms: options.officialTerms || [],
     sourceLabels,
-    version: options.version || 'Official page verified September 10, 2026',
+    version: options.version || 'Official page verified September 11, 2026',
     category: options.category || 'reference',
     learningTrack: options.learningTrack || null,
     referenceGroup: options.referenceGroup || null,
@@ -416,7 +420,14 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         type: 'card-anatomy',
         title: 'Read a real Magic card',
         oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.serraAngel],
-        callouts: ['Name', 'Mana cost', 'Type line', 'Rules text', 'Power / Toughness']
+        callouts: [
+          { label: 'Name', detail: 'The card title is the game object name and matters for copy limits and effects that name a card.' },
+          { label: 'Mana Cost', detail: 'The upper-right symbols tell you what mana to pay and usually determine the card colors.' },
+          { label: 'Type Line', detail: 'Creature tells you this can attack and block after it resolves; Angel is a subtype.' },
+          { label: 'Rules Text', detail: 'Flying and vigilance are keyword abilities that change combat and tapping.' },
+          { label: 'Power / Toughness', detail: '4/4 means it assigns 4 combat damage and needs 4 damage marked to be lethal.' },
+          { label: 'Collector Info', detail: 'Set code and collector number identify this printing for browsing and collecting.' }
+        ]
       }
     }),
     magicLearnLesson(4, 'learn-mana-and-colors', 'Mana and the Five Colors', 'Mana pays for spells and abilities, and Magic uses white, blue, black, red, green, generic, and true colorless costs in distinct ways.', {
@@ -434,7 +445,12 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         title: 'Paying a spell cost',
         oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.island, MAGIC_TEACHING_CARD_ORACLE_IDS.solRing, MAGIC_TEACHING_CARD_ORACLE_IDS.cancel],
         cost: '{1}{U}{U}',
-        steps: ['Tap Island for {U}', 'Tap another blue source for {U}', 'Use any remaining mana for the generic {1}', 'Put Cancel on the stack after costs are paid']
+        steps: [
+          { label: 'Colored mana', detail: 'Cancel needs two blue mana symbols. Tap Islands or other blue sources to make the {U}{U} portion.' },
+          { label: 'Generic mana', detail: 'The {1} is generic. Any type of mana can pay it, including mana from an artifact such as Sol Ring.' },
+          { label: 'True colorless', detail: 'Colorless mana such as {C} is a kind of mana, not the same as a numbered generic cost.' },
+          { label: 'After payment', detail: 'Once choices are made and costs are paid, the spell waits on the stack for responses.' }
+        ]
       }
     }),
     magicLearnLesson(5, 'learn-card-types', 'Card Types', 'Magic card types determine timing, whether a spell becomes a permanent, and where a card goes after it resolves.', {
@@ -494,7 +510,18 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       visual: {
         type: 'turn-timeline',
         title: 'Turn structure',
-        steps: ['Beginning: untap, upkeep, draw', 'First main: lands and sorcery-speed plays', 'Combat: attackers, blockers, damage', 'Second main: another main phase', 'Ending: end step, cleanup']
+        phases: [
+          { label: 'Beginning Phase', detail: 'Untap your tapped permanents, handle upkeep triggers, then draw a card.' },
+          { label: 'Untap', detail: 'The active player untaps. Players normally do not get priority during this step.' },
+          { label: 'Upkeep', detail: 'Upkeep triggers are put on the stack and players may respond after they are ordered.' },
+          { label: 'Draw', detail: 'The active player draws, then players can act when priority is given.' },
+          { label: 'First Main', detail: 'Play a land if available and cast sorcery-speed spells while the stack is empty.' },
+          { label: 'Combat', detail: 'Move through attackers, blockers, combat damage, and combat-end priority windows.' },
+          { label: 'Second Main', detail: 'Works like the first main phase, but the normal land play may already be spent.' },
+          { label: 'Ending Phase', detail: 'End step triggers and cleanup finish the turn.' },
+          { label: 'End Step', detail: 'End-of-turn triggers happen and players can respond.' },
+          { label: 'Cleanup', detail: 'Damage is removed, hand size is checked, and most turns end without priority here.' }
+        ]
       }
     }),
     magicLearnLesson(10, 'learn-casting-spells', 'Playing Lands and Casting Spells', 'Playing a land is a special action; casting a spell means announcing it, making choices, paying costs, and putting it on the stack.', {
@@ -522,7 +549,13 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         type: 'combat',
         title: 'Combat damage example',
         oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.grizzlyBears, MAGIC_TEACHING_CARD_ORACLE_IDS.hillGiant, MAGIC_TEACHING_CARD_ORACLE_IDS.colossalDreadmaw, MAGIC_TEACHING_CARD_ORACLE_IDS.typhoidRats],
-        steps: ['Declare Hill Giant as an attacker', 'Defending player blocks with Grizzly Bears', 'Both creatures assign combat damage', 'State-based actions put the creature with lethal damage into the graveyard']
+        steps: [
+          { label: 'Attacker', detail: 'Hill Giant is a 3/3. If it has been under your control since your turn began, you can declare it as an attacker and tap it.' },
+          { label: 'Blocker', detail: 'The defending player can block with an untapped Grizzly Bears, a 2/2 creature.' },
+          { label: 'Damage', detail: 'They deal damage at the same time: Hill Giant deals 3 to the Bears, and the Bears deals 2 to Hill Giant.' },
+          { label: 'Result', detail: 'The Bears has lethal damage and dies. Hill Giant survives with damage marked until cleanup.' },
+          { label: 'Windows', detail: 'Players get priority before blockers, after blockers, after first-strike damage if any, and after regular damage.' }
+        ]
       }
     }),
     magicLearnLesson(12, 'learn-instants-and-responses', 'Instants and Responses', 'Instants and many activated abilities can be used when a player has priority, letting players answer spells and combat decisions before they resolve.', {
@@ -539,7 +572,12 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         type: 'stack',
         title: 'A response sits above the original spell',
         oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.lightningBolt, MAGIC_TEACHING_CARD_ORACLE_IDS.counterspell],
-        stack: ['Counterspell resolves first', 'Lightning Bolt is countered if Counterspell resolves', 'The original target is affected only if Lightning Bolt still resolves']
+        stack: [
+          { label: 'Original spell', detail: 'Lightning Bolt is cast and placed on the stack targeting a creature or player.' },
+          { label: 'Response', detail: 'Counterspell is cast in response and goes on top of Lightning Bolt.' },
+          { label: 'Top resolves first', detail: 'If all players pass, Counterspell resolves first and counters Lightning Bolt.' },
+          { label: 'Lower object', detail: 'Lightning Bolt resolves only if it is still on the stack and still has legal targets.' }
+        ]
       }
     }),
     magicLearnLesson(13, 'learn-stack', 'The Stack', 'The stack is the waiting area for spells and most abilities; the newest object resolves first after all players pass priority.', {
@@ -556,7 +594,12 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         type: 'stack',
         title: 'Top object resolves first',
         oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.lightningBolt, MAGIC_TEACHING_CARD_ORACLE_IDS.counterspell, MAGIC_TEACHING_CARD_ORACLE_IDS.cancel],
-        stack: ['Cancel or Counterspell on top', 'Lightning Bolt underneath', 'After the top object resolves, players get priority again']
+        stack: [
+          { label: 'Bottom', detail: 'Lightning Bolt is the older object on the stack.' },
+          { label: 'Top', detail: 'Cancel or Counterspell is the newer response and resolves before the Bolt.' },
+          { label: 'One at a time', detail: 'Only the top object resolves after all players pass. The rest of the stack waits.' },
+          { label: 'Priority returns', detail: 'After one object resolves, players may respond again before the next object resolves.' }
+        ]
       }
     }),
     magicLearnLesson(14, 'learn-abilities-and-triggers', 'Abilities and Triggers', 'Magic abilities are static, activated, triggered, or mana abilities, and each type behaves differently at the table.', {
@@ -573,7 +616,13 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         type: 'trigger',
         title: 'Triggered ability words',
         oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.soulWarden, MAGIC_TEACHING_CARD_ORACLE_IDS.alesha],
-        triggerWords: ['When', 'Whenever', 'At']
+        triggerWords: [
+          { label: 'When', detail: 'A triggered ability can start with when and waits for a specific event.' },
+          { label: 'Whenever', detail: 'Whenever marks a repeatable trigger, such as Soul Warden seeing another creature enter.' },
+          { label: 'At', detail: 'At usually points to a step, phase, or moment in turn structure.' },
+          { label: 'Stack', detail: 'After the event occurs, the trigger is put on the stack the next time a player would get priority.' },
+          { label: 'Response', detail: 'Players may respond to the trigger before it resolves unless the ability is a mana ability or another exception applies.' }
+        ]
       }
     }),
     magicLearnLesson(15, 'learn-winning-and-losing', 'Winning and Losing', 'Common Magic losses happen at 0 or less life, drawing from an empty library, having enough poison counters, card-specific effects, or concession.', {
@@ -629,7 +678,18 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         { heading: 'Common Pitfalls', body: ['Do not resolve a spell just because it was announced. Opponents still get priority before it resolves.', 'Do not assume the nonactive player acts first because they might want to respond. Priority starts with the active player at the normal priority points.'] }
       ]
     }),
-    magicReferenceTopic('timing', 2, 'reference-stack', 'Stack', 'The stack orders spells and most abilities so the newest object resolves first after all players pass priority.', { officialTerms: ['Stack', 'Spell', 'Activated ability', 'Triggered ability', 'Resolve'], relatedTopics: ['learn-stack', 'reference-priority'], definition: 'The stack is a zone used by spells and most nonmana abilities. Objects on the stack resolve one at a time from top to bottom.', application: ['When a player responds, the response goes above the existing object. That response can counter, change targets, add damage, create prevention, or otherwise change what the lower object will do.', 'After a stack object resolves, the active player receives priority. The next object waits until all players pass again.'], example: 'Example: Counterspell cast in response to a creature spell resolves first and can counter that creature spell before it becomes a permanent.' }),
+    magicReferenceTopic('timing', 2, 'reference-stack', 'Stack', 'The stack orders spells and most abilities so the newest object resolves first after all players pass priority.', {
+      officialTerms: ['Stack', 'Spell', 'Activated ability', 'Triggered ability', 'Resolve'],
+      aliases: ['LIFO', 'respond', 'response order', 'spell stack'],
+      searchTerms: ['last in first out', 'top object resolves first', 'activated ability', 'triggered ability', 'mana ability', 'playing a land'],
+      relatedTopics: ['learn-stack', 'reference-priority'],
+      sections: [
+        { heading: 'Definition', body: ['The stack is a game zone where spells and most activated or triggered abilities wait to resolve. It lets players respond before the original object has its effect.', 'Objects on the stack resolve last-in, first-out. The newest object is on top, and only the top object can resolve after every player passes priority.'] },
+        { heading: 'What Goes On It', body: ['Cast spells go on the stack unless a rule or effect says otherwise. Activated abilities usually go on the stack after their costs are paid, and triggered abilities are put on the stack after their trigger event is noticed at the next appropriate priority point.', 'Playing a land, paying costs, turning some face-down permanents face up, and most mana abilities generally do not use the stack. Those actions cannot be answered in the same way a spell can be answered.'] },
+        { heading: 'Resolving Objects', body: ['When all players pass priority in succession, the top object resolves. Then state-based actions are checked, triggered abilities waiting to be put on the stack are handled, and the active player receives priority again.', 'The stack does not empty all at once. Objects resolve one at a time, and players can respond between each object resolving, which is why a two-spell stack can become a longer exchange.'], example: 'Example: Lightning Bolt is cast, then Counterspell is cast in response. Counterspell resolves first. If it counters Lightning Bolt, the Bolt never deals damage.' },
+        { heading: 'Common Pitfalls', body: ['Do not treat the stack like a batch that resolves automatically from top to bottom. Priority returns after each object resolves.', 'Do not put lands or ordinary mana production on the stack. A player can respond to the spell being paid for, but not to the mana ability used to pay for it in the usual case.'] }
+      ]
+    }),
     magicReferenceTopic('timing', 3, 'reference-timing-permissions', 'Timing Permissions', 'Timing permissions define when lands, sorceries, permanents, instants, activated abilities, and special actions can be used.', { officialTerms: ['Sorcery timing', 'Instant timing', 'Special action', 'Land play'], relatedTopics: ['learn-taking-your-turn', 'learn-casting-spells'] }),
     magicReferenceTopic('timing', 4, 'reference-state-based-actions', 'State-Based Actions', 'State-based actions are automatic checks that handle lethal damage, 0 life, illegal attachments, zero loyalty, and similar game states.', {
       officialTerms: ['State-based action', 'Lethal damage', 'Zero life', 'Legend rule'],
@@ -643,16 +703,71 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         { heading: 'Common Pitfalls', body: ['Do not try to respond to state-based actions. You can act before the game reaches the check, but not during the automatic check itself.', 'Do not confuse a state-based action with a triggered ability. A trigger uses the stack; a state-based action simply happens when checked.'] }
       ]
     }),
-    magicReferenceTopic('timing', 5, 'reference-triggered-abilities', 'Triggered Abilities', 'Triggered abilities begin with when, whenever, or at and wait to go on the stack after their trigger event occurs.', { officialTerms: ['Triggered ability', 'Trigger event', 'Intervening if'], relatedTopics: ['learn-abilities-and-triggers', 'reference-simultaneous-triggers'] }),
-    magicReferenceTopic('timing', 6, 'reference-replacement-effects', 'Replacement Effects', 'Replacement and prevention effects modify events before they happen instead of triggering after the event.', { officialTerms: ['Replacement effect', 'Prevention effect', 'Instead', 'Skip'], relatedTopics: ['reference-triggered-abilities', 'reference-continuous-effects'] }),
-    magicReferenceTopic('timing', 7, 'reference-continuous-effects', 'Continuous Effects', 'Continuous effects modify objects, players, or rules for a duration or while a static ability applies.', { officialTerms: ['Continuous effect', 'Duration', 'Static ability'], relatedTopics: ['reference-layers', 'reference-dependency-timestamp'] }),
+    magicReferenceTopic('timing', 5, 'reference-triggered-abilities', 'Triggered Abilities', 'Triggered abilities begin with when, whenever, or at and wait to go on the stack after their trigger event occurs.', {
+      officialTerms: ['Triggered ability', 'Trigger event', 'Intervening if'],
+      aliases: ['when trigger', 'whenever trigger', 'at trigger', 'dies trigger'],
+      searchTerms: ['trigger goes on stack', 'intervening if', 'missed trigger', 'dies', 'enters'],
+      relatedTopics: ['learn-abilities-and-triggers', 'reference-simultaneous-triggers'],
+      sections: [
+        { heading: 'Definition', body: ['A triggered ability is written with when, whenever, or at. It waits for its trigger event, then is put on the stack the next time a player would receive priority.', 'A trigger is not a choice to activate unless the text says may or gives a choice during resolution. Mandatory triggers happen even when they are inconvenient.'] },
+        { heading: 'Timing', body: ['Triggers do not interrupt the middle of another spell or action. Finish the current event, check state-based actions, then put waiting triggers on the stack in the required order.', 'If multiple players control triggers waiting at the same time, APNAP ordering and controller choices determine how they are placed on the stack.'], example: 'Example: Soul Warden triggers when another creature enters. The trigger waits, goes on the stack, and players can respond before its controller gains life.' },
+        { heading: 'Intervening If', body: ['Some triggered abilities contain an intervening if condition. That condition must be true both when the ability would trigger and when it resolves.', 'If the condition is false at either point, the ability either never goes on the stack or does not resolve.'] },
+        { heading: 'Common Pitfalls', body: ['Do not confuse a dies trigger with the creature dying. The creature moves as part of the event or state-based action; the trigger is handled afterward.', 'Do not respond before a triggered ability is put on the stack unless you are acting in an earlier priority window.'] }
+      ]
+    }),
+    magicReferenceTopic('timing', 6, 'reference-replacement-effects', 'Replacement Effects', 'Replacement and prevention effects modify events before they happen instead of triggering after the event.', {
+      officialTerms: ['Replacement effect', 'Prevention effect', 'Instead', 'Skip'],
+      aliases: ['instead effect', 'prevent damage', 'would happen'],
+      searchTerms: ['replacement', 'prevention', 'instead', 'skip', 'damage prevention'],
+      relatedTopics: ['reference-triggered-abilities', 'reference-continuous-effects'],
+      sections: [
+        { heading: 'Definition', body: ['Replacement effects watch for an event that would happen and change that event before it happens. Prevention effects are a common subset that stop or reduce damage before it is dealt.', 'These effects often use words such as instead, skip, prevent, or enters with. The important distinction is that they modify the event rather than waiting to trigger afterward.'] },
+        { heading: 'Applying The Effect', body: ['Identify the event that is about to happen, then apply applicable replacement or prevention effects before the event occurs. If more than one applies, the affected object or player often chooses among applicable effects unless a rule gives a specific order.', 'After a replacement effect changes an event, check again for other replacement effects that now apply to the modified event. A single replacement effect usually cannot apply to the same event more than once.'], example: 'Example: if damage would be dealt and an effect prevents that damage, damage is never marked and damage-triggered abilities that require damage dealt do not trigger.' },
+        { heading: 'Interaction With Triggers', body: ['Replacement effects happen before the event. Triggered abilities look back after an event happens. If the replacement effect changes or prevents the event, the trigger may see a different event or no event at all.', 'This is why instead effects can stop death triggers, enter-the-battlefield triggers, or damage triggers depending on what event was replaced.'] },
+        { heading: 'Common Pitfalls', body: ['Do not put replacement effects on the stack as though they were triggered abilities.', 'Do not apply an instead effect after the event has already happened; by then the window for replacement has passed.'] }
+      ]
+    }),
+    magicReferenceTopic('timing', 7, 'reference-continuous-effects', 'Continuous Effects', 'Continuous effects modify objects, players, or rules for a duration or while a static ability applies.', {
+      officialTerms: ['Continuous effect', 'Duration', 'Static ability'],
+      aliases: ['ongoing effect', 'static modifier', 'until end of turn'],
+      searchTerms: ['continuous effect', 'duration', 'static ability', 'layers', 'timestamp'],
+      relatedTopics: ['reference-layers', 'reference-dependency-timestamp'],
+      sections: [
+        { heading: 'Definition', body: ['A continuous effect changes objects, players, or rules for a stated duration or for as long as a static ability applies. It does not resolve repeatedly; once created, it keeps applying while its duration or source permits it.', 'Continuous effects can come from static abilities, resolving spells or abilities, replacement effects that set up a duration, or rules built into the game.'] },
+        { heading: 'Duration And Source', body: ['Some effects last until end of turn, as long as a permanent remains on the battlefield, while a card is in a zone, or for the rest of the game. The duration tells you when to stop applying it.', 'Removing the source stops a static ability from applying, but it does not automatically end a continuous effect already created by a resolving spell or ability unless that effect depends on the source remaining.'] },
+        { heading: 'Layer Interaction', body: ['When multiple continuous effects affect the same object, use layers to order them. If they are in the same layer, dependency and timestamp may decide the order.', 'Power/toughness effects are the common beginner collision point: base setting, counters, bonuses, and switches do not all apply at the same time in a casual intuition order.'] },
+        { heading: 'Common Pitfalls', body: ['Do not treat every ongoing text as a trigger. Static abilities and continuous effects often simply apply.', 'Do not use timestamp until you know the effects are in the same layer and no dependency changes the order.'] }
+      ]
+    }),
     magicReferenceTopic('turn-combat', 1, 'reference-turn-structure', 'Turn Structure', 'Turn structure covers beginning, precombat main, combat, postcombat main, and ending phases with their steps and priority windows.', { officialTerms: ['Beginning phase', 'Precombat main phase', 'Combat phase', 'Postcombat main phase', 'Ending phase'], relatedTopics: ['learn-taking-your-turn', 'reference-priority'] }),
     magicReferenceTopic('turn-combat', 2, 'reference-combat-steps', 'Combat Steps', 'Combat has beginning of combat, declare attackers, declare blockers, combat damage, and end of combat steps.', { officialTerms: ['Beginning of combat', 'Declare attackers', 'Declare blockers', 'Combat damage', 'End of combat'], relatedTopics: ['learn-combat', 'reference-attacking', 'reference-blocking'] }),
     magicReferenceTopic('turn-combat', 3, 'reference-attacking', 'Attacking', 'Attacking declares eligible creatures as attackers against players, planeswalkers, or battles and taps them unless an effect says otherwise.', { officialTerms: ['Declare attackers', 'Attacking creature', 'Tapped and attacking'], relatedTopics: ['reference-combat-steps', 'reference-summoning-sickness'] }),
     magicReferenceTopic('turn-combat', 4, 'reference-summoning-sickness', 'Summoning Sickness', 'A creature normally cannot attack or use tap or untap abilities unless its controller has controlled it continuously since their most recent turn began.', { officialTerms: ['Summoning sickness', 'Tap symbol', 'Untap symbol', 'Haste'], relatedTopics: ['learn-combat', 'reference-attacking'] }),
     magicReferenceTopic('turn-combat', 5, 'reference-blocking', 'Blocking', 'Blocking assigns untapped creatures to attacking creatures during the declare blockers step.', { officialTerms: ['Declare blockers', 'Blocking creature', 'Blocked creature', 'Unblocked creature'], relatedTopics: ['reference-attacking', 'reference-combat-damage'] }),
-    magicReferenceTopic('turn-combat', 6, 'reference-combat-damage', 'Combat Damage', 'Combat damage is assigned and dealt by attacking and blocking creatures, then state-based actions handle lethal damage.', { officialTerms: ['Combat damage', 'Assign damage', 'Lethal damage', 'Damage marked'], relatedTopics: ['learn-combat', 'reference-state-based-actions'] }),
-    magicReferenceTopic('turn-combat', 7, 'reference-first-strike-double-strike', 'First Strike / Double Strike', 'First strike and double strike can create an additional combat damage step before regular combat damage.', { officialTerms: ['First strike', 'Double strike', 'Combat damage step'], relatedTopics: ['reference-combat-damage'] }),
+    magicReferenceTopic('turn-combat', 6, 'reference-combat-damage', 'Combat Damage', 'Combat damage is assigned and dealt by attacking and blocking creatures, then state-based actions handle lethal damage.', {
+      officialTerms: ['Combat damage', 'Assign damage', 'Lethal damage', 'Damage marked'],
+      aliases: ['damage step', 'creature dies in combat', 'assign lethal'],
+      searchTerms: ['combat damage', 'lethal damage', 'blocked creature', 'trample', 'deathtouch'],
+      relatedTopics: ['learn-combat', 'reference-state-based-actions', 'reference-first-strike-double-strike'],
+      sections: [
+        { heading: 'Definition', body: ['Combat damage is the damage attacking and blocking creatures assign during combat damage steps. It is different from noncombat damage dealt by spells or abilities.', 'Unblocked attacking creatures assign damage to the player, planeswalker, or battle they attacked. Blocked creatures and their blockers usually assign damage to each other.'] },
+        { heading: 'Assignment And Dealing', body: ['Creatures assign damage based on power unless an effect changes the amount. Damage is then dealt simultaneously within that combat damage step.', 'A blocked creature remains blocked even if all blockers leave combat before damage. Unless it has trample or another effect, it will not assign damage to the player it attacked.'], example: 'Example: a 3/3 blocked by a 2/2 deals 3 damage to the blocker and receives 2 damage back. The 2/2 has lethal damage and dies when state-based actions are checked.' },
+        { heading: 'Keywords That Change Damage', body: ['First strike and double strike can create an earlier combat damage step. Trample changes how excess damage may be assigned. Deathtouch changes what counts as lethal damage for assignment and state-based checks.', 'Damage remains marked on surviving creatures until cleanup, so later damage in the same turn can combine with earlier damage.'] },
+        { heading: 'Common Pitfalls', body: ['Do not remove creatures from combat damage immediately after blockers are declared. They die only after damage is dealt and state-based actions are checked.', 'Do not let a blocked attacker hit the defending player just because the blocker disappeared unless trample or another effect allows it.'] }
+      ]
+    }),
+    magicReferenceTopic('turn-combat', 7, 'reference-first-strike-double-strike', 'First Strike / Double Strike', 'First strike and double strike can create an additional combat damage step before regular combat damage.', {
+      officialTerms: ['First strike', 'Double strike', 'Combat damage step'],
+      aliases: ['first strike damage', 'double strike damage', 'extra damage step'],
+      searchTerms: ['first strike', 'double strike', 'combat damage step', 'regular damage'],
+      relatedTopics: ['reference-combat-damage'],
+      sections: [
+        { heading: 'Definition', body: ['First strike lets a creature deal combat damage in an earlier combat damage step. Double strike lets a creature deal damage in that earlier step and again in the regular combat damage step.', 'These abilities do not change when attackers and blockers are declared. They change how many combat damage steps happen and which creatures assign damage in those steps.'] },
+        { heading: 'Damage Steps', body: ['If any attacking or blocking creature has first strike or double strike as the combat damage step begins, the game creates a first-strike combat damage step. Creatures with first strike and double strike assign damage there.', 'After that, the regular combat damage step happens. Creatures with double strike and creatures that did not assign first-strike damage assign damage in the regular step if they are still in combat.'], example: 'Example: a 2/2 first striker blocked by a 2/2 without first strike can deal lethal damage before the regular damage step, so the blocker may die before it deals damage back.' },
+        { heading: 'Changing Abilities Midcombat', body: ['Gaining or losing first strike or double strike between combat damage steps can matter. Check what abilities the creature has at the relevant damage step.', 'Removing a creature from combat before a damage step means it will not assign combat damage in that step.'] },
+        { heading: 'Common Pitfalls', body: ['Do not make first strike deal extra damage. It changes timing, not power.', 'Do not forget that double strike can deal damage twice only if the creature remains in combat for both relevant damage steps.'] }
+      ]
+    }),
     magicReferenceTopic('card-rules', 1, 'reference-card-types', 'Card Types', 'Card types define the basic rules for lands, creatures, instants, sorceries, artifacts, enchantments, planeswalkers, and battles.', { officialTerms: ['Card type', 'Land', 'Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Planeswalker', 'Battle'], relatedTopics: ['learn-card-types'] }),
     magicReferenceTopic('card-rules', 2, 'reference-supertypes', 'Supertypes', 'Supertypes such as basic, legendary, snow, world, and ongoing add rules meaning above the card type.', { officialTerms: ['Supertype', 'Basic', 'Legendary', 'Snow'], relatedTopics: ['reference-card-types', 'reference-state-based-actions'] }),
     magicReferenceTopic('card-rules', 3, 'reference-subtypes', 'Subtypes', 'Subtypes such as creature types, land types, Equipment, Aura, Vehicle, and Siege matter when rules or card text refer to them.', { officialTerms: ['Subtype', 'Creature type', 'Land type', 'Aura', 'Equipment'], relatedTopics: ['reference-card-types'] }),
@@ -697,6 +812,13 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       definition: 'Color identity is a Commander deck construction rule. A card color identity includes its colors plus mana symbols and color indicators that the Commander rules count for identity.',
       application: ['A Commander deck can include only cards whose color identity fits within the commander color identity. Lands and colorless cards still need to obey this rule if their rules text contains mana symbols outside the commander identity.', 'Basic lands are allowed as repeated cards, but their mana symbols and land types still need to fit the commander deck color identity expectations.'],
       example: 'Example: a blue-red commander allows cards with blue, red, both, or no color identity, but not a card with a green mana symbol in its rules text unless an official exception applies.',
+      sections: [
+        { heading: 'Definition', body: ['Color identity is a Commander deck construction rule. It starts with the card colors, then adds colors from mana symbols in the mana cost and rules text, plus color indicators and characteristic-defining abilities that set color where relevant.', 'Color identity is determined before the game begins and does not change during the game, even if the commander changes color, loses abilities, or moves to a hidden zone.'] },
+        { heading: 'What Counts', body: ['Mana symbols in the mana cost count. Colored mana symbols in rules text also count, including activated ability costs and hybrid mana symbols. A card with a white-black hybrid symbol has both white and black in its color identity.', 'Color indicators and characteristic-defining abilities that define color can count. Color words such as blue or green in ordinary rules text do not add color identity by themselves.'] },
+        { heading: 'What Does Not Count', body: ['Reminder text is ignored for color identity. A mana symbol that appears only inside reminder text does not add that color to the card identity.', 'Flavor text, watermark, art, collector information, and color words without mana symbols do not add colors to the identity.'] },
+        { heading: 'Faces And Deck Legality', body: ['For double-faced cards and modal double-faced cards, check the whole card as required by Commander deck construction, not only the face you expect to cast most often.', 'A card can be included only if its color identity is contained within the commanders color identity. Colorless cards are allowed if no rules text or other identity-defining feature adds an outside color. A commander without green in its identity cannot include a card whose rules text contains a green mana symbol.'], example: 'Example: Alesha, Who Smiles at Death has a red mana cost and white/black hybrid symbols in rules text, so her color identity is red, white, and black.' },
+        { heading: 'Common Pitfalls', body: ['Do not confuse a cards current color in game with its Commander color identity. Continuous effects can change color during the game without changing deck legality.', 'Do not assume a basic land is legal just because it is a land. A land with a basic land type can imply a mana ability outside the commanders color identity and become illegal for that deck.'] }
+      ],
       visual: {
         type: 'commander-color-identity',
         title: 'Commander color identity example',
@@ -705,11 +827,59 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         blocked: ['Cards with blue symbols', 'Cards with green symbols']
       }
     }),
-    magicReferenceTopic('commander', 4, 'reference-command-zone', 'Command Zone', 'The command zone is where commanders begin the game and where special Commander replacement effects can move them.', { officialTerms: ['Command zone', 'Commander', 'Zone change'], relatedTopics: ['reference-commander', 'reference-commander-tax'], sourceLabels: ['Magic Commander format'] }),
-    magicReferenceTopic('commander', 5, 'reference-commander-tax', 'Commander Tax', 'Commander tax is the additional cost to cast a commander from the command zone for each previous time it was cast from there.', { officialTerms: ['Additional cost', 'Command zone', 'Cast from command zone'], relatedTopics: ['reference-command-zone', 'reference-costs'], sourceLabels: ['Magic Commander format'] }),
-    magicReferenceTopic('commander', 6, 'reference-commander-damage', 'Commander Damage', 'A player can lose from being dealt enough combat damage by the same commander over the course of the game.', { officialTerms: ['Commander damage', 'Combat damage', 'Lose the game'], relatedTopics: ['reference-commander', 'reference-combat-damage'], sourceLabels: ['Magic Commander format'] }),
+    magicReferenceTopic('commander', 4, 'reference-command-zone', 'Command Zone', 'The command zone is where commanders begin the game and where special Commander replacement effects can move them.', {
+      officialTerms: ['Command zone', 'Commander', 'Zone change'],
+      aliases: ['commander zone', 'send commander to command zone', 'commander replacement'],
+      searchTerms: ['command zone', 'graveyard', 'exile', 'hand', 'library', 'state-based actions'],
+      relatedTopics: ['reference-commander', 'reference-commander-tax'],
+      sourceLabels: ['Magic Commander format'],
+      sections: [
+        { heading: 'Definition', body: ['The command zone is a special zone used by Commander and a few other rules-managed objects. In Commander, each commander starts the game there instead of in the library.', 'A commander can be cast from the command zone using the normal casting process, with commander tax added when applicable. The commander remains the same commander across zone changes.'] },
+        { heading: 'Zone Changes', body: ['When a commander would go to hand or library, its owner may apply the Commander replacement effect and put it into the command zone instead. When it goes to graveyard or exile, it goes there first, then its owner may move it to the command zone the next time state-based actions are performed.', 'Because the graveyard/exile move happens first under current Commander rules, dies or exile triggers can still see the commander move to that zone before it returns to the command zone.'], example: 'Example: if your commander dies, it goes to the graveyard. Before anyone gets priority, state-based actions let you move it from the graveyard to the command zone.' },
+        { heading: 'Table Tracking', body: ['Keep the commander visible and track how many times each commander has been cast from the command zone. If a deck has two commanders, track each commander separately.', 'Abilities of a commander in the command zone usually do not affect the game unless the ability specifically says it functions there.'] },
+        { heading: 'Common Pitfalls', body: ['Do not put a destroyed commander directly into the command zone without checking whether a dies trigger or graveyard interaction matters.', 'Do not combine commander tax between partner commanders; each commander tracks its own command-zone casts.'] }
+      ]
+    }),
+    magicReferenceTopic('commander', 5, 'reference-commander-tax', 'Commander Tax', 'Commander tax is the additional cost to cast a commander from the command zone for each previous time it was cast from there.', {
+      officialTerms: ['Additional cost', 'Command zone', 'Cast from command zone'],
+      aliases: ['tax', 'commander additional cost', 'cast commander again'],
+      searchTerms: ['two generic', 'additional cost', 'alternative cost', 'partner commanders'],
+      relatedTopics: ['reference-command-zone', 'reference-costs'],
+      sourceLabels: ['Magic Commander format'],
+      sections: [
+        { heading: 'Definition', body: ['Commander tax is an additional cost applied when casting a commander from the command zone. It increases by two generic mana for each previous time that specific commander was cast from the command zone during the game.', 'The tax applies only to casting from the command zone. Moving a commander between other zones does not itself add tax.'] },
+        { heading: 'Cost Calculation', body: ['Start with the spell cost or alternative cost you are using, add commander tax, then apply other additional costs, cost increases, and cost reductions according to the normal cost rules.', 'If an effect lets you cast the commander without paying its mana cost, commander tax can still apply because it is an additional cost.'], example: 'Example: the third time you cast the same commander from the command zone, it costs four generic mana more than the chosen base cost before other modifiers.' },
+        { heading: 'Multiple Commanders', body: ['If you have two commanders, including partner commanders, each one tracks command-zone casts separately. Casting one commander does not increase the tax for the other.', 'A commander that changes controllers or zones is still the same commander for tracking damage and command-zone cast history.'] },
+        { heading: 'Common Pitfalls', body: ['Do not count times the commander was cast from hand, graveyard, exile, or another zone unless an effect explicitly changes that.', 'Do not treat commander tax as colored mana. It is generic additional mana and can be paid by any suitable mana.'] }
+      ]
+    }),
+    magicReferenceTopic('commander', 6, 'reference-commander-damage', 'Commander Damage', 'A player can lose from being dealt enough combat damage by the same commander over the course of the game.', {
+      officialTerms: ['Commander damage', 'Combat damage', 'Lose the game'],
+      aliases: ['21 commander damage', 'voltron damage', 'commander lethal'],
+      searchTerms: ['twenty one', 'combat damage', 'same commander', 'damage tracking'],
+      relatedTopics: ['reference-commander', 'reference-combat-damage'],
+      sourceLabels: ['Magic Commander format'],
+      sections: [
+        { heading: 'Definition', body: ['Commander damage is a Commander-specific loss condition. If a player has been dealt 21 or more combat damage by the same commander over the course of the game, that player loses.', 'Only combat damage counts. Damage from activated abilities, triggered abilities, or noncombat spell effects does not count as commander damage even if the commander is the source.'] },
+        { heading: 'Tracking', body: ['Track damage from each commander separately for each player. If there are partner commanders or a commander changes control, the damage is still tracked by the individual commander that dealt it.', 'Commander damage remains tracked even if the commander changes zones, changes controllers, or stops being a creature later.'], example: 'Example: taking 10 combat damage from one commander and 11 from another is not 21 from the same commander. Taking 21 combat damage from one commander over multiple combats is lethal.' },
+        { heading: 'Interaction With Combat', body: ['Prevention, replacement effects, and damage modification can change how much combat damage is actually dealt. Track the damage dealt after those effects apply.', 'Lifelink, deathtouch, double strike, and trample still work normally; commander damage is an additional tracking rule layered on top of combat damage.'] },
+        { heading: 'Common Pitfalls', body: ['Do not count life loss as commander damage. The commander has to deal combat damage.', 'Do not reset commander damage when the commander leaves the battlefield. The game tracks the commander as the same object for this rule.'] }
+      ]
+    }),
     magicReferenceTopic('commander', 7, 'reference-partner-background', 'Partner / Background / Special Commanders', 'Partner, Background, Doctor companion, and similar mechanics modify how commanders can be paired or selected when current card text permits it.', { officialTerms: ['Partner', 'Background', 'Choose a Background', 'Commander'], relatedTopics: ['reference-commander-selection', 'reference-color-identity'], sourceLabels: ['Magic Commander format'] }),
-    magicReferenceTopic('commander', 8, 'reference-commander-brackets-game-changers', 'Commander Brackets and Game Changers', 'Commander Brackets and Game Changers help players communicate deck experience, power, and table expectations before a casual Commander game.', { officialTerms: ['Commander Brackets', 'Game Changers', 'Bracket 1', 'Bracket 5'], relatedTopics: ['reference-commander', 'reference-deck-construction'], sourceLabels: ['Commander brackets beta update'] }),
+    magicReferenceTopic('commander', 8, 'reference-commander-brackets-game-changers', 'Commander Brackets and Game Changers', 'Commander Brackets and Game Changers help players communicate deck experience, power, and table expectations before a casual Commander game.', {
+      officialTerms: ['Commander Brackets', 'Game Changers', 'Bracket 1', 'Bracket 5'],
+      aliases: ['brackets', 'game changers list', 'commander power level'],
+      searchTerms: ['pregame conversation', 'deck experience', 'power level', 'game changers', 'infinite combo'],
+      relatedTopics: ['reference-commander', 'reference-deck-construction'],
+      sourceLabels: ['Commander brackets beta update'],
+      sections: [
+        { heading: 'Definition', body: ['Commander Brackets are a pregame communication tool for describing the kind of Commander experience a deck is trying to create. Game Changers are cards called out by the current Commander update process because they can strongly shape table expectations.', 'The bracket system does not replace the Commander rules for deck legality. It helps players decide whether decks belong at the same casual table.'] },
+        { heading: 'How To Use Them', body: ['Before a game, tell the table what bracket your deck is built for and whether it includes Game Changers, fast mana, tutors, repeated extra turns, mass land denial, or deterministic combo lines.', 'Use the conversation to match expectations. Brackets 1 through 3 are generally social-game guidance, while higher brackets signal stronger or more competitive experiences.'], example: 'Example: a deck with a major Game Changer or compact infinite combo may need a different pod than a precon-level deck even if both are technically legal Commander decks.' },
+        { heading: 'Current Update Context', body: ['Wizards official Commander updates in 2026 continue to treat brackets and Game Changers as living tools. Specific cards can move as the format team receives feedback.', 'Because the list can change, use the official Commander update page for the current list before an event or a store league that relies on brackets.'] },
+        { heading: 'Common Pitfalls', body: ['Do not use brackets as a replacement for talking about how the deck actually wins.', 'Do not assume every legal deck is welcome in every casual pod. The point is table agreement before the game starts.'] }
+      ]
+    }),
     magicReferenceTopic('commander', 9, 'reference-commander-banned-list', 'Commander Banned List', 'Commander legality depends on current official Commander banned-list updates and format documents.', { officialTerms: ['Banned list', 'Commander', 'Legality'], relatedTopics: ['reference-commander', 'reference-commander-brackets-game-changers'], sourceLabels: ['Magic Commander format', 'Commander brackets beta update'] })
   ],
   pokemon: [

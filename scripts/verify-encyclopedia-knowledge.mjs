@@ -84,6 +84,19 @@ function assertTopicIncludes(topic, words = []) {
   }
 }
 
+function assertTopicCoverage(slug, required = []) {
+  const topic = (ENCYCLOPEDIA_RULE_TOPICS.magic || []).find((entry) => entry.slug === slug);
+  assert(topic, `Magic topic ${slug} is missing`);
+  assertTopicIncludes(topic, required);
+  assert(Array.isArray(topic?.article?.sections) && topic.article.sections.length >= 4, `Magic topic ${slug} needs at least four meaningful sections`);
+  assert((topic?.article?.sections || []).every((section) => section.heading && Array.isArray(section.body) && section.body.length >= 2), `Magic topic ${slug} has shallow section content`);
+}
+
+function textForTopic(slug) {
+  const topic = (ENCYCLOPEDIA_RULE_TOPICS.magic || []).find((entry) => entry.slug === slug);
+  return rulesArticleText(topic).toLowerCase();
+}
+
 const routeFile = fs.readFileSync(path.join(repoRoot, 'src/App.jsx'), 'utf8');
 for (const route of requiredRoutes) {
   assert(routeFile.includes(`path="${route}"`) || routeFile.includes(`path='${route}'`), `Route missing: ${route}`);
@@ -230,9 +243,29 @@ assert(ENCYCLOPEDIA_GAMES.length === 7, `Expected 7 games, found ${ENCYCLOPEDIA_
 const magicTopics = ENCYCLOPEDIA_RULE_TOPICS.magic || [];
 const magicLearnTopics = magicTopics.filter((topic) => topic.category === 'learn');
 const magicReferenceTopics = magicTopics.filter((topic) => topic.category === 'reference');
+const expectedLearnSequence = [
+  'learn-what-is-magic',
+  'learn-what-you-need',
+  'learn-understanding-a-card',
+  'learn-mana-and-colors',
+  'learn-card-types',
+  'learn-setting-up',
+  'learn-zones',
+  'learn-starting-hand-and-mulligans',
+  'learn-taking-your-turn',
+  'learn-casting-spells',
+  'learn-combat',
+  'learn-instants-and-responses',
+  'learn-stack',
+  'learn-abilities-and-triggers',
+  'learn-winning-and-losing',
+  'learn-building-first-deck',
+  'learn-where-to-go-next'
+];
 assert(magicLearnTopics.length >= 17, 'Magic Learn to Play hierarchy is incomplete');
 assert(magicReferenceTopics.length >= 40, 'Magic Rules Reference hierarchy is incomplete');
 assert(new Set(magicLearnTopics.map((topic) => topic.order)).size === magicLearnTopics.length, 'Magic Learn to Play order values must be unique');
+assert(expectedLearnSequence.every((slug, index) => magicLearnTopics.find((topic) => topic.slug === slug && topic.order === index + 1)), 'Magic Learn to Play sequence must match the required beginner journey');
 assert(magicLearnTopics.some((topic) => topic.slug === 'learn-instants-and-responses'), 'Magic Learn to Play must split Instants and Responses into its own lesson');
 assert(magicLearnTopics.some((topic) => topic.slug === 'learn-stack'), 'Magic Learn to Play must split The Stack into its own lesson');
 assert(!magicLearnTopics.some((topic) => topic.slug === 'learn-stack-and-responses'), 'Magic Learn to Play must not keep the obsolete combined stack lesson');
@@ -245,19 +278,60 @@ for (const topic of magicTopics) {
   for (const oracleId of topic.visual?.oracleIds || []) {
     assert(teachingOracleIds.has(oracleId), `Magic visual ${topic.slug} references an unmanaged teaching oracle id`);
   }
+  if (topic.visual?.type === 'card-anatomy') {
+    const labels = (topic.visual.callouts || []).map((entry) => String(entry.label || entry).toLowerCase()).join(' ');
+    for (const required of ['name', 'mana cost', 'type line', 'rules text', 'power / toughness', 'collector info']) {
+      assert(labels.includes(required), `Magic card anatomy visual missing ${required}`);
+    }
+  }
+  if (topic.visual?.type === 'turn-timeline') {
+    const labels = (topic.visual.phases || []).map((entry) => `${entry.label} ${entry.detail}`.toLowerCase()).join(' ');
+    for (const required of ['beginning phase', 'untap', 'upkeep', 'draw', 'first main', 'combat', 'second main', 'ending phase', 'end step', 'cleanup']) {
+      assert(labels.includes(required), `Magic turn timeline visual missing ${required}`);
+    }
+  }
+  if (topic.visual?.type === 'mana-payment') {
+    const visualText = JSON.stringify(topic.visual).toLowerCase();
+    for (const required of ['land', 'tap', 'colored mana', 'generic', 'colorless', '{1}{u}{u}']) {
+      assert(visualText.includes(required), `Magic mana visual missing ${required}`);
+    }
+  }
 }
 assert(MAGIC_KEYWORD_GLOSSARY.length >= 10, 'Magic keyword glossary seed is incomplete');
 assert(MAGIC_KEYWORD_GLOSSARY.every((entry) => entry.name && entry.category && entry.concise && Array.isArray(entry.relatedMechanics) && entry.sourceMeta?.lastVerified), 'Magic keyword glossary entries must be structured');
-assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-setting-up'), ['opening seven', 'mulligan', '20 life', 'starting player', 'skips the draw']);
-assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-taking-your-turn'), ['untap', 'upkeep', 'draw', 'first main', 'declare attackers', 'declare blockers', 'cleanup', 'priority']);
-assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-combat'), ['summoning sickness', 'blocked', 'combat damage', 'lethal', 'state-based actions']);
-assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-instants-and-responses'), ['respond', 'priority', 'does not use the stack']);
-assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-stack'), ['top object resolves first', 'priority', 'does not use the stack']);
-assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-priority'), ['active player', 'nonactive player', 'pass priority']);
-assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-state-based-actions'), ['do not use the stack', 'checked', 'zero life', 'lethal damage']);
-assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-layers'), ['timestamp', 'dependency', 'power and toughness', 'layer']);
-assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-deck-construction'), ['minimum', 'sideboard', 'copy limits', 'basic-land']);
-assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-color-identity'), ['mana symbols', 'commander deck', 'green mana symbol']);
+const requiredPracticalConcepts = [
+  ['learn-what-you-need', ['deck', 'life total', 'table space']],
+  ['learn-zones', ['library', 'hand', 'battlefield', 'graveyard', 'exile']],
+  ['learn-setting-up', ['shuffle', 'opening seven', 'mulligan', '20 life', 'starting player', 'skips the draw']],
+  ['learn-taking-your-turn', ['untap', 'upkeep', 'draw', 'first main', 'declare attackers', 'declare blockers', 'end step', 'cleanup', 'priority']],
+  ['learn-mana-and-colors', ['tap', 'colored mana', 'generic', 'colorless', 'mana pool']],
+  ['learn-casting-spells', ['playing a land', 'special action', 'casting a spell', 'pay costs', 'stack', 'resolve']],
+  ['learn-card-types', ['land', 'creature', 'instant', 'sorcery', 'permanent']],
+  ['learn-combat', ['summoning sickness', 'blocked', 'combat damage', 'lethal', 'state-based actions']],
+  ['learn-instants-and-responses', ['respond', 'priority', 'resolves', 'does not use the stack']],
+  ['learn-stack', ['top object resolves first', 'priority', 'does not use the stack']],
+  ['learn-abilities-and-triggers', ['static ability', 'activated ability', 'triggered ability', 'mana ability', 'target']],
+  ['learn-winning-and-losing', ['0 or less life', 'empty library', 'poison counters', 'concede']]
+];
+for (const [slug, concepts] of requiredPracticalConcepts) {
+  assertTopicCoverage(slug, concepts);
+  assert(textForTopic(slug).includes('what you do at the table'), `Magic lesson ${slug} must teach physical table actions`);
+}
+assertTopicCoverage('reference-priority', ['active player', 'nonactive player', 'pass priority', 'resolves', 'priority again', 'shortcut']);
+assertTopicCoverage('reference-stack', ['last-in', 'first-out', 'top object', 'activated', 'triggered', 'playing a land', 'one at a time']);
+assertTopicCoverage('reference-state-based-actions', ['do not use the stack', 'checked', 'zero life', 'lethal damage', 'checks again', 'trigger']);
+assertTopicCoverage('reference-layers', ['continuous effects', 'timestamp', 'dependency', 'power and toughness', 'sublayers']);
+assertTopicCoverage('reference-triggered-abilities', ['when', 'whenever', 'at', 'stack', 'intervening if']);
+assertTopicCoverage('reference-replacement-effects', ['instead', 'prevent', 'before the event', 'trigger']);
+assertTopicCoverage('reference-continuous-effects', ['duration', 'static ability', 'layers', 'timestamp']);
+assertTopicCoverage('reference-combat-damage', ['unblocked', 'blocked', 'lethal damage', 'trample', 'deathtouch']);
+assertTopicCoverage('reference-first-strike-double-strike', ['earlier combat damage step', 'regular combat damage step', 'double strike']);
+assertTopicCoverage('reference-command-zone', ['starts the game', 'graveyard', 'exile', 'state-based actions']);
+assertTopicCoverage('reference-commander-tax', ['additional cost', 'two generic', 'alternative cost', 'partner']);
+assertTopicCoverage('reference-commander-damage', ['21', 'combat damage', 'same commander', 'track']);
+assertTopicCoverage('reference-commander-brackets-game-changers', ['pregame', 'Game Changers', 'Bracket', 'table expectations']);
+assertTopicCoverage('reference-deck-construction', ['minimum', 'sideboard', 'copy limits', 'basic-land']);
+assertTopicCoverage('reference-color-identity', ['mana symbols', 'rules text', 'color indicator', 'reminder text', 'double-faced', 'commander deck', 'green mana symbol']);
 assert((ENCYCLOPEDIA_RULE_TOPICS.pokemon || []).length >= 15, 'Pokemon rules hierarchy is incomplete');
 assert((ENCYCLOPEDIA_RULE_TOPICS.yugioh || []).length >= 15, 'Yu-Gi-Oh rules hierarchy is incomplete');
 assert((ENCYCLOPEDIA_RULE_TOPICS.lorcana || []).length >= 13, 'Lorcana rules hierarchy is incomplete');

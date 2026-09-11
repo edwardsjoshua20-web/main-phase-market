@@ -668,23 +668,41 @@ function useMagicVisualCards(visual) {
 function LessonVisual({ visual }) {
   const { data: cards = [] } = useMagicVisualCards(visual);
   if (!visual) return null;
-  const steps = visual.steps || visual.stack || visual.callouts || visual.allowed || [];
+  const steps = visual.phases || visual.steps || visual.stack || visual.triggerWords || visual.callouts || visual.allowed || [];
+  const visualLabel = {
+    'card-anatomy': 'Card Anatomy',
+    'mana-payment': 'Mana Payment',
+    'turn-timeline': 'Turn Timeline',
+    combat: 'Combat Walkthrough',
+    stack: 'Stack Sequence',
+    trigger: 'Triggered Ability',
+    'commander-color-identity': 'Commander Identity'
+  }[visual.type] || 'Visual Guide';
 
   return (
     <section className="mt-8 border-y border-slate-200 bg-white/60 py-5">
       <div className="flex flex-col gap-5 lg:flex-row">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Visual Guide</p>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{visualLabel}</p>
           <h3 className="mt-2 text-xl font-black tracking-tight text-slate-950">{visual.title}</h3>
           {visual.cost && <p className="mt-2 text-sm font-black text-slate-700">Cost: {visual.cost}</p>}
-          <div className="mt-4 grid gap-2">
+          <div className={`mt-4 grid gap-2 ${visual.type === 'turn-timeline' ? 'sm:grid-cols-2' : ''}`}>
             {steps.map((step, index) => (
-              <div key={`${visual.type}-${step}`} className="grid grid-cols-[30px_minmax(0,1fr)] items-start gap-3 border-t border-slate-200 pt-2">
+              <div key={`${visual.type}-${step.label || step}`} className="grid grid-cols-[30px_minmax(0,1fr)] items-start gap-3 border-t border-slate-200 pt-2">
                 <span className="text-sm font-black text-slate-400">{index + 1}</span>
-                <span className="min-w-0 break-words text-sm font-semibold leading-6 text-slate-700">{step}</span>
+                <span className="min-w-0 break-words text-sm leading-6 text-slate-700">
+                  <span className="block font-black text-slate-950">{step.label || step}</span>
+                  {step.detail ? <span className="mt-0.5 block font-semibold">{step.detail}</span> : null}
+                </span>
               </div>
             ))}
           </div>
+          {Array.isArray(visual.allowed) && visual.allowed.length > 0 && visual.type === 'commander-color-identity' && (
+            <div className="mt-4 border-t border-slate-200 pt-3">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Within Identity</p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">{visual.allowed.join(', ')}</p>
+            </div>
+          )}
           {Array.isArray(visual.blocked) && visual.blocked.length > 0 && (
             <div className="mt-4 border-t border-slate-200 pt-3">
               <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Outside Identity</p>
@@ -899,7 +917,6 @@ function RulesPage({ game, topicSlug }) {
                   </div>
                 </div>
               )}
-              {isMagic && topic.category === 'learn' && <LessonNav previousTopic={previousTopic} nextTopic={nextTopic} />}
               <SourceList sources={topic.sources.slice(0, 1)} className="mt-8 border-t border-slate-200 pt-5" title={isMagic ? 'Official Rules Reference' : 'Sources'} />
             </>
           ) : (

@@ -175,7 +175,13 @@ export const gameKnowledgeOwner = {
       ...(topic.searchTerms || []),
       ...(topic.officialTerms || []),
       ...(topic.relatedMechanics || []),
-      ...(topic.relatedCardTypes || [])
+      ...(topic.relatedCardTypes || []),
+      topic.article?.introduction,
+      ...(topic.article?.sections || []).flatMap((section) => [
+        section.heading,
+        ...(section.body || []),
+        section.example
+      ])
     ].join(' ').toLowerCase().includes(normalized));
   },
 
