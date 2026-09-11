@@ -142,6 +142,23 @@ export const gameKnowledgeOwner = {
     return topics.find((topic) => topic.slug === topicSlug) || null;
   },
 
+  getRulesTopicsByCategory(value, category) {
+    return this.getRulesTopics(value)
+      .filter((topic) => topic.category === category)
+      .sort((left, right) => Number(left.order || 0) - Number(right.order || 0));
+  },
+
+  getRulesReferenceGroups(value) {
+    const topics = this.getRulesTopicsByCategory(value, 'reference');
+    const groups = new Map();
+    for (const topic of topics) {
+      const key = topic.referenceGroup || topic.sectionId || 'reference';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(topic);
+    }
+    return [...groups.entries()].map(([key, entries]) => ({ key, entries }));
+  },
+
   async listSets(value, options = {}) {
     const game = this.getGame(value);
     if (!game) return [];

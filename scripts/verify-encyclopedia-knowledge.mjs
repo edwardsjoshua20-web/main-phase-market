@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ENCYCLOPEDIA_GAMES, ENCYCLOPEDIA_RULE_TOPICS } from '../src/services/knowledge/encyclopediaData.js';
+import { ENCYCLOPEDIA_GAMES, ENCYCLOPEDIA_RULE_TOPICS, MAGIC_KEYWORD_GLOSSARY } from '../src/services/knowledge/encyclopediaData.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const requiredRoutes = [
@@ -65,6 +65,23 @@ function hasUniqueGallerySlots(cards = []) {
   return true;
 }
 
+function rulesArticleText(topic = {}) {
+  return [
+    topic.summary,
+    topic.article?.introduction,
+    ...(topic.article?.sections || []).flatMap((section) => [section.heading, ...(section.body || []), section.example || '']),
+    ...(topic.article?.terminology || [])
+  ].join(' ');
+}
+
+function assertTopicIncludes(topic, words = []) {
+  assert(topic, `Magic representative topic is missing`);
+  const text = rulesArticleText(topic).toLowerCase();
+  for (const word of words) {
+    assert(text.includes(String(word).toLowerCase()), `Magic topic ${topic?.slug || 'unknown'} missing representative content: ${word}`);
+  }
+}
+
 const routeFile = fs.readFileSync(path.join(repoRoot, 'src/App.jsx'), 'utf8');
 for (const route of requiredRoutes) {
   assert(routeFile.includes(`path="${route}"`) || routeFile.includes(`path='${route}'`), `Route missing: ${route}`);
@@ -79,6 +96,9 @@ assert(!pageFile.includes('function CardDetailPage'), 'Duplicate Encyclopedia ca
 assert(pageFile.includes('EncyclopediaCardRedirect') && pageFile.includes('<Navigate'), 'Legacy Encyclopedia card URLs must redirect to canonical CardDetail');
 assert(pageFile.includes('returnTo') && pageFile.includes('returnLabel'), 'Encyclopedia card routes must preserve return context');
 assert(pageFile.includes('Rules / How to Play'), 'Rules section must use public how-to-play labeling');
+assert(pageFile.includes('MagicRulesOverview'), 'Magic game landing must expose distinct Learn to Play and Rules Reference paths');
+assert(pageFile.includes('Previous lesson') && pageFile.includes('Next lesson'), 'Magic learn articles must render previous/next lesson navigation');
+assert(pageFile.includes('Official Rules Reference'), 'Magic articles must use restrained official reference labeling');
 assert(!pageFile.includes('Authority Boundary'), 'Rules page must not render the internal authority-boundary box');
 assert(!/catalog-backed|Search owner|source-attributed summaries|Complete local card|MainPhase Search owner/i.test(pageFile), 'Public Encyclopedia UI contains internal owner/catalog wording');
 
@@ -163,7 +183,11 @@ for (const game of ENCYCLOPEDIA_GAMES) {
     assert(symbolSets.length >= Math.min(20, sets.length), 'Magic sets must expose real set symbols from canonical set metadata');
   }
 
-  for (const topic of ENCYCLOPEDIA_RULE_TOPICS[game.id] || []) {
+  const gameTopics = ENCYCLOPEDIA_RULE_TOPICS[game.id] || [];
+  const topicSlugs = new Set();
+  for (const topic of gameTopics) {
+    assert(!topicSlugs.has(topic.slug), `${game.id}:${topic.slug} has a duplicate slug`);
+    topicSlugs.add(topic.slug);
     assert(topic.slug && topic.title && topic.summary, `${game.id} has incomplete rules topic metadata`);
     assert(topic.gameId && topic.sectionId && topic.topicId, `${game.id}:${topic.slug} missing structured topic IDs`);
     assert(Array.isArray(topic.officialTerms) && topic.officialTerms.length > 0, `${game.id}:${topic.slug} missing official terminology`);
@@ -180,11 +204,39 @@ for (const game of ENCYCLOPEDIA_GAMES) {
     ].join(' ');
     assert(articleText.split(/\s+/).filter(Boolean).length >= 110, `${game.id}:${topic.slug} rules article is too thin`);
     assert((topic.article?.sections || []).every((section) => section.heading && Array.isArray(section.body) && section.body.length >= 2), `${game.id}:${topic.slug} has malformed rule hierarchy`);
+    if (game.id === 'magic') {
+      for (const relatedSlug of topic.relatedTopics || []) {
+        assert(gameTopics.some((entry) => entry.slug === relatedSlug), `${game.id}:${topic.slug} has broken related topic ${relatedSlug}`);
+      }
+      assert(topic.sourceMeta?.rulesVersion && topic.sourceMeta?.lastVerified, `magic:${topic.slug} missing official source metadata`);
+      if (topic.category === 'learn') {
+        assert(topic.learningTrack === 'learn', `magic:${topic.slug} learn topic missing learningTrack`);
+        if (topic.order > 1) assert(topic.previousSlug && gameTopics.some((entry) => entry.slug === topic.previousSlug), `magic:${topic.slug} missing previous lesson`);
+        if (topic.order < 16) assert(topic.nextSlug && gameTopics.some((entry) => entry.slug === topic.nextSlug), `magic:${topic.slug} missing next lesson`);
+      }
+      if (topic.category === 'reference') {
+        assert(topic.referenceGroup, `magic:${topic.slug} reference topic missing reference group`);
+      }
+    }
   }
 }
 
 assert(ENCYCLOPEDIA_GAMES.length === 7, `Expected 7 games, found ${ENCYCLOPEDIA_GAMES.length}`);
-assert((ENCYCLOPEDIA_RULE_TOPICS.magic || []).length >= 15, 'Magic rules hierarchy is incomplete');
+const magicTopics = ENCYCLOPEDIA_RULE_TOPICS.magic || [];
+const magicLearnTopics = magicTopics.filter((topic) => topic.category === 'learn');
+const magicReferenceTopics = magicTopics.filter((topic) => topic.category === 'reference');
+assert(magicLearnTopics.length >= 16, 'Magic Learn to Play hierarchy is incomplete');
+assert(magicReferenceTopics.length >= 40, 'Magic Rules Reference hierarchy is incomplete');
+assert(new Set(magicLearnTopics.map((topic) => topic.order)).size === magicLearnTopics.length, 'Magic Learn to Play order values must be unique');
+assert(MAGIC_KEYWORD_GLOSSARY.length >= 10, 'Magic keyword glossary seed is incomplete');
+assert(MAGIC_KEYWORD_GLOSSARY.every((entry) => entry.name && entry.category && entry.concise && Array.isArray(entry.relatedMechanics) && entry.sourceMeta?.lastVerified), 'Magic keyword glossary entries must be structured');
+assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-setting-up'), ['opening seven', 'mulligan', '20 life', 'starting player', 'skips the draw']);
+assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-taking-your-turn'), ['untap', 'upkeep', 'draw', 'first main', 'declare attackers', 'declare blockers', 'cleanup', 'priority']);
+assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-combat'), ['summoning sickness', 'blocked', 'combat damage', 'lethal', 'state-based actions']);
+assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-stack-and-responses'), ['respond', 'top object resolves first', 'priority', 'does not use the stack']);
+assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-priority'), ['active player', 'nonactive player', 'pass priority']);
+assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-deck-construction'), ['minimum', 'sideboard', 'copy limits', 'basic-land']);
+assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-color-identity'), ['mana symbols', 'commander deck', 'green mana symbol']);
 assert((ENCYCLOPEDIA_RULE_TOPICS.pokemon || []).length >= 15, 'Pokemon rules hierarchy is incomplete');
 assert((ENCYCLOPEDIA_RULE_TOPICS.yugioh || []).length >= 15, 'Yu-Gi-Oh rules hierarchy is incomplete');
 assert((ENCYCLOPEDIA_RULE_TOPICS.lorcana || []).length >= 13, 'Lorcana rules hierarchy is incomplete');

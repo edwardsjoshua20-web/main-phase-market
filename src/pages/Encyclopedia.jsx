@@ -18,8 +18,18 @@ const LANDING_COPY_BY_GAME = {
   starwars: 'Browse sets, cards, and rules.'
 };
 
+const MAGIC_REFERENCE_GROUP_LABELS = {
+  core: 'Core',
+  timing: 'Timing',
+  'turn-combat': 'Turn / Combat',
+  'card-rules': 'Card Rules',
+  advanced: 'Advanced',
+  formats: 'Formats',
+  commander: 'Commander'
+};
+
 function SectionShell({ children, className = '' }) {
-  return <section className={`mx-auto w-full max-w-[1480px] px-4 ${className}`}>{children}</section>;
+  return <section className={`mx-auto w-full max-w-[100vw] overflow-x-hidden px-4 2xl:max-w-[1480px] ${className}`}>{children}</section>;
 }
 
 function LoadingState() {
@@ -92,10 +102,10 @@ function GameHero({ game, eyebrow = 'TCG Encyclopedia' }) {
   );
 }
 
-function SourceList({ sources = [], className = '' }) {
+function SourceList({ sources = [], className = '', title = 'Sources' }) {
   return (
     <div className={className}>
-      <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Sources</h3>
+      <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">{title}</h3>
       <div className="mt-3 space-y-3">
         {sources.map((source) => (
           <a key={source.url} href={source.url} target="_blank" rel="noreferrer" className="block border-t border-slate-200 pt-3 text-sm font-bold text-slate-900 hover:text-slate-600">
@@ -105,6 +115,58 @@ function SourceList({ sources = [], className = '' }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function MagicRulesOverview({ game }) {
+  const learnLessons = gameKnowledgeOwner.getRulesTopicsByCategory(game.id, 'learn');
+  const referenceGroups = gameKnowledgeOwner.getRulesReferenceGroups(game.id);
+  const featuredReference = ['reference-zones', 'reference-card-types', 'reference-priority', 'reference-stack', 'reference-abilities', 'reference-keywords', 'reference-formats', 'reference-commander']
+    .map((slug) => gameKnowledgeOwner.getRulesTopic(game.id, slug))
+    .filter(Boolean);
+
+  return (
+    <aside className="min-w-0">
+      <h2 className="text-2xl font-black tracking-tight">Rules / How to Play</h2>
+      <div className="mt-4 grid gap-6">
+        <section className="border-y border-slate-200 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Learn to Play</h3>
+            <span className="text-xs font-bold text-slate-500">{learnLessons.length} lessons</span>
+          </div>
+          <div className="mt-3 divide-y divide-slate-200">
+            {learnLessons.slice(0, 9).map((lesson) => (
+              <Link key={lesson.slug} to={lesson.path} className="grid grid-cols-[28px_minmax(0,1fr)] gap-3 py-3 hover:bg-white">
+                <span className="text-sm font-black text-slate-400">{lesson.order}</span>
+                <span className="min-w-0">
+                  <span className="block font-bold leading-5 text-slate-950">{lesson.title}</span>
+                  <span className="mt-1 line-clamp-2 block text-sm leading-5 text-slate-600">{lesson.summary}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+          {learnLessons.length > 9 && (
+            <Link to={learnLessons[9].path} className="mt-3 inline-flex text-sm font-black text-slate-900 hover:text-slate-600">
+              Continue lessons
+            </Link>
+          )}
+        </section>
+
+        <section className="border-b border-slate-200 pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Rules Reference</h3>
+            <span className="text-xs font-bold text-slate-500">{referenceGroups.reduce((sum, group) => sum + group.entries.length, 0)} topics</span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {featuredReference.map((topic) => (
+              <Link key={topic.slug} to={topic.path} className="min-w-0 break-words border border-slate-200 bg-white px-3 py-2 text-sm font-bold leading-5 text-slate-900 hover:border-slate-400">
+                {topic.title}
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
+    </aside>
   );
 }
 
@@ -168,7 +230,7 @@ function SetPagination({ currentPage, totalPages, onPageChange }) {
 function EncyclopediaLanding() {
   const games = gameKnowledgeOwner.listGames();
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
+    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
       <section className="bg-slate-950 text-white">
         <SectionShell className="py-10 md:py-12">
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/60">MainPhase reference</p>
@@ -273,11 +335,11 @@ function GameLanding({ game }) {
   const rules = gameKnowledgeOwner.getRulesTopics(game.id);
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
+    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
       <GameHero game={game} />
       <SectionShell className="grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <SetBrowser game={game} />
-        <aside className="min-w-0">
+        {game.id === 'magic' ? <MagicRulesOverview game={game} /> : <aside className="min-w-0">
           <h2 className="text-2xl font-black tracking-tight">Rules / How to Play</h2>
           <div className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
             {rules.map((topic) => (
@@ -287,7 +349,7 @@ function GameLanding({ game }) {
               </Link>
             ))}
           </div>
-        </aside>
+        </aside>}
       </SectionShell>
     </main>
   );
@@ -295,7 +357,7 @@ function GameLanding({ game }) {
 
 function SetListPage({ game }) {
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
+    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
       <GameHero game={game} eyebrow="Encyclopedia sets" />
       <SectionShell className="py-8">
         <SetBrowser game={game} title="All Sets" />
@@ -491,7 +553,7 @@ function SetDetailPage({ game, setSlug }) {
   if (!detail) return <EmptyState title="Set not found" body="That set is not available in the Encyclopedia yet." to={`/Encyclopedia/${game.routeKey}/sets`} action="Back to sets" />;
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
+    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
       <GameHero game={game} eyebrow="Encyclopedia set" />
       <SectionShell className="py-8">
         <div className="min-w-0">
@@ -572,6 +634,12 @@ function RulesPage({ game, topicSlug }) {
   const topics = gameKnowledgeOwner.getRulesTopics(game.id);
   const topic = topicSlug ? gameKnowledgeOwner.getRulesTopic(game.id, topicSlug) : null;
   const article = topic?.article || null;
+  const isMagic = game.id === 'magic';
+  const categoryLabel = topic?.category === 'learn' ? 'Learn to Play' : 'Rules Reference';
+  const previousTopic = topic?.previousSlug ? gameKnowledgeOwner.getRulesTopic(game.id, topic.previousSlug) : null;
+  const nextTopic = topic?.nextSlug ? gameKnowledgeOwner.getRulesTopic(game.id, topic.nextSlug) : null;
+  const learnLessons = isMagic ? gameKnowledgeOwner.getRulesTopicsByCategory(game.id, 'learn') : [];
+  const referenceGroups = isMagic ? gameKnowledgeOwner.getRulesReferenceGroups(game.id) : [];
   const relatedTopics = (topic?.relatedTopics || [])
     .map((slug) => gameKnowledgeOwner.getRulesTopic(game.id, slug))
     .filter(Boolean)
@@ -580,29 +648,42 @@ function RulesPage({ game, topicSlug }) {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <GameHero game={game} eyebrow="Encyclopedia rules" />
-      <SectionShell className="grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0">
+      <SectionShell className="grid min-w-0 gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 max-w-full break-words">
           {topic ? (
             <>
               <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                {isMagic && (
+                  <>
+                    <Link to="/Encyclopedia" className="hover:text-slate-900">TCG Encyclopedia</Link>
+                    <span>/</span>
+                  </>
+                )}
                 <Link to={`/Encyclopedia/${game.routeKey}`} className="hover:text-slate-900">{game.shortLabel || game.label}</Link>
                 <span>/</span>
-                <Link to={`/Encyclopedia/${game.routeKey}/rules`} className="hover:text-slate-900">Rules</Link>
+                <Link to={`/Encyclopedia/${game.routeKey}/rules`} className="hover:text-slate-900">{isMagic ? categoryLabel : 'Rules'}</Link>
               </div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Rules topic</p>
               <h2 className="mt-2 text-3xl font-black tracking-tight">{topic.title}</h2>
-              <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">{article?.introduction || topic.summary}</p>
+              <p className="mt-4 max-w-3xl break-words text-base leading-7 text-slate-700">{article?.introduction || topic.summary}</p>
+              {Array.isArray(article?.terminology) && article.terminology.length > 0 && (
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {article.terminology.map((term) => (
+                    <span key={term} className="border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700">{term}</span>
+                  ))}
+                </div>
+              )}
               <div className="mt-8 space-y-8">
                 {(article?.sections || []).map((section) => (
                   <section key={section.heading} className="border-t border-slate-200 pt-5">
                     <h3 className="text-xl font-black tracking-tight text-slate-950">{section.heading}</h3>
                     <div className="mt-3 space-y-3">
                       {(section.body || []).map((paragraph, index) => (
-                        <p key={`${section.heading}-${index}`} className="text-sm leading-7 text-slate-700">{paragraph}</p>
+                        <p key={`${section.heading}-${index}`} className="break-words text-sm leading-7 text-slate-700">{paragraph}</p>
                       ))}
                     </div>
                     {section.example && (
-                      <p className="mt-4 border-l-2 border-slate-300 pl-4 text-sm font-semibold leading-6 text-slate-700">{section.example}</p>
+                      <p className="mt-4 break-words border-l-2 border-slate-300 pl-4 text-sm font-semibold leading-6 text-slate-700">{section.example}</p>
                     )}
                   </section>
                 ))}
@@ -612,37 +693,107 @@ function RulesPage({ game, topicSlug }) {
                   <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Related Topics</h3>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {relatedTopics.map((entry) => (
-                      <Link key={entry.slug} to={entry.path} className="border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:border-slate-400">
+                      <Link key={entry.slug} to={entry.path} className="min-w-0 break-words border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:border-slate-400">
                         {entry.title}
                       </Link>
                     ))}
                   </div>
                 </div>
               )}
-              <SourceList sources={topic.sources} className="mt-8 border-t border-slate-200 pt-5" />
+              {isMagic && topic.category === 'learn' && (previousTopic || nextTopic) && (
+                <div className="mt-8 grid gap-3 border-t border-slate-200 pt-5 sm:grid-cols-2">
+                  {previousTopic ? (
+                    <Link to={previousTopic.path} className="min-w-0 break-words border border-slate-200 bg-white p-4 hover:border-slate-400">
+                      <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Previous lesson</span>
+                      <span className="mt-1 block font-black text-slate-950">{previousTopic.title}</span>
+                    </Link>
+                  ) : <div />}
+                  {nextTopic ? (
+                    <Link to={nextTopic.path} className="min-w-0 break-words border border-slate-200 bg-white p-4 text-right hover:border-slate-400">
+                      <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Next lesson</span>
+                      <span className="mt-1 block font-black text-slate-950">{nextTopic.title}</span>
+                    </Link>
+                  ) : null}
+                </div>
+              )}
+              <SourceList sources={topic.sources.slice(0, 1)} className="mt-8 border-t border-slate-200 pt-5" title={isMagic ? 'Official Rules Reference' : 'Sources'} />
             </>
           ) : (
             <>
               <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                {isMagic && (
+                  <>
+                    <Link to="/Encyclopedia" className="hover:text-slate-900">TCG Encyclopedia</Link>
+                    <span>/</span>
+                  </>
+                )}
                 <Link to={`/Encyclopedia/${game.routeKey}`} className="hover:text-slate-900">{game.shortLabel || game.label}</Link>
                 <span>/</span>
                 <span>Rules</span>
               </div>
               <h2 className="text-3xl font-black tracking-tight">Rules / How to Play</h2>
-              <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200">
-                {topics.map((entry) => (
-                  <Link key={entry.slug} to={entry.path} className="block py-4 hover:bg-white">
-                    <p className="font-bold text-slate-950">{entry.title}</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">{entry.summary}</p>
-                  </Link>
-                ))}
-              </div>
+              {isMagic ? (
+                <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <section>
+                    <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Learn to Play</h3>
+                    <div className="mt-3 divide-y divide-slate-200 border-y border-slate-200">
+                      {learnLessons.map((entry) => (
+                        <Link key={entry.slug} to={entry.path} className="grid grid-cols-[34px_minmax(0,1fr)] gap-3 py-4 hover:bg-white">
+                          <span className="text-sm font-black text-slate-400">{entry.order}</span>
+                          <span>
+                            <span className="block font-bold text-slate-950">{entry.title}</span>
+                            <span className="mt-1 block text-sm leading-6 text-slate-600">{entry.summary}</span>
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                  <section>
+                    <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Rules Reference</h3>
+                    <div className="mt-3 space-y-5">
+                      {referenceGroups.map((group) => (
+                        <div key={group.key} className="border-y border-slate-200 py-3">
+                          <h4 className="text-sm font-black text-slate-900">{MAGIC_REFERENCE_GROUP_LABELS[group.key] || fieldLabel(group.key)}</h4>
+                          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            {group.entries.map((entry) => (
+                              <Link key={entry.slug} to={entry.path} className="min-w-0 break-words border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:border-slate-400">
+                                {entry.title}
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              ) : (
+                <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200">
+                  {topics.map((entry) => (
+                    <Link key={entry.slug} to={entry.path} className="block py-4 hover:bg-white">
+                      <p className="font-bold text-slate-950">{entry.title}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">{entry.summary}</p>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
         <aside className="h-fit border-y border-slate-200 py-5">
           <h2 className="text-lg font-black tracking-tight">{game.shortLabel || game.label} Rules</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">Browse learning topics for play, deck construction, and common table interactions.</p>
+          {isMagic && (
+            <div className="mt-5 space-y-4 border-t border-slate-200 pt-4">
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Learn Path</h3>
+                <p className="mt-1 text-sm font-semibold text-slate-700">{learnLessons.length} sequential lessons</p>
+              </div>
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Reference</h3>
+                <p className="mt-1 text-sm font-semibold text-slate-700">{referenceGroups.reduce((sum, group) => sum + group.entries.length, 0)} searchable topics</p>
+              </div>
+            </div>
+          )}
         </aside>
       </SectionShell>
     </main>
