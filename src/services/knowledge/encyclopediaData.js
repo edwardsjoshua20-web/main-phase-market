@@ -15,11 +15,11 @@ export const ENCYCLOPEDIA_GAMES = Object.freeze([
     sourceLimitations: 'Set pages preserve release dates, set codes, collector numbers, and Oracle identity where available.',
     ruleStatus: 'Foundational rules topics with official Comprehensive Rules attribution.',
     sourceRefs: [
-      { label: 'Magic How to Play', url: 'https://magic.wizards.com/en/how-to-play', freshness: 'Official page verified September 10, 2026' },
-      { label: 'Magic rules page', url: 'https://magic.wizards.com/en/rules', freshness: 'Official page verified September 10, 2026' },
-      { label: 'Magic formats hub', url: 'https://magic.wizards.com/en/formats', freshness: 'Official page verified September 10, 2026' },
-      { label: 'Magic Commander format', url: 'https://magic.wizards.com/en/formats/commander', freshness: 'Official page verified September 10, 2026' },
-      { label: 'Commander brackets beta update', url: 'https://magic.wizards.com/en/news/announcements/commander-brackets-beta-update-february-9-2026', freshness: 'Official page verified September 10, 2026' },
+      { label: 'Magic How to Play', url: 'https://magic.wizards.com/en/how-to-play', freshness: 'Official page verified September 11, 2026' },
+      { label: 'Magic rules page', url: 'https://magic.wizards.com/en/rules', freshness: 'Official page verified September 11, 2026' },
+      { label: 'Magic formats hub', url: 'https://magic.wizards.com/en/formats', freshness: 'Official page verified September 11, 2026' },
+      { label: 'Magic Commander format', url: 'https://magic.wizards.com/en/formats/commander', freshness: 'Official page verified September 11, 2026' },
+      { label: 'Commander brackets beta update', url: 'https://magic.wizards.com/en/news/announcements/commander-brackets-beta-update-february-9-2026', freshness: 'Official page verified September 11, 2026' },
       { label: 'Scryfall card data', url: 'https://scryfall.com/docs/api/bulk-data', freshness: 'Primary Magic data reference' }
     ],
     focus: ['Sets', 'Collector order', 'Oracle printings', 'Rules topics', 'Store availability']
@@ -195,8 +195,8 @@ function buildDefaultRuleArticle(gameId, title, summary, options = {}) {
 }
 
 const MAGIC_SOURCE_METADATA = Object.freeze({
-  rulesVersion: 'Magic Comprehensive Rules and public Wizards rules resources verified September 10, 2026',
-  lastVerified: '2026-09-10',
+  rulesVersion: 'Magic Comprehensive Rules and public Wizards rules resources verified September 11, 2026',
+  lastVerified: '2026-09-11',
   sources: [
     { label: 'Magic How to Play', url: 'https://magic.wizards.com/en/how-to-play', role: 'Beginner learning order and teaching concepts' },
     { label: 'Magic rules page', url: 'https://magic.wizards.com/en/rules', role: 'Basic Rules and Comprehensive Rules access point' },
@@ -204,6 +204,25 @@ const MAGIC_SOURCE_METADATA = Object.freeze({
     { label: 'Magic Commander format', url: 'https://magic.wizards.com/en/formats/commander', role: 'Commander deck construction and format overview' },
     { label: 'Commander brackets beta update', url: 'https://magic.wizards.com/en/news/announcements/commander-brackets-beta-update-february-9-2026', role: 'Commander Brackets and Game Changers context' }
   ]
+});
+
+export const MAGIC_TEACHING_CARD_ORACLE_IDS = Object.freeze({
+  plains: 'bc71ebf6-2056-41f7-be35-b2e5c34afa99',
+  island: 'b2c6aa39-2d2a-459c-a555-fb48ba993373',
+  forest: 'b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6',
+  cancel: '7d00fb28-ea6c-49a9-b4af-ffb38860a9a7',
+  grizzlyBears: '14c8f55d-d177-4c25-a931-ebeb9e6062a0',
+  hillGiant: '342199e0-15b6-4824-83da-25caef2592b3',
+  colossalDreadmaw: '08c7db90-c0cf-4482-b7ee-bb033e5996d2',
+  typhoidRats: 'd6ee6cc1-902d-4f56-afa5-6fa4813bfbbc',
+  serraAngel: '4b7ac066-e5c7-43e6-9e7e-2739b24a905d',
+  soulWarden: 'f3fad295-1af2-4ecc-8546-b121ad6be27b',
+  lightningBolt: '4457ed35-7c10-48c8-9776-456485fdf070',
+  counterspell: 'cc187110-1148-4090-bbb8-e205694a39f5',
+  solRing: '6ad8011d-3471-4369-9d68-b264cc027487',
+  commandTower: '0895c9b7-ae7d-4bb3-af17-3b75deb50a25',
+  arcaneSignet: '0bc7f093-bef0-4f1a-852c-4b75ebf54838',
+  alesha: '6969a7e2-6866-4001-a139-24b3be13deae'
 });
 
 function sentenceList(values = []) {
@@ -217,7 +236,7 @@ function buildMagicLearnArticle(title, options = {}) {
   return {
     introduction: options.introduction,
     terminology: terms,
-    sections: [
+    sections: options.sections || [
       {
         heading: 'The Core Idea',
         body: options.core || []
@@ -232,6 +251,13 @@ function buildMagicLearnArticle(title, options = {}) {
         body: [
           ...(options.mistakes || []),
           `Key terms for this lesson: ${sentenceList(terms)}. Learn those words here, then use the related rules reference when a card or table question needs the exact technical rule.`
+        ]
+      },
+      {
+        heading: 'Practice Prompt',
+        body: options.practice || [
+          'Pause before moving on and say the table action out loud using the lesson terms.',
+          'If a card, phase, cost, or zone is involved, name it specifically before applying the shortcut you normally use.'
         ]
       }
     ]
@@ -249,6 +275,7 @@ function magicLearnLesson(order, topicId, title, summary, options = {}) {
     order,
     previousSlug: options.previousSlug || null,
     nextSlug: options.nextSlug || null,
+    visual: options.visual || null,
     sourceMeta: MAGIC_SOURCE_METADATA,
     article: buildMagicLearnArticle(title, options)
   });
@@ -259,7 +286,7 @@ function buildMagicReferenceArticle(title, summary, options = {}) {
   return {
     introduction: options.introduction || `${summary} This reference page keeps the concept searchable for real table questions while staying short enough to use during a game.`,
     terminology: options.officialTerms || [],
-    sections: [
+    sections: options.sections || [
       {
         heading: 'Definition',
         body: [
@@ -281,6 +308,13 @@ function buildMagicReferenceArticle(title, summary, options = {}) {
           'Ask whether this concept changes what can be done, when it can be done, what it costs, what it targets, or how it resolves.',
           'For tournament or judge-level detail, use the linked Wizards rules document and the source metadata stored with this topic.'
         ]
+      },
+      {
+        heading: 'Common Pitfalls',
+        body: options.pitfalls || [
+          'Do not import timing assumptions from another card game or from a casual shortcut unless the table has clearly agreed on that shortcut.',
+          'When the outcome matters, return to the exact rule term, the current zone, and the current priority window before resolving the play.'
+        ]
       }
     ]
   };
@@ -297,6 +331,7 @@ function magicReferenceTopic(group, order, topicId, title, summary, options = {}
     category: 'reference',
     referenceGroup: group,
     order,
+    visual: options.visual || null,
     sourceMeta: MAGIC_SOURCE_METADATA,
     article: buildMagicReferenceArticle(title, summary, options)
   });
@@ -325,6 +360,7 @@ function ruleTopic(gameId, sectionId, topicId, title, summary, sourceLabels, opt
     relatedTopics: options.relatedTopics || [],
     relatedMechanics: options.relatedMechanics || [],
     relatedCardTypes: options.relatedCardTypes || [],
+    visual: options.visual || null,
     article: options.article || buildDefaultRuleArticle(gameId, title, summary, options)
   };
 }
@@ -368,18 +404,42 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
     }),
     magicLearnLesson(3, 'learn-understanding-a-card', 'Understanding a Magic Card', 'A Magic card communicates its name, cost, color, type line, rules text, combat stats, and collector information through consistent card parts.', {
       previousSlug: 'learn-what-you-need',
-      nextSlug: 'learn-card-types',
+      nextSlug: 'learn-mana-and-colors',
       officialTerms: ['Mana cost', 'Type line', 'Rules text', 'Power', 'Toughness', 'Loyalty'],
       introduction: 'Reading the card correctly is the foundation of playing correctly. The Main Phase catalog can show real printings, but this lesson explains the rules meaning of the information printed on a card.',
       core: ['The name identifies the card. The mana cost in the upper corner tells you what mana is needed to cast it and usually determines color. The art helps identify the card but normally has no rules meaning.', 'The type line tells you whether the card is a creature, instant, sorcery, artifact, enchantment, planeswalker, land, battle, or a combination. Subtypes such as Goblin, Aura, Equipment, Forest, or Siege matter when card text asks for them.'],
       steps: ['Read the text box after the type line. Rules text tells you abilities and effects; reminder text explains a keyword in parentheses; flavor text is story text and is not used to determine gameplay.', 'Creatures use power and toughness for combat. Planeswalkers use loyalty. Collector number, rarity, artist, and set code identify the printing, which is useful for cataloging but usually not for game actions.'],
       example: 'Example: Llanowar Elves is a creature with a mana ability. Its type line makes it a permanent spell while on the stack, then a creature permanent after it resolves.',
       mistakes: ['Do not use flavor text as rules text. Only rules text, type line, and official rules define what a card does.', 'Do not confuse mana cost with color identity. Color identity matters mostly in Commander and includes more than just the mana cost.'],
-      relatedTopics: ['learn-card-types', 'reference-cards', 'reference-color-identity']
+      relatedTopics: ['learn-mana-and-colors', 'learn-card-types', 'reference-cards', 'reference-color-identity'],
+      visual: {
+        type: 'card-anatomy',
+        title: 'Read a real Magic card',
+        oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.serraAngel],
+        callouts: ['Name', 'Mana cost', 'Type line', 'Rules text', 'Power / Toughness']
+      }
     }),
-    magicLearnLesson(4, 'learn-card-types', 'Card Types', 'Magic card types determine timing, whether a spell becomes a permanent, and where a card goes after it resolves.', {
+    magicLearnLesson(4, 'learn-mana-and-colors', 'Mana and the Five Colors', 'Mana pays for spells and abilities, and Magic uses white, blue, black, red, green, generic, and true colorless costs in distinct ways.', {
       previousSlug: 'learn-understanding-a-card',
-      nextSlug: 'learn-mana-and-colors',
+      nextSlug: 'learn-card-types',
+      officialTerms: ['Mana', 'Generic mana', 'Colorless mana', 'Mana pool', 'Tap'],
+      introduction: 'Mana is the resource system that lets games build over time. Learning the difference between colored, generic, and colorless mana prevents many early mistakes.',
+      core: ['Colored mana is white, blue, black, red, or green. Generic mana is shown as a number and can be paid with mana of any type. True colorless mana is represented by the colorless symbol and must be paid with colorless mana.', 'Most lands tap to add mana. That mana goes into your mana pool temporarily, and you spend it to pay costs. Unspent mana empties as steps and phases end.'],
+      steps: ['To cast a spell, announce it, choose required modes and targets, determine the total cost, activate mana abilities if needed, then pay the cost. In a basic game, this often looks like tapping lands and placing the spell on the stack.', 'Playing a land is different from casting a spell. Under normal rules you may play one land on each of your turns during a main phase when the stack is empty.'],
+      example: 'Example: Cancel costs {1}{U}{U}. You can tap two Islands for the two blue mana and use any other available mana for the generic 1.',
+      mistakes: ['Do not treat the number in a mana cost as colorless mana. The number is generic and can be paid with any mana.', 'Do not save mana across phases unless a card specifically lets you. The mana pool empties as the turn moves on.'],
+      relatedTopics: ['reference-costs', 'reference-timing-permissions', 'learn-casting-spells'],
+      visual: {
+        type: 'mana-payment',
+        title: 'Paying a spell cost',
+        oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.island, MAGIC_TEACHING_CARD_ORACLE_IDS.solRing, MAGIC_TEACHING_CARD_ORACLE_IDS.cancel],
+        cost: '{1}{U}{U}',
+        steps: ['Tap Island for {U}', 'Tap another blue source for {U}', 'Use any remaining mana for the generic {1}', 'Put Cancel on the stack after costs are paid']
+      }
+    }),
+    magicLearnLesson(5, 'learn-card-types', 'Card Types', 'Magic card types determine timing, whether a spell becomes a permanent, and where a card goes after it resolves.', {
+      previousSlug: 'learn-mana-and-colors',
+      nextSlug: 'learn-setting-up',
       officialTerms: ['Land', 'Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Planeswalker', 'Battle'],
       introduction: 'A new player does not need every subtype on day one, but they do need to know the major card types. Card type tells you when you can use a card and what happens after it resolves.',
       core: ['Lands are played as a special action and usually make mana. Creatures are permanents that can attack and block. Artifacts and enchantments are permanents that often provide ongoing effects. Planeswalkers are permanents with loyalty abilities. Battles are permanents that can be attacked under their own rules.', 'Instants can usually be cast whenever you have priority. Sorceries usually require your main phase, an empty stack, and priority. After resolving, instants and sorceries go to the graveyard instead of staying on the battlefield.'],
@@ -388,19 +448,8 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       mistakes: ['Do not cast lands. Playing a land is not casting a spell and does not use the stack.', 'Do not put creatures directly onto the battlefield when you announce them. They are spells first, then permanents after they resolve.'],
       relatedTopics: ['reference-card-types', 'reference-permanents', 'reference-spells']
     }),
-    magicLearnLesson(5, 'learn-mana-and-colors', 'Mana and the Five Colors', 'Mana pays for spells and abilities, and Magic uses white, blue, black, red, green, generic, and true colorless costs in distinct ways.', {
-      previousSlug: 'learn-card-types',
-      nextSlug: 'learn-setting-up',
-      officialTerms: ['Mana', 'Generic mana', 'Colorless mana', 'Mana pool', 'Tap'],
-      introduction: 'Mana is the resource system that lets games build over time. Learning the difference between colored, generic, and colorless mana prevents many early mistakes.',
-      core: ['Colored mana is white, blue, black, red, or green. Generic mana is shown as a number and can be paid with mana of any type. True colorless mana is represented by the colorless symbol and must be paid with colorless mana.', 'Most lands tap to add mana. That mana goes into your mana pool temporarily, and you spend it to pay costs. Unspent mana empties as steps and phases end.'],
-      steps: ['To cast a spell, announce it, choose required modes and targets, determine the total cost, activate mana abilities if needed, then pay the cost. In a basic game, this often looks like tapping lands and placing the spell on the stack.', 'Playing a land is different from casting a spell. Under normal rules you may play one land on each of your turns during a main phase when the stack is empty.'],
-      example: 'Example: a spell that costs {2}{G} needs one green mana plus two additional mana of any type. A spell that costs {C} specifically needs colorless mana.',
-      mistakes: ['Do not treat the number in a mana cost as colorless mana. The number is generic and can be paid with any mana.', 'Do not save mana across phases unless a card specifically lets you. The mana pool empties as the turn moves on.'],
-      relatedTopics: ['reference-costs', 'reference-timing-permissions', 'learn-casting-spells']
-    }),
     magicLearnLesson(6, 'learn-setting-up', 'Setting Up a Game', 'A normal two-player Magic game starts with shuffled decks, opening seven-card hands, mulligans, 20 life, and a chosen starting player.', {
-      previousSlug: 'learn-mana-and-colors',
+      previousSlug: 'learn-card-types',
       nextSlug: 'learn-zones',
       officialTerms: ['Shuffle', 'Opening hand', 'Mulligan', 'Starting player', 'Draw step'],
       introduction: 'Setup is where players agree on the format and create the starting game state. This lesson covers ordinary Magic and calls out where Commander differs.',
@@ -421,7 +470,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       mistakes: ['Do not call the battlefield your field if that makes zones unclear; rules questions often depend on exact zone names.', 'Do not put exiled cards into the graveyard unless an effect specifically says to move them there.'],
       relatedTopics: ['reference-zones', 'reference-stack', 'reference-command-zone']
     }),
-    magicLearnLesson(8, 'learn-starting-hand-and-mulligans', 'Starting Hand and Mulligans', 'Players draw an opening hand of seven cards and may mulligan to improve unplayable hands, keeping fewer cards under current mulligan procedure.', {
+    magicLearnLesson(8, 'learn-starting-hand-and-mulligans', 'Opening Hand and Mulligans', 'Players draw an opening hand of seven cards and may mulligan to improve unplayable hands, keeping fewer cards under current mulligan procedure.', {
       previousSlug: 'learn-zones',
       nextSlug: 'learn-taking-your-turn',
       officialTerms: ['Opening hand', 'Mulligan', 'Library', 'Hand'],
@@ -441,7 +490,12 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       steps: ['Combat has beginning of combat, declare attackers, declare blockers, combat damage, and end of combat. Players get chances to cast instants or activate abilities between many combat steps, after turn-based actions such as declaring attackers or blockers are complete.', 'After combat, the second main phase works like the first main phase. If you already played your normal land for the turn, you do not get another one. The ending phase has the end step for end-of-turn triggers and responses, then cleanup, where damage marked on creatures is removed and the active player discards down to maximum hand size if needed.'],
       example: 'Example: you can cast a creature during your first main phase, attack with older creatures in combat, then cast another sorcery in your second main phase. Your opponent can cast an instant before blockers or after combat damage if they have priority.',
       mistakes: ['Do not play a land during combat or your opponent turn unless a card explicitly permits it.', 'Do not skip priority windows when they matter. Players often shortcut quiet turns, but responses still belong in the correct phase or step.'],
-      relatedTopics: ['reference-turn-structure', 'reference-priority', 'learn-combat']
+      relatedTopics: ['reference-turn-structure', 'reference-priority', 'learn-combat'],
+      visual: {
+        type: 'turn-timeline',
+        title: 'Turn structure',
+        steps: ['Beginning: untap, upkeep, draw', 'First main: lands and sorcery-speed plays', 'Combat: attackers, blockers, damage', 'Second main: another main phase', 'Ending: end step, cleanup']
+      }
     }),
     magicLearnLesson(10, 'learn-casting-spells', 'Playing Lands and Casting Spells', 'Playing a land is a special action; casting a spell means announcing it, making choices, paying costs, and putting it on the stack.', {
       previousSlug: 'learn-taking-your-turn',
@@ -456,28 +510,57 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
     }),
     magicLearnLesson(11, 'learn-combat', 'Combat', 'Combat lets creatures attack players, planeswalkers, and battles, then blockers and combat damage determine what survives.', {
       previousSlug: 'learn-casting-spells',
-      nextSlug: 'learn-stack-and-responses',
+      nextSlug: 'learn-instants-and-responses',
       officialTerms: ['Summoning sickness', 'Declare attackers', 'Declare blockers', 'Combat damage', 'Lethal damage', 'State-based actions'],
       introduction: 'Combat is where many beginner games are won, but it is also a structured phase with several decision points. This lesson teaches the order and the common traps.',
       core: ['A creature usually cannot attack or use abilities with the tap or untap symbol unless its controller has controlled it continuously since the start of their most recent turn. Players often call this summoning sickness.', 'During declare attackers, the attacking player chooses which eligible creatures attack and what each one attacks, then taps attackers unless vigilance or another effect says otherwise. The defending player later chooses blockers with untapped creatures they control.'],
       steps: ['A blocked creature stays blocked even if all blockers leave combat before damage. During combat damage, creatures assign damage. Unblocked attackers damage what they attacked; blocked creatures and blockers deal damage to each other unless an effect changes that.', 'Damage greater than or equal to toughness is lethal. Creatures with lethal damage are put into their owners graveyards as state-based actions. At cleanup, damage marked on surviving creatures is removed.'],
       example: 'Example: a 3/3 attacks and is blocked by a 2/2. They deal combat damage at the same time, the 2/2 has lethal damage and dies, and the 3/3 survives with 2 damage marked until cleanup.',
       mistakes: ['Do not attack with a creature you just cast unless it has haste or another effect allows it.', 'Do not wait until after blockers to tap an attacking creature as the cost of an ability unless the creature is still untapped; attackers normally tapped when declared.'],
-      relatedTopics: ['reference-combat-steps', 'reference-attacking', 'reference-blocking', 'reference-first-strike-double-strike']
+      relatedTopics: ['reference-combat-steps', 'reference-attacking', 'reference-blocking', 'reference-first-strike-double-strike'],
+      visual: {
+        type: 'combat',
+        title: 'Combat damage example',
+        oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.grizzlyBears, MAGIC_TEACHING_CARD_ORACLE_IDS.hillGiant, MAGIC_TEACHING_CARD_ORACLE_IDS.colossalDreadmaw, MAGIC_TEACHING_CARD_ORACLE_IDS.typhoidRats],
+        steps: ['Declare Hill Giant as an attacker', 'Defending player blocks with Grizzly Bears', 'Both creatures assign combat damage', 'State-based actions put the creature with lethal damage into the graveyard']
+      }
     }),
-    magicLearnLesson(12, 'learn-stack-and-responses', 'Instants, Responses, and the Stack', 'The stack is the waiting area for spells and most abilities; responses go on top and the top object resolves first.', {
+    magicLearnLesson(12, 'learn-instants-and-responses', 'Instants and Responses', 'Instants and many activated abilities can be used when a player has priority, letting players answer spells and combat decisions before they resolve.', {
       previousSlug: 'learn-combat',
-      nextSlug: 'learn-abilities-and-triggers',
-      officialTerms: ['Stack', 'Priority', 'Instant', 'Activated ability', 'Triggered ability', 'Resolve'],
-      introduction: 'The stack is the first deep Magic concept most players meet because it explains why responses can change an apparently simple spell. This lesson teaches the beginner version before the full priority reference.',
-      core: ['When a player casts a spell, it usually goes on the stack instead of resolving immediately. Other players get a chance to respond with instants or abilities they are allowed to use.', 'Each response is placed on top of what was already waiting. The top object resolves first, so the most recent response can change what happens to the original spell.'],
-      steps: ['After a spell or ability resolves, players get priority again. The next object on the stack resolves only when all players pass priority in a row without adding anything new.', 'Some actions do not use the stack, including playing a land, turning a face-down creature face up in the appropriate way, and many mana abilities. A land play does not use the stack, which is one of the clearest beginner examples.'],
-      example: 'Example: you cast Lightning Bolt targeting a 3/3 creature. Your opponent responds with Giant Growth. Giant Growth resolves first, making the creature bigger, then Lightning Bolt may no longer be enough damage to destroy it.',
-      mistakes: ['Do not resolve the original spell before asking whether opponents respond.', 'Do not put lands on the stack. A land play is not a spell.'],
-      relatedTopics: ['reference-stack', 'reference-priority', 'reference-triggered-abilities']
+      nextSlug: 'learn-stack',
+      officialTerms: ['Instant', 'Priority', 'Activated ability', 'Response', 'Resolve'],
+      introduction: 'Responses are how Magic becomes interactive on both players turns. This lesson focuses on when a player may answer something before the next lesson opens the stack in more detail.',
+      core: ['Instants can usually be cast whenever you have priority. Many activated abilities can also be used at those times unless card text restricts them.', 'A response does not rewind the game. It is added at the right time, then resolves before the thing it answered if all players pass priority.'],
+      steps: ['Ask who has priority, identify what is currently waiting, then decide whether to cast an instant, activate an ability, or pass.', 'If all players pass without adding anything, the top waiting object resolves. Players receive priority again after that resolution before anything lower resolves.'],
+      example: 'Example: an opponent casts Lightning Bolt targeting your creature. You can respond with an instant before Lightning Bolt resolves if you have priority and can pay the cost.',
+      mistakes: ['Do not wait until after a spell resolves to say you wanted to respond.', 'Do not respond to land plays; playing a land does not use the stack.'],
+      relatedTopics: ['reference-priority', 'reference-stack', 'learn-stack'],
+      visual: {
+        type: 'stack',
+        title: 'A response sits above the original spell',
+        oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.lightningBolt, MAGIC_TEACHING_CARD_ORACLE_IDS.counterspell],
+        stack: ['Counterspell resolves first', 'Lightning Bolt is countered if Counterspell resolves', 'The original target is affected only if Lightning Bolt still resolves']
+      }
     }),
-    magicLearnLesson(13, 'learn-abilities-and-triggers', 'Abilities and Triggers', 'Magic abilities are static, activated, triggered, or mana abilities, and each type behaves differently at the table.', {
-      previousSlug: 'learn-stack-and-responses',
+    magicLearnLesson(13, 'learn-stack', 'The Stack', 'The stack is the waiting area for spells and most abilities; the newest object resolves first after all players pass priority.', {
+      previousSlug: 'learn-instants-and-responses',
+      nextSlug: 'learn-abilities-and-triggers',
+      officialTerms: ['Stack', 'Priority', 'Spell', 'Ability', 'Resolve'],
+      introduction: 'The stack is the first deep Magic concept most players meet because it explains why responses can change an apparently simple spell. This lesson teaches the play pattern before the full priority reference.',
+      core: ['When a player casts a spell, it usually goes on the stack instead of resolving immediately. Other players get a chance to respond with instants or abilities they are allowed to use.', 'Each response is placed on top of what was already waiting. The top object resolves first, so the most recent response can change what happens to the original spell.'],
+      steps: ['After a spell or ability resolves, players get priority again. The next object on the stack resolves only when all players pass priority in a row without adding anything new.', 'Some actions do not use the stack, including playing a land and many mana abilities. A land play does not use the stack, which is one of the clearest beginner examples.'],
+      example: 'Example: you cast Lightning Bolt, then an opponent casts Counterspell. Counterspell is on top, resolves first, and can stop Lightning Bolt before the Bolt deals damage.',
+      mistakes: ['Do not resolve the original spell before asking whether opponents respond.', 'Do not put lands on the stack. A land play is not a spell.'],
+      relatedTopics: ['reference-stack', 'reference-priority', 'reference-triggered-abilities'],
+      visual: {
+        type: 'stack',
+        title: 'Top object resolves first',
+        oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.lightningBolt, MAGIC_TEACHING_CARD_ORACLE_IDS.counterspell, MAGIC_TEACHING_CARD_ORACLE_IDS.cancel],
+        stack: ['Cancel or Counterspell on top', 'Lightning Bolt underneath', 'After the top object resolves, players get priority again']
+      }
+    }),
+    magicLearnLesson(14, 'learn-abilities-and-triggers', 'Abilities and Triggers', 'Magic abilities are static, activated, triggered, or mana abilities, and each type behaves differently at the table.', {
+      previousSlug: 'learn-stack',
       nextSlug: 'learn-winning-and-losing',
       officialTerms: ['Static ability', 'Activated ability', 'Triggered ability', 'Mana ability', 'Cost', 'Target'],
       introduction: 'Card text often creates abilities instead of one-shot spell instructions. Learning the four big ability families helps players answer what uses the stack and what simply applies.',
@@ -485,9 +568,15 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       steps: ['For activated abilities, identify the cost before the colon and pay it to activate the ability. For triggered abilities, wait for the triggering event, then put the trigger on the stack at the next appropriate time.', 'If an ability says target, choose legal targets when it is put on the stack. If all targets are illegal when it tries to resolve, it does not resolve.'],
       example: 'Example: Prodigal Pyromancer has an activated ability because it uses a colon. Soul Warden has a triggered ability because it starts with whenever.',
       mistakes: ['Do not treat all abilities as optional. If a triggered ability is mandatory, it triggers even when its controller would rather ignore it.', 'Do not pay an activated ability cost twice unless you are activating it twice and can legally do so.'],
-      relatedTopics: ['reference-abilities', 'reference-triggered-abilities', 'reference-targets']
+      relatedTopics: ['reference-abilities', 'reference-triggered-abilities', 'reference-targets'],
+      visual: {
+        type: 'trigger',
+        title: 'Triggered ability words',
+        oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.soulWarden, MAGIC_TEACHING_CARD_ORACLE_IDS.alesha],
+        triggerWords: ['When', 'Whenever', 'At']
+      }
     }),
-    magicLearnLesson(14, 'learn-winning-and-losing', 'Winning and Losing', 'Common Magic losses happen at 0 or less life, drawing from an empty library, having enough poison counters, card-specific effects, or concession.', {
+    magicLearnLesson(15, 'learn-winning-and-losing', 'Winning and Losing', 'Common Magic losses happen at 0 or less life, drawing from an empty library, having enough poison counters, card-specific effects, or concession.', {
       previousSlug: 'learn-abilities-and-triggers',
       nextSlug: 'learn-building-first-deck',
       officialTerms: ['Lose the game', 'Win the game', 'Poison counter', 'Concede', 'Empty library'],
@@ -498,7 +587,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       mistakes: ['Do not confuse damage with loss of life; both can reduce a life total, but prevention, lifelink, and trigger text may care about the difference.', 'Do not remove poison counters when life changes. They are separate resources.'],
       relatedTopics: ['reference-state-based-actions', 'reference-multiplayer']
     }),
-    magicLearnLesson(15, 'learn-building-first-deck', 'Building Your First Deck', 'A first Constructed deck should follow format size, copy limits, basic-land exceptions, color choices, and a playable mana curve.', {
+    magicLearnLesson(16, 'learn-building-first-deck', 'Building Your First Deck', 'A first Constructed deck should follow format size, copy limits, basic-land exceptions, color choices, and a playable mana curve.', {
       previousSlug: 'learn-winning-and-losing',
       nextSlug: 'learn-where-to-go-next',
       officialTerms: ['Constructed deck', 'Sideboard', 'Four-card limit', 'Basic land', 'Format'],
@@ -509,7 +598,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       mistakes: ['Do not use Commander singleton rules for every Magic deck. Singleton is a Commander feature, not a universal Constructed rule.', 'Do not add too many colors before your lands can reliably produce them. Mana problems make it hard to learn the rest of the game.'],
       relatedTopics: ['reference-deck-construction', 'reference-formats', 'reference-commander']
     }),
-    magicLearnLesson(16, 'learn-where-to-go-next', 'Where to Go Next', 'After the first game, players can deepen their rules knowledge through formats, keywords, stack timing, Commander, and set browsing.', {
+    magicLearnLesson(17, 'learn-where-to-go-next', 'Where to Go Next', 'After the first game, players can deepen their rules knowledge through formats, keywords, stack timing, Commander, and set browsing.', {
       previousSlug: 'learn-building-first-deck',
       nextSlug: null,
       officialTerms: ['Format', 'Keyword ability', 'Rules reference', 'Commander'],
@@ -528,10 +617,32 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
     magicReferenceTopic('core', 6, 'reference-abilities', 'Abilities', 'Abilities are rules text that can be static, activated, triggered, or mana abilities.', { officialTerms: ['Static ability', 'Activated ability', 'Triggered ability', 'Mana ability'], relatedTopics: ['learn-abilities-and-triggers', 'reference-triggered-abilities'] }),
     magicReferenceTopic('core', 7, 'reference-costs', 'Costs', 'Costs are what a player must pay to cast spells, activate abilities, or satisfy effects.', { officialTerms: ['Mana cost', 'Additional cost', 'Alternative cost', 'Cost reduction'], relatedTopics: ['learn-mana-and-colors', 'reference-spells'] }),
     magicReferenceTopic('core', 8, 'reference-targets', 'Targets', 'Targets are chosen when a spell or ability is put on the stack and must remain legal for that object to resolve against them.', { officialTerms: ['Target', 'Legal target', 'Hexproof', 'Ward'], relatedTopics: ['reference-stack', 'reference-abilities'] }),
-    magicReferenceTopic('timing', 1, 'reference-priority', 'Priority', 'Priority is the permission system that tells which player may cast spells, activate abilities, or take certain special actions.', { officialTerms: ['Priority', 'Active player', 'Nonactive player', 'Pass priority'], relatedTopics: ['reference-stack', 'reference-apnap-ordering'], definition: 'Priority is given first to the active player at many points after turn-based actions and state-based actions are handled. The active player/nonactive player order matters when multiple players may act.', application: ['A player with priority may cast an instant, activate an ability, take an allowed special action, or pass. Sorcery-speed plays also require that it is the player own main phase and the stack is empty.', 'A stack object resolves only after every player passes priority in succession. After it resolves, priority starts again before the next object resolves.'], example: 'Example: after you cast a creature, you get priority again first, but the creature does not resolve until all players pass priority without adding another response.' }),
-    magicReferenceTopic('timing', 2, 'reference-stack', 'Stack', 'The stack orders spells and most abilities so the newest object resolves first after all players pass priority.', { officialTerms: ['Stack', 'Spell', 'Activated ability', 'Triggered ability', 'Resolve'], relatedTopics: ['learn-stack-and-responses', 'reference-priority'], definition: 'The stack is a zone used by spells and most nonmana abilities. Objects on the stack resolve one at a time from top to bottom.', application: ['When a player responds, the response goes above the existing object. That response can counter, change targets, add damage, create prevention, or otherwise change what the lower object will do.', 'After a stack object resolves, the active player receives priority. The next object waits until all players pass again.'], example: 'Example: Counterspell cast in response to a creature spell resolves first and can counter that creature spell before it becomes a permanent.' }),
+    magicReferenceTopic('timing', 1, 'reference-priority', 'Priority', 'Priority is the permission system that tells which player may cast spells, activate abilities, or take certain special actions.', {
+      officialTerms: ['Priority', 'Active player', 'Nonactive player', 'Pass priority'],
+      aliases: ['response window', 'can I respond', 'instant timing', 'APNAP priority'],
+      searchTerms: ['active player', 'nonactive player', 'pass priority', 'shortcut', 'resolve stack'],
+      relatedTopics: ['reference-stack', 'reference-apnap-ordering'],
+      sections: [
+        { heading: 'Definition', body: ['Priority is the rules permission that lets one player act before the game moves forward. At many points, the active player receives priority first, then each nonactive player receives the chance to act in turn order.', 'Before a player receives priority, the game handles state-based actions and puts waiting triggered abilities on the stack. That order matters because players cannot save a creature with lethal damage after state-based actions have already moved it.'] },
+        { heading: 'Priority Cycle', body: ['A player with priority may cast an instant, activate an ability, take an allowed special action, or pass. Sorcery-speed plays also require that it is that players own main phase and the stack is empty.', 'A stack object resolves only after every player passes priority in succession without adding another object. After one object resolves, the active player receives priority again before the next object resolves.'], example: 'Example: after you cast a creature, you receive priority again first, but the creature does not resolve until every player passes priority without adding another response.' },
+        { heading: 'Shortcuts', body: ['Players often shortcut quiet priority passes by saying combat, go, or no responses. Those shortcuts are useful, but they still represent real priority passes underneath.', 'When a shortcut is unclear, back up the communication to the relevant phase, step, stack object, and player with priority before choosing actions.'] },
+        { heading: 'Common Pitfalls', body: ['Do not resolve a spell just because it was announced. Opponents still get priority before it resolves.', 'Do not assume the nonactive player acts first because they might want to respond. Priority starts with the active player at the normal priority points.'] }
+      ]
+    }),
+    magicReferenceTopic('timing', 2, 'reference-stack', 'Stack', 'The stack orders spells and most abilities so the newest object resolves first after all players pass priority.', { officialTerms: ['Stack', 'Spell', 'Activated ability', 'Triggered ability', 'Resolve'], relatedTopics: ['learn-stack', 'reference-priority'], definition: 'The stack is a zone used by spells and most nonmana abilities. Objects on the stack resolve one at a time from top to bottom.', application: ['When a player responds, the response goes above the existing object. That response can counter, change targets, add damage, create prevention, or otherwise change what the lower object will do.', 'After a stack object resolves, the active player receives priority. The next object waits until all players pass again.'], example: 'Example: Counterspell cast in response to a creature spell resolves first and can counter that creature spell before it becomes a permanent.' }),
     magicReferenceTopic('timing', 3, 'reference-timing-permissions', 'Timing Permissions', 'Timing permissions define when lands, sorceries, permanents, instants, activated abilities, and special actions can be used.', { officialTerms: ['Sorcery timing', 'Instant timing', 'Special action', 'Land play'], relatedTopics: ['learn-taking-your-turn', 'learn-casting-spells'] }),
-    magicReferenceTopic('timing', 4, 'reference-state-based-actions', 'State-Based Actions', 'State-based actions are automatic checks that handle lethal damage, 0 life, illegal attachments, zero loyalty, and similar game states.', { officialTerms: ['State-based action', 'Lethal damage', 'Zero life', 'Legend rule'], relatedTopics: ['learn-winning-and-losing', 'reference-combat-damage'] }),
+    magicReferenceTopic('timing', 4, 'reference-state-based-actions', 'State-Based Actions', 'State-based actions are automatic checks that handle lethal damage, 0 life, illegal attachments, zero loyalty, and similar game states.', {
+      officialTerms: ['State-based action', 'Lethal damage', 'Zero life', 'Legend rule'],
+      aliases: ['SBA', 'dies automatically', 'lethal damage check', 'legend rule'],
+      searchTerms: ['zero life', 'lethal damage', 'poison counters', 'zero toughness', 'checked repeatedly'],
+      relatedTopics: ['learn-winning-and-losing', 'reference-combat-damage'],
+      sections: [
+        { heading: 'Definition', body: ['State-based actions are automatic game checks. They do not use the stack, they are not triggered abilities, and players do not get priority while the game is performing them.', 'The game checks state-based actions whenever a player would receive priority. If any apply, the game performs all applicable actions at once, then checks again until no state-based actions apply.'] },
+        { heading: 'What They Catch', body: ['Common checks include a player at 0 or less life losing, a creature with lethal damage being put into its owners graveyard, a creature with 0 or less toughness being put into its owners graveyard, and planeswalkers with no loyalty being put into the graveyard.', 'State-based actions also handle poison counters, the legend rule, illegal Auras or Equipment, battles with no defense counters, and other rule-defined impossible states.'], example: 'Example: a 2/2 with 2 damage marked is put into its owners graveyard before any player can cast another spell.' },
+        { heading: 'Why Repeated Checks Matter', body: ['One state-based action can create another state-based action. The game keeps checking until the table is stable before triggers are put on the stack and priority returns.', 'This repeated checking is why several permanents can leave at once before death triggers or other triggered abilities are ordered.'] },
+        { heading: 'Common Pitfalls', body: ['Do not try to respond to state-based actions. You can act before the game reaches the check, but not during the automatic check itself.', 'Do not confuse a state-based action with a triggered ability. A trigger uses the stack; a state-based action simply happens when checked.'] }
+      ]
+    }),
     magicReferenceTopic('timing', 5, 'reference-triggered-abilities', 'Triggered Abilities', 'Triggered abilities begin with when, whenever, or at and wait to go on the stack after their trigger event occurs.', { officialTerms: ['Triggered ability', 'Trigger event', 'Intervening if'], relatedTopics: ['learn-abilities-and-triggers', 'reference-simultaneous-triggers'] }),
     magicReferenceTopic('timing', 6, 'reference-replacement-effects', 'Replacement Effects', 'Replacement and prevention effects modify events before they happen instead of triggering after the event.', { officialTerms: ['Replacement effect', 'Prevention effect', 'Instead', 'Skip'], relatedTopics: ['reference-triggered-abilities', 'reference-continuous-effects'] }),
     magicReferenceTopic('timing', 7, 'reference-continuous-effects', 'Continuous Effects', 'Continuous effects modify objects, players, or rules for a duration or while a static ability applies.', { officialTerms: ['Continuous effect', 'Duration', 'Static ability'], relatedTopics: ['reference-layers', 'reference-dependency-timestamp'] }),
@@ -551,7 +662,18 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
     magicReferenceTopic('card-rules', 7, 'reference-copies', 'Copies', 'Copy effects create copies of spells, permanents, cards, or tokens using copiable values and effect instructions.', { officialTerms: ['Copy', 'Copiable values', 'Token copy'], relatedTopics: ['reference-tokens', 'reference-layers'] }),
     magicReferenceTopic('card-rules', 8, 'reference-face-down-cards', 'Face-Down Cards', 'Face-down cards have special characteristics and can be turned face up only under rules or effects that permit it.', { officialTerms: ['Face down', 'Morph', 'Disguise', 'Manifest'], relatedTopics: ['reference-timing-permissions'] }),
     magicReferenceTopic('card-rules', 9, 'reference-modal-split-double-faced-cards', 'Modal, Split, and Double-Faced Cards', 'Modal, split, and double-faced cards use special rules for choosing modes, halves, or faces in zones and while casting.', { officialTerms: ['Mode', 'Split card', 'Modal double-faced card', 'Transforming double-faced card'], relatedTopics: ['reference-cards', 'reference-spells'] }),
-    magicReferenceTopic('advanced', 1, 'reference-layers', 'Layers / Continuous Effect Interaction', 'The layer system orders continuous effects that change control, text, type, color, abilities, power, and toughness.', { officialTerms: ['Layer', 'Continuous effect', 'Dependency', 'Timestamp'], relatedTopics: ['reference-continuous-effects', 'reference-dependency-timestamp'] }),
+    magicReferenceTopic('advanced', 1, 'reference-layers', 'Layers / Continuous Effect Interaction', 'The layer system orders continuous effects that change control, text, type, color, abilities, power, and toughness.', {
+      officialTerms: ['Layer', 'Continuous effect', 'Dependency', 'Timestamp'],
+      aliases: ['continuous effect order', 'power toughness layers', 'timestamp order', 'dependency'],
+      searchTerms: ['layer 1', 'layer 4', 'layer 6', 'layer 7', 'timestamp', 'dependency', 'power and toughness'],
+      relatedTopics: ['reference-continuous-effects', 'reference-dependency-timestamp'],
+      sections: [
+        { heading: 'Definition', body: ['Layers are the rule system for applying continuous effects in a stable order. They matter when more than one continuous effect changes the same object or rule at the same time.', 'The system covers copy effects, control changes, text changes, type changes, color changes, ability changes, and power/toughness changes. Power and toughness have their own sublayers because counters, base setting, modifiers, and switches interact often.'] },
+        { heading: 'Application Order', body: ['Start by identifying every continuous effect that applies. Place each effect into its layer, then apply lower-numbered layers before higher-numbered layers.', 'Inside a layer, use dependency first when the rules say one effect depends on another. If dependency does not decide the order, apply effects by timestamp unless a specific rule says otherwise.'], example: 'Example: an effect that removes abilities and an effect that grants flying are both ability-changing effects. If neither depends on the other, timestamp determines whether the creature currently has flying.' },
+        { heading: 'Power And Toughness', body: ['Power/toughness effects are separated because a creature can have a base-setting effect, counters, bonuses, and a switch effect all at once.', 'Apply base-setting effects before modifiers from counters and other effects, then apply switching effects at the end of the power/toughness layer sequence.'] },
+        { heading: 'Common Pitfalls', body: ['Do not use timestamp before checking whether effects are in different layers. A later type-changing effect can still apply before an earlier ability-changing effect because the layer order controls first.', 'Do not treat counters as normal text bonuses. Counters live in the appropriate power/toughness sublayer and can produce a different result than a written continuous effect.'] }
+      ]
+    }),
     magicReferenceTopic('advanced', 2, 'reference-apnap-ordering', 'APNAP Ordering', 'APNAP ordering means the active player makes or orders required choices first, then nonactive players do so in turn order.', { officialTerms: ['Active player', 'Nonactive player', 'Turn order'], relatedTopics: ['reference-priority', 'reference-simultaneous-triggers'] }),
     magicReferenceTopic('advanced', 3, 'reference-simultaneous-triggers', 'Simultaneous Triggers', 'When multiple triggered abilities wait to go on the stack, controller and APNAP ordering determine how they are ordered.', { officialTerms: ['Triggered ability', 'APNAP order', 'Controller'], relatedTopics: ['reference-triggered-abilities', 'reference-apnap-ordering'] }),
     magicReferenceTopic('advanced', 4, 'reference-dependency-timestamp', 'Dependency and Timestamp', 'Dependency and timestamp rules help order continuous effects within layers when effects interact.', { officialTerms: ['Dependency', 'Timestamp', 'Continuous effect'], relatedTopics: ['reference-layers'] }),
@@ -566,7 +688,23 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
     magicReferenceTopic('formats', 8, 'reference-deck-construction', 'Deck Construction', 'Deck construction rules depend on format, including minimum size, sideboard, copy limits, and basic-land exceptions.', { officialTerms: ['Minimum deck size', 'Sideboard', 'Four-card limit', 'Basic land'], relatedTopics: ['learn-building-first-deck', 'reference-formats'] }),
     magicReferenceTopic('commander', 1, 'reference-commander', 'Commander', 'Commander is a multiplayer format built around a commander, a 99-card singleton deck, color identity, and the command zone.', { officialTerms: ['Commander', 'Singleton', 'Color identity', 'Command zone'], relatedTopics: ['reference-color-identity', 'reference-command-zone', 'reference-commander-tax', 'reference-commander-damage'], sourceLabels: ['Magic Commander format'] }),
     magicReferenceTopic('commander', 2, 'reference-commander-selection', 'Commander Selection', 'Commander decks choose a legal commander, usually a legendary creature, with some cards permitting other commander choices.', { officialTerms: ['Legendary creature', 'Can be your commander', 'Commander'], relatedTopics: ['reference-commander', 'reference-color-identity'], sourceLabels: ['Magic Commander format'] }),
-    magicReferenceTopic('commander', 3, 'reference-color-identity', 'Color Identity', 'Color identity determines which cards can be included in a Commander deck and includes mana symbols and characteristic-defining color indicators beyond mana cost.', { officialTerms: ['Color identity', 'Mana symbol', 'Color indicator', 'Commander deck'], relatedTopics: ['learn-understanding-a-card', 'reference-commander'], sourceLabels: ['Magic Commander format'], definition: 'Color identity is a Commander deck construction rule. A card color identity includes its colors plus mana symbols and color indicators that the Commander rules count for identity.', application: ['A Commander deck can include only cards whose color identity fits within the commander color identity. Lands and colorless cards still need to obey this rule if their rules text contains mana symbols outside the commander identity.', 'Basic lands are allowed as repeated cards, but their mana symbols and land types still need to fit the commander deck color identity expectations.'], example: 'Example: a blue-red commander allows cards with blue, red, both, or no color identity, but not a card with a green mana symbol in its rules text unless an official exception applies.' }),
+    magicReferenceTopic('commander', 3, 'reference-color-identity', 'Color Identity', 'Color identity determines which cards can be included in a Commander deck and includes mana symbols and characteristic-defining color indicators beyond mana cost.', {
+      officialTerms: ['Color identity', 'Mana symbol', 'Color indicator', 'Commander deck'],
+      aliases: ['commander colors', 'deck color rule', 'hybrid mana identity'],
+      searchTerms: ['mana symbols', 'commander deck', 'hybrid mana', 'colorless card', 'basic land'],
+      relatedTopics: ['learn-understanding-a-card', 'reference-commander'],
+      sourceLabels: ['Magic Commander format'],
+      definition: 'Color identity is a Commander deck construction rule. A card color identity includes its colors plus mana symbols and color indicators that the Commander rules count for identity.',
+      application: ['A Commander deck can include only cards whose color identity fits within the commander color identity. Lands and colorless cards still need to obey this rule if their rules text contains mana symbols outside the commander identity.', 'Basic lands are allowed as repeated cards, but their mana symbols and land types still need to fit the commander deck color identity expectations.'],
+      example: 'Example: a blue-red commander allows cards with blue, red, both, or no color identity, but not a card with a green mana symbol in its rules text unless an official exception applies.',
+      visual: {
+        type: 'commander-color-identity',
+        title: 'Commander color identity example',
+        oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.alesha, MAGIC_TEACHING_CARD_ORACLE_IDS.plains, MAGIC_TEACHING_CARD_ORACLE_IDS.lightningBolt, MAGIC_TEACHING_CARD_ORACLE_IDS.commandTower, MAGIC_TEACHING_CARD_ORACLE_IDS.arcaneSignet],
+        allowed: ['White symbols', 'Black symbols', 'Red symbols', 'Colorless cards'],
+        blocked: ['Cards with blue symbols', 'Cards with green symbols']
+      }
+    }),
     magicReferenceTopic('commander', 4, 'reference-command-zone', 'Command Zone', 'The command zone is where commanders begin the game and where special Commander replacement effects can move them.', { officialTerms: ['Command zone', 'Commander', 'Zone change'], relatedTopics: ['reference-commander', 'reference-commander-tax'], sourceLabels: ['Magic Commander format'] }),
     magicReferenceTopic('commander', 5, 'reference-commander-tax', 'Commander Tax', 'Commander tax is the additional cost to cast a commander from the command zone for each previous time it was cast from there.', { officialTerms: ['Additional cost', 'Command zone', 'Cast from command zone'], relatedTopics: ['reference-command-zone', 'reference-costs'], sourceLabels: ['Magic Commander format'] }),
     magicReferenceTopic('commander', 6, 'reference-commander-damage', 'Commander Damage', 'A player can lose from being dealt enough combat damage by the same commander over the course of the game.', { officialTerms: ['Commander damage', 'Combat damage', 'Lose the game'], relatedTopics: ['reference-commander', 'reference-combat-damage'], sourceLabels: ['Magic Commander format'] }),

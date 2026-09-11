@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ENCYCLOPEDIA_GAMES, ENCYCLOPEDIA_RULE_TOPICS, MAGIC_KEYWORD_GLOSSARY } from '../src/services/knowledge/encyclopediaData.js';
+import { ENCYCLOPEDIA_GAMES, ENCYCLOPEDIA_RULE_TOPICS, MAGIC_KEYWORD_GLOSSARY, MAGIC_TEACHING_CARD_ORACLE_IDS } from '../src/services/knowledge/encyclopediaData.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const requiredRoutes = [
@@ -10,6 +10,8 @@ const requiredRoutes = [
   '/Encyclopedia/:game/sets',
   '/Encyclopedia/:game/sets/:setSlug',
   '/Encyclopedia/:game/sets/:setSlug/cards/:cardId',
+  '/Encyclopedia/:game/learn',
+  '/Encyclopedia/:game/learn/:topicSlug',
   '/Encyclopedia/:game/rules',
   '/Encyclopedia/:game/rules/:topicSlug'
 ];
@@ -95,8 +97,11 @@ assert(!pageFile.includes('View all sets'), 'Game landings must not gate the set
 assert(!pageFile.includes('function CardDetailPage'), 'Duplicate Encyclopedia card detail page must not be active');
 assert(pageFile.includes('EncyclopediaCardRedirect') && pageFile.includes('<Navigate'), 'Legacy Encyclopedia card URLs must redirect to canonical CardDetail');
 assert(pageFile.includes('returnTo') && pageFile.includes('returnLabel'), 'Encyclopedia card routes must preserve return context');
-assert(pageFile.includes('Rules / How to Play'), 'Rules section must use public how-to-play labeling');
-assert(pageFile.includes('MagicRulesOverview'), 'Magic game landing must expose distinct Learn to Play and Rules Reference paths');
+assert(pageFile.includes('function MagicHub'), 'Magic game landing must render a three-destination hub');
+assert(pageFile.includes('/Encyclopedia/magic/sets') && pageFile.includes('/Encyclopedia/magic/learn') && pageFile.includes('/Encyclopedia/magic/rules'), 'Magic hub must expose Sets & Cards, Learn to Play, and Game Rules routes');
+assert(pageFile.includes('function LearnPage'), 'Magic Learn to Play route must render a dedicated course page');
+assert(pageFile.includes('LessonVisual') && pageFile.includes('getMagicTeachingCards'), 'Magic lessons must render structured real-card teaching visuals');
+assert(pageFile.includes('searchRulesTopics') && pageFile.includes('Search topic, alias, keyword, or mechanic'), 'Magic Game Rules must expose topic/alias/mechanic search');
 assert(pageFile.includes('Previous lesson') && pageFile.includes('Next lesson'), 'Magic learn articles must render previous/next lesson navigation');
 assert(pageFile.includes('Official Rules Reference'), 'Magic articles must use restrained official reference labeling');
 assert(!pageFile.includes('Authority Boundary'), 'Rules page must not render the internal authority-boundary box');
@@ -212,7 +217,7 @@ for (const game of ENCYCLOPEDIA_GAMES) {
       if (topic.category === 'learn') {
         assert(topic.learningTrack === 'learn', `magic:${topic.slug} learn topic missing learningTrack`);
         if (topic.order > 1) assert(topic.previousSlug && gameTopics.some((entry) => entry.slug === topic.previousSlug), `magic:${topic.slug} missing previous lesson`);
-        if (topic.order < 16) assert(topic.nextSlug && gameTopics.some((entry) => entry.slug === topic.nextSlug), `magic:${topic.slug} missing next lesson`);
+        if (topic.order < 17) assert(topic.nextSlug && gameTopics.some((entry) => entry.slug === topic.nextSlug), `magic:${topic.slug} missing next lesson`);
       }
       if (topic.category === 'reference') {
         assert(topic.referenceGroup, `magic:${topic.slug} reference topic missing reference group`);
@@ -225,16 +230,32 @@ assert(ENCYCLOPEDIA_GAMES.length === 7, `Expected 7 games, found ${ENCYCLOPEDIA_
 const magicTopics = ENCYCLOPEDIA_RULE_TOPICS.magic || [];
 const magicLearnTopics = magicTopics.filter((topic) => topic.category === 'learn');
 const magicReferenceTopics = magicTopics.filter((topic) => topic.category === 'reference');
-assert(magicLearnTopics.length >= 16, 'Magic Learn to Play hierarchy is incomplete');
+assert(magicLearnTopics.length >= 17, 'Magic Learn to Play hierarchy is incomplete');
 assert(magicReferenceTopics.length >= 40, 'Magic Rules Reference hierarchy is incomplete');
 assert(new Set(magicLearnTopics.map((topic) => topic.order)).size === magicLearnTopics.length, 'Magic Learn to Play order values must be unique');
+assert(magicLearnTopics.some((topic) => topic.slug === 'learn-instants-and-responses'), 'Magic Learn to Play must split Instants and Responses into its own lesson');
+assert(magicLearnTopics.some((topic) => topic.slug === 'learn-stack'), 'Magic Learn to Play must split The Stack into its own lesson');
+assert(!magicLearnTopics.some((topic) => topic.slug === 'learn-stack-and-responses'), 'Magic Learn to Play must not keep the obsolete combined stack lesson');
+const expectedVisualTypes = new Set(['card-anatomy', 'mana-payment', 'combat', 'stack', 'trigger', 'turn-timeline']);
+for (const type of expectedVisualTypes) {
+  assert(magicLearnTopics.some((topic) => topic.visual?.type === type), `Magic Learn to Play missing visual type: ${type}`);
+}
+const teachingOracleIds = new Set(Object.values(MAGIC_TEACHING_CARD_ORACLE_IDS));
+for (const topic of magicTopics) {
+  for (const oracleId of topic.visual?.oracleIds || []) {
+    assert(teachingOracleIds.has(oracleId), `Magic visual ${topic.slug} references an unmanaged teaching oracle id`);
+  }
+}
 assert(MAGIC_KEYWORD_GLOSSARY.length >= 10, 'Magic keyword glossary seed is incomplete');
 assert(MAGIC_KEYWORD_GLOSSARY.every((entry) => entry.name && entry.category && entry.concise && Array.isArray(entry.relatedMechanics) && entry.sourceMeta?.lastVerified), 'Magic keyword glossary entries must be structured');
 assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-setting-up'), ['opening seven', 'mulligan', '20 life', 'starting player', 'skips the draw']);
 assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-taking-your-turn'), ['untap', 'upkeep', 'draw', 'first main', 'declare attackers', 'declare blockers', 'cleanup', 'priority']);
 assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-combat'), ['summoning sickness', 'blocked', 'combat damage', 'lethal', 'state-based actions']);
-assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-stack-and-responses'), ['respond', 'top object resolves first', 'priority', 'does not use the stack']);
+assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-instants-and-responses'), ['respond', 'priority', 'does not use the stack']);
+assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'learn-stack'), ['top object resolves first', 'priority', 'does not use the stack']);
 assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-priority'), ['active player', 'nonactive player', 'pass priority']);
+assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-state-based-actions'), ['do not use the stack', 'checked', 'zero life', 'lethal damage']);
+assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-layers'), ['timestamp', 'dependency', 'power and toughness', 'layer']);
 assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-deck-construction'), ['minimum', 'sideboard', 'copy limits', 'basic-land']);
 assertTopicIncludes(magicTopics.find((topic) => topic.slug === 'reference-color-identity'), ['mana symbols', 'commander deck', 'green mana symbol']);
 assert((ENCYCLOPEDIA_RULE_TOPICS.pokemon || []).length >= 15, 'Pokemon rules hierarchy is incomplete');

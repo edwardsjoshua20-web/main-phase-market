@@ -73,6 +73,11 @@ function sourceObjectsForTopic(gameMeta, topic = {}) {
   return gameMeta.sourceRefs.filter((source) => wanted.size === 0 || wanted.has(source.label));
 }
 
+function buildTopicPath(gameMeta, topic = {}) {
+  const section = gameMeta.id === 'magic' && topic.category === 'learn' ? 'learn' : 'rules';
+  return `/Encyclopedia/${gameMeta.routeKey}/${section}/${topic.slug}`;
+}
+
 function printingKey(printing = {}) {
   return [
     printing.id,
@@ -132,7 +137,7 @@ export const gameKnowledgeOwner = {
     return (ENCYCLOPEDIA_RULE_TOPICS[game.id] || []).map((topic) => ({
       ...topic,
       game: game.id,
-      path: `/Encyclopedia/${game.routeKey}/rules/${topic.slug}`,
+      path: buildTopicPath(game, topic),
       sources: sourceObjectsForTopic(game, topic)
     }));
   },
@@ -157,6 +162,33 @@ export const gameKnowledgeOwner = {
       groups.get(key).push(topic);
     }
     return [...groups.entries()].map(([key, entries]) => ({ key, entries }));
+  },
+
+  searchRulesTopics(value, query = '') {
+    const normalized = cleanText(query).toLowerCase();
+    const topics = this.getRulesTopicsByCategory(value, 'reference');
+    if (!normalized) return topics;
+    return topics.filter((topic) => [
+      topic.title,
+      topic.summary,
+      ...(topic.aliases || []),
+      ...(topic.searchTerms || []),
+      ...(topic.officialTerms || []),
+      ...(topic.relatedMechanics || []),
+      ...(topic.relatedCardTypes || [])
+    ].join(' ').toLowerCase().includes(normalized));
+  },
+
+  async getMagicTeachingCards(oracleIds = []) {
+    const game = this.getGame('magic');
+    const ids = (Array.isArray(oracleIds) ? oracleIds : []).map(cleanText).filter(Boolean);
+    if (!game || ids.length === 0) return [];
+    const rows = await searchOwner.getMagicPreferredPrintingsByOracleIds(ids);
+    const byOracleId = new Map(rows.map((row) => [cleanText(row.oracle_id || row.raw?.oracle_id), row]));
+    return ids
+      .map((id) => byOracleId.get(id))
+      .filter(Boolean)
+      .map((card) => normalizeCard(card, game, cleanText(card.set_name || card.set_code || 'teaching')));
   },
 
   async listSets(value, options = {}) {

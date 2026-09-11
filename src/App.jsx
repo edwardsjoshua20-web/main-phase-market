@@ -106,6 +106,8 @@ const AuthenticatedApp = () => {
         <Route path="/Encyclopedia/:game/sets" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
         <Route path="/Encyclopedia/:game/sets/:setSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
         <Route path="/Encyclopedia/:game/sets/:setSlug/cards/:cardId" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+        <Route path="/Encyclopedia/:game/learn" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+        <Route path="/Encyclopedia/:game/learn/:topicSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
         <Route path="/Encyclopedia/:game/rules" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
         <Route path="/Encyclopedia/:game/rules/:topicSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
         <Route path="/AdminInventory" element={<AdminInventory />} />
@@ -161,6 +163,8 @@ const AuthenticatedApp = () => {
       <Route path="/Encyclopedia/:game/sets" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
       <Route path="/Encyclopedia/:game/sets/:setSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
       <Route path="/Encyclopedia/:game/sets/:setSlug/cards/:cardId" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+      <Route path="/Encyclopedia/:game/learn" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+      <Route path="/Encyclopedia/:game/learn/:topicSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
       <Route path="/Encyclopedia/:game/rules" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
       <Route path="/Encyclopedia/:game/rules/:topicSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
       <Route path="/set/:game/:setSlug" element={<LayoutWrapper currentPageName="SetDetail"><SetDetail /></LayoutWrapper>} />
