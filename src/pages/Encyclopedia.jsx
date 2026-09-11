@@ -680,7 +680,7 @@ function LessonVisual({ visual }) {
   }[visual.type] || 'Visual Guide';
 
   return (
-    <section className="mt-8 border-y border-slate-200 bg-white/60 py-5">
+    <section className="mt-8 max-w-[calc(100vw-2rem)] border-y border-slate-200 bg-white/60 py-5 sm:max-w-full">
       <div className="flex flex-col gap-5 lg:flex-row">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{visualLabel}</p>
@@ -728,7 +728,7 @@ function ArticleBody({ article }) {
           <h3 className="text-xl font-black tracking-tight text-slate-950">{section.heading}</h3>
           <div className="mt-3 space-y-3">
             {(section.body || []).map((paragraph, index) => (
-              <p key={`${section.heading}-${index}`} className="w-full max-w-full break-words text-sm leading-7 text-slate-700">{paragraph}</p>
+              <p key={`${section.heading}-${index}`} className="w-full max-w-[calc(100vw-2rem)] break-words text-sm leading-7 text-slate-700 sm:max-w-full">{paragraph}</p>
             ))}
           </div>
           {section.example && (
@@ -787,7 +787,7 @@ function LearnPage({ game, topicSlug }) {
             <article className="min-w-0 max-w-full break-words">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Lesson {topic.order}</p>
               <h2 className="mt-2 text-3xl font-black tracking-tight">{topic.title}</h2>
-              <p className="mt-4 max-w-3xl break-words text-base leading-7 text-slate-700">{topic.article?.introduction || topic.summary}</p>
+              <p className="mt-4 max-w-[calc(100vw-2rem)] break-words text-base leading-7 text-slate-700 sm:max-w-3xl">{topic.article?.introduction || topic.summary}</p>
               <LessonVisual visual={topic.visual} />
               <ArticleBody article={topic.article} />
               {relatedTopics.length > 0 && (
@@ -895,7 +895,7 @@ function RulesPage({ game, topicSlug }) {
               </div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Rules topic</p>
               <h2 className="mt-2 text-3xl font-black tracking-tight">{topic.title}</h2>
-              <p className="mt-4 max-w-3xl break-words text-base leading-7 text-slate-700">{article?.introduction || topic.summary}</p>
+              <p className="mt-4 max-w-[calc(100vw-2rem)] break-words text-base leading-7 text-slate-700 sm:max-w-3xl">{article?.introduction || topic.summary}</p>
               {Array.isArray(article?.terminology) && article.terminology.length > 0 && (
                 <div className="mt-5 flex flex-wrap gap-2">
                   {article.terminology.map((term) => (
