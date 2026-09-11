@@ -897,7 +897,7 @@ function RulesPage({ game, topicSlug }) {
               <h2 className="mt-2 text-3xl font-black tracking-tight">{topic.title}</h2>
               <p className="mt-4 max-w-[min(22rem,calc(100vw-2rem))] break-words text-base leading-7 text-slate-700 sm:max-w-3xl">{article?.introduction || topic.summary}</p>
               {Array.isArray(article?.terminology) && article.terminology.length > 0 && (
-                <div className="mt-5 flex flex-wrap gap-2">
+                <div className="mt-5 flex max-w-[min(22rem,calc(100vw-2rem))] flex-wrap gap-2 overflow-hidden sm:max-w-full">
                   {article.terminology.map((term) => (
                     <span key={term} className="border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700">{term}</span>
                   ))}
