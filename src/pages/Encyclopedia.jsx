@@ -28,15 +28,25 @@ const MAGIC_REFERENCE_GROUP_LABELS = {
   commander: 'Commander'
 };
 
+const encyclopediaPageClass = 'min-h-screen overflow-x-hidden bg-[#070b14] text-slate-100';
+const encyclopediaPanelClass = 'border border-slate-700/70 bg-slate-900/44 shadow-[0_18px_70px_rgba(0,0,0,0.22)]';
+const encyclopediaDividerClass = 'border-slate-700/70';
+const encyclopediaMutedTextClass = 'text-slate-400';
+const encyclopediaSoftTextClass = 'text-slate-300';
+const encyclopediaAccentTextClass = 'text-cyan-200';
+const encyclopediaControlClass = 'border border-slate-700 bg-slate-950/70 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/70';
+const encyclopediaButtonClass = 'rounded border-slate-700 bg-slate-950/70 text-slate-100 hover:border-cyan-300/70 hover:bg-slate-900 disabled:opacity-45';
+const encyclopediaPrimaryButtonClass = 'rounded bg-cyan-200 text-slate-950 hover:bg-cyan-100';
+
 function SectionShell({ children, className = '' }) {
   return <section className={`mx-auto box-border w-full max-w-[100vw] overflow-x-hidden px-4 2xl:max-w-[1480px] ${className}`}>{children}</section>;
 }
 
 function LoadingState() {
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className={encyclopediaPageClass}>
       <div className="mx-auto flex min-h-[420px] w-full max-w-[1480px] items-center justify-center px-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-800 border-t-cyan-200" />
       </div>
     </main>
   );
@@ -44,13 +54,13 @@ function LoadingState() {
 
 function EmptyState({ title, body, to = '/Encyclopedia', action = 'Back to Encyclopedia' }) {
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
+    <main className={encyclopediaPageClass}>
       <SectionShell className="py-16">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Encyclopedia</p>
-        <h1 className="mt-3 text-3xl font-black tracking-tight">{title}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{body}</p>
+        <p className={`text-xs font-bold uppercase tracking-[0.18em] ${encyclopediaMutedTextClass}`}>Encyclopedia</p>
+        <h1 className="mt-3 text-3xl font-black tracking-tight text-white">{title}</h1>
+        <p className={`mt-2 max-w-2xl text-sm leading-6 ${encyclopediaSoftTextClass}`}>{body}</p>
         <Link to={to}>
-          <Button className="mt-6 rounded bg-slate-900 text-white hover:bg-slate-800">{action}</Button>
+          <Button className={`mt-6 ${encyclopediaPrimaryButtonClass}`}>{action}</Button>
         </Link>
       </SectionShell>
     </main>
@@ -85,12 +95,12 @@ function GameHero({ game, eyebrow = 'TCG Encyclopedia' }) {
   const showIdentityMark = game.id !== 'magic';
 
   return (
-    <section className={`bg-gradient-to-br ${game.tintClassName} text-white`}>
+    <section className={`border-b border-slate-800 bg-gradient-to-br ${game.tintClassName} text-white shadow-[inset_0_-1px_0_rgba(255,255,255,0.04)]`}>
       <SectionShell className={`grid gap-4 py-4 md:items-center md:py-5 ${showIdentityMark ? 'md:grid-cols-[minmax(0,1fr)_220px]' : ''}`}>
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/58">{eyebrow}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-100/70">{eyebrow}</p>
           <h1 className="mt-1.5 text-3xl font-black tracking-tight md:text-4xl">{game.label}</h1>
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-white/74">{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-200/82">{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
         </div>
         {showIdentityMark ? (
           <div className="flex min-h-10 items-center justify-start md:justify-end">
@@ -105,12 +115,12 @@ function GameHero({ game, eyebrow = 'TCG Encyclopedia' }) {
 function SourceList({ sources = [], className = '', title = 'Sources' }) {
   return (
     <div className={className}>
-      <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">{title}</h3>
+      <h3 className={`text-sm font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>{title}</h3>
       <div className="mt-3 space-y-3">
         {sources.map((source) => (
-          <a key={source.url} href={source.url} target="_blank" rel="noreferrer" className="block border-t border-slate-200 pt-3 text-sm font-bold text-slate-900 hover:text-slate-600">
+          <a key={source.url} href={source.url} target="_blank" rel="noreferrer" className={`block border-t ${encyclopediaDividerClass} pt-3 text-sm font-bold text-slate-100 hover:text-cyan-200`}>
             <span className="inline-flex items-center gap-2">{source.label}<ExternalLink className="h-3.5 w-3.5" /></span>
-            <span className="mt-1 block text-xs font-semibold text-slate-500">{source.freshness}</span>
+            <span className={`mt-1 block text-xs font-semibold ${encyclopediaMutedTextClass}`}>{source.freshness}</span>
           </a>
         ))}
       </div>
@@ -120,16 +130,16 @@ function SourceList({ sources = [], className = '', title = 'Sources' }) {
 
 function MagicDestinationCard({ to, icon: Icon, eyebrow, title, body, meta }) {
   return (
-    <Link to={to} className="group flex min-h-[190px] min-w-0 flex-col justify-between border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400 hover:shadow-md">
+    <Link to={to} className={`group flex min-h-[190px] min-w-0 flex-col justify-between p-5 transition hover:border-cyan-300/60 hover:bg-slate-900/70 ${encyclopediaPanelClass}`}>
       <span>
-        <span className="inline-flex h-10 w-10 items-center justify-center bg-slate-950 text-white">
+        <span className="inline-flex h-10 w-10 items-center justify-center border border-cyan-200/30 bg-cyan-200/10 text-cyan-100">
           <Icon className="h-5 w-5" />
         </span>
-        <span className="mt-5 block text-xs font-black uppercase tracking-[0.16em] text-slate-500">{eyebrow}</span>
-        <span className="mt-2 block text-2xl font-black tracking-tight text-slate-950">{title}</span>
-        <span className="mt-2 block text-sm leading-6 text-slate-600">{body}</span>
+        <span className={`mt-5 block text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>{eyebrow}</span>
+        <span className="mt-2 block text-2xl font-black tracking-tight text-white">{title}</span>
+        <span className={`mt-2 block text-sm leading-6 ${encyclopediaSoftTextClass}`}>{body}</span>
       </span>
-      <span className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-sm font-bold text-slate-900">
+      <span className={`mt-5 flex items-center justify-between border-t ${encyclopediaDividerClass} pt-4 text-sm font-bold ${encyclopediaAccentTextClass}`}>
         <span>{meta}</span>
         <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
       </span>
@@ -143,11 +153,11 @@ function MagicHub({ game }) {
   const referenceCount = referenceGroups.reduce((sum, group) => sum + group.entries.length, 0);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
+    <main className={encyclopediaPageClass}>
       <GameHero game={game} />
       <SectionShell className="py-8">
-        <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
-          <Link to="/Encyclopedia" className="hover:text-slate-900">TCG Encyclopedia</Link>
+        <div className={`mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>
+          <Link to="/Encyclopedia" className="hover:text-cyan-200">TCG Encyclopedia</Link>
           <span>/</span>
           <span>Magic</span>
         </div>
@@ -187,17 +197,17 @@ function SetRow({ set }) {
   const returnTo = `${location.pathname}${location.search}`;
 
   return (
-    <Link to={set.path} state={{ encyclopediaReturnTo: returnTo }} className="grid grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-4 py-3 hover:bg-white">
-      <div className="flex h-10 w-10 items-center justify-center bg-white">
-        {set.imageUrl ? <img src={set.imageUrl} alt="" className="max-h-8 max-w-8 object-contain" /> : <Layers className="h-5 w-5 text-slate-400" />}
+    <Link to={set.path} state={{ encyclopediaReturnTo: returnTo }} className="grid grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-4 py-3 transition hover:bg-slate-900/62">
+      <div className="flex h-10 w-10 items-center justify-center border border-slate-700/70 bg-slate-950/70">
+        {set.imageUrl ? <img src={set.imageUrl} alt="" className="max-h-8 max-w-8 object-contain opacity-90 invert" /> : <Layers className="h-5 w-5 text-slate-500" />}
       </div>
       <div className="min-w-0">
-        <p className="truncate font-bold text-slate-950">{set.name}</p>
-        <p className="mt-0.5 text-xs font-semibold text-slate-500">
+        <p className="truncate font-bold text-slate-100">{set.name}</p>
+        <p className={`mt-0.5 text-xs font-semibold ${encyclopediaMutedTextClass}`}>
           {[set.setCode, set.releaseDate].filter(Boolean).join(' · ') || 'Set'}
         </p>
       </div>
-      <ArrowRight className="h-4 w-4 text-slate-400" />
+      <ArrowRight className="h-4 w-4 text-slate-500" />
     </Link>
   );
 }
@@ -225,13 +235,13 @@ function clampPage(value, totalPages) {
 function SetPagination({ currentPage, totalPages, onPageChange }) {
   if (totalPages <= 1) return null;
   return (
-    <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm font-semibold text-slate-600">Page {currentPage} of {totalPages}</p>
+    <div className={`flex flex-col gap-3 border-t ${encyclopediaDividerClass} pt-4 sm:flex-row sm:items-center sm:justify-between`}>
+      <p className={`text-sm font-semibold ${encyclopediaSoftTextClass}`}>Page {currentPage} of {totalPages}</p>
       <div className="flex gap-2">
-        <Button type="button" variant="outline" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)} className="rounded border-slate-300 bg-white text-slate-900 hover:bg-slate-100 disabled:opacity-45">
+        <Button type="button" variant="outline" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)} className={encyclopediaButtonClass}>
           Previous
         </Button>
-        <Button type="button" variant="outline" disabled={currentPage >= totalPages} onClick={() => onPageChange(currentPage + 1)} className="rounded border-slate-300 bg-white text-slate-900 hover:bg-slate-100 disabled:opacity-45">
+        <Button type="button" variant="outline" disabled={currentPage >= totalPages} onClick={() => onPageChange(currentPage + 1)} className={encyclopediaButtonClass}>
           Next
         </Button>
       </div>
@@ -242,12 +252,12 @@ function SetPagination({ currentPage, totalPages, onPageChange }) {
 function EncyclopediaLanding() {
   const games = gameKnowledgeOwner.listGames();
   return (
-    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
-      <section className="bg-slate-950 text-white">
+    <main className={encyclopediaPageClass}>
+      <section className="border-b border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.13),transparent_32%),linear-gradient(135deg,#111827,#070b14_58%,#1f130b)] text-white">
         <SectionShell className="py-10 md:py-12">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/60">MainPhase reference</p>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-100/70">MainPhase reference</p>
           <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight md:text-5xl">TCG Encyclopedia</h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-white/74">
+          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-200/82">
             Browse trading card sets, cards, rules, and MainPhase availability across supported games.
           </p>
         </SectionShell>
@@ -256,15 +266,15 @@ function EncyclopediaLanding() {
       <SectionShell className="py-8">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {games.map((game) => (
-            <Link key={game.id} to={`/Encyclopedia/${game.routeKey}`} className="group flex min-h-[210px] flex-col justify-between border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400 hover:shadow-md">
+            <Link key={game.id} to={`/Encyclopedia/${game.routeKey}`} className={`group flex min-h-[210px] flex-col justify-between p-5 transition hover:border-cyan-300/60 hover:bg-slate-900/70 ${encyclopediaPanelClass}`}>
               <div>
-                <div className={`flex h-20 items-center justify-start bg-gradient-to-br ${game.tintClassName} px-4`}>
+                <div className={`flex h-20 items-center justify-start border border-slate-700/70 bg-gradient-to-br ${game.tintClassName} px-4`}>
                   <GameLogo game={game} />
                 </div>
-                <h2 className="mt-4 text-xl font-black tracking-tight">{game.label}</h2>
-                <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
+                <h2 className="mt-4 text-xl font-black tracking-tight text-white">{game.label}</h2>
+                <p className={`mt-2 line-clamp-3 text-sm leading-6 ${encyclopediaSoftTextClass}`}>{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
               </div>
-              <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-sm font-bold text-slate-900">
+              <div className={`mt-5 flex items-center justify-between border-t ${encyclopediaDividerClass} pt-4 text-sm font-bold ${encyclopediaAccentTextClass}`}>
                 <span>{game.rulesCount} rule topics</span>
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </div>
@@ -306,25 +316,25 @@ function SetBrowser({ game, title = 'Sets' }) {
 
   return (
     <div className="min-w-0">
-      <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
+      <div className={`flex flex-col gap-4 border-b ${encyclopediaDividerClass} pb-5 md:flex-row md:items-end md:justify-between`}>
         <div>
-          <h2 className="text-2xl font-black tracking-tight">{title}</h2>
-          <p className="mt-1 text-sm text-slate-600">{filteredSets.length} set{filteredSets.length === 1 ? '' : 's'} visible.</p>
+          <h2 className="text-2xl font-black tracking-tight text-white">{title}</h2>
+          <p className={`mt-1 text-sm ${encyclopediaSoftTextClass}`}>{filteredSets.length} set{filteredSets.length === 1 ? '' : 's'} visible.</p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:flex-row md:max-w-xl">
-          <label className="flex min-w-0 flex-1 items-center gap-2 border border-slate-300 bg-white px-3 py-2">
-            <Search className="h-4 w-4 text-slate-400" />
+          <label className={`flex min-w-0 flex-1 items-center gap-2 px-3 py-2 ${encyclopediaControlClass}`}>
+            <Search className="h-4 w-4 text-slate-500" />
             <input
               value={query}
               onChange={(event) => handleBrowseChange({ q: event.target.value, page: 1 })}
               placeholder="Search set name or code"
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
             />
           </label>
           <select
             value={sortMode}
             onChange={(event) => handleBrowseChange({ sort: event.target.value, page: 1 })}
-            className="border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none"
+            className={`px-3 py-2 text-sm font-semibold ${encyclopediaControlClass}`}
           >
             <option value="newest">Newest to oldest</option>
             <option value="oldest">Oldest to newest</option>
@@ -332,11 +342,11 @@ function SetBrowser({ game, title = 'Sets' }) {
         </div>
       </div>
       {isLoading ? (
-        <div className="py-10 text-sm font-semibold text-slate-500">Loading sets...</div>
+        <div className={`py-10 text-sm font-semibold ${encyclopediaMutedTextClass}`}>Loading sets...</div>
       ) : displaySets.length === 0 ? (
-        <div className="border-b border-slate-200 py-10 text-sm font-semibold text-slate-500">No sets match that search.</div>
+        <div className={`border-b ${encyclopediaDividerClass} py-10 text-sm font-semibold ${encyclopediaMutedTextClass}`}>No sets match that search.</div>
       ) : (
-        <div className="divide-y divide-slate-200">{displaySets.map((set) => <SetRow key={set.id} set={set} />)}</div>
+        <div className={`divide-y ${encyclopediaDividerClass}`}>{displaySets.map((set) => <SetRow key={set.id} set={set} />)}</div>
       )}
       {!isLoading && <SetPagination currentPage={currentPage} totalPages={totalPages} onPageChange={(page) => handleBrowseChange({ page })} />}
     </div>
@@ -348,17 +358,17 @@ function GameLanding({ game }) {
   const rules = gameKnowledgeOwner.getRulesTopics(game.id);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
+    <main className={encyclopediaPageClass}>
       <GameHero game={game} />
       <SectionShell className="grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <SetBrowser game={game} />
         <aside className="min-w-0">
-          <h2 className="text-2xl font-black tracking-tight">Rules / How to Play</h2>
-          <div className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
+          <h2 className="text-2xl font-black tracking-tight text-white">Rules / How to Play</h2>
+          <div className={`mt-4 divide-y border-y ${encyclopediaDividerClass}`}>
             {rules.map((topic) => (
-              <Link key={topic.slug} to={topic.path} className="block py-4 hover:bg-white">
-                <p className="font-bold text-slate-950">{topic.title}</p>
-                <p className="mt-1 text-sm leading-6 text-slate-600">{topic.summary}</p>
+              <Link key={topic.slug} to={topic.path} className="block py-4 transition hover:bg-slate-900/62">
+                <p className="font-bold text-slate-100">{topic.title}</p>
+                <p className={`mt-1 text-sm leading-6 ${encyclopediaSoftTextClass}`}>{topic.summary}</p>
               </Link>
             ))}
           </div>
@@ -370,7 +380,7 @@ function GameLanding({ game }) {
 
 function SetListPage({ game }) {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
+    <main className={encyclopediaPageClass}>
       <GameHero game={game} eyebrow="Encyclopedia sets" />
       <SectionShell className="py-8">
         <SetBrowser game={game} title="All Sets" />
@@ -508,12 +518,12 @@ function CardGalleryTile({ card, setTotal, game, detail }) {
 
   return (
     <Link to={detailPath} state={{ returnTo, returnLabel: `Back to ${detail?.name || 'set'}` }} className="group block min-w-0">
-      <div className="aspect-[63/88] overflow-hidden bg-slate-100 shadow-sm ring-1 ring-slate-200 transition group-hover:-translate-y-0.5 group-hover:shadow-lg group-hover:ring-slate-300">
+      <div className="aspect-[63/88] overflow-hidden bg-slate-950/80 shadow-sm ring-1 ring-slate-700 transition group-hover:-translate-y-0.5 group-hover:shadow-lg group-hover:ring-cyan-300/50">
         <CardImage card={card} alt={card.name} className="h-full w-full object-contain" fallbackClassName="flex h-full w-full items-center justify-center px-3 text-center text-xs font-semibold text-slate-500" />
       </div>
       <div className="mt-2 min-w-0">
-        <p className="truncate text-sm font-bold leading-5 text-slate-950">{card.name}</p>
-        <p className="mt-0.5 truncate text-xs font-semibold leading-4 text-slate-500">
+        <p className="truncate text-sm font-bold leading-5 text-slate-100">{card.name}</p>
+        <p className={`mt-0.5 truncate text-xs font-semibold leading-4 ${encyclopediaMutedTextClass}`}>
           {metadata}
         </p>
       </div>
@@ -566,41 +576,41 @@ function SetDetailPage({ game, setSlug }) {
   if (!detail) return <EmptyState title="Set not found" body="That set is not available in the Encyclopedia yet." to={`/Encyclopedia/${game.routeKey}/sets`} action="Back to sets" />;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
+    <main className={encyclopediaPageClass}>
       <GameHero game={game} eyebrow="Encyclopedia set" />
       <SectionShell className="py-8">
         <div className="min-w-0">
-          <div className="flex flex-col gap-5 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className={`flex flex-col gap-5 border-b ${encyclopediaDividerClass} pb-5 lg:flex-row lg:items-end lg:justify-between`}>
             <div className="min-w-0">
-              <Link to={returnTo} className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-slate-500 hover:text-slate-900">
+              <Link to={returnTo} className={`inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass} hover:text-cyan-200`}>
                 <span aria-hidden="true">&larr;</span>
                 {game.shortLabel || game.label} Sets
               </Link>
-              <p className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{detail.setCode || game.shortLabel}</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight">{detail.name}</h2>
-              <p className="mt-2 text-sm text-slate-600">
+              <p className={`mt-3 text-xs font-bold uppercase tracking-[0.18em] ${encyclopediaMutedTextClass}`}>{detail.setCode || game.shortLabel}</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-white">{detail.name}</h2>
+              <p className={`mt-2 text-sm ${encyclopediaSoftTextClass}`}>
                 {detail.cardCatalog?.knownLabel || `${setCards.length} known cards`} in collector order.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link to={detail.legacySetPath}>
-                <Button variant="outline" className="rounded border-slate-300 bg-white text-slate-900 hover:bg-slate-100">Retail set page</Button>
+                <Button variant="outline" className={encyclopediaButtonClass}>Retail set page</Button>
               </Link>
               <Link to={createPageUrl('Shop') + `?type=single_card&game=${encodeURIComponent(game.searchGame)}&search=${encodeURIComponent(detail.name)}`}>
-                <Button className="rounded bg-slate-900 text-white hover:bg-slate-800">
+                <Button className={encyclopediaPrimaryButtonClass}>
                   {detail.availability?.activeListingCount > 0 ? `Shop ${detail.availability.activeListingCount} listing${detail.availability.activeListingCount === 1 ? '' : 's'}` : 'Shop this set'}
                 </Button>
               </Link>
             </div>
           </div>
-          <div className="flex flex-col gap-3 border-b border-slate-200 py-4 lg:flex-row lg:items-center">
-            <label className="flex min-w-0 flex-1 items-center gap-2 border border-slate-300 bg-white px-3 py-2">
-              <Search className="h-4 w-4 text-slate-400" />
-              <input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleLimit(120); }} placeholder="Search this set" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+          <div className={`flex flex-col gap-3 border-b ${encyclopediaDividerClass} py-4 lg:flex-row lg:items-center`}>
+            <label className={`flex min-w-0 flex-1 items-center gap-2 px-3 py-2 ${encyclopediaControlClass}`}>
+              <Search className="h-4 w-4 text-slate-500" />
+              <input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleLimit(120); }} placeholder="Search this set" className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500" />
             </label>
             <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:w-[680px] lg:grid-cols-4">
               {filterConfig.filter(({ key }) => filterOptions[key]?.length > 0).map(({ key, label }) => (
-                <select key={key} value={activeFilters[key] || ''} onChange={(event) => { setActiveFilters((current) => ({ ...current, [key]: event.target.value })); setVisibleLimit(120); }} className="min-w-0 border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none">
+                <select key={key} value={activeFilters[key] || ''} onChange={(event) => { setActiveFilters((current) => ({ ...current, [key]: event.target.value })); setVisibleLimit(120); }} className={`min-w-0 px-3 py-2 text-sm font-semibold ${encyclopediaControlClass}`}>
                   <option value="">{label || fieldLabel(key)}</option>
                   {filterOptions[key].map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
@@ -608,19 +618,19 @@ function SetDetailPage({ game, setSlug }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 py-4">
-            <p className="text-sm font-semibold text-slate-600">
+            <p className={`text-sm font-semibold ${encyclopediaSoftTextClass}`}>
               Showing {visibleCards.length} of {filteredCards.length} card{filteredCards.length === 1 ? '' : 's'}
             </p>
-            {detail.cardCatalog?.printingLabel && <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{detail.cardCatalog.printingLabel}</p>}
+            {detail.cardCatalog?.printingLabel && <p className={`text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>{detail.cardCatalog.printingLabel}</p>}
           </div>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(138px,1fr))] gap-x-4 gap-y-7 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(176px,1fr))]">
             {visibleCards.map((card) => <CardGalleryTile key={card.id} card={card} setTotal={setCards.length} game={game} detail={detail} />)}
           </div>
           {visibleCards.length === 0 && (
-            <div className="border-y border-slate-200 py-12 text-center text-sm font-semibold text-slate-500">No cards match those set filters.</div>
+            <div className={`border-y ${encyclopediaDividerClass} py-12 text-center text-sm font-semibold ${encyclopediaMutedTextClass}`}>No cards match those set filters.</div>
           )}
           {visibleCards.length < filteredCards.length && (
-            <Button variant="outline" onClick={() => setVisibleLimit((current) => current + 120)} className="mt-8 w-full rounded border-slate-300 bg-white text-slate-900 hover:bg-slate-100">
+            <Button variant="outline" onClick={() => setVisibleLimit((current) => current + 120)} className={`mt-8 w-full ${encyclopediaButtonClass}`}>
               Show more cards
             </Button>
           )}
@@ -646,11 +656,11 @@ function EncyclopediaCardRedirect({ game, setSlug, cardId }) {
 function TeachingCard({ card }) {
   return (
     <div className="min-w-0">
-      <div className="aspect-[63/88] overflow-hidden bg-white shadow-sm ring-1 ring-slate-200">
+      <div className="aspect-[63/88] overflow-hidden bg-slate-950/80 shadow-sm ring-1 ring-slate-700">
         <CardImage card={card} alt={card.name} className="h-full w-full object-contain" fallbackClassName="flex h-full w-full items-center justify-center px-3 text-center text-xs font-semibold text-slate-500" />
       </div>
-      <p className="mt-2 truncate text-sm font-black text-slate-950">{card.name}</p>
-      <p className="truncate text-xs font-semibold text-slate-500">{card.type_line || card.set_name || card.set_code}</p>
+      <p className="mt-2 truncate text-sm font-black text-slate-100">{card.name}</p>
+      <p className={`truncate text-xs font-semibold ${encyclopediaMutedTextClass}`}>{card.type_line || card.set_name || card.set_code}</p>
     </div>
   );
 }
@@ -680,33 +690,33 @@ function LessonVisual({ visual }) {
   }[visual.type] || 'Visual Guide';
 
   return (
-    <section className="mt-8 max-w-[min(22rem,calc(100vw-2rem))] border-y border-slate-200 bg-white/60 py-5 sm:max-w-full">
+    <section className={`mt-8 max-w-[min(22rem,calc(100vw-2rem))] border-y ${encyclopediaDividerClass} bg-slate-900/30 py-5 sm:max-w-full`}>
       <div className="flex flex-col gap-5 lg:flex-row">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{visualLabel}</p>
-          <h3 className="mt-2 text-xl font-black tracking-tight text-slate-950">{visual.title}</h3>
-          {visual.cost && <p className="mt-2 text-sm font-black text-slate-700">Cost: {visual.cost}</p>}
+          <p className={`text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>{visualLabel}</p>
+          <h3 className="mt-2 text-xl font-black tracking-tight text-white">{visual.title}</h3>
+          {visual.cost && <p className={`mt-2 text-sm font-black ${encyclopediaSoftTextClass}`}>Cost: {visual.cost}</p>}
           <div className={`mt-4 grid gap-2 ${visual.type === 'turn-timeline' ? 'sm:grid-cols-2' : ''}`}>
             {steps.map((step, index) => (
-              <div key={`${visual.type}-${step.label || step}`} className="grid grid-cols-[30px_minmax(0,1fr)] items-start gap-3 border-t border-slate-200 pt-2">
+              <div key={`${visual.type}-${step.label || step}`} className={`grid grid-cols-[30px_minmax(0,1fr)] items-start gap-3 border-t ${encyclopediaDividerClass} pt-2`}>
                 <span className="text-sm font-black text-slate-400">{index + 1}</span>
-                <span className="min-w-0 break-words text-sm leading-6 text-slate-700">
-                  <span className="block font-black text-slate-950">{step.label || step}</span>
+                <span className={`min-w-0 break-words text-sm leading-6 ${encyclopediaSoftTextClass}`}>
+                  <span className="block font-black text-slate-100">{step.label || step}</span>
                   {step.detail ? <span className="mt-0.5 block font-semibold">{step.detail}</span> : null}
                 </span>
               </div>
             ))}
           </div>
           {Array.isArray(visual.allowed) && visual.allowed.length > 0 && visual.type === 'commander-color-identity' && (
-            <div className="mt-4 border-t border-slate-200 pt-3">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Within Identity</p>
-              <p className="mt-1 text-sm font-semibold text-slate-700">{visual.allowed.join(', ')}</p>
+            <div className={`mt-4 border-t ${encyclopediaDividerClass} pt-3`}>
+              <p className={`text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>Within Identity</p>
+              <p className={`mt-1 text-sm font-semibold ${encyclopediaSoftTextClass}`}>{visual.allowed.join(', ')}</p>
             </div>
           )}
           {Array.isArray(visual.blocked) && visual.blocked.length > 0 && (
-            <div className="mt-4 border-t border-slate-200 pt-3">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Outside Identity</p>
-              <p className="mt-1 text-sm font-semibold text-slate-700">{visual.blocked.join(', ')}</p>
+            <div className={`mt-4 border-t ${encyclopediaDividerClass} pt-3`}>
+              <p className={`text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>Outside Identity</p>
+              <p className={`mt-1 text-sm font-semibold ${encyclopediaSoftTextClass}`}>{visual.blocked.join(', ')}</p>
             </div>
           )}
         </div>
@@ -724,15 +734,15 @@ function ArticleBody({ article }) {
   return (
     <div className="mt-8 min-w-0 max-w-full space-y-8 overflow-x-hidden">
       {(article?.sections || []).map((section) => (
-        <section key={section.heading} className="min-w-0 max-w-full border-t border-slate-200 pt-5">
-          <h3 className="text-xl font-black tracking-tight text-slate-950">{section.heading}</h3>
+        <section key={section.heading} className={`min-w-0 max-w-full border-t ${encyclopediaDividerClass} pt-5`}>
+          <h3 className="text-xl font-black tracking-tight text-white">{section.heading}</h3>
           <div className="mt-3 space-y-3">
             {(section.body || []).map((paragraph, index) => (
-              <p key={`${section.heading}-${index}`} className="w-full max-w-[min(22rem,calc(100vw-2rem))] break-words text-sm leading-7 text-slate-700 sm:max-w-full">{paragraph}</p>
+              <p key={`${section.heading}-${index}`} className={`w-full max-w-[min(22rem,calc(100vw-2rem))] break-words text-sm leading-7 ${encyclopediaSoftTextClass} sm:max-w-full`}>{paragraph}</p>
             ))}
           </div>
           {section.example && (
-            <p className="mt-4 break-words border-l-2 border-slate-300 pl-4 text-sm font-semibold leading-6 text-slate-700">{section.example}</p>
+            <p className="mt-4 break-words border-l-2 border-cyan-300/45 bg-slate-950/40 py-2 pl-4 pr-3 text-sm font-semibold leading-6 text-slate-300">{section.example}</p>
           )}
         </section>
       ))}
@@ -743,17 +753,17 @@ function ArticleBody({ article }) {
 function LessonNav({ previousTopic, nextTopic }) {
   if (!previousTopic && !nextTopic) return null;
   return (
-    <div className="mt-8 grid gap-3 border-t border-slate-200 pt-5 sm:grid-cols-2">
+    <div className={`mt-8 grid gap-3 border-t ${encyclopediaDividerClass} pt-5 sm:grid-cols-2`}>
       {previousTopic ? (
-        <Link to={previousTopic.path} className="min-w-0 break-words border border-slate-200 bg-white p-4 hover:border-slate-400">
-          <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Previous lesson</span>
-          <span className="mt-1 block font-black text-slate-950">{previousTopic.title}</span>
+        <Link to={previousTopic.path} className={`min-w-0 break-words p-4 transition hover:border-cyan-300/60 hover:bg-slate-900/70 ${encyclopediaPanelClass}`}>
+          <span className={`text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>Previous lesson</span>
+          <span className="mt-1 block font-black text-white">{previousTopic.title}</span>
         </Link>
       ) : <div />}
       {nextTopic ? (
-        <Link to={nextTopic.path} className="min-w-0 break-words border border-slate-200 bg-white p-4 text-right hover:border-slate-400">
-          <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Next lesson</span>
-          <span className="mt-1 block font-black text-slate-950">{nextTopic.title}</span>
+        <Link to={nextTopic.path} className={`min-w-0 break-words p-4 text-right transition hover:border-cyan-300/60 hover:bg-slate-900/70 ${encyclopediaPanelClass}`}>
+          <span className={`text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>Next lesson</span>
+          <span className="mt-1 block font-black text-white">{nextTopic.title}</span>
         </Link>
       ) : null}
     </div>
@@ -772,30 +782,30 @@ function LearnPage({ game, topicSlug }) {
     .slice(0, 6);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
+    <main className={encyclopediaPageClass}>
       <GameHero game={game} eyebrow="Learn to Play" />
       <SectionShell className="py-8">
-        <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
-          <Link to="/Encyclopedia" className="hover:text-slate-900">TCG Encyclopedia</Link>
+        <div className={`mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>
+          <Link to="/Encyclopedia" className="hover:text-cyan-200">TCG Encyclopedia</Link>
           <span>/</span>
-          <Link to="/Encyclopedia/magic" className="hover:text-slate-900">Magic</Link>
+          <Link to="/Encyclopedia/magic" className="hover:text-cyan-200">Magic</Link>
           <span>/</span>
           <span>Learn to Play</span>
         </div>
         {topic ? (
           <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <article className="min-w-0 max-w-full break-words">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Lesson {topic.order}</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight">{topic.title}</h2>
-              <p className="mt-4 max-w-[min(22rem,calc(100vw-2rem))] break-words text-base leading-7 text-slate-700 sm:max-w-3xl">{topic.article?.introduction || topic.summary}</p>
+              <p className={`text-xs font-bold uppercase tracking-[0.18em] ${encyclopediaMutedTextClass}`}>Lesson {topic.order}</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-white">{topic.title}</h2>
+              <p className={`mt-4 max-w-[min(22rem,calc(100vw-2rem))] break-words text-base leading-7 ${encyclopediaSoftTextClass} sm:max-w-3xl`}>{topic.article?.introduction || topic.summary}</p>
               <LessonVisual visual={topic.visual} />
               <ArticleBody article={topic.article} />
               {relatedTopics.length > 0 && (
-                <div className="mt-8 border-t border-slate-200 pt-5">
-                  <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Deeper Rules</h3>
+                <div className={`mt-8 border-t ${encyclopediaDividerClass} pt-5`}>
+                  <h3 className={`text-sm font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>Deeper Rules</h3>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {relatedTopics.map((entry) => (
-                      <Link key={entry.slug} to={entry.path} className="min-w-0 break-words border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:border-slate-400">
+                      <Link key={entry.slug} to={entry.path} className="min-w-0 break-words border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm font-bold text-cyan-100 transition hover:border-cyan-300/60 hover:bg-slate-900">
                         {entry.title}
                       </Link>
                     ))}
@@ -803,14 +813,14 @@ function LearnPage({ game, topicSlug }) {
                 </div>
               )}
               <LessonNav previousTopic={previousTopic} nextTopic={nextTopic} />
-              <SourceList sources={topic.sources.slice(0, 1)} className="mt-8 border-t border-slate-200 pt-5" title="Official Rules Reference" />
+              <SourceList sources={topic.sources.slice(0, 1)} className={`mt-8 border-t ${encyclopediaDividerClass} pt-5`} title="Official Rules Reference" />
             </article>
-            <aside className="h-fit border-y border-slate-200 py-5">
-              <h2 className="text-lg font-black tracking-tight">Course Progress</h2>
-              <div className="mt-4 divide-y divide-slate-200">
+            <aside className={`h-fit border-y ${encyclopediaDividerClass} py-5`}>
+              <h2 className="text-lg font-black tracking-tight text-white">Course Progress</h2>
+              <div className={`mt-4 divide-y ${encyclopediaDividerClass}`}>
                 {lessons.map((lesson) => (
-                  <Link key={lesson.slug} to={lesson.path} className={`grid grid-cols-[30px_minmax(0,1fr)] gap-3 py-3 text-sm hover:bg-white ${lesson.slug === topic.slug ? 'text-slate-950' : 'text-slate-600'}`}>
-                    <span className="font-black text-slate-400">{lesson.order}</span>
+                  <Link key={lesson.slug} to={lesson.path} className={`grid grid-cols-[30px_minmax(0,1fr)] gap-3 py-3 text-sm transition hover:bg-slate-900/62 ${lesson.slug === topic.slug ? 'text-cyan-100' : 'text-slate-400'}`}>
+                    <span className="font-black text-slate-500">{lesson.order}</span>
                     <span className="font-bold">{lesson.title}</span>
                   </Link>
                 ))}
@@ -820,27 +830,27 @@ function LearnPage({ game, topicSlug }) {
         ) : (
           <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="min-w-0">
-              <h2 className="text-3xl font-black tracking-tight">Learn to Play</h2>
-              <p className="mt-3 max-w-3xl text-base leading-7 text-slate-700">Start with the table basics, then move through turns, combat, responses, the stack, abilities, and first deck building.</p>
-              <div className="mt-6 divide-y divide-slate-200 border-y border-slate-200">
+              <h2 className="text-3xl font-black tracking-tight text-white">Learn to Play</h2>
+              <p className={`mt-3 max-w-3xl text-base leading-7 ${encyclopediaSoftTextClass}`}>Start with the table basics, then move through turns, combat, responses, the stack, abilities, and first deck building.</p>
+              <div className={`mt-6 divide-y border-y ${encyclopediaDividerClass}`}>
                 {lessons.map((lesson) => (
-                  <Link key={lesson.slug} to={lesson.path} className="grid grid-cols-[38px_minmax(0,1fr)_auto] items-start gap-3 py-4 hover:bg-white">
-                    <span className="text-sm font-black text-slate-400">{lesson.order}</span>
+                  <Link key={lesson.slug} to={lesson.path} className="grid grid-cols-[38px_minmax(0,1fr)_auto] items-start gap-3 py-4 transition hover:bg-slate-900/62">
+                    <span className="text-sm font-black text-slate-500">{lesson.order}</span>
                     <span className="min-w-0">
-                      <span className="block font-black text-slate-950">{lesson.title}</span>
-                      <span className="mt-1 block text-sm leading-6 text-slate-600">{lesson.summary}</span>
+                      <span className="block font-black text-slate-100">{lesson.title}</span>
+                      <span className={`mt-1 block text-sm leading-6 ${encyclopediaSoftTextClass}`}>{lesson.summary}</span>
                     </span>
-                    <ArrowRight className="mt-1 h-4 w-4 text-slate-400" />
+                    <ArrowRight className="mt-1 h-4 w-4 text-slate-500" />
                   </Link>
                 ))}
               </div>
             </div>
-            <aside className="h-fit border-y border-slate-200 py-5">
-              <h2 className="text-lg font-black tracking-tight">Course Shape</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{lessons.length} lessons with real-card examples for card anatomy, mana, combat, responses, triggers, and Commander color identity.</p>
+            <aside className={`h-fit border-y ${encyclopediaDividerClass} py-5`}>
+              <h2 className="text-lg font-black tracking-tight text-white">Course Shape</h2>
+              <p className={`mt-2 text-sm leading-6 ${encyclopediaSoftTextClass}`}>{lessons.length} lessons with real-card examples for card anatomy, mana, combat, responses, triggers, and Commander color identity.</p>
               {lessons[0] && (
                 <Link to={lessons[0].path}>
-                  <Button className="mt-5 w-full rounded bg-slate-900 text-white hover:bg-slate-800">Start lesson 1</Button>
+                  <Button className={`mt-5 w-full ${encyclopediaPrimaryButtonClass}`}>Start lesson 1</Button>
                 </Link>
               )}
             </aside>
@@ -876,99 +886,99 @@ function RulesPage({ game, topicSlug }) {
     .slice(0, 6);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
+    <main className={encyclopediaPageClass}>
       <GameHero game={game} eyebrow="Encyclopedia rules" />
       <SectionShell className="grid min-w-0 gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 max-w-full break-words">
           {topic ? (
             <>
-              <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+              <div className={`mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>
                 {isMagic && (
                   <>
-                    <Link to="/Encyclopedia" className="hover:text-slate-900">TCG Encyclopedia</Link>
+                    <Link to="/Encyclopedia" className="hover:text-cyan-200">TCG Encyclopedia</Link>
                     <span>/</span>
                   </>
                 )}
-                <Link to={`/Encyclopedia/${game.routeKey}`} className="hover:text-slate-900">{game.shortLabel || game.label}</Link>
+                <Link to={`/Encyclopedia/${game.routeKey}`} className="hover:text-cyan-200">{game.shortLabel || game.label}</Link>
                 <span>/</span>
-                <Link to={`/Encyclopedia/${game.routeKey}/rules`} className="hover:text-slate-900">{isMagic ? categoryLabel : 'Rules'}</Link>
+                <Link to={`/Encyclopedia/${game.routeKey}/rules`} className="hover:text-cyan-200">{isMagic ? categoryLabel : 'Rules'}</Link>
               </div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Rules topic</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight">{topic.title}</h2>
-              <p className="mt-4 max-w-[min(22rem,calc(100vw-2rem))] break-words text-base leading-7 text-slate-700 sm:max-w-3xl">{article?.introduction || topic.summary}</p>
+              <p className={`text-xs font-bold uppercase tracking-[0.18em] ${encyclopediaMutedTextClass}`}>Rules topic</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-white">{topic.title}</h2>
+              <p className={`mt-4 max-w-[min(22rem,calc(100vw-2rem))] break-words text-base leading-7 ${encyclopediaSoftTextClass} sm:max-w-3xl`}>{article?.introduction || topic.summary}</p>
               {Array.isArray(article?.terminology) && article.terminology.length > 0 && (
                 <div className="mt-5 flex max-w-[min(22rem,calc(100vw-2rem))] flex-wrap gap-2 overflow-hidden sm:max-w-full">
                   {article.terminology.map((term) => (
-                    <span key={term} className="border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700">{term}</span>
+                    <span key={term} className="border border-cyan-300/30 bg-cyan-200/10 px-2.5 py-1 text-xs font-bold text-cyan-100">{term}</span>
                   ))}
                 </div>
               )}
               <LessonVisual visual={topic.visual} />
               <ArticleBody article={article} />
               {relatedTopics.length > 0 && (
-                <div className="mt-8 border-t border-slate-200 pt-5">
-                  <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Related Topics</h3>
+                <div className={`mt-8 border-t ${encyclopediaDividerClass} pt-5`}>
+                  <h3 className={`text-sm font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>Related Topics</h3>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {relatedTopics.map((entry) => (
-                      <Link key={entry.slug} to={entry.path} className="min-w-0 break-words border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:border-slate-400">
+                      <Link key={entry.slug} to={entry.path} className="min-w-0 break-words border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm font-bold text-cyan-100 transition hover:border-cyan-300/60 hover:bg-slate-900">
                         {entry.title}
                       </Link>
                     ))}
                   </div>
                 </div>
               )}
-              <SourceList sources={topic.sources.slice(0, 1)} className="mt-8 border-t border-slate-200 pt-5" title={isMagic ? 'Official Rules Reference' : 'Sources'} />
+              <SourceList sources={topic.sources.slice(0, 1)} className={`mt-8 border-t ${encyclopediaDividerClass} pt-5`} title={isMagic ? 'Official Rules Reference' : 'Sources'} />
             </>
           ) : (
             <>
-              <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+              <div className={`mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>
                 {isMagic && (
                   <>
-                    <Link to="/Encyclopedia" className="hover:text-slate-900">TCG Encyclopedia</Link>
+                    <Link to="/Encyclopedia" className="hover:text-cyan-200">TCG Encyclopedia</Link>
                     <span>/</span>
                   </>
                 )}
-                <Link to={`/Encyclopedia/${game.routeKey}`} className="hover:text-slate-900">{game.shortLabel || game.label}</Link>
+                <Link to={`/Encyclopedia/${game.routeKey}`} className="hover:text-cyan-200">{game.shortLabel || game.label}</Link>
                 <span>/</span>
                 <span>Rules</span>
               </div>
-              <h2 className="text-3xl font-black tracking-tight">{isMagic ? 'Game Rules' : 'Rules / How to Play'}</h2>
+              <h2 className="text-3xl font-black tracking-tight text-white">{isMagic ? 'Game Rules' : 'Rules / How to Play'}</h2>
               {isMagic ? (
                 <>
-                  <label className="mt-5 flex min-w-0 items-center gap-2 border border-slate-300 bg-white px-3 py-2">
-                    <Search className="h-4 w-4 text-slate-400" />
+                  <label className={`mt-5 flex min-w-0 items-center gap-2 px-3 py-2 ${encyclopediaControlClass}`}>
+                    <Search className="h-4 w-4 text-slate-500" />
                     <input
                       value={rulesQuery}
                       onChange={(event) => updateBrowseParams(searchParams, setSearchParams, { q: event.target.value })}
                       placeholder="Search topic, alias, keyword, or mechanic"
-                      className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                      className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
                     />
                   </label>
                   <div className="mt-6 space-y-6">
                     {referenceGroups.map((group) => (
-                      <section key={group.key} className="border-y border-slate-200 py-3">
-                        <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">{MAGIC_REFERENCE_GROUP_LABELS[group.key] || fieldLabel(group.key)}</h3>
+                      <section key={group.key} className={`border-y ${encyclopediaDividerClass} py-3`}>
+                        <h3 className={`text-sm font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>{MAGIC_REFERENCE_GROUP_LABELS[group.key] || fieldLabel(group.key)}</h3>
                         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                           {group.entries.map((entry) => (
-                            <Link key={entry.slug} to={entry.path} className="min-w-0 break-words border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:border-slate-400">
-                              <span className="block text-slate-950">{entry.title}</span>
-                              <span className="mt-1 line-clamp-2 block text-xs font-semibold leading-5 text-slate-500">{entry.summary}</span>
+                            <Link key={entry.slug} to={entry.path} className={`min-w-0 break-words px-3 py-2 text-sm font-bold transition hover:border-cyan-300/60 hover:bg-slate-900/70 ${encyclopediaPanelClass}`}>
+                              <span className="block text-slate-100">{entry.title}</span>
+                              <span className={`mt-1 line-clamp-2 block text-xs font-semibold leading-5 ${encyclopediaMutedTextClass}`}>{entry.summary}</span>
                             </Link>
                           ))}
                         </div>
                       </section>
                     ))}
                     {referenceGroups.length === 0 && (
-                      <div className="border-y border-slate-200 py-10 text-sm font-semibold text-slate-500">No rules topics match that search.</div>
+                      <div className={`border-y ${encyclopediaDividerClass} py-10 text-sm font-semibold ${encyclopediaMutedTextClass}`}>No rules topics match that search.</div>
                     )}
                   </div>
                 </>
               ) : (
-                <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200">
+                <div className={`mt-5 divide-y border-y ${encyclopediaDividerClass}`}>
                   {topics.map((entry) => (
-                    <Link key={entry.slug} to={entry.path} className="block py-4 hover:bg-white">
-                      <p className="font-bold text-slate-950">{entry.title}</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-600">{entry.summary}</p>
+                    <Link key={entry.slug} to={entry.path} className="block py-4 transition hover:bg-slate-900/62">
+                      <p className="font-bold text-slate-100">{entry.title}</p>
+                      <p className={`mt-1 text-sm leading-6 ${encyclopediaSoftTextClass}`}>{entry.summary}</p>
                     </Link>
                   ))}
                 </div>
@@ -976,18 +986,18 @@ function RulesPage({ game, topicSlug }) {
             </>
           )}
         </div>
-        <aside className="h-fit border-y border-slate-200 py-5">
-          <h2 className="text-lg font-black tracking-tight">{game.shortLabel || game.label} Rules</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Browse learning topics for play, deck construction, and common table interactions.</p>
+        <aside className={`h-fit border-y ${encyclopediaDividerClass} py-5`}>
+          <h2 className="text-lg font-black tracking-tight text-white">{game.shortLabel || game.label} Rules</h2>
+          <p className={`mt-2 text-sm leading-6 ${encyclopediaSoftTextClass}`}>Browse learning topics for play, deck construction, and common table interactions.</p>
           {isMagic && (
-            <div className="mt-5 space-y-4 border-t border-slate-200 pt-4">
+            <div className={`mt-5 space-y-4 border-t ${encyclopediaDividerClass} pt-4`}>
               <div>
-                <h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Learn Path</h3>
-                <Link to="/Encyclopedia/magic/learn" className="mt-1 block text-sm font-semibold text-slate-700 hover:text-slate-950">{learnLessons.length} sequential lessons</Link>
+                <h3 className={`text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>Learn Path</h3>
+                <Link to="/Encyclopedia/magic/learn" className="mt-1 block text-sm font-semibold text-cyan-100 hover:text-cyan-200">{learnLessons.length} sequential lessons</Link>
               </div>
               <div>
-                <h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Reference</h3>
-                <p className="mt-1 text-sm font-semibold text-slate-700">{referenceGroups.reduce((sum, group) => sum + group.entries.length, 0)} searchable topics</p>
+                <h3 className={`text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>Reference</h3>
+                <p className={`mt-1 text-sm font-semibold ${encyclopediaSoftTextClass}`}>{referenceGroups.reduce((sum, group) => sum + group.entries.length, 0)} searchable topics</p>
               </div>
             </div>
           )}
