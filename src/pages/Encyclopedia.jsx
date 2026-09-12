@@ -276,7 +276,12 @@ function EncyclopediaLanding() {
         style={{ backgroundImage: 'linear-gradient(90deg, rgba(7, 11, 20, 0.82), rgba(7, 11, 20, 0.44) 48%, rgba(7, 11, 20, 0.2)), url("/images/tcg-encyclopedia-banner.png")' }}
       >
         <SectionShell className="py-10 md:py-12">
-          <h1 className="max-w-4xl text-3xl font-black tracking-tight drop-shadow-[0_2px_16px_rgba(0,0,0,0.7)] md:text-4xl">TCG Encyclopedia</h1>
+          <h1
+            className="max-w-4xl text-4xl font-semibold tracking-normal text-[#f4ead7] drop-shadow-[0_2px_18px_rgba(224,154,72,0.32)] md:text-5xl"
+            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+          >
+            TCG Encyclopedia
+          </h1>
         </SectionShell>
       </section>
 
