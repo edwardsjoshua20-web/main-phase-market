@@ -271,9 +271,12 @@ function EncyclopediaLanding() {
   const games = gameKnowledgeOwner.listGames();
   return (
     <main className={encyclopediaPageClass}>
-      <section className="border-b border-slate-800 bg-slate-950/55 text-white">
-        <SectionShell className="py-6">
-          <h1 className="max-w-4xl text-3xl font-black tracking-tight md:text-4xl">TCG Encyclopedia</h1>
+      <section
+        className="border-b border-slate-800 bg-cover bg-center text-white"
+        style={{ backgroundImage: 'linear-gradient(90deg, rgba(7, 11, 20, 0.82), rgba(7, 11, 20, 0.44) 48%, rgba(7, 11, 20, 0.2)), url("/images/tcg-encyclopedia-banner.png")' }}
+      >
+        <SectionShell className="py-10 md:py-12">
+          <h1 className="max-w-4xl text-3xl font-black tracking-tight drop-shadow-[0_2px_16px_rgba(0,0,0,0.7)] md:text-4xl">TCG Encyclopedia</h1>
         </SectionShell>
       </section>
 
