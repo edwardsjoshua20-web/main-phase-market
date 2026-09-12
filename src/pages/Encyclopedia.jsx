@@ -81,34 +81,57 @@ function GameLogo({ game }) {
 
 function GameIdentityMark({ game }) {
   if (game.id === 'magic') {
-    return null;
+    return (
+      <span className="flex h-9 w-9 items-center justify-center border border-cyan-200/35 bg-cyan-200/10 text-xs font-black uppercase tracking-[0.08em] text-cyan-100">
+        MTG
+      </span>
+    );
   }
 
+  return <img src={game.logoSrc} alt="" loading="lazy" className="max-h-9 max-w-[92px] object-contain opacity-95" />;
+}
+
+function GameHubHeader({ game }) {
   return (
-    <div className="flex h-12 max-w-[190px] items-center justify-start overflow-hidden opacity-90 md:justify-end">
-      <GameLogo game={game} />
-    </div>
+    <section className="border-b border-slate-800 bg-slate-950/55 text-white">
+      <SectionShell className="py-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-100/70">TCG Encyclopedia</p>
+            <div className="mt-2 flex min-w-0 items-center gap-3">
+              <GameIdentityMark game={game} />
+              <h1 className="min-w-0 text-2xl font-black tracking-tight text-white md:text-3xl">{game.label}</h1>
+            </div>
+            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-300">{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
+          </div>
+        </div>
+      </SectionShell>
+    </section>
   );
 }
 
-function GameHero({ game, eyebrow = 'TCG Encyclopedia' }) {
-  const showIdentityMark = game.id !== 'magic';
-
+function PageHeader({ breadcrumbs = [], eyebrow, title, subtitle, actions = null }) {
   return (
-    <section className={`border-b border-slate-800 bg-gradient-to-br ${game.tintClassName} text-white shadow-[inset_0_-1px_0_rgba(255,255,255,0.04)]`}>
-      <SectionShell className={`grid gap-4 py-4 md:items-center md:py-5 ${showIdentityMark ? 'md:grid-cols-[minmax(0,1fr)_220px]' : ''}`}>
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-100/70">{eyebrow}</p>
-          <h1 className="mt-1.5 text-3xl font-black tracking-tight md:text-4xl">{game.label}</h1>
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-200/82">{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
+    <SectionShell className="pt-6">
+      <div className={`min-w-0 overflow-x-hidden border-b ${encyclopediaDividerClass} pb-5`}>
+        <div className={`mb-3 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>
+          {breadcrumbs.map((crumb, index) => (
+            <React.Fragment key={`${crumb.label}-${index}`}>
+              {crumb.to ? <Link to={crumb.to} className="min-w-0 break-words hover:text-cyan-200">{crumb.label}</Link> : <span className="min-w-0 break-words">{crumb.label}</span>}
+              {index < breadcrumbs.length - 1 ? <span>/</span> : null}
+            </React.Fragment>
+          ))}
         </div>
-        {showIdentityMark ? (
-          <div className="flex min-h-10 items-center justify-start md:justify-end">
-            <GameIdentityMark game={game} />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            {eyebrow ? <p className={`text-xs font-bold uppercase tracking-[0.18em] ${encyclopediaMutedTextClass}`}>{eyebrow}</p> : null}
+            <h1 className="mt-1 max-w-full break-words text-3xl font-black tracking-tight text-white">{title}</h1>
+            {subtitle ? <p className={`mt-2 max-w-[min(22rem,calc(100vw-2rem))] break-words text-sm leading-6 ${encyclopediaSoftTextClass} sm:max-w-3xl`}>{subtitle}</p> : null}
           </div>
-        ) : null}
-      </SectionShell>
-    </section>
+          {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+        </div>
+      </div>
+    </SectionShell>
   );
 }
 
@@ -154,13 +177,8 @@ function MagicHub({ game }) {
 
   return (
     <main className={encyclopediaPageClass}>
-      <GameHero game={game} />
-      <SectionShell className="py-8">
-        <div className={`mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>
-          <Link to="/Encyclopedia" className="hover:text-cyan-200">TCG Encyclopedia</Link>
-          <span>/</span>
-          <span>Magic</span>
-        </div>
+      <GameHubHeader game={game} />
+      <SectionShell className="py-6">
         <div className="grid gap-4 lg:grid-cols-3">
           <MagicDestinationCard
             to="/Encyclopedia/magic/sets"
@@ -253,17 +271,17 @@ function EncyclopediaLanding() {
   const games = gameKnowledgeOwner.listGames();
   return (
     <main className={encyclopediaPageClass}>
-      <section className="border-b border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.13),transparent_32%),linear-gradient(135deg,#111827,#070b14_58%,#1f130b)] text-white">
-        <SectionShell className="py-10 md:py-12">
+      <section className="border-b border-slate-800 bg-slate-950/55 text-white">
+        <SectionShell className="py-6">
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-100/70">MainPhase reference</p>
-          <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight md:text-5xl">TCG Encyclopedia</h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-200/82">
+          <h1 className="mt-2 max-w-4xl text-3xl font-black tracking-tight md:text-4xl">TCG Encyclopedia</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
             Browse trading card sets, cards, rules, and MainPhase availability across supported games.
           </p>
         </SectionShell>
       </section>
 
-      <SectionShell className="py-8">
+      <SectionShell className="py-6">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {games.map((game) => (
             <Link key={game.id} to={`/Encyclopedia/${game.routeKey}`} className={`group flex min-h-[210px] flex-col justify-between p-5 transition hover:border-cyan-300/60 hover:bg-slate-900/70 ${encyclopediaPanelClass}`}>
@@ -299,7 +317,7 @@ function updateBrowseParams(searchParams, setSearchParams, updates = {}) {
   setSearchParams(next, { replace: true });
 }
 
-function SetBrowser({ game, title = 'Sets' }) {
+function SetBrowser({ game, title = 'Sets', showTitle = true }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: sets = [], isLoading } = useQuery({
     queryKey: ['encyclopedia-sets', game.id],
@@ -318,7 +336,7 @@ function SetBrowser({ game, title = 'Sets' }) {
     <div className="min-w-0">
       <div className={`flex flex-col gap-4 border-b ${encyclopediaDividerClass} pb-5 md:flex-row md:items-end md:justify-between`}>
         <div>
-          <h2 className="text-2xl font-black tracking-tight text-white">{title}</h2>
+          {showTitle ? <h2 className="text-2xl font-black tracking-tight text-white">{title}</h2> : null}
           <p className={`mt-1 text-sm ${encyclopediaSoftTextClass}`}>{filteredSets.length} set{filteredSets.length === 1 ? '' : 's'} visible.</p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:flex-row md:max-w-xl">
@@ -359,8 +377,8 @@ function GameLanding({ game }) {
 
   return (
     <main className={encyclopediaPageClass}>
-      <GameHero game={game} />
-      <SectionShell className="grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <GameHubHeader game={game} />
+      <SectionShell className="grid gap-8 py-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <SetBrowser game={game} />
         <aside className="min-w-0">
           <h2 className="text-2xl font-black tracking-tight text-white">Rules / How to Play</h2>
@@ -381,9 +399,16 @@ function GameLanding({ game }) {
 function SetListPage({ game }) {
   return (
     <main className={encyclopediaPageClass}>
-      <GameHero game={game} eyebrow="Encyclopedia sets" />
-      <SectionShell className="py-8">
-        <SetBrowser game={game} title="All Sets" />
+      <PageHeader
+        breadcrumbs={[
+          { label: 'TCG Encyclopedia', to: '/Encyclopedia' },
+          { label: game.shortLabel || game.label, to: `/Encyclopedia/${game.routeKey}` },
+          { label: 'Sets' }
+        ]}
+        title="All Sets"
+      />
+      <SectionShell className="py-6">
+        <SetBrowser game={game} title="All Sets" showTitle={false} />
       </SectionShell>
     </main>
   );
@@ -538,11 +563,9 @@ function fieldLabel(key) {
 }
 
 function SetDetailPage({ game, setSlug }) {
-  const location = useLocation();
   const [query, setQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState({});
   const [visibleLimit, setVisibleLimit] = useState(120);
-  const returnTo = location.state?.encyclopediaReturnTo || `/Encyclopedia/${game.routeKey}`;
   const { data: detail, isLoading } = useQuery({
     queryKey: ['encyclopedia-set-detail', game.id, setSlug],
     queryFn: () => gameKnowledgeOwner.resolveSet(game.id, setSlug),
@@ -577,32 +600,30 @@ function SetDetailPage({ game, setSlug }) {
 
   return (
     <main className={encyclopediaPageClass}>
-      <GameHero game={game} eyebrow="Encyclopedia set" />
-      <SectionShell className="py-8">
+      <PageHeader
+        breadcrumbs={[
+          { label: 'TCG Encyclopedia', to: '/Encyclopedia' },
+          { label: game.shortLabel || game.label, to: `/Encyclopedia/${game.routeKey}` },
+          { label: 'Sets', to: `/Encyclopedia/${game.routeKey}/sets` }
+        ]}
+        eyebrow={detail.setCode || game.shortLabel}
+        title={detail.name}
+        subtitle={`${detail.cardCatalog?.knownLabel || `${setCards.length} known cards`} in collector order.`}
+        actions={(
+          <>
+            <Link to={detail.legacySetPath}>
+              <Button variant="outline" className={encyclopediaButtonClass}>Retail set page</Button>
+            </Link>
+            <Link to={createPageUrl('Shop') + `?type=single_card&game=${encodeURIComponent(game.searchGame)}&search=${encodeURIComponent(detail.name)}`}>
+              <Button className={encyclopediaPrimaryButtonClass}>
+                {detail.availability?.activeListingCount > 0 ? `Shop ${detail.availability.activeListingCount} listing${detail.availability.activeListingCount === 1 ? '' : 's'}` : 'Shop this set'}
+              </Button>
+            </Link>
+          </>
+        )}
+      />
+      <SectionShell className="py-6">
         <div className="min-w-0">
-          <div className={`flex flex-col gap-5 border-b ${encyclopediaDividerClass} pb-5 lg:flex-row lg:items-end lg:justify-between`}>
-            <div className="min-w-0">
-              <Link to={returnTo} className={`inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass} hover:text-cyan-200`}>
-                <span aria-hidden="true">&larr;</span>
-                {game.shortLabel || game.label} Sets
-              </Link>
-              <p className={`mt-3 text-xs font-bold uppercase tracking-[0.18em] ${encyclopediaMutedTextClass}`}>{detail.setCode || game.shortLabel}</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight text-white">{detail.name}</h2>
-              <p className={`mt-2 text-sm ${encyclopediaSoftTextClass}`}>
-                {detail.cardCatalog?.knownLabel || `${setCards.length} known cards`} in collector order.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link to={detail.legacySetPath}>
-                <Button variant="outline" className={encyclopediaButtonClass}>Retail set page</Button>
-              </Link>
-              <Link to={createPageUrl('Shop') + `?type=single_card&game=${encodeURIComponent(game.searchGame)}&search=${encodeURIComponent(detail.name)}`}>
-                <Button className={encyclopediaPrimaryButtonClass}>
-                  {detail.availability?.activeListingCount > 0 ? `Shop ${detail.availability.activeListingCount} listing${detail.availability.activeListingCount === 1 ? '' : 's'}` : 'Shop this set'}
-                </Button>
-              </Link>
-            </div>
-          </div>
           <div className={`flex flex-col gap-3 border-b ${encyclopediaDividerClass} py-4 lg:flex-row lg:items-center`}>
             <label className={`flex min-w-0 flex-1 items-center gap-2 px-3 py-2 ${encyclopediaControlClass}`}>
               <Search className="h-4 w-4 text-slate-500" />
@@ -783,21 +804,20 @@ function LearnPage({ game, topicSlug }) {
 
   return (
     <main className={encyclopediaPageClass}>
-      <GameHero game={game} eyebrow="Learn to Play" />
-      <SectionShell className="py-8">
-        <div className={`mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>
-          <Link to="/Encyclopedia" className="hover:text-cyan-200">TCG Encyclopedia</Link>
-          <span>/</span>
-          <Link to="/Encyclopedia/magic" className="hover:text-cyan-200">Magic</Link>
-          <span>/</span>
-          <span>Learn to Play</span>
-        </div>
+      <PageHeader
+        breadcrumbs={[
+          { label: 'TCG Encyclopedia', to: '/Encyclopedia' },
+          { label: 'Magic', to: '/Encyclopedia/magic' },
+          { label: 'Learn to Play', to: topic ? '/Encyclopedia/magic/learn' : undefined }
+        ]}
+        eyebrow={topic ? `Lesson ${topic.order}` : undefined}
+        title={topic ? topic.title : 'Learn to Play'}
+        subtitle={topic ? (topic.article?.introduction || topic.summary) : 'Start with the table basics, then move through turns, combat, responses, the stack, abilities, and first deck building.'}
+      />
+      <SectionShell className="py-6">
         {topic ? (
           <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <article className="min-w-0 max-w-full break-words">
-              <p className={`text-xs font-bold uppercase tracking-[0.18em] ${encyclopediaMutedTextClass}`}>Lesson {topic.order}</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight text-white">{topic.title}</h2>
-              <p className={`mt-4 max-w-[min(22rem,calc(100vw-2rem))] break-words text-base leading-7 ${encyclopediaSoftTextClass} sm:max-w-3xl`}>{topic.article?.introduction || topic.summary}</p>
               <LessonVisual visual={topic.visual} />
               <ArticleBody article={topic.article} />
               {relatedTopics.length > 0 && (
@@ -830,9 +850,7 @@ function LearnPage({ game, topicSlug }) {
         ) : (
           <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="min-w-0">
-              <h2 className="text-3xl font-black tracking-tight text-white">Learn to Play</h2>
-              <p className={`mt-3 max-w-3xl text-base leading-7 ${encyclopediaSoftTextClass}`}>Start with the table basics, then move through turns, combat, responses, the stack, abilities, and first deck building.</p>
-              <div className={`mt-6 divide-y border-y ${encyclopediaDividerClass}`}>
+              <div className={`divide-y border-y ${encyclopediaDividerClass}`}>
                 {lessons.map((lesson) => (
                   <Link key={lesson.slug} to={lesson.path} className="grid grid-cols-[38px_minmax(0,1fr)_auto] items-start gap-3 py-4 transition hover:bg-slate-900/62">
                     <span className="text-sm font-black text-slate-500">{lesson.order}</span>
@@ -887,25 +905,20 @@ function RulesPage({ game, topicSlug }) {
 
   return (
     <main className={encyclopediaPageClass}>
-      <GameHero game={game} eyebrow="Encyclopedia rules" />
-      <SectionShell className="grid min-w-0 gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <PageHeader
+        breadcrumbs={[
+          { label: 'TCG Encyclopedia', to: '/Encyclopedia' },
+          { label: game.shortLabel || game.label, to: `/Encyclopedia/${game.routeKey}` },
+          { label: isMagic ? categoryLabel : 'Rules', to: topic ? `/Encyclopedia/${game.routeKey}/rules` : undefined }
+        ]}
+        eyebrow={topic ? 'Rules topic' : undefined}
+        title={topic ? topic.title : (isMagic ? 'Game Rules' : 'Rules / How to Play')}
+        subtitle={topic ? (article?.introduction || topic.summary) : undefined}
+      />
+      <SectionShell className="grid min-w-0 gap-8 py-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 max-w-full break-words">
           {topic ? (
             <>
-              <div className={`mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>
-                {isMagic && (
-                  <>
-                    <Link to="/Encyclopedia" className="hover:text-cyan-200">TCG Encyclopedia</Link>
-                    <span>/</span>
-                  </>
-                )}
-                <Link to={`/Encyclopedia/${game.routeKey}`} className="hover:text-cyan-200">{game.shortLabel || game.label}</Link>
-                <span>/</span>
-                <Link to={`/Encyclopedia/${game.routeKey}/rules`} className="hover:text-cyan-200">{isMagic ? categoryLabel : 'Rules'}</Link>
-              </div>
-              <p className={`text-xs font-bold uppercase tracking-[0.18em] ${encyclopediaMutedTextClass}`}>Rules topic</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight text-white">{topic.title}</h2>
-              <p className={`mt-4 max-w-[min(22rem,calc(100vw-2rem))] break-words text-base leading-7 ${encyclopediaSoftTextClass} sm:max-w-3xl`}>{article?.introduction || topic.summary}</p>
               {Array.isArray(article?.terminology) && article.terminology.length > 0 && (
                 <div className="mt-5 flex max-w-[min(22rem,calc(100vw-2rem))] flex-wrap gap-2 overflow-hidden sm:max-w-full">
                   {article.terminology.map((term) => (
@@ -931,21 +944,9 @@ function RulesPage({ game, topicSlug }) {
             </>
           ) : (
             <>
-              <div className={`mb-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>
-                {isMagic && (
-                  <>
-                    <Link to="/Encyclopedia" className="hover:text-cyan-200">TCG Encyclopedia</Link>
-                    <span>/</span>
-                  </>
-                )}
-                <Link to={`/Encyclopedia/${game.routeKey}`} className="hover:text-cyan-200">{game.shortLabel || game.label}</Link>
-                <span>/</span>
-                <span>Rules</span>
-              </div>
-              <h2 className="text-3xl font-black tracking-tight text-white">{isMagic ? 'Game Rules' : 'Rules / How to Play'}</h2>
               {isMagic ? (
                 <>
-                  <label className={`mt-5 flex min-w-0 items-center gap-2 px-3 py-2 ${encyclopediaControlClass}`}>
+                  <label className={`flex min-w-0 items-center gap-2 px-3 py-2 ${encyclopediaControlClass}`}>
                     <Search className="h-4 w-4 text-slate-500" />
                     <input
                       value={rulesQuery}
