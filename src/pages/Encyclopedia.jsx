@@ -294,11 +294,6 @@ function EncyclopediaLanding() {
                   <GameLogo game={game} />
                 </div>
                 <h2 className="mt-4 text-xl font-black tracking-tight text-white">{game.label}</h2>
-                <p className={`mt-2 line-clamp-3 text-sm leading-6 ${encyclopediaSoftTextClass}`}>{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
-              </div>
-              <div className={`mt-5 flex items-center justify-between border-t ${encyclopediaDividerClass} pt-4 text-sm font-bold ${encyclopediaAccentTextClass}`}>
-                <span>{game.rulesCount} rule topics</span>
-                <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </div>
             </Link>
           ))}
