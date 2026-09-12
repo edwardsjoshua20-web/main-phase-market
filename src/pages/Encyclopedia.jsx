@@ -273,11 +273,7 @@ function EncyclopediaLanding() {
     <main className={encyclopediaPageClass}>
       <section className="border-b border-slate-800 bg-slate-950/55 text-white">
         <SectionShell className="py-6">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-100/70">MainPhase reference</p>
-          <h1 className="mt-2 max-w-4xl text-3xl font-black tracking-tight md:text-4xl">TCG Encyclopedia</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-            Browse trading card sets, cards, rules, and MainPhase availability across supported games.
-          </p>
+          <h1 className="max-w-4xl text-3xl font-black tracking-tight md:text-4xl">TCG Encyclopedia</h1>
         </SectionShell>
       </section>
 
