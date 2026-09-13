@@ -271,11 +271,15 @@ function printingShardForOracleId(oracleId) {
 
 function expandCompactPrinting(row, fields) {
   const expanded = Object.fromEntries(fields.map((field, index) => [field, row[index]]));
+  const language = String(expanded.lang || 'en').toLowerCase();
   expanded.prices = {
     usd: expanded.usd ?? null,
     usd_foil: expanded.usd_foil ?? null,
     usd_etched: expanded.usd_etched ?? null
   };
+  expanded.market_price = expanded.prices.usd ?? null;
+  expanded.market_price_scope = language === 'en' ? 'exact' : 'reference';
+  expanded.market_price_source = 'scryfall_catalog';
   delete expanded.usd;
   delete expanded.usd_foil;
   delete expanded.usd_etched;
@@ -680,6 +684,7 @@ function mergePreferValue(...values) {
 }
 
 function mergeMtgPrintingRows(primaryRow = {}, fallbackRow = {}) {
+  const samePrinting = Boolean(primaryRow.id && fallbackRow.id && primaryRow.id === fallbackRow.id);
   return {
     ...fallbackRow,
     ...primaryRow,
@@ -696,9 +701,9 @@ function mergeMtgPrintingRows(primaryRow = {}, fallbackRow = {}) {
     image_art_crop: mergePreferValue(primaryRow.image_art_crop, fallbackRow.image_art_crop),
     image_png: mergePreferValue(primaryRow.image_png, fallbackRow.image_png),
     prices: {
-      usd: mergePreferValue(primaryRow.prices?.usd, fallbackRow.prices?.usd) ?? null,
-      usd_foil: mergePreferValue(primaryRow.prices?.usd_foil, fallbackRow.prices?.usd_foil) ?? null,
-      usd_etched: mergePreferValue(primaryRow.prices?.usd_etched, fallbackRow.prices?.usd_etched) ?? null
+      usd: mergePreferValue(primaryRow.prices?.usd, samePrinting ? fallbackRow.prices?.usd : undefined) ?? null,
+      usd_foil: mergePreferValue(primaryRow.prices?.usd_foil, samePrinting ? fallbackRow.prices?.usd_foil : undefined) ?? null,
+      usd_etched: mergePreferValue(primaryRow.prices?.usd_etched, samePrinting ? fallbackRow.prices?.usd_etched : undefined) ?? null
     },
     type_line: mergePreferValue(primaryRow.type_line, fallbackRow.type_line),
     mana_cost: mergePreferValue(primaryRow.mana_cost, fallbackRow.mana_cost),
@@ -749,6 +754,8 @@ function formatResult(row, englishImageIndexes = null) {
   const englishFallbackImage = !isEnglish(row) ? getEnglishFallbackImage(row, englishImageIndexes) : null;
   const displayImageUrl = directImageUrl || englishFallbackImage;
   const canonicalName = getCanonicalName(row);
+  const marketPrice = row.prices?.usd ? Number.parseFloat(row.prices.usd) : null;
+  const marketPriceScope = isEnglish(row) ? 'exact' : 'reference';
 
   return {
     id: row.id,
@@ -770,7 +777,11 @@ function formatResult(row, englishImageIndexes = null) {
     image_art_crop: resolveMtgAssetUrl(row.image_art_crop),
     highres_image: Boolean(row.highres_image),
     has_localized_image: Boolean(directImageUrl),
-    price: row.prices?.usd ? Number.parseFloat(row.prices.usd) : null,
+    price: marketPrice,
+    market_price: marketPrice,
+    price_scope: marketPriceScope,
+    market_price_scope: marketPriceScope,
+    market_price_source: 'scryfall_catalog',
     allPrices: {
       usd: row.prices?.usd ? Number.parseFloat(row.prices.usd) : null,
       usd_foil: row.prices?.usd_foil ? Number.parseFloat(row.prices.usd_foil) : null,

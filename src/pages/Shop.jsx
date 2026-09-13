@@ -36,6 +36,7 @@ import {
 } from '@/pages/shop/shopUtils';
 import { inventoryOwner } from '@/services/inventory/inventoryOwner';
 import { listingOwner } from '@/services/listing/listingOwner';
+import { pricingOwner } from '@/services/pricing/pricingOwner';
 import { searchOwner } from '@/services/search/searchOwner';
 import { performShopCardSearch } from '@/services/search/shopSearch';
 import { useCartOwner } from '@/hooks/useCartOwner';
@@ -58,6 +59,25 @@ function resolveResultSellPrice(result = {}) {
 function resolveMarketPrice(result = {}) {
   const value = Number(result.marketPrice ?? result.market_price ?? result.price ?? 0);
   return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function resolveMarketPriceState(result = {}) {
+  const pricingState = result.pricing_state || pricingOwner.resolvePricingState({
+    ...result,
+    api_id: result.api_id || result.id,
+    card_number: result.card_number || result.collector_number || result.number,
+    language: result.language || result.lang || 'en',
+    market_price: result.marketPrice ?? result.market_price ?? result.price ?? null
+  }, {
+    floor: 0,
+    listingPriceAuthority: false
+  });
+  const amount = Number(pricingState.market_price ?? pricingState.display_price ?? 0);
+  return {
+    amount: Number.isFinite(amount) && amount > 0 ? amount : null,
+    label: pricingState.market_price_label || 'Market',
+    scope: pricingState.market_price_scope || pricingState.price_scope || 'unavailable'
+  };
 }
 
 function resolveReleaseYear(value) {
@@ -399,52 +419,57 @@ export default function Shop() {
     });
   };
 
+  const detailReturnParams = () => {
+    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    return `&returnTo=${encodeURIComponent(returnTo)}&returnLabel=${encodeURIComponent('Back to Marketplace')}`;
+  };
+
   const openMagicCardDetail = (result) => {
     if (!result?.oracle_id) return;
     const advancedParams = advancedSearchOpen && advancedApiQuery ? `&advancedSearch=1&aq=${advancedApiQuery}` : '';
-    const detailUrl = `${createPageUrl('CardDetail')}?oracle_id=${encodeURIComponent(result.oracle_id)}&set=${encodeURIComponent(result.set_code || '')}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}`;
+    const detailUrl = `${createPageUrl('CardDetail')}?oracle_id=${encodeURIComponent(result.oracle_id)}&set=${encodeURIComponent(result.set_code || '')}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}${detailReturnParams()}`;
     navigate(detailUrl);
   };
 
   const openPokemonCardDetail = (result) => {
     if (!result?.id) return;
     const advancedParams = advancedSearchOpen && advancedApiQuery ? `&advancedSearch=1&aq=${advancedApiQuery}` : '';
-    const detailUrl = `${createPageUrl('CardDetail')}?pokemon_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}`;
+    const detailUrl = `${createPageUrl('CardDetail')}?pokemon_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}${detailReturnParams()}`;
     navigate(detailUrl);
   };
 
   const openYugiohCardDetail = (result) => {
     if (!result?.id) return;
     const advancedParams = advancedSearchOpen && advancedApiQuery ? `&advancedSearch=1&aq=${advancedApiQuery}` : '';
-    const detailUrl = `${createPageUrl('CardDetail')}?yugioh_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}`;
+    const detailUrl = `${createPageUrl('CardDetail')}?yugioh_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}${detailReturnParams()}`;
     navigate(detailUrl);
   };
 
   const openLorcanaCardDetail = (result) => {
     if (!result?.id) return;
     const advancedParams = advancedSearchOpen && advancedApiQuery ? `&advancedSearch=1&aq=${advancedApiQuery}` : '';
-    const detailUrl = `${createPageUrl('CardDetail')}?lorcana_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}`;
+    const detailUrl = `${createPageUrl('CardDetail')}?lorcana_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}${detailReturnParams()}`;
     navigate(detailUrl);
   };
 
   const openOnePieceCardDetail = (result) => {
     if (!result?.id) return;
     const advancedParams = advancedSearchOpen && advancedApiQuery ? `&advancedSearch=1&aq=${advancedApiQuery}` : '';
-    const detailUrl = `${createPageUrl('CardDetail')}?onepiece_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}`;
+    const detailUrl = `${createPageUrl('CardDetail')}?onepiece_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}${detailReturnParams()}`;
     navigate(detailUrl);
   };
 
   const openFabCardDetail = (result) => {
     if (!result?.id) return;
     const advancedParams = advancedSearchOpen && advancedApiQuery ? `&advancedSearch=1&aq=${advancedApiQuery}` : '';
-    const detailUrl = `${createPageUrl('CardDetail')}?fab_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}`;
+    const detailUrl = `${createPageUrl('CardDetail')}?fab_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}${detailReturnParams()}`;
     navigate(detailUrl);
   };
 
   const openStarWarsCardDetail = (result) => {
     if (!result?.id) return;
     const advancedParams = advancedSearchOpen && advancedApiQuery ? `&advancedSearch=1&aq=${advancedApiQuery}` : '';
-    const detailUrl = `${createPageUrl('CardDetail')}?starwars_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}`;
+    const detailUrl = `${createPageUrl('CardDetail')}?starwars_id=${encodeURIComponent(result.id)}&search=${encodeURIComponent(filters.search || result.name || '')}${advancedParams}${detailReturnParams()}`;
     navigate(detailUrl);
   };
 
@@ -1149,8 +1174,7 @@ export default function Shop() {
 
             <form onSubmit={(event) => { event.preventDefault(); if (showBoxSearch) searchBoosterBoxes(boxSearchQuery); else submitSinglesSearch(); }} className="mb-3 flex min-w-0 flex-col gap-2 border-b border-slate-700/60 pb-3 sm:flex-row sm:items-center">
               <div className="relative min-w-0 flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input value={showBoxSearch ? boxSearchQuery : singlesSearchDraft} onChange={showBoxSearch ? handleBoxSearchChange : (event) => setSinglesSearchDraft(event.target.value)} placeholder={showBoxSearch ? 'Search sealed sets...' : 'Search the marketplace...'} className="h-10 rounded border-slate-700/35 bg-[#101924] pl-9 pr-10 text-sm text-white placeholder:text-slate-500 focus-visible:border-slate-500/70" />
+                <Input value={showBoxSearch ? boxSearchQuery : singlesSearchDraft} onChange={showBoxSearch ? handleBoxSearchChange : (event) => setSinglesSearchDraft(event.target.value)} placeholder={showBoxSearch ? 'Search sealed sets...' : 'Search the marketplace...'} className="h-10 rounded border-slate-700/35 bg-[#101924] pl-3 pr-10 text-sm text-white placeholder:text-slate-500 focus-visible:border-slate-500/70" />
                 <button type="submit" aria-label="Search" className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center text-slate-300 hover:text-white"><Search className="h-4 w-4" /></button>
               </div>
               <Select value={filters.sort} onValueChange={(sort) => updateFilters({ ...filters, sort })}>
@@ -1360,7 +1384,8 @@ export default function Shop() {
             {pagedResults.map((result, idx) => {
               const gridImageUrl = getResultGridImageUrl(result);
               const listingSellPrice = resolveResultSellPrice(result);
-              const marketPrice = resolveMarketPrice(result);
+              const marketPriceState = resolveMarketPriceState(result);
+              const marketPrice = marketPriceState.amount;
               const hasActiveListingPrice = result.inStock && listingSellPrice != null;
 
               if (
@@ -1487,7 +1512,7 @@ export default function Shop() {
 
                 <>
                         {marketPrice != null &&
-                  <p className="mb-1 text-sm text-slate-500">Market: <span className="font-semibold text-slate-300">${marketPrice.toFixed(2)}</span></p>
+                  <p className="mb-1 text-sm text-slate-500">{marketPriceState.label}: <span className="font-semibold text-slate-300">${marketPrice.toFixed(2)}</span></p>
                   }
                       </>
                 }

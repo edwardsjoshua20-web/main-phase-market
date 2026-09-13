@@ -42,10 +42,31 @@ const catalogState = resolvePricingState({
   name: 'Catalog Card',
   price: 9.25
 });
+const nonEnglishCatalogState = resolvePricingState({
+  id: 'catalog-card-ja',
+  game: 'magic',
+  name: 'Catalog Card',
+  set_code: 'TST',
+  card_number: '1',
+  language: 'ja',
+  market_price: 9.25
+});
+const exactScopedCatalogState = resolvePricingState({
+  id: 'catalog-card-ja-exact',
+  game: 'magic',
+  name: 'Catalog Card',
+  set_code: 'TST',
+  card_number: '1',
+  language: 'ja',
+  market_price: 10.5,
+  market_price_scope: 'exact'
+});
 
 assert(baseState.identity_key !== foilState.identity_key, 'Pricing identity must distinguish finish/printing variants.');
 assert(listingState.sell_price === 12, 'Explicit Main Phase sell price must be authoritative for inventory/listing records.');
 assert(catalogState.market_price === 9.25, 'Loose catalog price fields must be treated as advisory source data.');
+assert(nonEnglishCatalogState.market_price_scope === 'reference', 'Non-English MTG catalog pricing must not be labeled exact when only language-neutral catalog pricing is available.');
+assert(exactScopedCatalogState.market_price_scope === 'exact', 'Explicit language-scoped market pricing must be preserved by Pricing Owner.');
 assert(listingState.market_price === 13.75, 'Merged external source median should remain available as market reference.');
 assert(assertSellPriceAvailable(listingState).sell_price === 12, 'Valid listings must produce an authoritative sell price.');
 
@@ -92,6 +113,7 @@ console.log(JSON.stringify({
     'pricing identity distinguishes variants',
     'Main Phase sell price is authoritative for inventory/listing records',
     'loose catalog price fields remain advisory',
+    'non-English MTG catalog market pricing is labeled reference unless exact-scoped',
     'external market references remain advisory',
     'missing sell price fails explicitly',
     'legacy pricing pipeline delegates to pricing core',

@@ -11,6 +11,7 @@ import { createPageUrl } from '@/utils';
 import { backend } from '@/services/backend';
 import { inventoryOwner } from '@/services/inventory/inventoryOwner';
 import { listingOwner } from '@/services/listing/listingOwner';
+import { pricingOwner } from '@/services/pricing/pricingOwner';
 import { useCartOwner } from '@/hooks/useCartOwner';
 import { getLorcanaCardById } from '@/lib/lorcanaLocalCatalog';
 import { getFabCardById } from '@/lib/fabLocalCatalog';
@@ -214,12 +215,6 @@ export default function CardDetail() {
     enabled: !isMtgCatalogMode && !isPokemonCatalogMode && !isYugiohCatalogMode && !isLorcanaCatalogMode && !isOnePieceCatalogMode && !isFabCatalogMode && !!cardId
   });
 
-  const { data: inventoryRows = [] } = useQuery({
-    queryKey: ['detail-inventory-listings'],
-    queryFn: () => listingOwner.listCardListings('-created_date', 5000),
-    enabled: isMtgCatalogMode || isPokemonCatalogMode || isYugiohCatalogMode || isLorcanaCatalogMode || isOnePieceCatalogMode || isFabCatalogMode || isStarWarsCatalogMode
-  });
-
   const { data: mtgPrintings = [], isLoading: mtgLoading } = useQuery({
     queryKey: ['mtg-card-detail', oracleId],
     queryFn: () => getMtgPrintingsByOracleId(oracleId),
@@ -374,10 +369,29 @@ export default function CardDetail() {
               : isMtgCatalogMode
                 ? 'magic'
                 : null;
+  const { data: inventoryRows = [] } = useQuery({
+    queryKey: ['detail-inventory-listings', requestGame],
+    queryFn: () => listingOwner.filterCardListings({ status: 'active', game: requestGame }, '-created_date', 1000),
+    enabled: Boolean(requestGame)
+  });
   const stockListing = useMemo(() => {
     if (!requestItem || !requestGame) return null;
     return inventoryOwner.findInventoryMatch(requestItem, inventoryRows, requestGame);
   }, [inventoryRows, requestGame, requestItem]);
+  const activePricingState = useMemo(() => {
+    if (!requestItem || !requestGame) return null;
+    return pricingOwner.resolvePricingState({
+      ...requestItem,
+      game: requestGame,
+      api_id: requestItem.api_id || requestItem.id,
+      card_number: requestItem.card_number || requestItem.collector_number || requestItem.number,
+      language: requestItem.language || requestItem.lang || 'en',
+      market_price: requestItem.market_price ?? requestItem.marketPrice ?? requestItem.price ?? null
+    }, {
+      floor: 0,
+      listingPriceAuthority: false
+    });
+  }, [requestGame, requestItem]);
   const canAddToCart = Boolean(stockListing);
   const cart = useCartOwner(user);
 
@@ -1568,6 +1582,11 @@ export default function CardDetail() {
     activePrinting.toughness !== undefined &&
     String(activePrinting.power) !== '' &&
     String(activePrinting.toughness) !== '';
+  const activeMarketPrice = activePricingState?.market_price ?? null;
+  const activeMarketLabel = activePricingState?.market_price_label || 'Market';
+  const activeMarketReason = activePricingState?.market_price_scope === 'reference'
+    ? activePricingState.fallback_reason
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1692,8 +1711,11 @@ export default function CardDetail() {
                   <p className="text-gray-900 font-medium">{activePrinting.released_at || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Market</p>
-                  <p className="text-gray-900 font-medium">{activePrinting.price != null ? `$${activePrinting.price.toFixed(2)}` : 'N/A'}</p>
+                  <p className="text-gray-500">{activeMarketLabel}</p>
+                  <p className="text-gray-900 font-medium">{activeMarketPrice != null ? `$${activeMarketPrice.toFixed(2)}` : 'N/A'}</p>
+                  {activeMarketReason && (
+                    <p className="mt-1 text-xs leading-5 text-gray-500">{activeMarketReason}</p>
+                  )}
                 </div>
                 {hasLoyalty && (
                   <div>

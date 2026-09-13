@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react';
 
 const actions = [
   {
-    title: 'Shop',
+    title: 'Marketplace',
     subtitle: 'Browse singles, sealed, and deals',
     to: '/MobileShop?type=single_card',
     accent: 'from-blue-700 via-indigo-700 to-slate-950'

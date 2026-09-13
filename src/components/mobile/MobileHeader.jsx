@@ -84,7 +84,7 @@ export default function MobileHeader({
                 <Home className="w-4 h-4" /> Home
               </button>
               <button onClick={() => goTo('/MobileShop')} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-200 hover:bg-gray-800 hover:text-white transition-colors text-left">
-                <Store className="w-4 h-4" /> Shop
+                <Store className="w-4 h-4" /> Marketplace
               </button>
               <button onClick={() => goTo('/MobileDeckBuilder')} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-200 hover:bg-gray-800 hover:text-white transition-colors text-left">
                 <Swords className="w-4 h-4" /> Deck Builder

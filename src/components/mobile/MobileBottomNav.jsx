@@ -26,7 +26,7 @@ export default function MobileBottomNav({
 
         <Link to="/MobileShop" className="flex h-full flex-col items-center justify-center gap-1 rounded-xl hover:bg-gray-800 transition-colors">
           <Store className={`h-5 w-5 ${isActive('Shop') || isActive('MobileShop') ? 'text-white' : 'text-gray-400'}`} />
-          <span className={`min-w-[2.5rem] text-center text-[11px] leading-none ${isActive('Shop') || isActive('MobileShop') ? 'font-semibold text-white' : 'text-gray-400'}`}>Shop</span>
+          <span className={`min-w-[4rem] text-center text-[11px] leading-none ${isActive('Shop') || isActive('MobileShop') ? 'font-semibold text-white' : 'text-gray-400'}`}>Marketplace</span>
         </Link>
 
         <Link to="/MobileDeckBuilder" className="flex h-full flex-col items-center justify-center gap-1 rounded-xl hover:bg-gray-800 transition-colors">

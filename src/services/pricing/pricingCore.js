@@ -3,6 +3,14 @@ import { buildPriceSource, normalizePriceNumber, summarizePricing } from './pric
 
 const CANONICAL_SELL_PRICE_FIELDS = ['sell_price', 'target_price'];
 const MARKET_PRICE_FIELDS = ['market_price', 'cardkingdom_price', 'tcgplayer_price', 'starcitygames_price'];
+const LANGUAGE_NEUTRAL_MARKET_SOURCES = new Set([
+  'catalog_market',
+  'catalog_price',
+  'catalog_usd',
+  'catalog_usd_foil',
+  'catalog_usd_etched'
+]);
+const PRICE_SCOPES = new Set(['exact', 'reference', 'unavailable']);
 const LISTING_AUTHORITY_FIELDS = [
   'listing_id',
   'inventory_entity_type',
@@ -45,6 +53,54 @@ function isListingPriceAuthority(raw = {}) {
   return LISTING_AUTHORITY_FIELDS.some((field) => hasField(raw, field));
 }
 
+function normalizeLanguage(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizePriceScope(value) {
+  const scope = String(value || '').trim().toLowerCase();
+  return PRICE_SCOPES.has(scope) ? scope : '';
+}
+
+function resolvePriceScope(raw = {}, identity, marketPrice, priceSources = []) {
+  if (marketPrice == null) return 'unavailable';
+
+  const explicitScope = normalizePriceScope(
+    raw.price_scope ||
+    raw.market_price_scope ||
+    raw.pricing_scope ||
+    raw.marketPriceScope
+  );
+  if (explicitScope) return explicitScope;
+
+  const language = normalizeLanguage(identity.language || raw.language || raw.lang || 'en') || 'en';
+  const allMarketSourcesAreLanguageNeutral =
+    priceSources.length > 0 &&
+    priceSources.every((source) => LANGUAGE_NEUTRAL_MARKET_SOURCES.has(source.source));
+
+  if (identity.game === 'magic' && language !== 'en' && allMarketSourcesAreLanguageNeutral) {
+    return 'reference';
+  }
+
+  return 'exact';
+}
+
+function priceScopeLabel(scope) {
+  if (scope === 'reference') return 'Reference market';
+  if (scope === 'unavailable') return 'Market unavailable';
+  return 'Market';
+}
+
+function priceScopeReason(scope) {
+  if (scope === 'reference') {
+    return 'Exact language-specific market pricing is unavailable; displaying a catalog reference price.';
+  }
+  if (scope === 'unavailable') {
+    return 'No positive market price is available.';
+  }
+  return null;
+}
+
 export function resolvePricingState(raw = {}, options = {}) {
   const identity = buildCardIdentity(raw);
   const listingPriceAuthority = options.listingPriceAuthority ?? isListingPriceAuthority(raw);
@@ -80,6 +136,7 @@ export function resolvePricingState(raw = {}, options = {}) {
   const targetPrice = summary.targetPrice ?? marketPrice ?? fallbackPrice;
   const sellPrice = positivePrice(explicitSellPrice ?? targetPrice);
   const updatedAt = raw.pricing_updated_at || raw.updated_date || raw.updated_at || raw.created_date || null;
+  const priceScope = resolvePriceScope(raw, identity, marketPrice, summary.sources);
 
   return {
     identity,
@@ -88,12 +145,15 @@ export function resolvePricingState(raw = {}, options = {}) {
     market_price: marketPrice,
     target_price: targetPrice,
     display_price: sellPrice ?? marketPrice ?? targetPrice ?? null,
+    price_scope: priceScope,
+    market_price_scope: priceScope,
+    market_price_label: priceScopeLabel(priceScope),
     source_count: summary.sourceCount,
     sources: summary.sources,
     status: sellPrice != null ? 'priced' : 'unavailable',
     stale: false,
     updated_at: updatedAt,
-    fallback_reason: sellPrice == null ? 'No positive canonical sell price is available.' : null
+    fallback_reason: sellPrice == null ? 'No positive canonical sell price is available.' : priceScopeReason(priceScope)
   };
 }
 
@@ -109,7 +169,10 @@ export function applyPricingProjection(raw = {}, options = {}) {
     pricing_identity_key: pricing.identity_key,
     pricing_state: pricing,
     pricing_source_count: pricing.source_count,
-    pricing_sources: pricing.sources
+    pricing_sources: pricing.sources,
+    price_scope: pricing.price_scope,
+    market_price_scope: pricing.market_price_scope,
+    market_price_label: pricing.market_price_label
   };
 }
 

@@ -188,7 +188,7 @@ export default function Layout({ children, currentPageName }) {
 
   const primaryNavItems = [
     { label: 'Home', to: '/', pages: ['Home'] },
-    { label: 'Shop', to: '/Shop', pages: ['Shop'] },
+    { label: 'Marketplace', to: '/Shop', pages: ['Shop'] },
     { label: 'Deck Builder', to: '/DeckBuilder', pages: ['AdvancedDeckBuilder', 'DeckBuilder'] },
     { label: 'Deck Chemistry', to: '/DeckChemistry', pages: ['DeckChemistry', 'CommanderHub', 'CommanderDetail'], desktopOnly: true },
     { label: 'Community', to: '/CommunityDecks', pages: ['CommunityDecks'], desktopOnly: true },
@@ -355,7 +355,7 @@ export default function Layout({ children, currentPageName }) {
                       <SheetTitle className="text-gray-900">Menu</SheetTitle>
                     </SheetHeader>
                     <nav className="flex flex-col gap-4 mt-8">
-                      <Link to={createPageUrl('Home')} onClick={() => setMobileMenuOpen(false)} className="text-lg text-gray-700 hover:text-blue-600">Shop</Link>
+                      <Link to={createPageUrl('Shop')} onClick={() => setMobileMenuOpen(false)} className="text-lg text-gray-700 hover:text-blue-600">Marketplace</Link>
                       {user?.role === 'admin' && (
                         <>
                           <Link to={createPageUrl('AdminInventory')} onClick={() => setMobileMenuOpen(false)} className="text-lg text-gray-700 hover:text-blue-600">Inventory</Link>

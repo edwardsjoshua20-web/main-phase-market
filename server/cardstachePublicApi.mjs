@@ -366,6 +366,14 @@ function pricingInput(row, identity) {
   const ygoPrice = row.card_prices?.[0];
   const pokemonPrices = row.tcgplayer?.prices || {};
   const pokemonMarket = pokemonPrices.normal?.market || pokemonPrices.holofoil?.market || pokemonPrices.reverseHolofoil?.market || row.cardmarket?.prices?.averageSellPrice;
+  const mtgMarket = identity.finish === 'foil'
+    ? row.prices?.usd_foil ?? row.usd_foil
+    : identity.finish === 'etched'
+      ? row.prices?.usd_etched ?? row.usd_etched
+      : row.prices?.usd ?? row.usd;
+  const catalogMarket = identity.game === 'magic'
+    ? mtgMarket
+    : row.market_price ?? row.price ?? pokemonMarket ?? ygoPrice?.tcgplayer_price ?? ygoPrice?.cardmarket_price ?? null;
   return {
     ...row,
     id: identity.printingId,
@@ -376,7 +384,12 @@ function pricingInput(row, identity) {
     card_number: identity.collectorNumber,
     finish: identity.finish,
     language: identity.language,
-    market_price: row.market_price ?? row.price ?? pokemonMarket ?? ygoPrice?.tcgplayer_price ?? ygoPrice?.cardmarket_price ?? null
+    // Source-field normalization belongs here; Pricing Owner remains responsible
+    // for interpreting the canonical market projection.
+    prices: identity.game === 'magic' ? {} : row.prices,
+    market_price: catalogMarket,
+    market_price_scope: identity.game === 'magic' && identity.language !== 'en' ? 'reference' : 'exact',
+    market_price_source: identity.game === 'magic' ? 'scryfall_catalog' : row.market_price_source
   };
 }
 
@@ -385,11 +398,15 @@ function quoteFor(row, identity) {
   const updatedAt = row.pricing_updated_at || row.updated_at || row.updated_date || generatedAtOf(pricingSnapshot()) || null;
   const staleAt = updatedAt ? new Date(new Date(updatedAt).getTime() + 24 * 60 * 60 * 1000).toISOString() : null;
   const amount = positiveNumber(pricing.market_price ?? pricing.display_price);
+  const scope = pricing.market_price_scope || pricing.price_scope || (amount == null ? 'unavailable' : 'exact');
   return {
     identityKey: identity.identityKey,
     currency: 'USD',
     amount,
-    status: amount == null ? 'unavailable' : staleAt && Date.parse(staleAt) < Date.now() ? 'stale' : 'current',
+    status: amount == null ? 'unavailable' : scope === 'reference' ? 'reference' : staleAt && Date.parse(staleAt) < Date.now() ? 'stale' : 'current',
+    scope,
+    label: pricing.market_price_label || (scope === 'reference' ? 'Reference market' : 'Market'),
+    fallbackReason: pricing.fallback_reason,
     updatedAt,
     staleAt,
     sourceCount: Number(pricing.source_count || 0)
