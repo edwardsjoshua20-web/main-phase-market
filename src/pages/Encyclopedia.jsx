@@ -18,6 +18,16 @@ const LANDING_COPY_BY_GAME = {
   starwars: 'Browse sets, cards, and rules.'
 };
 
+const LANDING_SELECTOR_BACKGROUNDS = {
+  magic: '/images/encyclopedia-selectors/enchanted_library_grimoire_vortex.png',
+  pokemon: '/images/encyclopedia-selectors/enchanted_valley_of_floating_cards.png',
+  yugioh: '/images/encyclopedia-selectors/mystic_sandstorm_temple_arena.png',
+  lorcana: '/images/encyclopedia-selectors/moonlit_castle_harbor_of_floating_cards.png',
+  flesh_and_blood: '/images/encyclopedia-selectors/war_camp_strategy_table_at_dusk.png',
+  onepiece: '/images/encyclopedia-selectors/golden_hour_pirate_treasure_deck.png',
+  starwars: '/images/encyclopedia-selectors/cosmic_command_deck_overlooking_distant_worlds.png'
+};
+
 const MAGIC_REFERENCE_GROUP_LABELS = {
   core: 'Core',
   timing: 'Timing',
@@ -65,18 +75,6 @@ function EmptyState({ title, body, to = '/Encyclopedia', action = 'Back to Encyc
       </SectionShell>
     </main>
   );
-}
-
-function GameLogo({ game }) {
-  if (game.id === 'magic') {
-    return (
-      <span className="text-sm font-black uppercase tracking-[0.18em] text-white">
-        Magic: The Gathering
-      </span>
-    );
-  }
-
-  return <img src={game.logoSrc} alt={game.label} loading="lazy" className={`h-auto w-auto object-contain ${game.logoClassName}`} />;
 }
 
 function GameIdentityMark({ game }) {
@@ -286,14 +284,30 @@ function EncyclopediaLanding() {
       </section>
 
       <SectionShell className="py-6">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {games.map((game) => (
-            <Link key={game.id} to={`/Encyclopedia/${game.routeKey}`} className={`group flex min-h-[210px] flex-col justify-between p-5 transition hover:border-cyan-300/60 hover:bg-slate-900/70 ${encyclopediaPanelClass}`}>
-              <div>
-                <div className={`flex h-20 items-center justify-start border border-slate-700/70 bg-gradient-to-br ${game.tintClassName} px-4`}>
-                  <GameLogo game={game} />
+            <Link
+              key={game.id}
+              to={`/Encyclopedia/${game.routeKey}`}
+              aria-label={`Open ${game.label} Encyclopedia`}
+              className="group relative isolate flex aspect-[16/7] min-h-[150px] items-center overflow-hidden border border-slate-700/70 bg-slate-950 transition duration-300 hover:border-cyan-200/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-200"
+            >
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-[1.025] group-hover:brightness-110"
+                style={{ backgroundImage: `url("${LANDING_SELECTOR_BACKGROUNDS[game.id]}")` }}
+              />
+              <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(90deg,rgba(7,11,20,0.72),rgba(7,11,20,0.3)_56%,rgba(7,11,20,0.12)),linear-gradient(0deg,rgba(7,11,20,0.34),rgba(7,11,20,0.04)_48%,rgba(7,11,20,0.3))]" />
+              <div className="relative flex min-h-full w-full items-center justify-between gap-4 px-5 py-5 md:px-6">
+                <div className="flex min-h-20 min-w-0 items-center justify-start">
+                  <img
+                    src={game.logoSrc}
+                    alt={`${game.label} logo`}
+                    loading="lazy"
+                    className={`h-auto w-auto object-contain drop-shadow-[0_4px_18px_rgba(0,0,0,0.75)] ${game.logoClassName}`}
+                  />
                 </div>
-                <h2 className="mt-4 text-xl font-black tracking-tight text-white">{game.label}</h2>
+                <ArrowRight className="h-5 w-5 shrink-0 text-cyan-100/85 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] transition group-hover:translate-x-1" aria-hidden="true" />
               </div>
             </Link>
           ))}
