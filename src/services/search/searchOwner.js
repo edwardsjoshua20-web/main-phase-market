@@ -235,6 +235,7 @@ function normalizeSetResult(set, game, products = []) {
     id: set.id || setCode || setName,
     name: setName,
     set_code: String(setCode || '').toUpperCase(),
+    display_code: String(setCode || '').toUpperCase(),
     image_url: symbolUrl || logoUrl || productImageUrl,
     icon_url: symbolUrl || null,
     logo_url: logoUrl || null,

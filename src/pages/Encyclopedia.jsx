@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, ExternalLink, Layers, Search } from 'lucide-react';
+import { ArrowRight, ExternalLink, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CardImage from '@/components/cards/CardImage';
 import { gameKnowledgeOwner } from '@/services/knowledge/gameKnowledgeOwner';
@@ -198,6 +198,7 @@ function GameLanding({ game }) {
 function SetRow({ set }) {
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}`;
+  const displayCode = String(set.displayCode || set.setCode || '').trim().toUpperCase();
   const imageClassName = set.iconSource === 'product'
     ? 'max-h-9 max-w-9 object-contain opacity-95'
     : set.iconSource === 'logo'
@@ -207,7 +208,15 @@ function SetRow({ set }) {
   return (
     <Link to={set.path} state={{ encyclopediaReturnTo: returnTo }} className="grid grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-4 py-3 transition hover:bg-slate-900/62">
       <div className="flex h-10 w-10 items-center justify-center border border-slate-700/70 bg-slate-950/70">
-        {set.imageUrl ? <img src={set.imageUrl} alt="" className={imageClassName} /> : <Layers className="h-5 w-5 text-slate-500" />}
+        {set.imageUrl ? (
+          <img src={set.imageUrl} alt="" className={imageClassName} />
+        ) : displayCode ? (
+          <span className="max-w-9 truncate px-1 text-center text-[0.62rem] font-black uppercase leading-none tracking-normal text-slate-300" aria-hidden="true">
+            {displayCode}
+          </span>
+        ) : (
+          <span className="h-1.5 w-1.5 rounded-full bg-slate-500" aria-hidden="true" />
+        )}
       </div>
       <div className="min-w-0">
         <p className="truncate font-bold text-slate-100">{set.name}</p>

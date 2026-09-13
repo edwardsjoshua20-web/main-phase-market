@@ -33,6 +33,7 @@ function normalizeSet(set = {}, gameMeta) {
     routeGame: gameMeta.routeKey,
     name: cleanText(set.name),
     setCode: cleanText(set.set_code),
+    displayCode: cleanText(set.display_code || set.set_code || set.id),
     imageUrl: set.image_url || null,
     iconUrl: set.icon_url || null,
     logoUrl: set.logo_url || null,

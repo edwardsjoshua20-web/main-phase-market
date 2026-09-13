@@ -153,9 +153,12 @@ assert(pageFile.includes('Official Rules Reference'), 'Magic articles must use r
 assert(!pageFile.includes('Authority Boundary'), 'Rules page must not render the internal authority-boundary box');
 assert(!/catalog-backed|Search owner|source-attributed summaries|Complete local card|MainPhase Search owner/i.test(pageFile), 'Public Encyclopedia UI contains internal owner/catalog wording');
 assert(searchOwnerFile.includes('icon_url') && searchOwnerFile.includes('logo_url') && searchOwnerFile.includes('product_image_url') && searchOwnerFile.includes('icon_source'), 'Search owner must expose canonical set icon/logo/product image metadata');
+assert(searchOwnerFile.includes('display_code'), 'Search owner must expose set display codes for code-badge fallbacks');
 assert(searchOwnerFile.includes('set.set_image') && searchOwnerFile.includes('set.set_logo'), 'Search owner must consume set product/logo fields from source set metadata');
-assert(gameKnowledgeOwnerFile.includes('iconUrl') && gameKnowledgeOwnerFile.includes('logoUrl') && gameKnowledgeOwnerFile.includes('productImageUrl') && gameKnowledgeOwnerFile.includes('iconSource'), 'Game knowledge owner must preserve set icon metadata for Encyclopedia consumers');
+assert(gameKnowledgeOwnerFile.includes('iconUrl') && gameKnowledgeOwnerFile.includes('logoUrl') && gameKnowledgeOwnerFile.includes('productImageUrl') && gameKnowledgeOwnerFile.includes('iconSource') && gameKnowledgeOwnerFile.includes('displayCode'), 'Game knowledge owner must preserve set icon metadata and display codes for Encyclopedia consumers');
 assert(pageFile.includes('set.iconSource') && pageFile.includes("set.iconSource === 'product'") && pageFile.includes("set.iconSource === 'logo'"), 'Shared set-row renderer must render set icons according to canonical icon source');
+assert(pageFile.includes('displayCode') && pageFile.includes('text-[0.62rem]'), 'Shared set-row renderer must use compact code badges when real set imagery is unavailable');
+assert(!pageFile.includes('<Layers'), 'Set rows must not fall back to the generic stacked-layers icon');
 
 const cardDetailFile = fs.readFileSync(path.join(repoRoot, 'src/pages/CardDetail.jsx'), 'utf8');
 assert(cardDetailFile.includes('getPreferredBackLink') && cardDetailFile.includes('returnTo') && cardDetailFile.includes('returnLabel'), 'Canonical CardDetail must honor Encyclopedia return context');
@@ -180,7 +183,9 @@ for (const game of ENCYCLOPEDIA_GAMES) {
   const sets = readJson(`public/data/${game.assetGame}/sets.json`);
   const iconExpectation = SET_ICON_EXPECTATIONS[game.id];
   const setsWithIconSource = sets.filter((set) => iconUrlForSet(set));
+  const setsWithDisplayCode = sets.filter((set) => String(set.set_code || set.code || set.ptcgoCode || set.id || '').trim());
   assert(iconExpectation, `${game.id} missing set icon expectation`);
+  assert(setsWithDisplayCode.length === sets.length, `${game.id} has set rows without displayable source codes for code-badge fallback`);
   assert(setsWithIconSource.length >= iconExpectation.min, `${game.id} should expose ${iconExpectation.source}; found ${setsWithIconSource.length} source icons`);
   if (iconExpectation.min > 0) {
     assert(setsWithIconSource.some((set) => iconSourceForSet(set) !== 'fallback'), `${game.id} source icon fields are present but not classifiable`);
