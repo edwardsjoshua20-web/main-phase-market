@@ -237,6 +237,12 @@ async function loadAliasBucket(bucket) {
 
 async function loadLiteRowsForQuery(normalizedQuery) {
   const queryBucket = bucketForQuery(normalizedQuery);
+  const queryRows = await loadLiteBucket(queryBucket);
+
+  if (queryRows.some((row) => isCanonicalCardNameMatch(row, normalizedQuery))) {
+    return queryRows;
+  }
+
   const aliasRoutes = await loadAliasBucket(queryBucket);
   const targetBuckets = new Set([queryBucket]);
 
@@ -246,7 +252,8 @@ async function loadLiteRowsForQuery(normalizedQuery) {
     }
   }
 
-  return (await Promise.all([...targetBuckets].map(loadLiteBucket))).flat();
+  const additionalBuckets = [...targetBuckets].filter((bucket) => bucket !== queryBucket);
+  return queryRows.concat((await Promise.all(additionalBuckets.map(loadLiteBucket))).flat());
 }
 
 async function loadAllLiteBuckets() {
