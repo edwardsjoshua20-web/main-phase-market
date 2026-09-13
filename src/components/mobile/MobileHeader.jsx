@@ -18,7 +18,6 @@ import {
   Store,
   Home,
   Star,
-  SquareStack,
   BookOpen,
   Crown
 } from 'lucide-react';
@@ -88,9 +87,6 @@ export default function MobileHeader({
               </button>
               <button onClick={() => goTo('/MobileDeckBuilder')} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-200 hover:bg-gray-800 hover:text-white transition-colors text-left">
                 <Swords className="w-4 h-4" /> Deck Builder
-              </button>
-              <button onClick={() => goTo('/MobileCommunityDecks')} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-200 hover:bg-gray-800 hover:text-white transition-colors text-left">
-                <SquareStack className="w-4 h-4" /> Community Decks
               </button>
               <button onClick={() => goTo('/Encyclopedia')} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-200 hover:bg-gray-800 hover:text-white transition-colors text-left">
                 <BookOpen className="w-4 h-4" /> TCG Encyclopedia

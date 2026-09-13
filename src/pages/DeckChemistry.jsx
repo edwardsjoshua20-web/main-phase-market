@@ -119,7 +119,6 @@ function ChemistryGameCard({ game }) {
           />
         </div>
         <div>
-          <p className="text-base font-semibold text-white">{game.name}</p>
           <p className="mt-1 text-xs leading-relaxed text-slate-300">{game.description}</p>
           <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2.5">
             <span className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${game.available ? 'text-sky-300' : 'text-slate-400'}`}>
