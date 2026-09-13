@@ -110,8 +110,9 @@ assert(!pageFile.includes('View all sets'), 'Game landings must not gate the set
 assert(!pageFile.includes('function CardDetailPage'), 'Duplicate Encyclopedia card detail page must not be active');
 assert(pageFile.includes('EncyclopediaCardRedirect') && pageFile.includes('<Navigate'), 'Legacy Encyclopedia card URLs must redirect to canonical CardDetail');
 assert(pageFile.includes('returnTo') && pageFile.includes('returnLabel'), 'Encyclopedia card routes must preserve return context');
-assert(pageFile.includes('function MagicHub'), 'Magic game landing must render a three-destination hub');
-assert(pageFile.includes('/Encyclopedia/magic/sets') && pageFile.includes('/Encyclopedia/magic/learn') && pageFile.includes('/Encyclopedia/magic/rules'), 'Magic hub must expose Sets & Cards, Learn to Play, and Game Rules routes');
+assert(pageFile.includes('function GameLanding') && pageFile.includes('HUB_CHOICES'), 'Game landings must render the shared three-destination hub');
+assert(pageFile.includes('Sets & Cards') && pageFile.includes('Learn to Play') && pageFile.includes('Game Rules'), 'Game hubs must expose Sets & Cards, Learn to Play, and Game Rules choices');
+assert(pageFile.includes('`/Encyclopedia/${game.routeKey}/${choice.section}`'), 'Game hub choices must use existing game route keys');
 assert(pageFile.includes('function LearnPage'), 'Magic Learn to Play route must render a dedicated course page');
 assert(pageFile.includes('LessonVisual') && pageFile.includes('getMagicTeachingCards'), 'Magic lessons must render structured real-card teaching visuals');
 assert(pageFile.includes('searchRulesTopics') && pageFile.includes('Search topic, alias, keyword, or mechanic'), 'Magic Game Rules must expose topic/alias/mechanic search');

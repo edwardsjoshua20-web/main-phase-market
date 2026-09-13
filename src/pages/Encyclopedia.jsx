@@ -1,23 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, BookOpen, ExternalLink, Layers, Library, Search, ScrollText } from 'lucide-react';
+import { ArrowRight, ExternalLink, Layers, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CardImage from '@/components/cards/CardImage';
 import { gameKnowledgeOwner } from '@/services/knowledge/gameKnowledgeOwner';
 import { createPageUrl } from '@/utils';
 
 const SETS_PER_PAGE = 24;
-const LANDING_COPY_BY_GAME = {
-  magic: 'Browse sets, cards, and rules.',
-  pokemon: 'Browse sets, cards, and play topics.',
-  yugioh: 'Browse sets, cards, and duel rules.',
-  lorcana: 'Browse sets, cards, and rules.',
-  flesh_and_blood: 'Browse sets, cards, and game rules.',
-  onepiece: 'Browse sets, cards, and play rules.',
-  starwars: 'Browse sets, cards, and rules.'
-};
-
 const LANDING_SELECTOR_BACKGROUNDS = {
   magic: '/images/encyclopedia-selectors/enchanted_library_grimoire_vortex.png',
   pokemon: '/images/encyclopedia-selectors/enchanted_valley_of_floating_cards.png',
@@ -43,7 +33,6 @@ const encyclopediaPanelClass = 'border border-slate-700/70 bg-slate-900/44 shado
 const encyclopediaDividerClass = 'border-slate-700/70';
 const encyclopediaMutedTextClass = 'text-slate-400';
 const encyclopediaSoftTextClass = 'text-slate-300';
-const encyclopediaAccentTextClass = 'text-cyan-200';
 const encyclopediaControlClass = 'border border-slate-700 bg-slate-950/70 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/70';
 const encyclopediaButtonClass = 'rounded border-slate-700 bg-slate-950/70 text-slate-100 hover:border-cyan-300/70 hover:bg-slate-900 disabled:opacity-45';
 const encyclopediaPrimaryButtonClass = 'rounded bg-cyan-200 text-slate-950 hover:bg-cyan-100';
@@ -77,32 +66,19 @@ function EmptyState({ title, body, to = '/Encyclopedia', action = 'Back to Encyc
   );
 }
 
-function GameIdentityMark({ game }) {
-  if (game.id === 'magic') {
-    return (
-      <span className="flex h-9 w-9 items-center justify-center border border-cyan-200/35 bg-cyan-200/10 text-xs font-black uppercase tracking-[0.08em] text-cyan-100">
-        MTG
-      </span>
-    );
-  }
-
-  return <img src={game.logoSrc} alt="" loading="lazy" className="max-h-9 max-w-[92px] object-contain opacity-95" />;
-}
-
-function GameHubHeader({ game }) {
+function EncyclopediaBanner() {
   return (
-    <section className="border-b border-slate-800 bg-slate-950/55 text-white">
-      <SectionShell className="py-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-100/70">TCG Encyclopedia</p>
-            <div className="mt-2 flex min-w-0 items-center gap-3">
-              <GameIdentityMark game={game} />
-              <h1 className="min-w-0 text-2xl font-black tracking-tight text-white md:text-3xl">{game.label}</h1>
-            </div>
-            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-300">{LANDING_COPY_BY_GAME[game.id] || 'Browse sets, cards, and rules.'}</p>
-          </div>
-        </div>
+    <section
+      className="border-b border-slate-800 bg-cover bg-center text-white"
+      style={{ backgroundImage: 'linear-gradient(90deg, rgba(7, 11, 20, 0.82), rgba(7, 11, 20, 0.44) 48%, rgba(7, 11, 20, 0.2)), url("/images/tcg-encyclopedia-banner.png")' }}
+    >
+      <SectionShell className="py-10 md:py-12">
+        <h1
+          className="max-w-4xl text-4xl font-semibold tracking-normal text-[#f4ead7] drop-shadow-[0_2px_18px_rgba(224,154,72,0.32)] md:text-5xl"
+          style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+        >
+          TCG Encyclopedia
+        </h1>
       </SectionShell>
     </section>
   );
@@ -149,59 +125,52 @@ function SourceList({ sources = [], className = '', title = 'Sources' }) {
   );
 }
 
-function MagicDestinationCard({ to, icon: Icon, eyebrow, title, body, meta }) {
+const HUB_CHOICES = Object.freeze([
+  { label: 'Sets & Cards', section: 'sets' },
+  { label: 'Learn to Play', section: 'learn' },
+  { label: 'Game Rules', section: 'rules' }
+]);
+
+const HUB_TITLE_BY_GAME = Object.freeze({
+  magic: 'Magic: The Gathering',
+  pokemon: 'Pokémon',
+  yugioh: 'Yu-Gi-Oh!',
+  lorcana: 'Disney Lorcana',
+  flesh_and_blood: 'Flesh and Blood',
+  onepiece: 'One Piece',
+  starwars: 'Star Wars Unlimited'
+});
+
+function HubChoiceRow({ to, label }) {
   return (
-    <Link to={to} className={`group flex min-h-[190px] min-w-0 flex-col justify-between p-5 transition hover:border-cyan-300/60 hover:bg-slate-900/70 ${encyclopediaPanelClass}`}>
-      <span>
-        <span className="inline-flex h-10 w-10 items-center justify-center border border-cyan-200/30 bg-cyan-200/10 text-cyan-100">
-          <Icon className="h-5 w-5" />
-        </span>
-        <span className={`mt-5 block text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>{eyebrow}</span>
-        <span className="mt-2 block text-2xl font-black tracking-tight text-white">{title}</span>
-        <span className={`mt-2 block text-sm leading-6 ${encyclopediaSoftTextClass}`}>{body}</span>
-      </span>
-      <span className={`mt-5 flex items-center justify-between border-t ${encyclopediaDividerClass} pt-4 text-sm font-bold ${encyclopediaAccentTextClass}`}>
-        <span>{meta}</span>
-        <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-      </span>
+    <Link
+      to={to}
+      className={`group flex min-h-14 items-center justify-between gap-4 border-b ${encyclopediaDividerClass} py-4 text-lg font-bold text-slate-100 transition hover:bg-slate-900/50 hover:text-cyan-100 sm:text-xl`}
+    >
+      <span>{label}</span>
+      <ArrowRight className="h-5 w-5 shrink-0 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-cyan-200" aria-hidden="true" />
     </Link>
   );
 }
 
-function MagicHub({ game }) {
-  const learnLessons = gameKnowledgeOwner.getRulesTopicsByCategory(game.id, 'learn');
-  const referenceGroups = gameKnowledgeOwner.getRulesReferenceGroups(game.id);
-  const referenceCount = referenceGroups.reduce((sum, group) => sum + group.entries.length, 0);
+function GameLanding({ game }) {
+  const hubTitle = HUB_TITLE_BY_GAME[game.id] || game.label;
 
   return (
     <main className={encyclopediaPageClass}>
-      <GameHubHeader game={game} />
-      <SectionShell className="py-6">
-        <div className="grid gap-4 lg:grid-cols-3">
-          <MagicDestinationCard
-            to="/Encyclopedia/magic/sets"
-            icon={Library}
-            eyebrow="Browse"
-            title="Sets & Cards"
-            body="Search Magic sets, sort by release date, open set galleries, and continue into card detail."
-            meta="Set browser"
-          />
-          <MagicDestinationCard
-            to="/Encyclopedia/magic/learn"
-            icon={BookOpen}
-            eyebrow="Course"
-            title="Learn to Play"
-            body="A guided sequence from first game concepts through combat, the stack, abilities, and first decks."
-            meta={`${learnLessons.length} lessons`}
-          />
-          <MagicDestinationCard
-            to="/Encyclopedia/magic/rules"
-            icon={ScrollText}
-            eyebrow="Reference"
-            title="Game Rules"
-            body="Searchable rules topics for timing, zones, combat, card rules, formats, and Commander."
-            meta={`${referenceCount} topics`}
-          />
+      <EncyclopediaBanner />
+      <SectionShell className="py-7 sm:py-8">
+        <div className="max-w-3xl">
+          <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">{hubTitle}</h1>
+          <nav className={`mt-6 border-t ${encyclopediaDividerClass}`} aria-label={`${hubTitle} Encyclopedia sections`}>
+            {HUB_CHOICES.map((choice) => (
+              <HubChoiceRow
+                key={choice.section}
+                to={`/Encyclopedia/${game.routeKey}/${choice.section}`}
+                label={choice.label}
+              />
+            ))}
+          </nav>
         </div>
       </SectionShell>
     </main>
@@ -381,31 +350,6 @@ function SetBrowser({ game, title = 'Sets', showTitle = true }) {
       )}
       {!isLoading && <SetPagination currentPage={currentPage} totalPages={totalPages} onPageChange={(page) => handleBrowseChange({ page })} />}
     </div>
-  );
-}
-
-function GameLanding({ game }) {
-  if (game.id === 'magic') return <MagicHub game={game} />;
-  const rules = gameKnowledgeOwner.getRulesTopics(game.id);
-
-  return (
-    <main className={encyclopediaPageClass}>
-      <GameHubHeader game={game} />
-      <SectionShell className="grid gap-8 py-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <SetBrowser game={game} />
-        <aside className="min-w-0">
-          <h2 className="text-2xl font-black tracking-tight text-white">Rules / How to Play</h2>
-          <div className={`mt-4 divide-y border-y ${encyclopediaDividerClass}`}>
-            {rules.map((topic) => (
-              <Link key={topic.slug} to={topic.path} className="block py-4 transition hover:bg-slate-900/62">
-                <p className="font-bold text-slate-100">{topic.title}</p>
-                <p className={`mt-1 text-sm leading-6 ${encyclopediaSoftTextClass}`}>{topic.summary}</p>
-              </Link>
-            ))}
-          </div>
-        </aside>
-      </SectionShell>
-    </main>
   );
 }
 
