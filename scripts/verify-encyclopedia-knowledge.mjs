@@ -34,6 +34,15 @@ const MTG_DEDUPE_SAMPLE_SETS = [
   { code: 'TRK', slug: 'star-trek' },
   { code: 'TDM', slug: 'tarkir-dragonstorm' }
 ];
+const SET_ICON_EXPECTATIONS = Object.freeze({
+  magic: { min: 20, source: 'Scryfall set_icon_svg_uri' },
+  pokemon: { min: 20, source: 'PokemonTCG.io images.symbol/images.logo' },
+  yugioh: { min: 20, source: 'YGOPRODeck set_image' },
+  flesh_and_blood: { min: 20, source: 'FAB set_logo' },
+  lorcana: { min: 0, source: 'Lorcast set export currently has no per-set symbol/logo' },
+  onepiece: { min: 0, source: 'One Piece extracted set export currently has no per-set symbol/logo' },
+  starwars: { min: 0, source: 'SWU set export currently has no per-set symbol/logo' }
+});
 
 function assert(condition, message) {
   if (!condition) failures.push(message);
@@ -76,6 +85,27 @@ function rulesArticleText(topic = {}) {
   ].join(' ');
 }
 
+function iconSourceForSet(set = {}) {
+  if (set.icon_svg_uri || set.set_icon_svg_uri || set.images?.symbol || set.images?.icon) return 'symbol';
+  if (set.images?.logo || set.logo || set.set_logo) return 'logo';
+  if (set.set_image || set.set_image_url || set.image_url) return 'product';
+  return 'fallback';
+}
+
+function iconUrlForSet(set = {}) {
+  return set.icon_svg_uri
+    || set.set_icon_svg_uri
+    || set.images?.symbol
+    || set.images?.icon
+    || set.images?.logo
+    || set.logo
+    || set.set_logo
+    || set.set_image
+    || set.set_image_url
+    || set.image_url
+    || '';
+}
+
 function assertTopicIncludes(topic, words = []) {
   assert(topic, `Magic representative topic is missing`);
   const text = rulesArticleText(topic).toLowerCase();
@@ -103,6 +133,8 @@ for (const route of requiredRoutes) {
 }
 
 const pageFile = fs.readFileSync(path.join(repoRoot, 'src/pages/Encyclopedia.jsx'), 'utf8');
+const searchOwnerFile = fs.readFileSync(path.join(repoRoot, 'src/services/search/searchOwner.js'), 'utf8');
+const gameKnowledgeOwnerFile = fs.readFileSync(path.join(repoRoot, 'src/services/knowledge/gameKnowledgeOwner.js'), 'utf8');
 assert(pageFile.includes('gameKnowledgeOwner'), 'Encyclopedia page must consume gameKnowledgeOwner');
 assert(pageFile.includes('createPageUrl') && pageFile.includes('Shop'), 'Encyclopedia must expose Shop/listing paths without owning commerce');
 assert(pageFile.includes('filterOptions') && pageFile.includes('Show more cards'), 'Encyclopedia set detail must expose set search, filters, and capped rendering');
@@ -120,6 +152,10 @@ assert(pageFile.includes('Previous lesson') && pageFile.includes('Next lesson'),
 assert(pageFile.includes('Official Rules Reference'), 'Magic articles must use restrained official reference labeling');
 assert(!pageFile.includes('Authority Boundary'), 'Rules page must not render the internal authority-boundary box');
 assert(!/catalog-backed|Search owner|source-attributed summaries|Complete local card|MainPhase Search owner/i.test(pageFile), 'Public Encyclopedia UI contains internal owner/catalog wording');
+assert(searchOwnerFile.includes('icon_url') && searchOwnerFile.includes('logo_url') && searchOwnerFile.includes('product_image_url') && searchOwnerFile.includes('icon_source'), 'Search owner must expose canonical set icon/logo/product image metadata');
+assert(searchOwnerFile.includes('set.set_image') && searchOwnerFile.includes('set.set_logo'), 'Search owner must consume set product/logo fields from source set metadata');
+assert(gameKnowledgeOwnerFile.includes('iconUrl') && gameKnowledgeOwnerFile.includes('logoUrl') && gameKnowledgeOwnerFile.includes('productImageUrl') && gameKnowledgeOwnerFile.includes('iconSource'), 'Game knowledge owner must preserve set icon metadata for Encyclopedia consumers');
+assert(pageFile.includes('set.iconSource') && pageFile.includes("set.iconSource === 'product'") && pageFile.includes("set.iconSource === 'logo'"), 'Shared set-row renderer must render set icons according to canonical icon source');
 
 const cardDetailFile = fs.readFileSync(path.join(repoRoot, 'src/pages/CardDetail.jsx'), 'utf8');
 assert(cardDetailFile.includes('getPreferredBackLink') && cardDetailFile.includes('returnTo') && cardDetailFile.includes('returnLabel'), 'Canonical CardDetail must honor Encyclopedia return context');
@@ -142,6 +178,15 @@ for (const game of ENCYCLOPEDIA_GAMES) {
   routeKeys.add(game.routeKey);
 
   const sets = readJson(`public/data/${game.assetGame}/sets.json`);
+  const iconExpectation = SET_ICON_EXPECTATIONS[game.id];
+  const setsWithIconSource = sets.filter((set) => iconUrlForSet(set));
+  assert(iconExpectation, `${game.id} missing set icon expectation`);
+  assert(setsWithIconSource.length >= iconExpectation.min, `${game.id} should expose ${iconExpectation.source}; found ${setsWithIconSource.length} source icons`);
+  if (iconExpectation.min > 0) {
+    assert(setsWithIconSource.some((set) => iconSourceForSet(set) !== 'fallback'), `${game.id} source icon fields are present but not classifiable`);
+  } else {
+    assert(setsWithIconSource.length === 0, `${game.id} unexpectedly has source icons; update renderer certification to consume them instead of treating fallback as expected`);
+  }
   assert(Array.isArray(sets) && sets.length > 0, `${game.id} has no public sets`);
   if (game.id === 'magic') {
     const manifest = readJson('public/data/mtg/manifest.json');
@@ -200,6 +245,12 @@ for (const game of ENCYCLOPEDIA_GAMES) {
   if (game.id === 'magic') {
     const symbolSets = sets.filter((set) => set.set_code && (set.image_url || set.icon_svg_uri || set.set_icon_svg_uri));
     assert(symbolSets.length >= Math.min(20, sets.length), 'Magic sets must expose real set symbols from canonical set metadata');
+    for (const expectedSet of ['LEA', 'ARN', 'FDN', 'CMM', 'SLD', 'TRK']) {
+      const matchingSet = sets.find((set) => String(set.set_code || set.code || '').toUpperCase() === expectedSet);
+      assert(matchingSet, `Magic set ${expectedSet} is missing from sets.json`);
+      assert(iconUrlForSet(matchingSet), `Magic set ${expectedSet} must expose its real Scryfall set symbol`);
+      assert(iconSourceForSet(matchingSet) === 'symbol', `Magic set ${expectedSet} must classify as a set symbol`);
+    }
   }
 
   const gameTopics = ENCYCLOPEDIA_RULE_TOPICS[game.id] || [];

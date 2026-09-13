@@ -198,11 +198,16 @@ function GameLanding({ game }) {
 function SetRow({ set }) {
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}`;
+  const imageClassName = set.iconSource === 'product'
+    ? 'max-h-9 max-w-9 object-contain opacity-95'
+    : set.iconSource === 'logo'
+      ? 'max-h-8 max-w-9 object-contain opacity-95'
+      : 'max-h-8 max-w-8 object-contain opacity-90 invert';
 
   return (
     <Link to={set.path} state={{ encyclopediaReturnTo: returnTo }} className="grid grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-4 py-3 transition hover:bg-slate-900/62">
       <div className="flex h-10 w-10 items-center justify-center border border-slate-700/70 bg-slate-950/70">
-        {set.imageUrl ? <img src={set.imageUrl} alt="" className="max-h-8 max-w-8 object-contain opacity-90 invert" /> : <Layers className="h-5 w-5 text-slate-500" />}
+        {set.imageUrl ? <img src={set.imageUrl} alt="" className={imageClassName} /> : <Layers className="h-5 w-5 text-slate-500" />}
       </div>
       <div className="min-w-0">
         <p className="truncate font-bold text-slate-100">{set.name}</p>

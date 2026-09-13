@@ -34,6 +34,10 @@ function normalizeSet(set = {}, gameMeta) {
     name: cleanText(set.name),
     setCode: cleanText(set.set_code),
     imageUrl: set.image_url || null,
+    iconUrl: set.icon_url || null,
+    logoUrl: set.logo_url || null,
+    productImageUrl: set.product_image_url || null,
+    iconSource: set.icon_source || (set.image_url ? 'symbol' : 'fallback'),
     releaseDate: formatDate(set.release_date),
     inStock: Boolean(set.inStock),
     path: buildEncyclopediaSetPath(gameMeta, set)

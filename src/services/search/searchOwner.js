@@ -222,6 +222,9 @@ function normalizeSetResult(set, game, products = []) {
   const searchGame = canonicalGame(game);
   const setCode = set.code || set.set_code || set.ptcgoCode || set.id || '';
   const setName = set.name || set.set_name || set.setName || set.title || 'Unknown Set';
+  const symbolUrl = set.icon_svg_uri || set.set_icon_svg_uri || set.images?.symbol || set.images?.icon || null;
+  const logoUrl = set.images?.logo || set.logo || set.set_logo || null;
+  const productImageUrl = set.set_image || set.set_image_url || set.image_url || null;
   const listedProduct = products.find((product) =>
     product.product_type === 'booster_box' &&
     String(product.set_name || '').toLowerCase() === String(setName || '').toLowerCase()
@@ -232,7 +235,11 @@ function normalizeSetResult(set, game, products = []) {
     id: set.id || setCode || setName,
     name: setName,
     set_code: String(setCode || '').toUpperCase(),
-    image_url: set.icon_svg_uri || set.set_icon_svg_uri || set.images?.symbol || set.images?.logo || set.logo || set.image_url || null,
+    image_url: symbolUrl || logoUrl || productImageUrl,
+    icon_url: symbolUrl || null,
+    logo_url: logoUrl || null,
+    product_image_url: productImageUrl || null,
+    icon_source: symbolUrl ? 'symbol' : logoUrl ? 'logo' : productImageUrl ? 'product' : 'fallback',
     release_date: set.releaseDate || set.released_at || set.tcg_date || null,
     game: searchGame,
     inStock: Boolean(listedProduct && stockState.inStock),
