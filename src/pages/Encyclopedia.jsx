@@ -304,7 +304,7 @@ function EncyclopediaLanding() {
                     src={game.logoSrc}
                     alt={`${game.label} logo`}
                     loading="lazy"
-                    className={`h-auto w-auto object-contain drop-shadow-[0_4px_18px_rgba(0,0,0,0.75)] ${game.logoClassName}`}
+                    className={`h-auto object-contain drop-shadow-[0_4px_18px_rgba(0,0,0,0.75)] ${game.id === 'magic' ? 'w-[180px] max-h-12' : `w-auto ${game.logoClassName}`}`}
                   />
                 </div>
                 <ArrowRight className="h-5 w-5 shrink-0 text-cyan-100/85 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] transition group-hover:translate-x-1" aria-hidden="true" />
