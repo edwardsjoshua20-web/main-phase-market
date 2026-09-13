@@ -141,6 +141,16 @@ const HUB_TITLE_BY_GAME = Object.freeze({
   starwars: 'Star Wars Unlimited'
 });
 
+const HUB_LOGO_CLASS_BY_GAME = Object.freeze({
+  magic: 'max-h-14 max-w-[220px] brightness-0 invert',
+  pokemon: 'max-h-16 max-w-[220px]',
+  yugioh: 'max-h-14 max-w-[220px]',
+  lorcana: 'max-h-16 max-w-[230px]',
+  flesh_and_blood: 'max-h-14 max-w-[220px]',
+  onepiece: 'max-h-14 max-w-[220px] brightness-0 invert',
+  starwars: 'max-h-16 max-w-[210px] brightness-0 invert'
+});
+
 function HubChoiceRow({ to, label }) {
   return (
     <Link
@@ -161,7 +171,15 @@ function GameLanding({ game }) {
       <EncyclopediaBanner />
       <SectionShell className="py-7 sm:py-8">
         <div className="max-w-3xl">
-          <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">{hubTitle}</h1>
+          <div className="flex min-h-16 items-center">
+            <h1 className="sr-only">{hubTitle}</h1>
+            <img
+              src={game.logoSrc}
+              alt={`${hubTitle} logo`}
+              loading="lazy"
+              className={`h-auto w-auto object-contain opacity-95 drop-shadow-[0_4px_18px_rgba(0,0,0,0.75)] ${HUB_LOGO_CLASS_BY_GAME[game.id] || game.logoClassName}`}
+            />
+          </div>
           <nav className={`mt-6 border-t ${encyclopediaDividerClass}`} aria-label={`${hubTitle} Encyclopedia sections`}>
             {HUB_CHOICES.map((choice) => (
               <HubChoiceRow
