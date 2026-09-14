@@ -198,7 +198,6 @@ function GameLanding({ game }) {
 function SetRow({ set }) {
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}`;
-  const displayCode = String(set.displayCode || set.setCode || '').trim().toUpperCase();
   const imageClassName = set.iconSource === 'product'
     ? 'max-h-9 max-w-9 object-contain opacity-95'
     : set.iconSource === 'logo'
@@ -206,18 +205,16 @@ function SetRow({ set }) {
       : 'max-h-8 max-w-8 object-contain opacity-90 invert';
 
   return (
-    <Link to={set.path} state={{ encyclopediaReturnTo: returnTo }} className="grid grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-4 py-3 transition hover:bg-slate-900/62">
-      <div className="flex h-10 w-10 items-center justify-center border border-slate-700/70 bg-slate-950/70">
-        {set.imageUrl ? (
+    <Link
+      to={set.path}
+      state={{ encyclopediaReturnTo: returnTo }}
+      className={`grid items-center py-3 transition hover:bg-slate-900/62 ${set.imageUrl ? 'grid-cols-[46px_minmax(0,1fr)_auto] gap-4' : 'grid-cols-[minmax(0,1fr)_auto] gap-3'}`}
+    >
+      {set.imageUrl ? (
+        <div className="flex h-10 w-10 items-center justify-center border border-slate-700/70 bg-slate-950/70">
           <img src={set.imageUrl} alt="" className={imageClassName} />
-        ) : displayCode ? (
-          <span className="max-w-9 truncate px-1 text-center text-[0.62rem] font-black uppercase leading-none tracking-normal text-slate-300" aria-hidden="true">
-            {displayCode}
-          </span>
-        ) : (
-          <span className="h-1.5 w-1.5 rounded-full bg-slate-500" aria-hidden="true" />
-        )}
-      </div>
+        </div>
+      ) : null}
       <div className="min-w-0">
         <p className="truncate font-bold text-slate-100">{set.name}</p>
         <p className={`mt-0.5 text-xs font-semibold ${encyclopediaMutedTextClass}`}>

@@ -33,12 +33,11 @@ function normalizeSet(set = {}, gameMeta) {
     routeGame: gameMeta.routeKey,
     name: cleanText(set.name),
     setCode: cleanText(set.set_code),
-    displayCode: cleanText(set.display_code || set.set_code || set.id),
     imageUrl: set.image_url || null,
     iconUrl: set.icon_url || null,
     logoUrl: set.logo_url || null,
     productImageUrl: set.product_image_url || null,
-    iconSource: set.icon_source || (set.image_url ? 'symbol' : 'fallback'),
+    iconSource: set.icon_source || (set.image_url ? 'symbol' : 'none'),
     releaseDate: formatDate(set.release_date),
     inStock: Boolean(set.inStock),
     path: buildEncyclopediaSetPath(gameMeta, set)
