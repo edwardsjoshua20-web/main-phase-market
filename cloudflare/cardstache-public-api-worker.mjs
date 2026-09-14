@@ -1,5 +1,5 @@
 const SUPABASE_FUNCTION_ORIGIN = 'https://wwvvyrhlybwijqlhubdv.supabase.co/functions/v1/cardstache-public-api';
-const MAINPHASE_STATIC_ORIGIN = 'https://main-phase-market.pages.dev';
+const MAINPHASE_STATIC_ORIGIN = 'https://wwvvyrhlybwijqlhubdv.supabase.co/storage/v1/object/public/main-phase-market-public/data';
 const LEGALITY_BATCH_MAX = 1000;
 const SUPPORTED_GAMES = new Set(['magic', 'pokemon', 'yugioh', 'lorcana', 'onepiece', 'flesh_and_blood', 'starwars']);
 const MAGIC_FORMATS = new Set(['standard', 'pioneer', 'modern', 'legacy', 'vintage', 'pauper', 'commander']);
@@ -88,7 +88,7 @@ async function readJsonBody(request) {
 
 async function mtgLegalityIndex() {
   if (!mtgLegalityIndexPromise) {
-    mtgLegalityIndexPromise = fetch(`${MAINPHASE_STATIC_ORIGIN}/data/legality/mtg.json`)
+    mtgLegalityIndexPromise = fetch(`${MAINPHASE_STATIC_ORIGIN}/legality/mtg.json`)
       .then((response) => {
         if (!response.ok) throw new ApiError(503, 'upstream_unavailable', 'Magic legality index is not available.', true);
         return response.json();
@@ -238,6 +238,7 @@ async function handleLegality(request, url) {
     }
     return null;
   } catch (error) {
+    console.error('legality route failed', error);
     return errorResponse(request, error);
   }
 }
