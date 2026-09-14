@@ -3,8 +3,22 @@ const MAINPHASE_STATIC_ORIGIN = 'https://wwvvyrhlybwijqlhubdv.supabase.co/storag
 const LEGALITY_BATCH_MAX = 1000;
 const SUPPORTED_GAMES = new Set(['magic', 'pokemon', 'yugioh', 'lorcana', 'onepiece', 'flesh_and_blood', 'starwars']);
 const MAGIC_FORMATS = new Set(['standard', 'pioneer', 'modern', 'legacy', 'vintage', 'pauper', 'commander']);
+const CATALOG_LEGALITY_CONFIG = {
+  pokemon: { assetGame: 'pokemon', source: 'Pokemon TCG catalog legalities' },
+  yugioh: { assetGame: 'yugioh', source: 'YGOPRODeck banlist_info.ban_tcg', region: 'TCG' },
+  flesh_and_blood: { assetGame: 'fab', source: 'Flesh and Blood card source legality flags' }
+};
+const FAB_FORMAT_PREFIX = {
+  blitz: 'blitz',
+  classic_constructed: 'cc',
+  commoner: 'commoner',
+  living_legend: 'll',
+  upf: 'upf',
+  silver_age: 'silver_age'
+};
 
 let mtgLegalityIndexPromise;
+const catalogIndexPromises = new Map();
 
 class ApiError extends Error {
   constructor(status, code, message, retryable = false, retryAfterSeconds = null) {
@@ -74,6 +88,29 @@ function normalizeFormat(value) {
   return aliases[key] || key;
 }
 
+function normalizeStatus(value) {
+  const key = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  const aliases = {
+    legal: 'legal',
+    unlimited: 'legal',
+    forbidden: 'banned',
+    banned: 'banned',
+    restricted: 'restricted',
+    limited: 'limited',
+    semi_limited: 'semi_limited',
+    semilimited: 'semi_limited',
+    suspended: 'suspended',
+    rotated: 'rotated',
+    not_legal: 'not_legal',
+    illegal: 'not_legal',
+    unknown: 'unknown'
+  };
+  return aliases[key] || 'unknown';
+}
+
 async function readJsonBody(request) {
   const contentLength = Number(request.headers.get('content-length') || 0);
   if (contentLength > 512_000) throw new ApiError(413, 'invalid_request', 'Request body must be 512 KiB or smaller.');
@@ -107,6 +144,48 @@ async function mtgLegalityIndex() {
   return mtgLegalityIndexPromise;
 }
 
+async function optionalJson(url) {
+  const response = await fetch(url);
+  return response.ok ? response.json() : null;
+}
+
+async function catalogLegalityIndex(game) {
+  const config = CATALOG_LEGALITY_CONFIG[game];
+  if (!config) return null;
+  if (!catalogIndexPromises.has(game)) {
+    catalogIndexPromises.set(game, Promise.all([
+      optionalJson(`${MAINPHASE_STATIC_ORIGIN}/${config.assetGame}/cards.json`),
+      optionalJson(`${MAINPHASE_STATIC_ORIGIN}/${config.assetGame}/cards-manifest.json`)
+    ]).then(([cards, manifest]) => {
+      if (!Array.isArray(cards)) throw new ApiError(503, 'upstream_unavailable', `${game} legality source cards are not available.`, true);
+      const byId = new Map();
+      for (const card of cards) {
+        const ids = [
+          card?.id,
+          card?.card_id,
+          card?.api_id,
+          card?.unique_id,
+          card?.uuid
+        ].map((id) => String(id || '').trim()).filter(Boolean);
+        for (const id of ids) byId.set(id, card);
+      }
+      const generatedAt = manifest?.generated_at || manifest?.generatedAt || null;
+      return {
+        metadata: {
+          source: config.source,
+          sourceVersion: generatedAt ? `${game}-${generatedAt}` : null,
+          lastVerified: generatedAt,
+          effectiveDate: generatedAt,
+          region: config.region || null,
+          canonicalCardCount: byId.size
+        },
+        byId
+      };
+    }));
+  }
+  return catalogIndexPromises.get(game);
+}
+
 function validateLegalityIdentity(value, index = 0) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new ApiError(400, 'invalid_request', `identities[${index}] must be an object.`);
@@ -137,11 +216,94 @@ function unknownLegality(input, metadata = {}, reason = 'No authoritative legali
     sourceVersion: metadata.sourceVersion || null,
     lastVerified: metadata.lastVerified || null,
     effectiveDate: metadata.effectiveDate || null,
+    ...(metadata.region ? { region: metadata.region } : {}),
     ...(reason ? { reason } : {})
   };
 }
 
+function legalityResult(input, card, overrides = {}) {
+  return {
+    game: input.game,
+    canonicalCardId: input.canonicalCardId,
+    ...(input.printingId ? { printingId: input.printingId } : {}),
+    format: input.format,
+    status: overrides.status || 'unknown',
+    ...(Number.isFinite(overrides.restrictionLimit) ? { restrictionLimit: overrides.restrictionLimit } : {}),
+    source: overrides.source || null,
+    sourceVersion: overrides.sourceVersion || null,
+    lastVerified: overrides.lastVerified || null,
+    effectiveDate: overrides.effectiveDate || null,
+    ...(overrides.region ? { region: overrides.region } : {}),
+    ...(overrides.reason ? { reason: overrides.reason } : {})
+  };
+}
+
+function yugiohBanlistStatus(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return { status: 'legal', limit: 3 };
+  if (raw === 'forbidden') return { status: 'banned', limit: 0 };
+  if (raw === 'limited') return { status: 'limited', limit: 1 };
+  if (raw === 'semi-limited' || raw === 'semi_limited') return { status: 'semi_limited', limit: 2 };
+  return { status: 'unknown', limit: null };
+}
+
+async function checkCatalogBackedLegality(input) {
+  const index = await catalogLegalityIndex(input.game);
+  const metadata = index?.metadata || {};
+  const card = index?.byId.get(input.canonicalCardId || input.printingId);
+  if (!card) return unknownLegality(input, metadata, 'Card identity is not present in the production legality source index.');
+
+  if (input.game === 'pokemon') {
+    const legalities = card.legalities && typeof card.legalities === 'object' ? card.legalities : null;
+    if (!legalities || !Object.prototype.hasOwnProperty.call(legalities, input.format)) {
+      return unknownLegality(input, metadata, 'Pokemon legality is unavailable for this card/format in the current source data.');
+    }
+    const status = normalizeStatus(legalities[input.format]);
+    return legalityResult(input, card, { ...metadata, status, reason: status === 'not_legal' ? 'The source legality map marks this format as not legal.' : null });
+  }
+
+  if (input.game === 'yugioh') {
+    if (input.format !== 'advanced_tcg') {
+      return unknownLegality(input, metadata, 'Yu-Gi-Oh! legality is only source-backed for the TCG Advanced list right now.');
+    }
+    const resolved = yugiohBanlistStatus(card.ban_tcg || card.banlist_info?.ban_tcg);
+    return legalityResult(input, card, { ...metadata, status: resolved.status, restrictionLimit: resolved.limit });
+  }
+
+  if (input.game === 'flesh_and_blood') {
+    const prefix = FAB_FORMAT_PREFIX[input.format];
+    if (!prefix) {
+      return unknownLegality(input, metadata, 'Flesh and Blood format is not supported by the current source data.');
+    }
+    const hasAnyField = [`${prefix}_legal`, `${prefix}_banned`, `${prefix}_suspended`, `${prefix}_restricted`, `${prefix}_living_legend`]
+      .some((field) => Object.prototype.hasOwnProperty.call(card, field));
+    if (!hasAnyField) {
+      return unknownLegality(input, metadata, 'Flesh and Blood legality fields are missing for this card/format.');
+    }
+    let status = card[`${prefix}_legal`] === false ? 'not_legal' : 'legal';
+    let restrictionLimit = null;
+    if (card[`${prefix}_living_legend`]) status = 'rotated';
+    if (card[`${prefix}_suspended`]) status = 'suspended';
+    if (card[`${prefix}_banned`]) status = 'banned';
+    if (card[`${prefix}_restricted`]) {
+      status = 'restricted';
+      restrictionLimit = 1;
+    }
+    return legalityResult(input, card, {
+      ...metadata,
+      status,
+      restrictionLimit,
+      reason: status === 'rotated' ? 'Source marks this identity as Living Legend for this format.' : null
+    });
+  }
+
+  return unknownLegality(input, metadata);
+}
+
 async function checkLegality(input) {
+  if (CATALOG_LEGALITY_CONFIG[input.game]) {
+    return checkCatalogBackedLegality(input);
+  }
   if (input.game !== 'magic') {
     return unknownLegality(input, {
       source: `${input.game} MainPhase catalog legality fields`,
@@ -248,16 +410,21 @@ async function augmentServiceStatus(request, upstreamResponse) {
   if (!response.ok) return upstreamResponse;
   try {
     const body = await response.json();
-    const index = await mtgLegalityIndex();
+    const [index, pokemonIndex, yugiohIndex, fabIndex] = await Promise.all([
+      mtgLegalityIndex(),
+      catalogLegalityIndex('pokemon'),
+      catalogLegalityIndex('yugioh'),
+      catalogLegalityIndex('flesh_and_blood')
+    ]);
     body.data = {
       ...body.data,
       legality: {
         status: index.metadata.canonicalCardCount > 0 ? 'partial' : 'unavailable',
         games: [
           { game: 'magic', status: index.metadata.canonicalCardCount > 0 ? 'ready' : 'unavailable', sourceVersion: index.metadata.sourceVersion, generatedAt: index.metadata.lastVerified, canonicalCardCount: index.metadata.canonicalCardCount },
-          { game: 'pokemon', status: 'unknown-until-production-index', sourceVersion: null, generatedAt: null },
-          { game: 'yugioh', status: 'unknown-until-production-index', sourceVersion: null, generatedAt: null, region: 'TCG' },
-          { game: 'flesh_and_blood', status: 'unknown-until-production-index', sourceVersion: null, generatedAt: null },
+          { game: 'pokemon', status: 'source-backed-card-fields', sourceVersion: pokemonIndex?.metadata.sourceVersion || null, generatedAt: pokemonIndex?.metadata.lastVerified || null, canonicalCardCount: pokemonIndex?.metadata.canonicalCardCount || 0 },
+          { game: 'yugioh', status: 'source-backed-banlist-fields', sourceVersion: yugiohIndex?.metadata.sourceVersion || null, generatedAt: yugiohIndex?.metadata.lastVerified || null, canonicalCardCount: yugiohIndex?.metadata.canonicalCardCount || 0, region: 'TCG' },
+          { game: 'flesh_and_blood', status: 'source-backed-card-fields', sourceVersion: fabIndex?.metadata.sourceVersion || null, generatedAt: fabIndex?.metadata.lastVerified || null, canonicalCardCount: fabIndex?.metadata.canonicalCardCount || 0 },
           { game: 'lorcana', status: 'unknown-until-official-list-source', sourceVersion: null, generatedAt: null },
           { game: 'onepiece', status: 'unknown-until-official-list-source', sourceVersion: null, generatedAt: null },
           { game: 'starwars', status: 'unknown-until-official-list-source', sourceVersion: null, generatedAt: null }
