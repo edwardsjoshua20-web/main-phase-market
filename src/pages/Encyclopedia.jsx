@@ -151,6 +151,8 @@ const HUB_LOGO_CLASS_BY_GAME = Object.freeze({
   starwars: 'max-h-16 max-w-[210px] brightness-0 invert'
 });
 
+const SET_ROW_VISUAL_DISABLED_GAMES = new Set(['yugioh', 'flesh_and_blood']);
+
 function HubChoiceRow({ to, label }) {
   return (
     <Link
@@ -198,6 +200,7 @@ function GameLanding({ game }) {
 function SetRow({ set }) {
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}`;
+  const shouldRenderSetVisual = Boolean(set.imageUrl && !SET_ROW_VISUAL_DISABLED_GAMES.has(set.game));
   const imageClassName = set.iconSource === 'product'
     ? 'max-h-9 max-w-9 object-contain opacity-95'
     : set.iconSource === 'logo'
@@ -208,9 +211,9 @@ function SetRow({ set }) {
     <Link
       to={set.path}
       state={{ encyclopediaReturnTo: returnTo }}
-      className={`grid items-center py-3 transition hover:bg-slate-900/62 ${set.imageUrl ? 'grid-cols-[46px_minmax(0,1fr)_auto] gap-4' : 'grid-cols-[minmax(0,1fr)_auto] gap-3'}`}
+      className={`grid items-center py-3 transition hover:bg-slate-900/62 ${shouldRenderSetVisual ? 'grid-cols-[46px_minmax(0,1fr)_auto] gap-4' : 'grid-cols-[minmax(0,1fr)_auto] gap-3'}`}
     >
-      {set.imageUrl ? (
+      {shouldRenderSetVisual ? (
         <div className="flex h-10 w-10 items-center justify-center border border-slate-700/70 bg-slate-950/70">
           <img src={set.imageUrl} alt="" className={imageClassName} />
         </div>
