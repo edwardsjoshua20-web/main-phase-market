@@ -111,8 +111,41 @@ async function main() {
   assert(prices.payload.data.items.some((item) => Number(item.quote.amount) > 0), 'Pricing batch did not return any covered quote.');
   assertNoPrivateFields(prices.payload);
 
+  const legalitySingle = await request('single legality', '/legality/check', post({
+    game: 'magic',
+    canonicalCardId: mtg.identity.cardId,
+    printingId: mtg.identity.printingId,
+    format: 'modern'
+  }));
+  assert(legalitySingle.response.ok, `Single legality failed: ${legalitySingle.text}`);
+  assert(['legal', 'banned', 'restricted', 'not_legal', 'unknown'].includes(legalitySingle.payload.data.status), 'Single legality returned an invalid status.');
+  assert(legalitySingle.payload.data.sourceVersion, 'Single legality omitted sourceVersion.');
+  assert(legalitySingle.payload.data.lastVerified, 'Single legality omitted lastVerified.');
+  assertNoPrivateFields(legalitySingle.payload);
+
+  const legalityBatch = await request('batch legality', '/legality/checks/batch', post({
+    identities: [
+      { game: 'magic', canonicalCardId: mtg.identity.cardId, format: 'commander' },
+      { game: 'pokemon', canonicalCardId: pokemon.identity.cardId, format: 'standard' },
+      { game: 'yugioh', canonicalCardId: yugioh.identity.cardId, format: 'advanced' },
+      { game: 'lorcana', canonicalCardId: lorcana.identity.cardId, format: 'core_constructed' }
+    ]
+  }));
+  assert(legalityBatch.response.ok && legalityBatch.payload.data.items.length === 4, 'Batch legality failed.');
+  assert(legalityBatch.payload.data.items[3].status === 'unknown', 'Unsupported Lorcana legality source should return unknown.');
+  assertNoPrivateFields(legalityBatch.payload);
+
+  for (const size of [100, 1000]) {
+    const result = await request(`batch legality ${size}`, '/legality/checks/batch', post({
+      identities: Array.from({ length: size }, () => ({ game: 'mtg', canonicalCardId: 'x', format: 'modern' }))
+    }));
+    assert(result.response.ok && result.payload.data.items.length === size, `Batch legality ${size} failed.`);
+    assert(result.payload.data.items.every((item) => item.status === 'unknown'), `Batch legality ${size} should safely return unknown for unresolved identities.`);
+  }
+
   const status = await request('service status', '/service/status');
   assert(status.response.ok && status.payload.data.catalogs.length === 7, 'Service status failed.');
+  assert(status.payload.data.legality?.games?.length === 7, 'Service status omitted legality coverage.');
   observations.serviceStatus = status.payload.data;
   observations.cacheControl.serviceStatus = status.response.headers.get('cache-control');
   assertNoPrivateFields(status.payload);
@@ -127,6 +160,8 @@ async function main() {
   assert(oversized.response.status === 400, 'Oversized summary batch was not rejected.');
   const oversizedPricing = await request('oversized pricing', '/pricing/quotes/batch', post({ identities: Array.from({ length: 201 }, () => pokemon.identity) }));
   assert(oversizedPricing.response.status === 400, 'Oversized pricing batch was not rejected.');
+  const oversizedLegality = await request('oversized legality', '/legality/checks/batch', post({ identities: Array.from({ length: 1001 }, () => ({ game: 'mtg', canonicalCardId: 'x', format: 'm' })) }));
+  assert(oversizedLegality.response.status === 400, 'Oversized legality batch was not rejected.');
   const malformedJson = await request('malformed JSON', '/catalog/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' });
   assert(malformedJson.response.status === 400 && malformedJson.payload.error.code === 'invalid_request', 'Malformed JSON was not rejected with the public error envelope.');
   const oversizedBody = await request('oversized body', '/catalog/search', post({ game: 'magic', query: 'bolt', padding: 'x'.repeat(70_000) }));

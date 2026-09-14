@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { canonicalGame, rankCatalogResults } from '../src/services/search/searchCore.js';
+import { legalityOwner } from '../src/services/legality/legalityOwner.js';
 import { buildCardIdentity, normalizeFinish } from '../src/services/pricing/cardIdentity.js';
 import { pricingOwner } from '../src/services/pricing/pricingOwner.js';
 import { ensureMtgSearchIndex, searchMtgAdvancedIndex, searchMtgIndex } from './mtgSearchIndex.mjs';
@@ -25,6 +26,7 @@ const SEARCH_LIMIT_MAX = 45;
 const SEARCH_SOURCE_LIMIT = 500;
 const SUMMARY_BATCH_MAX = 100;
 const PRICING_BATCH_MAX = 200;
+const LEGALITY_BATCH_MAX = 1000;
 const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT = Math.max(20, Number(process.env.MPM_PUBLIC_API_RATE_LIMIT || 120));
 const RATE_BUCKETS = new Map();
@@ -33,6 +35,7 @@ const mtgLiteCache = { promise: null, rows: null, byId: null, byGroup: null };
 const mtgFallbackDetailCache = new Map();
 const mtgPrintingShardCache = new Map();
 const setMetadataCache = new Map();
+let legalityIndexCache = null;
 
 const gameAdapters = {
   magic: { ensure: ensureMtgSearchIndex, search: searchMtgIndex, advanced: searchMtgAdvancedIndex },
@@ -126,6 +129,39 @@ function pricingVersion() {
 function dataVersion(game = null) {
   if (game) return catalogVersion(game);
   return hashVersion('catalog', [...SUPPORTED_GAMES].map((key) => catalogVersion(key)));
+}
+
+function legalityIndexes() {
+  if (legalityIndexCache) return legalityIndexCache;
+  const mtg = readJson(path.join(PUBLIC_DATA_ROOT, 'legality', 'mtg.json'), {}) || {};
+  legalityIndexCache = {
+    magic: {
+      metadata: {
+        source: mtg.source || 'Scryfall catalog legalities',
+        sourceVersion: mtg.sourceVersion || null,
+        lastVerified: mtg.generatedAt || null,
+        effectiveDate: mtg.sourceGeneratedAt || null
+      },
+      byOracleId: new Map((Array.isArray(mtg.records) ? mtg.records : []).map((row) => [String(row.id || ''), {
+        ...row,
+        sourceVersion: mtg.sourceVersion || null,
+        lastVerified: mtg.generatedAt || null,
+        effectiveDate: mtg.sourceGeneratedAt || null
+      }]))
+    }
+  };
+  return legalityIndexCache;
+}
+
+function legalityMetadata(game) {
+  if (game === 'magic') return legalityIndexes().magic.metadata;
+  const manifest = manifestFor(game);
+  return {
+    source: `${game} MainPhase catalog legality fields`,
+    sourceVersion: catalogVersion(game),
+    lastVerified: generatedAtOf(manifest),
+    effectiveDate: generatedAtOf(manifest)
+  };
 }
 
 function envelope(data, req, game = null) {
@@ -747,6 +783,42 @@ function validateIdentity(value, index) {
   return { ...value, game, printingId, language: String(value.language || 'en').toLowerCase(), finish: normalizeFinish(value.finish || 'nonfoil') };
 }
 
+function validateLegalityIdentity(value, index = 0) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new PublicApiError(400, 'invalid_request', `identities[${index}] must be an object.`);
+  const game = normalizeGame(value.game);
+  const canonicalCardId = String(value.canonicalCardId || value.cardId || '').trim();
+  const printingId = String(value.printingId || '').trim();
+  const format = String(value.format || '').trim();
+  if (!canonicalCardId && !printingId) throw new PublicApiError(400, 'invalid_request', `identities[${index}].canonicalCardId or printingId is required.`);
+  if (!format) throw new PublicApiError(400, 'invalid_request', `identities[${index}].format is required.`);
+  return { game, canonicalCardId, ...(printingId ? { printingId } : {}), format };
+}
+
+async function findCanonicalCard(game, canonicalCardId, printingId = '') {
+  if (printingId) return findPrinting(game, printingId);
+  const id = String(canonicalCardId || '').trim();
+  if (!id) return null;
+  if (game === 'magic') {
+    const indexed = legalityIndexes().magic.byOracleId.get(id);
+    return indexed ? { oracle_id: id, name: indexed.name, legalities: indexed.legalities } : null;
+  }
+  const rows = await loadSource(game);
+  if (game === 'pokemon') return rows.find((row) => String(row.id) === id) || null;
+  if (game === 'yugioh') return rows.find((row) => String(row.id) === id) || null;
+  if (game === 'flesh_and_blood') return rows.find((row) => String(row.unique_id) === id) || null;
+  if (game === 'starwars') return rows.find((row) => String(row.uuid) === id || String(row.id) === id) || null;
+  return rows.find((row) => String(row.id) === id || String(row.unique_id) === id || String(row.uuid) === id) || null;
+}
+
+async function resolveLegality(input) {
+  const card = await findCanonicalCard(input.game, input.canonicalCardId, input.printingId);
+  return legalityOwner.check(input, {
+    card: card || {},
+    indexes: legalityIndexes(),
+    metadata: legalityMetadata(input.game)
+  });
+}
+
 export function installCardstachePublicApi(app) {
   const parsePublicJson = express.json({ limit: '64kb' });
   app.use('/api/public/v1', (req, res, next) => {
@@ -813,6 +885,24 @@ export function installCardstachePublicApi(app) {
     sendEnvelope(req, res, { items }, null, 'private, max-age=300, stale-while-revalidate=86400');
   }, 8_000)));
 
+  app.post('/api/public/v1/legality/check', route(async (req, res) => withTimeout(async () => {
+    const identity = validateLegalityIdentity(req.body || {}, 0);
+    const result = await resolveLegality(identity);
+    sendEnvelope(req, res, result, identity.game, 'public, max-age=3600, stale-while-revalidate=86400');
+  }, 2_000)));
+
+  app.post('/api/public/v1/legality/checks/batch', route(async (req, res) => withTimeout(async () => {
+    const identities = req.body?.identities;
+    if (!Array.isArray(identities)) throw new PublicApiError(400, 'invalid_request', 'identities must be an array.');
+    if (identities.length > LEGALITY_BATCH_MAX) throw new PublicApiError(400, 'invalid_request', `A maximum of ${LEGALITY_BATCH_MAX} identities is allowed.`);
+    const validated = identities.map(validateLegalityIdentity);
+    const items = [];
+    for (const identity of validated) {
+      items.push(await resolveLegality(identity));
+    }
+    sendEnvelope(req, res, { items }, null, 'public, max-age=3600, stale-while-revalidate=86400');
+  }, 8_000)));
+
   app.get('/api/public/v1/service/status', route(async (req, res) => withTimeout(async () => {
     const now = Date.now();
     const catalogs = [...SUPPORTED_GAMES].map((game) => {
@@ -839,6 +929,23 @@ export function installCardstachePublicApi(app) {
     const priced = games.reduce((sum, row) => sum + row.pricedRecords, 0);
     const pricingStatus = !pricingGeneratedAt ? 'unavailable' : priced === 0 ? 'empty' : pricingAge > 48 * 60 * 60 * 1000 ? 'stale' : games.some((row) => row.coveragePercent != null && row.coveragePercent < 100) ? 'partial' : 'ready';
     const status = catalogs.some((row) => row.status !== 'ready') || ['unavailable', 'empty'].includes(pricingStatus) ? 'degraded' : 'ok';
-    sendEnvelope(req, res, { status, catalogs, pricing: { status: pricingStatus, pricingVersion: pricingVersion(), generatedAt: pricingGeneratedAt, games } }, null, 'public, max-age=60, stale-while-revalidate=300');
+    const legality = legalityIndexes();
+    sendEnvelope(req, res, {
+      status,
+      catalogs,
+      pricing: { status: pricingStatus, pricingVersion: pricingVersion(), generatedAt: pricingGeneratedAt, games },
+      legality: {
+        status: legality.magic.byOracleId.size > 0 ? 'partial' : 'unavailable',
+        games: [
+          { game: 'magic', status: legality.magic.byOracleId.size > 0 ? 'ready' : 'unavailable', sourceVersion: legality.magic.metadata.sourceVersion, generatedAt: legality.magic.metadata.lastVerified, canonicalCardCount: legality.magic.byOracleId.size },
+          { game: 'pokemon', status: 'source-backed-card-fields', sourceVersion: catalogVersion('pokemon'), generatedAt: generatedAtOf(manifestFor('pokemon')) },
+          { game: 'yugioh', status: 'source-backed-banlist-fields', sourceVersion: catalogVersion('yugioh'), generatedAt: generatedAtOf(manifestFor('yugioh')), region: 'TCG' },
+          { game: 'flesh_and_blood', status: 'source-backed-card-fields', sourceVersion: catalogVersion('flesh_and_blood'), generatedAt: generatedAtOf(manifestFor('flesh_and_blood')) },
+          { game: 'lorcana', status: 'unknown-until-official-list-source', sourceVersion: catalogVersion('lorcana'), generatedAt: generatedAtOf(manifestFor('lorcana')) },
+          { game: 'onepiece', status: 'unknown-until-official-list-source', sourceVersion: catalogVersion('onepiece'), generatedAt: generatedAtOf(manifestFor('onepiece')) },
+          { game: 'starwars', status: 'unknown-until-official-list-source', sourceVersion: catalogVersion('starwars'), generatedAt: generatedAtOf(manifestFor('starwars')) }
+        ]
+      }
+    }, null, 'public, max-age=60, stale-while-revalidate=300');
   }, 2_000)));
 }
