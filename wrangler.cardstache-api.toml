@@ -1,0 +1,8 @@
+name = "main-phase-market-cardstache-api"
+main = "cloudflare/cardstache-public-api-worker.mjs"
+compatibility_date = "2026-09-10"
+workers_dev = true
+
+[[routes]]
+pattern = "api.mainphasemarket.net"
+custom_domain = true
