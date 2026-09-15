@@ -816,9 +816,9 @@ function LessonProgress({ current, total, allLessonsPath }) {
 
 function LessonSection({ title, children }) {
   return (
-    <section className={`border-t ${encyclopediaDividerClass} pt-5`}>
+    <section className={`min-w-0 border-t ${encyclopediaDividerClass} pt-5`}>
       <h2 className="text-xl font-black tracking-tight text-white">{title}</h2>
-      <div className={`mt-3 text-sm leading-7 ${encyclopediaSoftTextClass}`}>{children}</div>
+      <div className={`mt-3 min-w-0 break-words text-sm leading-7 ${encyclopediaSoftTextClass} [overflow-wrap:anywhere]`}>{children}</div>
     </section>
   );
 }
@@ -892,9 +892,9 @@ function CardCalloutExample({ visual }) {
   const callouts = visual?.callouts || [];
 
   return (
-    <section className={`border-y ${encyclopediaDividerClass} bg-slate-900/26 py-5`}>
-      <div className="grid gap-5 lg:grid-cols-[minmax(220px,300px)_minmax(0,1fr)] lg:items-center">
-        <div className="mx-auto w-full max-w-[260px]">
+    <section className={`min-w-0 border-y ${encyclopediaDividerClass} bg-slate-900/26 py-6 lg:py-7`}>
+      <div className="grid gap-6 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] lg:items-center xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)] xl:gap-10">
+        <div className="mx-auto w-full max-w-[280px] sm:max-w-[320px] lg:mx-0 lg:max-w-[380px] xl:max-w-[410px]">
           {card ? (
             <div className="aspect-[63/88] overflow-hidden bg-slate-950/80 ring-1 ring-slate-700">
               <TeachingCardFace card={card} />
@@ -907,11 +907,11 @@ function CardCalloutExample({ visual }) {
         </div>
         <div className="min-w-0">
           <p className={`text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>{visual?.title || 'Card Example'}</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:gap-x-5 xl:gap-x-6">
             {callouts.map((callout) => (
               <div key={callout.label} className={`min-w-0 border-t ${encyclopediaDividerClass} pt-3`}>
                 <p className="text-sm font-black text-cyan-100">{callout.label}</p>
-                <p className="mt-1 line-clamp-2 break-words text-sm font-semibold text-slate-100">{card ? cardCalloutValue(card, callout.field) : callout.detail}</p>
+                <p className="mt-1 max-w-full whitespace-normal break-words text-sm font-semibold text-slate-100 [overflow-wrap:anywhere]">{card ? cardCalloutValue(card, callout.field) : callout.detail}</p>
                 <p className={`mt-1 text-xs leading-5 ${encyclopediaMutedTextClass}`}>{callout.detail}</p>
               </div>
             ))}
@@ -928,10 +928,10 @@ function QuickCheck() {
   const isCorrect = selected === 'Battlefield';
 
   return (
-    <section className={`border-y ${encyclopediaDividerClass} bg-slate-900/30 py-5`}>
+    <section className={`min-w-0 border-y ${encyclopediaDividerClass} bg-slate-900/18 py-5`}>
       <h2 className="text-xl font-black tracking-tight text-white">Quick Check</h2>
-      <p className={`mt-2 text-sm leading-7 ${encyclopediaSoftTextClass}`}>Which zone do cards usually go to after they are played from your hand and remain in play?</p>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      <p className={`mt-2 break-words text-sm leading-7 ${encyclopediaSoftTextClass}`}>Which zone do cards usually go to after they are played from your hand and remain in play?</p>
+      <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
         {options.map((option) => {
           const isSelected = selected === option;
           return (
@@ -939,7 +939,7 @@ function QuickCheck() {
               key={option}
               type="button"
               onClick={() => setSelected(option)}
-              className={`min-h-11 border px-3 py-2 text-left text-sm font-bold transition ${isSelected ? (isCorrect ? 'border-emerald-300/70 bg-emerald-300/10 text-emerald-100' : 'border-amber-300/70 bg-amber-300/10 text-amber-100') : 'border-slate-700 bg-slate-950/50 text-slate-100 hover:border-cyan-300/60 hover:bg-slate-900'}`}
+              className={`min-h-11 border px-3 py-2 text-center text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300/70 ${isSelected ? (isCorrect ? 'border-emerald-300/70 bg-emerald-300/10 text-emerald-100' : 'border-red-300/70 bg-red-300/10 text-red-100') : 'border-slate-700 bg-slate-950/40 text-slate-100 hover:border-cyan-300/60 hover:bg-slate-900/75 hover:text-cyan-50'}`}
               aria-pressed={isSelected}
             >
               {option}
@@ -948,8 +948,8 @@ function QuickCheck() {
         })}
       </div>
       {selected ? (
-        <p className={`mt-4 border-l-2 py-2 pl-4 pr-3 text-sm font-semibold leading-6 ${isCorrect ? 'border-emerald-300/70 bg-emerald-300/10 text-emerald-100' : 'border-amber-300/70 bg-amber-300/10 text-amber-100'}`}>
-          {isCorrect ? 'Correct. Permanents such as creatures, artifacts, and enchantments remain on the battlefield after they resolve.' : 'Not quite. Cards that stay in play usually become permanents on the battlefield after they resolve.'}
+        <p className={`mt-3 text-sm font-semibold leading-6 ${isCorrect ? 'text-emerald-200' : 'text-red-200'}`}>
+          {isCorrect ? 'Correct - permanents such as creatures usually enter the battlefield.' : 'Not quite - cards that stay in play usually become permanents on the battlefield.'}
         </p>
       ) : null}
     </section>
@@ -992,7 +992,7 @@ function WhatIsMagicLesson({ game, topic, lessons, nextTopic }) {
         subtitle="Magic is a trading card game where players use decks of lands, creatures, spells, and other cards to outplay an opponent."
       />
       <SectionShell className="py-6">
-        <article className="mx-auto max-w-5xl space-y-7">
+        <article className="mx-auto min-w-0 w-[calc(100vw-5rem)] max-w-[calc(100vw-5rem)] space-y-7 overflow-x-hidden sm:w-auto sm:max-w-[calc(100vw-2rem)] lg:w-full lg:max-w-[1320px]">
           <LessonProgress current={topic.order} total={lessons.length} allLessonsPath={learnPath} />
           <CardCalloutExample visual={topic.visual} />
           <LessonSection title="What It Is">
