@@ -84,18 +84,29 @@ function EncyclopediaBanner() {
   );
 }
 
+function BreadcrumbTrail({ breadcrumbs = [], className = '' }) {
+  if (breadcrumbs.length === 0) return null;
+
+  return (
+    <nav
+      className={`flex max-w-full flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass} ${className}`}
+      aria-label="Breadcrumb"
+    >
+      {breadcrumbs.map((crumb, index) => (
+        <React.Fragment key={`${crumb.label}-${index}`}>
+          {crumb.to ? <Link to={crumb.to} className="min-w-0 break-words hover:text-cyan-200">{crumb.label}</Link> : <span className="min-w-0 break-words">{crumb.label}</span>}
+          {index < breadcrumbs.length - 1 ? <span aria-hidden="true">/</span> : null}
+        </React.Fragment>
+      ))}
+    </nav>
+  );
+}
+
 function PageHeader({ breadcrumbs = [], eyebrow, title, subtitle, actions = null }) {
   return (
     <SectionShell className="pt-6">
       <div className={`min-w-0 overflow-x-hidden border-b ${encyclopediaDividerClass} pb-5`}>
-        <div className={`mb-3 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>
-          {breadcrumbs.map((crumb, index) => (
-            <React.Fragment key={`${crumb.label}-${index}`}>
-              {crumb.to ? <Link to={crumb.to} className="min-w-0 break-words hover:text-cyan-200">{crumb.label}</Link> : <span className="min-w-0 break-words">{crumb.label}</span>}
-              {index < breadcrumbs.length - 1 ? <span>/</span> : null}
-            </React.Fragment>
-          ))}
-        </div>
+        <BreadcrumbTrail breadcrumbs={breadcrumbs} className="mb-3" />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
             {eyebrow ? <p className={`text-xs font-bold uppercase tracking-[0.18em] ${encyclopediaMutedTextClass}`}>{eyebrow}</p> : null}
@@ -153,6 +164,26 @@ const HUB_LOGO_CLASS_BY_GAME = Object.freeze({
 
 const SET_ROW_VISUAL_ENABLED_GAMES = new Set(['magic', 'pokemon']);
 
+function gameBreadcrumbLabel(game) {
+  if (game.id === 'pokemon') return 'Pokémon';
+  if (game.id === 'lorcana') return 'Disney Lorcana';
+  if (game.id === 'flesh_and_blood') return 'Flesh and Blood';
+  if (game.id === 'starwars') return 'Star Wars Unlimited';
+  return game.shortLabel || game.label;
+}
+
+function gameHubPath(game) {
+  return `/Encyclopedia/${game.routeKey}`;
+}
+
+function encyclopediaBreadcrumbs(game, entries = []) {
+  return [
+    { label: 'TCG Encyclopedia', to: '/Encyclopedia' },
+    { label: gameBreadcrumbLabel(game), to: entries.length > 0 ? gameHubPath(game) : undefined },
+    ...entries
+  ];
+}
+
 function HubChoiceRow({ to, label }) {
   return (
     <Link
@@ -173,6 +204,7 @@ function GameLanding({ game }) {
       <EncyclopediaBanner />
       <SectionShell className="py-7 sm:py-8">
         <div className="max-w-3xl">
+          <BreadcrumbTrail breadcrumbs={encyclopediaBreadcrumbs(game)} className="mb-5" />
           <div className="flex min-h-16 items-center">
             <h1 className="sr-only">{hubTitle}</h1>
             <img
@@ -391,11 +423,7 @@ function SetListPage({ game }) {
   return (
     <main className={encyclopediaPageClass}>
       <PageHeader
-        breadcrumbs={[
-          { label: 'TCG Encyclopedia', to: '/Encyclopedia' },
-          { label: game.shortLabel || game.label, to: `/Encyclopedia/${game.routeKey}` },
-          { label: 'Sets' }
-        ]}
+        breadcrumbs={encyclopediaBreadcrumbs(game, [{ label: 'Sets' }])}
         title="All Sets"
       />
       <SectionShell className="py-6">
@@ -592,11 +620,10 @@ function SetDetailPage({ game, setSlug }) {
   return (
     <main className={encyclopediaPageClass}>
       <PageHeader
-        breadcrumbs={[
-          { label: 'TCG Encyclopedia', to: '/Encyclopedia' },
-          { label: game.shortLabel || game.label, to: `/Encyclopedia/${game.routeKey}` },
-          { label: 'Sets', to: `/Encyclopedia/${game.routeKey}/sets` }
-        ]}
+        breadcrumbs={encyclopediaBreadcrumbs(game, [
+          { label: 'Sets', to: `/Encyclopedia/${game.routeKey}/sets` },
+          { label: detail.name }
+        ])}
         eyebrow={detail.setCode || game.shortLabel}
         title={detail.name}
         subtitle={`${detail.cardCatalog?.knownLabel || `${setCards.length} known cards`} in collector order.`}
@@ -785,7 +812,8 @@ function LessonNav({ previousTopic, nextTopic }) {
 function LearnPage({ game, topicSlug }) {
   const lessons = gameKnowledgeOwner.getRulesTopicsByCategory(game.id, 'learn');
   const topic = topicSlug ? gameKnowledgeOwner.getRulesTopic(game.id, topicSlug) : null;
-  if (topicSlug && topic?.category !== 'learn') return <EmptyState title="Lesson not found" body="That Learn to Play lesson is not available." to="/Encyclopedia/magic/learn" action="Back to Learn to Play" />;
+  const learnPath = `/Encyclopedia/${game.routeKey}/learn`;
+  if (topicSlug && topic?.category !== 'learn') return <EmptyState title="Lesson not found" body="That Learn to Play lesson is not available." to={learnPath} action="Back to Learn to Play" />;
   const previousTopic = topic?.previousSlug ? gameKnowledgeOwner.getRulesTopic(game.id, topic.previousSlug) : null;
   const nextTopic = topic?.nextSlug ? gameKnowledgeOwner.getRulesTopic(game.id, topic.nextSlug) : null;
   const relatedTopics = (topic?.relatedTopics || [])
@@ -796,11 +824,10 @@ function LearnPage({ game, topicSlug }) {
   return (
     <main className={encyclopediaPageClass}>
       <PageHeader
-        breadcrumbs={[
-          { label: 'TCG Encyclopedia', to: '/Encyclopedia' },
-          { label: 'Magic', to: '/Encyclopedia/magic' },
-          { label: 'Learn to Play', to: topic ? '/Encyclopedia/magic/learn' : undefined }
-        ]}
+        breadcrumbs={encyclopediaBreadcrumbs(game, [
+          { label: 'Learn to Play', to: topic ? learnPath : undefined },
+          ...(topic ? [{ label: topic.title }] : [])
+        ])}
         eyebrow={topic ? `Lesson ${topic.order}` : undefined}
         title={topic ? topic.title : 'Learn to Play'}
         subtitle={topic ? (topic.article?.introduction || topic.summary) : 'Start with the table basics, then move through turns, combat, responses, the stack, abilities, and first deck building.'}
@@ -878,7 +905,7 @@ function RulesPage({ game, topicSlug }) {
   const topic = topicSlug ? gameKnowledgeOwner.getRulesTopic(game.id, topicSlug) : null;
   const article = topic?.article || null;
   if (isMagic && topic?.category === 'learn') return <Navigate to={`/Encyclopedia/magic/learn/${topic.slug}`} replace />;
-  const categoryLabel = isMagic ? 'Game Rules' : 'Rules Reference';
+  const rulesPath = `/Encyclopedia/${game.routeKey}/rules`;
   const learnLessons = isMagic ? gameKnowledgeOwner.getRulesTopicsByCategory(game.id, 'learn') : [];
   const referenceGroups = isMagic ? (() => {
     const groups = new Map();
@@ -897,11 +924,10 @@ function RulesPage({ game, topicSlug }) {
   return (
     <main className={encyclopediaPageClass}>
       <PageHeader
-        breadcrumbs={[
-          { label: 'TCG Encyclopedia', to: '/Encyclopedia' },
-          { label: game.shortLabel || game.label, to: `/Encyclopedia/${game.routeKey}` },
-          { label: isMagic ? categoryLabel : 'Rules', to: topic ? `/Encyclopedia/${game.routeKey}/rules` : undefined }
-        ]}
+        breadcrumbs={encyclopediaBreadcrumbs(game, [
+          { label: 'Game Rules', to: topic ? rulesPath : undefined },
+          ...(topic ? [{ label: topic.title }] : [])
+        ])}
         eyebrow={topic ? 'Rules topic' : undefined}
         title={topic ? topic.title : (isMagic ? 'Game Rules' : 'Rules / How to Play')}
         subtitle={topic ? (article?.introduction || topic.summary) : undefined}

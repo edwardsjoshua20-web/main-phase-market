@@ -145,6 +145,11 @@ assert(pageFile.includes('returnTo') && pageFile.includes('returnLabel'), 'Encyc
 assert(pageFile.includes('function GameLanding') && pageFile.includes('HUB_CHOICES'), 'Game landings must render the shared three-destination hub');
 assert(pageFile.includes('Sets & Cards') && pageFile.includes('Learn to Play') && pageFile.includes('Game Rules'), 'Game hubs must expose Sets & Cards, Learn to Play, and Game Rules choices');
 assert(pageFile.includes('`/Encyclopedia/${game.routeKey}/${choice.section}`'), 'Game hub choices must use existing game route keys');
+assert(pageFile.includes('function BreadcrumbTrail') && pageFile.includes('aria-label="Breadcrumb"'), 'Encyclopedia pages must render compact accessible breadcrumbs');
+assert(pageFile.includes('BreadcrumbTrail breadcrumbs={encyclopediaBreadcrumbs(game)}'), 'Game hubs must provide a breadcrumb back to the main Encyclopedia landing');
+assert(pageFile.includes('function encyclopediaBreadcrumbs') && pageFile.includes("to: entries.length > 0 ? gameHubPath(game) : undefined"), 'Encyclopedia breadcrumbs must keep the current page segment non-clickable');
+assert(pageFile.includes("...(topic ? [{ label: topic.title }] : [])"), 'Learn and Rules article breadcrumbs must include the current topic as the final segment');
+assert(pageFile.includes("{ label: detail.name }"), 'Set detail breadcrumbs must include the current set as the final segment');
 assert(pageFile.includes('function LearnPage'), 'Magic Learn to Play route must render a dedicated course page');
 assert(pageFile.includes('LessonVisual') && pageFile.includes('getMagicTeachingCards'), 'Magic lessons must render structured real-card teaching visuals');
 assert(pageFile.includes('searchRulesTopics') && pageFile.includes('Search topic, alias, keyword, or mechanic'), 'Magic Game Rules must expose topic/alias/mechanic search');
