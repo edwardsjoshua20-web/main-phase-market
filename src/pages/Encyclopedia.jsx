@@ -151,7 +151,7 @@ const HUB_LOGO_CLASS_BY_GAME = Object.freeze({
   starwars: 'max-h-16 max-w-[210px] brightness-0 invert'
 });
 
-const SET_ROW_VISUAL_DISABLED_GAMES = new Set(['yugioh', 'flesh_and_blood']);
+const SET_ROW_VISUAL_ENABLED_GAMES = new Set(['magic', 'pokemon']);
 
 function HubChoiceRow({ to, label }) {
   return (
@@ -200,12 +200,14 @@ function GameLanding({ game }) {
 function SetRow({ set }) {
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}`;
-  const shouldRenderSetVisual = Boolean(set.imageUrl && !SET_ROW_VISUAL_DISABLED_GAMES.has(set.game));
+  const shouldRenderSetVisual = Boolean(set.imageUrl && SET_ROW_VISUAL_ENABLED_GAMES.has(set.game));
   const imageClassName = set.iconSource === 'product'
     ? 'max-h-9 max-w-9 object-contain opacity-95'
     : set.iconSource === 'logo'
       ? 'max-h-8 max-w-9 object-contain opacity-95'
-      : 'max-h-8 max-w-8 object-contain opacity-90 invert';
+      : set.game === 'magic'
+        ? 'max-h-8 max-w-8 object-contain opacity-90 invert'
+        : 'max-h-8 max-w-8 object-contain opacity-95';
 
   return (
     <Link

@@ -155,12 +155,13 @@ assert(!/catalog-backed|Search owner|source-attributed summaries|Complete local 
 assert(searchOwnerFile.includes('icon_url') && searchOwnerFile.includes('logo_url') && searchOwnerFile.includes('product_image_url') && searchOwnerFile.includes('icon_source'), 'Search owner must expose canonical set icon/logo/product image metadata');
 assert(searchOwnerFile.includes('set.set_image') && searchOwnerFile.includes('set.set_logo'), 'Search owner must consume set product/logo fields from source set metadata');
 assert(gameKnowledgeOwnerFile.includes('iconUrl') && gameKnowledgeOwnerFile.includes('logoUrl') && gameKnowledgeOwnerFile.includes('productImageUrl') && gameKnowledgeOwnerFile.includes('iconSource'), 'Game knowledge owner must preserve set icon metadata for Encyclopedia consumers');
-assert(pageFile.includes('SET_ROW_VISUAL_DISABLED_GAMES') && pageFile.includes("'yugioh'") && pageFile.includes("'flesh_and_blood'"), 'Set rows must disable visual icons only for Yu-Gi-Oh! and Flesh and Blood');
-assert(pageFile.includes('shouldRenderSetVisual') && pageFile.includes('!SET_ROW_VISUAL_DISABLED_GAMES.has(set.game)'), 'Shared set-row renderer must suppress the visual column by normalized game id');
+assert(pageFile.includes('SET_ROW_VISUAL_ENABLED_GAMES') && pageFile.includes("'magic'") && pageFile.includes("'pokemon'"), 'Set rows must enable visual icons only for Magic and Pokemon');
+assert(pageFile.includes('shouldRenderSetVisual') && pageFile.includes('SET_ROW_VISUAL_ENABLED_GAMES.has(set.game)'), 'Shared set-row renderer must allow the visual column by normalized game id');
 assert(pageFile.includes('<img src={set.imageUrl}') && pageFile.includes("grid-cols-[46px_minmax(0,1fr)_auto]"), 'Shared set-row renderer must preserve set visuals for non-suppressed games');
 assert(pageFile.includes("grid-cols-[minmax(0,1fr)_auto]"), 'Shared set-row renderer must remove the icon gutter when a set visual is suppressed or unavailable');
 assert(!pageFile.includes('displayCode') && !pageFile.includes('text-[0.62rem]'), 'Set rows must not render code-badge fallbacks');
 assert(!pageFile.includes('<Layers'), 'Set rows must not fall back to the generic stacked-layers icon');
+assert(gameKnowledgeOwnerFile.includes('setRowVisualForGame') && gameKnowledgeOwnerFile.includes("gameMeta.id === 'magic'") && gameKnowledgeOwnerFile.includes("gameMeta.id === 'pokemon'"), 'Game knowledge owner must centralize the set-row visual policy for Magic and Pokemon only');
 
 const cardDetailFile = fs.readFileSync(path.join(repoRoot, 'src/pages/CardDetail.jsx'), 'utf8');
 assert(cardDetailFile.includes('getPreferredBackLink') && cardDetailFile.includes('returnTo') && cardDetailFile.includes('returnLabel'), 'Canonical CardDetail must honor Encyclopedia return context');

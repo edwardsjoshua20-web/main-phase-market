@@ -21,23 +21,43 @@ function formatDate(value) {
   return String(value).slice(0, 10);
 }
 
+function setRowVisualForGame(set = {}, gameMeta) {
+  if (gameMeta.id === 'magic') {
+    return {
+      imageUrl: set.icon_url || set.set_icon_svg_uri || set.icon_svg_uri || set.image_url || null,
+      iconSource: 'symbol'
+    };
+  }
+  if (gameMeta.id === 'pokemon') {
+    return {
+      imageUrl: set.icon_url || set.images?.symbol || set.image_url || null,
+      iconSource: 'symbol'
+    };
+  }
+  return {
+    imageUrl: null,
+    iconSource: 'none'
+  };
+}
+
 function buildEncyclopediaSetPath(gameMeta, set = {}) {
   const slugSource = set.name || set.set_name || set.setName || set.set_code || set.code || set.id;
   return `/Encyclopedia/${gameMeta.routeKey}/sets/${slugifySetValue(slugSource)}`;
 }
 
 function normalizeSet(set = {}, gameMeta) {
+  const rowVisual = setRowVisualForGame(set, gameMeta);
   return {
     id: cleanText(set.id || set.set_code || set.name),
     game: gameMeta.id,
     routeGame: gameMeta.routeKey,
     name: cleanText(set.name),
     setCode: cleanText(set.set_code),
-    imageUrl: set.image_url || null,
+    imageUrl: rowVisual.imageUrl,
     iconUrl: set.icon_url || null,
     logoUrl: set.logo_url || null,
     productImageUrl: set.product_image_url || null,
-    iconSource: set.icon_source || (set.image_url ? 'symbol' : 'none'),
+    iconSource: rowVisual.iconSource,
     releaseDate: formatDate(set.release_date),
     inStock: Boolean(set.inStock),
     path: buildEncyclopediaSetPath(gameMeta, set)
