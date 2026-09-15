@@ -221,6 +221,14 @@ export const gameKnowledgeOwner = {
       .map((card) => normalizeCard(card, game, cleanText(card.set_name || card.set_code || 'teaching')));
   },
 
+  async searchMagicTeachingCards(query, limit = 1) {
+    const game = this.getGame('magic');
+    const normalizedQuery = cleanText(query);
+    if (!game || !normalizedQuery) return [];
+    const card = await searchOwner.getMagicTeachingCardByName(normalizedQuery);
+    return card ? [normalizeCard(card, game, cleanText(card.set_name || card.set_code || 'teaching'))].slice(0, limit) : [];
+  },
+
   async listSets(value, options = {}) {
     const game = this.getGame(value);
     if (!game) return [];

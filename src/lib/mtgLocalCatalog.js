@@ -1047,6 +1047,29 @@ export async function getMtgPreferredPrintingsByOracleIds(oracleIds = []) {
   return [...preferredByOracleId.values()];
 }
 
+export async function getMtgTeachingCardByName(name) {
+  const normalizedQuery = normalizeText(name);
+  if (!normalizedQuery) return null;
+
+  const rows = await loadLiteRowsForQuery(normalizedQuery);
+  const exactMatch = rows
+    .filter((row) => isCanonicalCardNameMatch(row, normalizedQuery))
+    .sort(compareExactPrintings)[0];
+  if (!exactMatch) return null;
+
+  const indexedRows = await loadIndexedPrintingsForExactMatches([exactMatch]).catch(() => []);
+  const allRows = indexedRows.length > 0
+    ? mergePrintingDetailsWithRepresentatives(indexedRows, [exactMatch])
+    : [exactMatch];
+  const englishImageIndexes = buildEnglishImageIndexes(allRows);
+  const displayableRow = allRows
+    .filter((row) => row.oracle_id === exactMatch.oracle_id)
+    .sort(compareExactPrintings)
+    .find((row) => hasDisplayableImage(row, englishImageIndexes)) || exactMatch;
+
+  return formatResult(displayableRow, englishImageIndexes);
+}
+
 export async function getMtgCatalogManifest() {
   return loadManifest();
 }

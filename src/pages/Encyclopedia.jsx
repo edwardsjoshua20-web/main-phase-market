@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, ExternalLink, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CardImage from '@/components/cards/CardImage';
+import { getCardImageCandidates } from '@/lib/cardImages';
 import { gameKnowledgeOwner } from '@/services/knowledge/gameKnowledgeOwner';
 import { createPageUrl } from '@/utils';
 
@@ -707,9 +708,15 @@ function TeachingCard({ card }) {
 function useMagicVisualCards(visual) {
   const oracleIds = Array.isArray(visual?.oracleIds) ? visual.oracleIds : [];
   return useQuery({
-    queryKey: ['magic-teaching-cards', oracleIds],
-    queryFn: () => gameKnowledgeOwner.getMagicTeachingCards(oracleIds),
-    enabled: oracleIds.length > 0,
+    queryKey: ['magic-teaching-cards', oracleIds, visual?.search || ''],
+    queryFn: async () => {
+      const cards = oracleIds.length > 0
+        ? await gameKnowledgeOwner.getMagicTeachingCards(oracleIds).catch(() => [])
+        : [];
+      if (cards.length > 0 || !visual?.search) return cards;
+      return gameKnowledgeOwner.searchMagicTeachingCards(visual.search, 1);
+    },
+    enabled: oracleIds.length > 0 || Boolean(visual?.search),
     staleTime: 60_000
   });
 }
@@ -789,6 +796,214 @@ function ArticleBody({ article }) {
   );
 }
 
+function LessonProgress({ current, total, allLessonsPath }) {
+  const percent = total > 0 ? Math.min(100, Math.max(0, (current / total) * 100)) : 0;
+
+  return (
+    <div className={`flex flex-col gap-3 border-b ${encyclopediaDividerClass} pb-5 sm:flex-row sm:items-center sm:justify-between`}>
+      <div className="min-w-0 flex-1">
+        <p className={`text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>Lesson {current} of {total}</p>
+        <div className="mt-3 h-1.5 overflow-hidden bg-slate-800" aria-hidden="true">
+          <div className="h-full bg-cyan-200" style={{ width: `${percent}%` }} />
+        </div>
+      </div>
+      <Link to={allLessonsPath} className="text-sm font-bold text-cyan-100 hover:text-cyan-200">
+        View All Lessons
+      </Link>
+    </div>
+  );
+}
+
+function LessonSection({ title, children }) {
+  return (
+    <section className={`border-t ${encyclopediaDividerClass} pt-5`}>
+      <h2 className="text-xl font-black tracking-tight text-white">{title}</h2>
+      <div className={`mt-3 text-sm leading-7 ${encyclopediaSoftTextClass}`}>{children}</div>
+    </section>
+  );
+}
+
+function cardRulesText(card = {}) {
+  const raw = card.raw || {};
+  return String(card.oracle_text || raw.oracle_text || raw.rules_text || card.text || '')
+    .split('\n')
+    .filter(Boolean)
+    .join(' ');
+}
+
+function cardCalloutValue(card = {}, field) {
+  const raw = card.raw || {};
+  if (field === 'name') return card.name || raw.name || 'Card name';
+  if (field === 'manaCost') return card.mana_cost || raw.mana_cost || raw.cost || 'Printed cost';
+  if (field === 'typeLine') return card.type_line || raw.type_line || raw.type || 'Type line';
+  if (field === 'rulesText') return cardRulesText(card) || 'Rules text';
+  return '';
+}
+
+function TeachingCardFace({ card }) {
+  const imageCandidates = getCardImageCandidates(card);
+  const rulesText = cardRulesText(card);
+
+  if (imageCandidates.length > 0) {
+    return (
+      <CardImage
+        card={card}
+        alt={card.name}
+        className="h-full w-full object-contain"
+        fallbackClassName="hidden"
+        renderFallback={() => <TeachingCardFieldFace card={card} rulesText={rulesText} />}
+      />
+    );
+  }
+
+  return <TeachingCardFieldFace card={card} rulesText={rulesText} />;
+}
+
+function TeachingCardFieldFace({ card, rulesText }) {
+  return (
+    <div className="flex h-full flex-col border border-[#4b3422] bg-[#d8c096] p-3 text-[#1d160f] shadow-inner">
+      <div className="flex items-start justify-between gap-3 border-b border-[#6c4b2f]/60 pb-2">
+        <p className="min-w-0 break-words text-sm font-black leading-tight">{cardCalloutValue(card, 'name')}</p>
+        <p className="shrink-0 text-xs font-black">{cardCalloutValue(card, 'manaCost')}</p>
+      </div>
+      <div className="my-3 min-h-16 border border-[#6c4b2f]/45 bg-[#4b3422]/12" aria-hidden="true" />
+      <p className="border-y border-[#6c4b2f]/60 py-1 text-xs font-black">{cardCalloutValue(card, 'typeLine')}</p>
+      <p className="mt-3 text-xs font-semibold leading-5">{rulesText}</p>
+    </div>
+  );
+}
+
+function CardCalloutExample({ visual }) {
+  const { data: cards = [], isLoading } = useMagicVisualCards(visual);
+  const card = cards[0] || visual?.fallbackCard || null;
+  const callouts = visual?.callouts || [];
+
+  return (
+    <section className={`border-y ${encyclopediaDividerClass} bg-slate-900/26 py-5`}>
+      <div className="grid gap-5 lg:grid-cols-[minmax(220px,300px)_minmax(0,1fr)] lg:items-center">
+        <div className="mx-auto w-full max-w-[260px]">
+          {card ? (
+            <div className="aspect-[63/88] overflow-hidden bg-slate-950/80 ring-1 ring-slate-700">
+              <TeachingCardFace card={card} />
+            </div>
+          ) : (
+            <div className="flex aspect-[63/88] items-center justify-center bg-slate-950/80 px-4 text-center text-sm font-semibold text-slate-500 ring-1 ring-slate-700">
+              {isLoading ? 'Loading card example...' : 'Card example unavailable'}
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className={`text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>{visual?.title || 'Card Example'}</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {callouts.map((callout) => (
+              <div key={callout.label} className={`min-w-0 border-t ${encyclopediaDividerClass} pt-3`}>
+                <p className="text-sm font-black text-cyan-100">{callout.label}</p>
+                <p className="mt-1 line-clamp-2 break-words text-sm font-semibold text-slate-100">{card ? cardCalloutValue(card, callout.field) : callout.detail}</p>
+                <p className={`mt-1 text-xs leading-5 ${encyclopediaMutedTextClass}`}>{callout.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function QuickCheck() {
+  const [selected, setSelected] = useState('');
+  const options = ['Hand', 'Battlefield', 'Graveyard', 'Exile'];
+  const isCorrect = selected === 'Battlefield';
+
+  return (
+    <section className={`border-y ${encyclopediaDividerClass} bg-slate-900/30 py-5`}>
+      <h2 className="text-xl font-black tracking-tight text-white">Quick Check</h2>
+      <p className={`mt-2 text-sm leading-7 ${encyclopediaSoftTextClass}`}>Which zone do cards usually go to after they are played from your hand and remain in play?</p>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {options.map((option) => {
+          const isSelected = selected === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setSelected(option)}
+              className={`min-h-11 border px-3 py-2 text-left text-sm font-bold transition ${isSelected ? (isCorrect ? 'border-emerald-300/70 bg-emerald-300/10 text-emerald-100' : 'border-amber-300/70 bg-amber-300/10 text-amber-100') : 'border-slate-700 bg-slate-950/50 text-slate-100 hover:border-cyan-300/60 hover:bg-slate-900'}`}
+              aria-pressed={isSelected}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+      {selected ? (
+        <p className={`mt-4 border-l-2 py-2 pl-4 pr-3 text-sm font-semibold leading-6 ${isCorrect ? 'border-emerald-300/70 bg-emerald-300/10 text-emerald-100' : 'border-amber-300/70 bg-amber-300/10 text-amber-100'}`}>
+          {isCorrect ? 'Correct. Permanents such as creatures, artifacts, and enchantments remain on the battlefield after they resolve.' : 'Not quite. Cards that stay in play usually become permanents on the battlefield after they resolve.'}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function PrototypeLessonNavigation({ nextTopic, allLessonsPath }) {
+  return (
+    <nav className={`grid gap-3 border-t ${encyclopediaDividerClass} pt-5 sm:grid-cols-3`} aria-label="Lesson navigation">
+      <span className={`min-w-0 border border-slate-800 bg-slate-950/35 p-4 text-sm font-bold ${encyclopediaMutedTextClass}`} aria-disabled="true">
+        Previous Lesson
+      </span>
+      <Link to={allLessonsPath} className={`min-w-0 border border-slate-700 bg-slate-950/50 p-4 text-center text-sm font-bold text-cyan-100 transition hover:border-cyan-300/60 hover:bg-slate-900`}>
+        View All Lessons
+      </Link>
+      {nextTopic ? (
+        <Link to={nextTopic.path} className={`group min-w-0 border border-slate-700 bg-slate-950/50 p-4 text-sm font-bold text-slate-100 transition hover:border-cyan-300/60 hover:bg-slate-900 hover:text-cyan-100`}>
+          <span className={`block text-xs uppercase tracking-[0.14em] ${encyclopediaMutedTextClass}`}>Next Lesson</span>
+          <span className="mt-1 flex items-center justify-between gap-3">
+            <span className="min-w-0 truncate">{nextTopic.title}</span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-cyan-200" aria-hidden="true" />
+          </span>
+        </Link>
+      ) : null}
+    </nav>
+  );
+}
+
+function WhatIsMagicLesson({ game, topic, lessons, nextTopic }) {
+  const learnPath = `/Encyclopedia/${game.routeKey}/learn`;
+
+  return (
+    <main className={encyclopediaPageClass}>
+      <PageHeader
+        breadcrumbs={encyclopediaBreadcrumbs(game, [
+          { label: 'Learn to Play', to: learnPath },
+          { label: topic.title }
+        ])}
+        title={topic.title}
+        subtitle="Magic is a trading card game where players use decks of lands, creatures, spells, and other cards to outplay an opponent."
+      />
+      <SectionShell className="py-6">
+        <article className="mx-auto max-w-5xl space-y-7">
+          <LessonProgress current={topic.order} total={lessons.length} allLessonsPath={learnPath} />
+          <CardCalloutExample visual={topic.visual} />
+          <LessonSection title="What It Is">
+            <p>Magic is a trading card game where players use decks of lands, creatures, spells, and other cards to outplay an opponent.</p>
+          </LessonSection>
+          <LessonSection title="What You Do">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {['Draw cards', 'Play lands', 'Generate resources and mana', 'Cast spells', 'Play creatures and other permanents', 'Make decisions each turn', 'Attack and respond'].map((item) => (
+                <p key={item} className={`border-t ${encyclopediaDividerClass} pt-2 font-semibold text-slate-100`}>{item}</p>
+              ))}
+            </div>
+          </LessonSection>
+          <LessonSection title="How You Win">
+            <p>Most Magic games have a defined win condition. In ordinary two-player Constructed Magic, players commonly start at 20 life and reducing an opponent to 0 is one common way to win.</p>
+            <p className="mt-3">Alternate win and loss conditions exist, and format rules can change starting life totals, deck construction, and multiplayer expectations.</p>
+          </LessonSection>
+          <QuickCheck />
+          <PrototypeLessonNavigation nextTopic={nextTopic} allLessonsPath={learnPath} />
+        </article>
+      </SectionShell>
+    </main>
+  );
+}
+
 function LessonNav({ previousTopic, nextTopic }) {
   if (!previousTopic && !nextTopic) return null;
   return (
@@ -820,6 +1035,10 @@ function LearnPage({ game, topicSlug }) {
     .map((slug) => gameKnowledgeOwner.getRulesTopic(game.id, slug))
     .filter(Boolean)
     .slice(0, 6);
+
+  if (topic?.slug === 'learn-what-is-magic') {
+    return <WhatIsMagicLesson game={game} topic={topic} lessons={lessons} nextTopic={nextTopic} />;
+  }
 
   return (
     <main className={encyclopediaPageClass}>

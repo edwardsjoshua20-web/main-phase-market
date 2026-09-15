@@ -1,7 +1,7 @@
 import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 import { searchFabCatalog, searchFabCatalogAdvanced } from '@/lib/fabLocalCatalog';
 import { searchLorcanaCatalog, searchLorcanaCatalogAdvanced } from '@/lib/lorcanaLocalCatalog';
-import { browseMtgCatalog, getMtgPreferredPrintingsByOracleIds, getMtgPrintingsByOracleId, searchMtgCatalog, searchMtgCatalogAdvanced, searchMtgCatalogSuggestions } from '@/lib/mtgLocalCatalog';
+import { browseMtgCatalog, getMtgPreferredPrintingsByOracleIds, getMtgPrintingsByOracleId, getMtgTeachingCardByName, searchMtgCatalog, searchMtgCatalogAdvanced, searchMtgCatalogSuggestions } from '@/lib/mtgLocalCatalog';
 import { searchOnePieceCatalog, searchOnePieceCatalogAdvanced } from '@/lib/onePieceLocalCatalog';
 import { searchPokemonCatalog, searchPokemonCatalogAdvanced } from '@/lib/pokemonLocalCatalog';
 import { searchStarWarsCatalog, searchStarWarsCatalogAdvanced } from '@/lib/starwarsLocalCatalog';
@@ -345,6 +345,11 @@ export const searchOwner = {
 
   async getMagicPreferredPrintingsByOracleIds(oracleIds) {
     return getMtgPreferredPrintingsByOracleIds(oracleIds);
+  },
+
+  async getMagicTeachingCardByName(name) {
+    const card = await getMtgTeachingCardByName(name);
+    return card ? withCommonCardFields(card, { game: 'magic', rarity: card.rarity || 'Common' }) : null;
   },
 
   async searchSets({ query, game, products = [], limit = 100 } = {}) {

@@ -155,6 +155,11 @@ assert(pageFile.includes('LessonVisual') && pageFile.includes('getMagicTeachingC
 assert(pageFile.includes('searchRulesTopics') && pageFile.includes('Search topic, alias, keyword, or mechanic'), 'Magic Game Rules must expose topic/alias/mechanic search');
 assert(pageFile.includes('Previous lesson') && pageFile.includes('Next lesson'), 'Magic learn articles must render previous/next lesson navigation');
 assert(pageFile.includes('Official Rules Reference'), 'Magic articles must use restrained official reference labeling');
+assert(pageFile.includes('function WhatIsMagicLesson') && pageFile.includes("topic?.slug === 'learn-what-is-magic'"), 'What Is Magic must use the focused prototype lesson experience');
+assert(pageFile.includes('function LessonProgress') && pageFile.includes('Lesson {current} of {total}'), 'What Is Magic prototype must show compact lesson progress');
+assert(pageFile.includes('function CardCalloutExample') && pageFile.includes('cardCalloutValue'), 'What Is Magic prototype must render a catalog-backed visual card callout area');
+assert(pageFile.includes('function QuickCheck') && pageFile.includes('Battlefield'), 'What Is Magic prototype must render the interactive Quick Check');
+assert(pageFile.includes('What It Is') && pageFile.includes('What You Do') && pageFile.includes('How You Win') && pageFile.includes('Quick Check'), 'What Is Magic prototype must use the required focused section labels');
 assert(!pageFile.includes('Authority Boundary'), 'Rules page must not render the internal authority-boundary box');
 assert(!/catalog-backed|Search owner|source-attributed summaries|Complete local card|MainPhase Search owner/i.test(pageFile), 'Public Encyclopedia UI contains internal owner/catalog wording');
 assert(searchOwnerFile.includes('icon_url') && searchOwnerFile.includes('logo_url') && searchOwnerFile.includes('product_image_url') && searchOwnerFile.includes('icon_source'), 'Search owner must expose canonical set icon/logo/product image metadata');
@@ -167,6 +172,8 @@ assert(pageFile.includes("grid-cols-[minmax(0,1fr)_auto]"), 'Shared set-row rend
 assert(!pageFile.includes('displayCode') && !pageFile.includes('text-[0.62rem]'), 'Set rows must not render code-badge fallbacks');
 assert(!pageFile.includes('<Layers'), 'Set rows must not fall back to the generic stacked-layers icon');
 assert(gameKnowledgeOwnerFile.includes('setRowVisualForGame') && gameKnowledgeOwnerFile.includes("gameMeta.id === 'magic'") && gameKnowledgeOwnerFile.includes("gameMeta.id === 'pokemon'"), 'Game knowledge owner must centralize the set-row visual policy for Magic and Pokemon only');
+assert(gameKnowledgeOwnerFile.includes('searchMagicTeachingCards') && gameKnowledgeOwnerFile.includes('searchOwner.getMagicTeachingCardByName'), 'Magic lesson examples must resolve fallback teaching cards through Search Owner');
+assert(searchOwnerFile.includes('getMagicTeachingCardByName') && searchOwnerFile.includes('getMtgTeachingCardByName'), 'Search Owner must expose the narrow MTG teaching-card catalog helper');
 
 const cardDetailFile = fs.readFileSync(path.join(repoRoot, 'src/pages/CardDetail.jsx'), 'utf8');
 assert(cardDetailFile.includes('getPreferredBackLink') && cardDetailFile.includes('returnTo') && cardDetailFile.includes('returnLabel'), 'Canonical CardDetail must honor Encyclopedia return context');

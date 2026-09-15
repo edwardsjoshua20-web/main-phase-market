@@ -393,7 +393,34 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       steps: ['Think of a turn as a chance to draw a card, play one land if you have not already played one this turn, cast spells you can pay for, attack with creatures that are allowed to attack, and pass to the next player.', 'A basic game uses many shortcuts, but the important skill is knowing what kind of card you are using and whether the current part of the turn lets you use it.'],
       example: 'Example: a new player can win a normal game by playing lands, casting creatures, attacking with them over several turns, and using removal spells to clear blockers.',
       mistakes: ['Do not treat every card as something that stays in play. Instants and sorceries usually do their effect and go to the graveyard, while permanents such as creatures and artifacts stay on the battlefield after resolving.', 'Do not assume Magic is only about attacking. Many games are decided by timing, card advantage, resource management, and knowing when not to spend a spell.'],
-      relatedTopics: ['learn-taking-your-turn', 'learn-winning-and-losing', 'reference-permanents']
+      relatedTopics: ['learn-taking-your-turn', 'learn-winning-and-losing', 'reference-permanents'],
+      visual: {
+        type: 'intro-card-callouts',
+        title: 'A Magic card at a glance',
+        search: 'Serra Angel',
+        oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.serraAngel],
+        fallbackCard: {
+          id: 'b8c5e74c-96e7-4a1f-93b7-14d776fe4b2d',
+          oracle_id: MAGIC_TEACHING_CARD_ORACLE_IDS.serraAngel,
+          name: 'Serra Angel',
+          game: 'magic',
+          set_name: 'Foundations',
+          set_code: 'FDN',
+          collector_number: '740',
+          mana_cost: '{3}{W}{W}',
+          type_line: 'Creature — Angel',
+          oracle_text: "Flying\nVigilance (Attacking doesn't cause this creature to tap.)",
+          image_small: 'https://cards.scryfall.io/small/front/b/8/b8c5e74c-96e7-4a1f-93b7-14d776fe4b2d.jpg?1787563091',
+          image_normal: 'https://cards.scryfall.io/normal/front/b/8/b8c5e74c-96e7-4a1f-93b7-14d776fe4b2d.jpg?1787563091',
+          image_url: 'https://cards.scryfall.io/normal/front/b/8/b8c5e74c-96e7-4a1f-93b7-14d776fe4b2d.jpg?1787563091'
+        },
+        callouts: [
+          { label: 'Card Name', field: 'name', detail: 'The card name identifies this game object.' },
+          { label: 'Mana Cost', field: 'manaCost', detail: 'The symbols in the upper corner show what mana is needed to cast it.' },
+          { label: 'Type Line', field: 'typeLine', detail: 'The type line tells you what kind of card it is.' },
+          { label: 'Rules Text', field: 'rulesText', detail: 'Rules text explains what the card does in the game.' }
+        ]
+      }
     }),
     magicLearnLesson(2, 'learn-what-you-need', 'What You Need to Play', 'A beginner game needs decks, a way to track life, enough table space for zones, and a shared understanding of the format being played.', {
       previousSlug: 'learn-what-is-magic',
