@@ -875,7 +875,20 @@ function TeachingCardFieldFace({ card, rulesText }) {
 
 function CardCalloutExample({ visual }) {
   const { data: cards = [], isLoading } = useMagicVisualCards(visual);
-  const card = cards[0] || visual?.fallbackCard || null;
+  const resolvedCard = cards[0] || null;
+  const fallbackCard = visual?.fallbackCard || null;
+  const card = resolvedCard && fallbackCard
+    ? {
+        ...fallbackCard,
+        ...resolvedCard,
+        mana_cost: resolvedCard.mana_cost || fallbackCard.mana_cost,
+        type_line: resolvedCard.type_line || fallbackCard.type_line,
+        oracle_text: resolvedCard.oracle_text || fallbackCard.oracle_text,
+        image_url: fallbackCard.image_url || resolvedCard.image_url,
+        image_normal: fallbackCard.image_normal || resolvedCard.image_normal,
+        image_small: fallbackCard.image_small || resolvedCard.image_small
+      }
+    : resolvedCard || fallbackCard;
   const callouts = visual?.callouts || [];
 
   return (
