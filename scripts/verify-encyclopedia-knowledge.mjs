@@ -159,7 +159,7 @@ assert(pageFile.includes('function WhatIsMagicLesson') && pageFile.includes("top
 assert(pageFile.includes('function LessonProgress') && pageFile.includes('Lesson {current} of {total}'), 'What Is Magic prototype must show compact lesson progress');
 assert(pageFile.includes('function CardCalloutExample') && pageFile.includes('cardCalloutValue'), 'What Is Magic prototype must render a catalog-backed visual card callout area');
 assert(pageFile.includes('function QuickCheck') && pageFile.includes('Battlefield'), 'What Is Magic prototype must render the interactive Quick Check');
-assert(pageFile.includes('What It Is') && pageFile.includes('What You Do') && pageFile.includes('How You Win') && pageFile.includes('Quick Check'), 'What Is Magic prototype must use the required focused section labels');
+assert(pageFile.includes('Getting Started') && pageFile.includes('What You Need to Play') && pageFile.includes('Commander at a Glance') && pageFile.includes('What You Do') && pageFile.includes('How You Win') && pageFile.includes('Quick Check'), 'What Is Magic prototype must use the required focused section labels');
 assert(!pageFile.includes('Authority Boundary'), 'Rules page must not render the internal authority-boundary box');
 assert(!/catalog-backed|Search owner|source-attributed summaries|Complete local card|MainPhase Search owner/i.test(pageFile), 'Public Encyclopedia UI contains internal owner/catalog wording');
 assert(searchOwnerFile.includes('icon_url') && searchOwnerFile.includes('logo_url') && searchOwnerFile.includes('product_image_url') && searchOwnerFile.includes('icon_source'), 'Search owner must expose canonical set icon/logo/product image metadata');

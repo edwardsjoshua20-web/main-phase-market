@@ -1018,23 +1018,55 @@ function PrototypeLessonNavigation({ nextTopic, allLessonsPath }) {
 
 function WhatIsMagicLesson({ game, topic, lessons, nextTopic }) {
   const learnPath = `/Encyclopedia/${game.routeKey}/learn`;
+  const starterNeeds = [
+    ['Deck', 'Bring a deck built for the format you are playing.'],
+    ['Opponent', 'Magic is easiest to learn with one other player across the table.'],
+    ['Life Tracker', 'Use dice, paper, an app, or another clear way to track life totals.'],
+    ['Play Space', 'Leave enough room for decks, hands, battlefield cards, and graveyards.']
+  ];
+  const commanderBasics = [
+    ['100 Cards', 'Commander decks are 100 cards total, including the commander.'],
+    ['1 Commander', 'One commander normally starts in the command zone.'],
+    ['Singleton', 'Most non-basic cards appear only once; basic lands are exempt.'],
+    ['Color Identity', 'Cards must follow the commander color identity.'],
+    ['40 Life', 'Commander games normally start each player at 40 life.']
+  ];
 
   return (
     <main className={encyclopediaPageClass}>
       <PageHeader
         breadcrumbs={encyclopediaBreadcrumbs(game, [
           { label: 'Learn to Play', to: learnPath },
-          { label: topic.title }
+          { label: 'Getting Started' }
         ])}
-        title={topic.title}
-        subtitle="Magic is a trading card game where players use decks of lands, creatures, spells, and other cards to outplay an opponent."
+        title="Getting Started"
+        subtitle="Set up your first game, then use Commander as a beginner-friendly format example."
       />
       <SectionShell className="py-6">
         <article className="mx-auto min-w-0 w-[calc(100vw-5rem)] max-w-[calc(100vw-5rem)] space-y-7 overflow-x-hidden sm:w-auto sm:max-w-[calc(100vw-2rem)] lg:w-full lg:max-w-[1320px]">
           <LessonProgress current={topic.order} total={lessons.length} allLessonsPath={learnPath} />
           <CardCalloutExample visual={topic.visual} />
-          <LessonSection title="What It Is">
-            <p>Magic is a trading card game where players use decks of lands, creatures, spells, and other cards to outplay an opponent.</p>
+          <LessonSection title="What You Need to Play">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {starterNeeds.map(([label, detail]) => (
+                <div key={label} className={`min-w-0 border-t ${encyclopediaDividerClass} pt-3`}>
+                  <p className="text-sm font-black text-cyan-100">{label}</p>
+                  <p className={`mt-1 text-sm leading-6 ${encyclopediaSoftTextClass}`}>{detail}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4">Deck construction changes depending on the format being played. That means there is no single universal Magic deck size.</p>
+            <div className={`mt-5 border-t ${encyclopediaDividerClass} pt-5`}>
+              <h3 className="text-base font-black tracking-tight text-white">Commander at a Glance</h3>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                {commanderBasics.map(([label, detail]) => (
+                  <div key={label} className={`min-w-0 border-t ${encyclopediaDividerClass} pt-3`}>
+                    <p className="text-sm font-black text-cyan-100">{label}</p>
+                    <p className={`mt-1 text-xs leading-5 ${encyclopediaMutedTextClass}`}>{detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </LessonSection>
           <LessonSection title="What You Do">
             <div className="grid gap-2 sm:grid-cols-2">
