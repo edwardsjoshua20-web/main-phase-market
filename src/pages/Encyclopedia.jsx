@@ -890,14 +890,39 @@ function CardCalloutExample({ visual }) {
       }
     : resolvedCard || fallbackCard;
   const callouts = visual?.callouts || [];
+  const [activeField, setActiveField] = useState(callouts[0]?.field || 'name');
+  const activeCallout = callouts.find((callout) => callout.field === activeField) || callouts[0];
+  const markerPositions = {
+    name: 'left-[18%] top-[7%]',
+    manaCost: 'left-[82%] top-[7%]',
+    typeLine: 'left-[22%] top-[59%]',
+    rulesText: 'left-[50%] top-[73%]'
+  };
 
   return (
     <section className={`min-w-0 border-y ${encyclopediaDividerClass} bg-slate-900/26 py-6 lg:py-7`}>
       <div className="grid gap-6 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] lg:items-center xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)] xl:gap-10">
         <div className="mx-auto w-full max-w-[280px] sm:max-w-[320px] lg:mx-0 lg:max-w-[380px] xl:max-w-[410px]">
           {card ? (
-            <div className="aspect-[63/88] overflow-hidden bg-slate-950/80 ring-1 ring-slate-700">
+            <div className="relative aspect-[63/88] overflow-hidden bg-slate-950/80 ring-1 ring-slate-700">
               <TeachingCardFace card={card} />
+              {callouts.map((callout, index) => {
+                const isActive = activeCallout?.field === callout.field;
+                return (
+                  <button
+                    key={callout.field}
+                    type="button"
+                    onClick={() => setActiveField(callout.field)}
+                    onMouseEnter={() => setActiveField(callout.field)}
+                    onFocus={() => setActiveField(callout.field)}
+                    className={`absolute z-10 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-xs font-black shadow-[0_0_22px_rgba(0,0,0,0.55)] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 sm:h-9 sm:w-9 ${markerPositions[callout.field] || 'left-1/2 top-1/2'} ${isActive ? 'border-cyan-100 bg-cyan-200 text-slate-950 ring-4 ring-cyan-200/24' : 'border-slate-950/80 bg-slate-950/78 text-cyan-100 ring-2 ring-cyan-100/35 hover:border-cyan-100 hover:bg-cyan-200 hover:text-slate-950'}`}
+                    aria-pressed={isActive}
+                    aria-label={`${callout.label}: ${callout.detail}`}
+                  >
+                    {index + 1}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="flex aspect-[63/88] items-center justify-center bg-slate-950/80 px-4 text-center text-sm font-semibold text-slate-500 ring-1 ring-slate-700">
@@ -907,13 +932,26 @@ function CardCalloutExample({ visual }) {
         </div>
         <div className="min-w-0">
           <p className={`text-xs font-black uppercase tracking-[0.16em] ${encyclopediaMutedTextClass}`}>{visual?.title || 'Card Example'}</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:gap-x-5 xl:gap-x-6">
+          {activeCallout ? (
+            <div className="mt-4 border border-cyan-200/40 bg-cyan-200/[0.06] p-4">
+              <p className="text-sm font-black text-cyan-100">{activeCallout.label}</p>
+              <p className="mt-1 max-w-full whitespace-normal break-words text-base font-black text-white [overflow-wrap:anywhere]">{card ? cardCalloutValue(card, activeCallout.field) : activeCallout.detail}</p>
+              <p className={`mt-2 text-sm leading-6 ${encyclopediaSoftTextClass}`}>{activeCallout.detail}</p>
+            </div>
+          ) : null}
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:gap-x-4">
             {callouts.map((callout) => (
-              <div key={callout.label} className={`min-w-0 border-t ${encyclopediaDividerClass} pt-3`}>
-                <p className="text-sm font-black text-cyan-100">{callout.label}</p>
-                <p className="mt-1 max-w-full whitespace-normal break-words text-sm font-semibold text-slate-100 [overflow-wrap:anywhere]">{card ? cardCalloutValue(card, callout.field) : callout.detail}</p>
-                <p className={`mt-1 text-xs leading-5 ${encyclopediaMutedTextClass}`}>{callout.detail}</p>
-              </div>
+              <button
+                key={callout.label}
+                type="button"
+                onClick={() => setActiveField(callout.field)}
+                onMouseEnter={() => setActiveField(callout.field)}
+                className={`min-w-0 border px-3 py-2 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300/70 ${activeCallout?.field === callout.field ? 'border-cyan-200/60 bg-cyan-200/10 text-white' : 'border-slate-700/70 bg-slate-950/30 text-slate-300 hover:border-cyan-300/50 hover:bg-slate-900/80 hover:text-cyan-100'}`}
+                aria-pressed={activeCallout?.field === callout.field}
+              >
+                <span className="block text-xs font-black uppercase tracking-[0.12em]">{callout.label}</span>
+                <span className={`mt-1 block text-xs leading-5 ${activeCallout?.field === callout.field ? 'text-slate-200' : encyclopediaMutedTextClass}`}>{callout.detail}</span>
+              </button>
             ))}
           </div>
         </div>
@@ -928,7 +966,7 @@ function QuickCheck() {
   const isCorrect = selected === 'Battlefield';
 
   return (
-    <section className={`min-w-0 border-y ${encyclopediaDividerClass} bg-slate-900/18 py-5`}>
+    <section className={`min-w-0 border ${encyclopediaDividerClass} bg-slate-950/48 p-4 shadow-[0_18px_70px_rgba(0,0,0,0.18)] sm:p-5`}>
       <h2 className="text-xl font-black tracking-tight text-white">Quick Check</h2>
       <p className={`mt-2 break-words text-sm leading-7 ${encyclopediaSoftTextClass}`}>Which zone do cards usually go to after they are played from your hand and remain in play?</p>
       <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
@@ -939,7 +977,7 @@ function QuickCheck() {
               key={option}
               type="button"
               onClick={() => setSelected(option)}
-              className={`min-h-11 border px-3 py-2 text-center text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300/70 ${isSelected ? (isCorrect ? 'border-emerald-300/70 bg-emerald-300/10 text-emerald-100' : 'border-red-300/70 bg-red-300/10 text-red-100') : 'border-slate-700 bg-slate-950/40 text-slate-100 hover:border-cyan-300/60 hover:bg-slate-900/75 hover:text-cyan-50'}`}
+              className={`min-h-12 border px-3 py-2 text-center text-sm font-black transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300/70 ${isSelected ? (isCorrect ? 'border-emerald-300/80 bg-emerald-300/12 text-emerald-100 shadow-[inset_0_0_0_1px_rgba(110,231,183,0.18)]' : 'border-red-300/80 bg-red-300/12 text-red-100 shadow-[inset_0_0_0_1px_rgba(252,165,165,0.18)]') : 'border-slate-700 bg-slate-950/55 text-slate-100 hover:border-cyan-300/60 hover:bg-slate-900/80 hover:text-cyan-50'}`}
               aria-pressed={isSelected}
             >
               {option}
@@ -949,7 +987,7 @@ function QuickCheck() {
       </div>
       {selected ? (
         <p className={`mt-3 text-sm font-semibold leading-6 ${isCorrect ? 'text-emerald-200' : 'text-red-200'}`}>
-          {isCorrect ? 'Correct - permanents such as creatures usually enter the battlefield.' : 'Not quite - cards that stay in play usually become permanents on the battlefield.'}
+          {isCorrect ? 'Correct - permanents such as creatures usually enter the battlefield.' : 'Not quite - permanents usually enter the battlefield.'}
         </p>
       ) : null}
     </section>
