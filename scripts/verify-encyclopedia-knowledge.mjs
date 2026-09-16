@@ -143,7 +143,13 @@ assert(!pageFile.includes('function CardDetailPage'), 'Duplicate Encyclopedia ca
 assert(pageFile.includes('EncyclopediaCardRedirect') && pageFile.includes('<Navigate'), 'Legacy Encyclopedia card URLs must redirect to canonical CardDetail');
 assert(pageFile.includes('returnTo') && pageFile.includes('returnLabel'), 'Encyclopedia card routes must preserve return context');
 assert(pageFile.includes('function GameLanding') && pageFile.includes('HUB_CHOICES'), 'Game landings must render the shared three-destination hub');
-assert(pageFile.includes('Sets & Cards') && pageFile.includes('Learn to Play') && pageFile.includes('Game Rules'), 'Game hubs must expose Sets & Cards, Learn to Play, and Game Rules choices');
+const hubChoicesSource = pageFile.slice(
+  pageFile.indexOf('const HUB_CHOICES'),
+  pageFile.indexOf('const HUB_TITLE_BY_GAME')
+);
+assert(hubChoicesSource.includes('Sets & Cards') && hubChoicesSource.includes('Game Rules'), 'Game hubs must expose Sets & Cards and Game Rules choices');
+assert(!hubChoicesSource.includes('Learn to Play'), 'Game hubs must hide Learn to Play from public hub choices');
+assert(pageFile.includes('function LearnPage') && routeFile.includes('path="/Encyclopedia/:game/learn/:topicSlug"'), 'Learn to Play routes/components must remain available directly');
 assert(pageFile.includes('`/Encyclopedia/${game.routeKey}/${choice.section}`'), 'Game hub choices must use existing game route keys');
 assert(pageFile.includes('function BreadcrumbTrail') && pageFile.includes('aria-label="Breadcrumb"'), 'Encyclopedia pages must render compact accessible breadcrumbs');
 assert(pageFile.includes('BreadcrumbTrail breadcrumbs={encyclopediaBreadcrumbs(game)}'), 'Game hubs must provide a breadcrumb back to the main Encyclopedia landing');

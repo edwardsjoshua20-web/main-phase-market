@@ -139,7 +139,6 @@ function SourceList({ sources = [], className = '', title = 'Sources' }) {
 
 const HUB_CHOICES = Object.freeze([
   { label: 'Sets & Cards', section: 'sets' },
-  { label: 'Learn to Play', section: 'learn' },
   { label: 'Game Rules', section: 'rules' }
 ]);
 

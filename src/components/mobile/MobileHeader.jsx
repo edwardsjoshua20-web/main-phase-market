@@ -19,7 +19,8 @@ import {
   Home,
   Star,
   BookOpen,
-  Crown
+  Crown,
+  Gavel
 } from 'lucide-react';
 import { brandAssets } from '@/config/appAssets';
 import { getCardImageUrl, handleCardImageError } from '@/lib/cardImages';
@@ -90,6 +91,9 @@ export default function MobileHeader({
               </button>
               <button onClick={() => goTo('/Encyclopedia')} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-200 hover:bg-gray-800 hover:text-white transition-colors text-left">
                 <BookOpen className="w-4 h-4" /> TCG Encyclopedia
+              </button>
+              <button onClick={() => goTo('/InstaJudge')} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-200 hover:bg-gray-800 hover:text-white transition-colors text-left">
+                <Gavel className="w-4 h-4" /> InstaJudge
               </button>
 
               <p className="text-xs font-bold text-gray-500 uppercase tracking-widest px-2 mt-4 mb-2">Utility</p>

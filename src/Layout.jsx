@@ -191,7 +191,8 @@ export default function Layout({ children, currentPageName }) {
     { label: 'Marketplace', to: '/Shop', pages: ['Shop'] },
     { label: 'Deck Builder', to: '/DeckBuilder', pages: ['AdvancedDeckBuilder', 'DeckBuilder'] },
     { label: 'Deck Chemistry', to: '/DeckChemistry', pages: ['DeckChemistry', 'CommanderHub', 'CommanderDetail'], desktopOnly: true },
-    { label: 'TCG Encyclopedia', to: '/Encyclopedia', pages: ['Encyclopedia'], desktopOnly: true }
+    { label: 'TCG Encyclopedia', to: '/Encyclopedia', pages: ['Encyclopedia'], desktopOnly: true },
+    { label: 'InstaJudge', to: '/InstaJudge', pages: ['InstaJudge'], desktopOnly: true }
   ];
 
   const primaryNavClass = (item) => {

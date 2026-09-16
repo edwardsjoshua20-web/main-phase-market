@@ -23,6 +23,7 @@ import Forum from './pages/Forum';
 import ForumThread from './pages/ForumThread';
 import RulesReference from './pages/RulesReference';
 import Encyclopedia from './pages/Encyclopedia';
+import InstaJudge from './pages/InstaJudge';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminInventory from './pages/AdminInventory';
 import AdminOperations from './pages/AdminOperations';
@@ -110,6 +111,7 @@ const AuthenticatedApp = () => {
         <Route path="/Encyclopedia/:game/learn/:topicSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
         <Route path="/Encyclopedia/:game/rules" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
         <Route path="/Encyclopedia/:game/rules/:topicSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+        <Route path="/InstaJudge" element={<LayoutWrapper currentPageName="InstaJudge"><InstaJudge /></LayoutWrapper>} />
         <Route path="/AdminInventory" element={<AdminInventory />} />
         <Route path="/AdminShippingFulfillment" element={<AdminShippingFulfillment />} />
         <Route path="/set/:game/:setSlug" element={<SetDetail />} />
@@ -167,6 +169,7 @@ const AuthenticatedApp = () => {
       <Route path="/Encyclopedia/:game/learn/:topicSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
       <Route path="/Encyclopedia/:game/rules" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
       <Route path="/Encyclopedia/:game/rules/:topicSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
+      <Route path="/InstaJudge" element={<LayoutWrapper currentPageName="InstaJudge"><InstaJudge /></LayoutWrapper>} />
       <Route path="/set/:game/:setSlug" element={<LayoutWrapper currentPageName="SetDetail"><SetDetail /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
