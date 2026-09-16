@@ -157,9 +157,7 @@ assert(pageFile.includes('Previous lesson') && pageFile.includes('Next lesson'),
 assert(pageFile.includes('Official Rules Reference'), 'Magic articles must use restrained official reference labeling');
 assert(pageFile.includes('function WhatIsMagicLesson') && pageFile.includes("topic?.slug === 'learn-what-is-magic'"), 'What Is Magic must use the focused prototype lesson experience');
 assert(pageFile.includes('function LessonProgress') && pageFile.includes('Lesson {current} of {total}'), 'What Is Magic prototype must show compact lesson progress');
-assert(pageFile.includes('function CardCalloutExample') && pageFile.includes('cardCalloutValue'), 'What Is Magic prototype must render a catalog-backed visual card callout area');
-assert(pageFile.includes('function QuickCheck') && pageFile.includes('Battlefield'), 'What Is Magic prototype must render the interactive Quick Check');
-assert(pageFile.includes('Getting Started') && pageFile.includes('What You Need to Play') && pageFile.includes('Commander at a Glance') && pageFile.includes('What You Do') && pageFile.includes('How You Win') && pageFile.includes('Quick Check'), 'What Is Magic prototype must use the required focused section labels');
+assert(pageFile.includes('Getting Started') && pageFile.includes('What You Need to Play') && pageFile.includes('Commander at a Glance'), 'Getting Started must use the required focused onboarding labels');
 assert(!pageFile.includes('Authority Boundary'), 'Rules page must not render the internal authority-boundary box');
 assert(!/catalog-backed|Search owner|source-attributed summaries|Complete local card|MainPhase Search owner/i.test(pageFile), 'Public Encyclopedia UI contains internal owner/catalog wording');
 assert(searchOwnerFile.includes('icon_url') && searchOwnerFile.includes('logo_url') && searchOwnerFile.includes('product_image_url') && searchOwnerFile.includes('icon_source'), 'Search owner must expose canonical set icon/logo/product image metadata');
@@ -300,7 +298,7 @@ for (const game of ENCYCLOPEDIA_GAMES) {
       if (topic.category === 'learn') {
         assert(topic.learningTrack === 'learn', `magic:${topic.slug} learn topic missing learningTrack`);
         if (topic.order > 1) assert(topic.previousSlug && gameTopics.some((entry) => entry.slug === topic.previousSlug), `magic:${topic.slug} missing previous lesson`);
-        if (topic.order < 17) assert(topic.nextSlug && gameTopics.some((entry) => entry.slug === topic.nextSlug), `magic:${topic.slug} missing next lesson`);
+        if (topic.order < 16) assert(topic.nextSlug && gameTopics.some((entry) => entry.slug === topic.nextSlug), `magic:${topic.slug} missing next lesson`);
       }
       if (topic.category === 'reference') {
         assert(topic.referenceGroup, `magic:${topic.slug} reference topic missing reference group`);
@@ -315,11 +313,10 @@ const magicLearnTopics = magicTopics.filter((topic) => topic.category === 'learn
 const magicReferenceTopics = magicTopics.filter((topic) => topic.category === 'reference');
 const expectedLearnSequence = [
   'learn-what-is-magic',
-  'learn-what-you-need',
   'learn-understanding-a-card',
+  'learn-setting-up',
   'learn-mana-and-colors',
   'learn-card-types',
-  'learn-setting-up',
   'learn-zones',
   'learn-starting-hand-and-mulligans',
   'learn-taking-your-turn',
@@ -332,7 +329,7 @@ const expectedLearnSequence = [
   'learn-building-first-deck',
   'learn-where-to-go-next'
 ];
-assert(magicLearnTopics.length >= 17, 'Magic Learn to Play hierarchy is incomplete');
+assert(magicLearnTopics.length >= 16, 'Magic Learn to Play hierarchy is incomplete');
 assert(magicReferenceTopics.length >= 40, 'Magic Rules Reference hierarchy is incomplete');
 assert(new Set(magicLearnTopics.map((topic) => topic.order)).size === magicLearnTopics.length, 'Magic Learn to Play order values must be unique');
 assert(expectedLearnSequence.every((slug, index) => magicLearnTopics.find((topic) => topic.slug === slug && topic.order === index + 1)), 'Magic Learn to Play sequence must match the required beginner journey');
@@ -370,7 +367,7 @@ for (const topic of magicTopics) {
 assert(MAGIC_KEYWORD_GLOSSARY.length >= 10, 'Magic keyword glossary seed is incomplete');
 assert(MAGIC_KEYWORD_GLOSSARY.every((entry) => entry.name && entry.category && entry.concise && Array.isArray(entry.relatedMechanics) && entry.sourceMeta?.lastVerified), 'Magic keyword glossary entries must be structured');
 const requiredPracticalConcepts = [
-  ['learn-what-you-need', ['deck', 'life total', 'table space']],
+  ['learn-what-is-magic', ['deck', 'life total', 'table space', 'commander', '40 starting life']],
   ['learn-zones', ['library', 'hand', 'battlefield', 'graveyard', 'exile']],
   ['learn-setting-up', ['shuffle', 'opening seven', 'mulligan', '20 life', 'starting player', 'skips the draw']],
   ['learn-taking-your-turn', ['untap', 'upkeep', 'draw', 'first main', 'declare attackers', 'declare blockers', 'end step', 'cleanup', 'priority']],

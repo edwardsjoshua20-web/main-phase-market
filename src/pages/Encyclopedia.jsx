@@ -1043,9 +1043,8 @@ function WhatIsMagicLesson({ game, topic, lessons, nextTopic }) {
         subtitle="Set up your first game, then use Commander as a beginner-friendly format example."
       />
       <SectionShell className="py-6">
-        <article className="mx-auto min-w-0 w-[calc(100vw-5rem)] max-w-[calc(100vw-5rem)] space-y-7 overflow-x-hidden sm:w-auto sm:max-w-[calc(100vw-2rem)] lg:w-full lg:max-w-[1320px]">
+        <article className="mx-auto min-w-0 w-full max-w-[calc(100vw-2rem)] space-y-7 overflow-x-hidden lg:max-w-[1320px]">
           <LessonProgress current={topic.order} total={lessons.length} allLessonsPath={learnPath} />
-          <CardCalloutExample visual={topic.visual} />
           <LessonSection title="What You Need to Play">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {starterNeeds.map(([label, detail]) => (
@@ -1068,18 +1067,6 @@ function WhatIsMagicLesson({ game, topic, lessons, nextTopic }) {
               </div>
             </div>
           </LessonSection>
-          <LessonSection title="What You Do">
-            <div className="grid gap-2 sm:grid-cols-2">
-              {['Draw cards', 'Play lands', 'Generate resources and mana', 'Cast spells', 'Play creatures and other permanents', 'Make decisions each turn', 'Attack and respond'].map((item) => (
-                <p key={item} className={`border-t ${encyclopediaDividerClass} pt-2 font-semibold text-slate-100`}>{item}</p>
-              ))}
-            </div>
-          </LessonSection>
-          <LessonSection title="How You Win">
-            <p>Most Magic games have a defined win condition. In ordinary two-player Constructed Magic, players commonly start at 20 life and reducing an opponent to 0 is one common way to win.</p>
-            <p className="mt-3">Alternate win and loss conditions exist, and format rules can change starting life totals, deck construction, and multiplayer expectations.</p>
-          </LessonSection>
-          <QuickCheck />
           <PrototypeLessonNavigation nextTopic={nextTopic} allLessonsPath={learnPath} />
         </article>
       </SectionShell>

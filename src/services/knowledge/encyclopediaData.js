@@ -384,58 +384,20 @@ export const MAGIC_KEYWORD_GLOSSARY = Object.freeze([
 
 export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
   magic: [
-    magicLearnLesson(1, 'learn-what-is-magic', 'What Is Magic?', 'Magic is a two-player or multiplayer trading card game where players use decks of lands, creatures, and spells to reduce opponents to a losing condition.', {
+    magicLearnLesson(1, 'learn-what-is-magic', 'Getting Started', 'Start with the physical pieces needed for a first game, then understand that deck size depends on the format being played.', {
       previousSlug: null,
-      nextSlug: 'learn-what-you-need',
-      officialTerms: ['Player', 'Deck', 'Spell', 'Permanent', 'Life total'],
-      introduction: 'Magic is a game about building a deck, managing resources, and choosing when to commit cards to the battlefield. This lesson gives a new player the mental model before any detailed rules.',
-      core: ['Each player brings a deck and starts with a library, hand, battlefield, graveyard, and life total. Most beginner games are won by attacking with creatures until an opponent reaches 0 or less life.', 'The table is shared, but each player controls their own cards and makes choices when the rules or a spell asks them to. The game alternates turns so players can develop mana, cast spells, attack, block, and respond.'],
-      steps: ['Think of a turn as a chance to draw a card, play one land if you have not already played one this turn, cast spells you can pay for, attack with creatures that are allowed to attack, and pass to the next player.', 'A basic game uses many shortcuts, but the important skill is knowing what kind of card you are using and whether the current part of the turn lets you use it.'],
-      example: 'Example: a new player can win a normal game by playing lands, casting creatures, attacking with them over several turns, and using removal spells to clear blockers.',
-      mistakes: ['Do not treat every card as something that stays in play. Instants and sorceries usually do their effect and go to the graveyard, while permanents such as creatures and artifacts stay on the battlefield after resolving.', 'Do not assume Magic is only about attacking. Many games are decided by timing, card advantage, resource management, and knowing when not to spend a spell.'],
-      relatedTopics: ['learn-taking-your-turn', 'learn-winning-and-losing', 'reference-permanents'],
-      visual: {
-        type: 'intro-card-callouts',
-        title: 'A Magic card at a glance',
-        search: 'Serra Angel',
-        oracleIds: [MAGIC_TEACHING_CARD_ORACLE_IDS.serraAngel],
-        fallbackCard: {
-          id: 'b8c5e74c-96e7-4a1f-93b7-14d776fe4b2d',
-          oracle_id: MAGIC_TEACHING_CARD_ORACLE_IDS.serraAngel,
-          name: 'Serra Angel',
-          game: 'magic',
-          set_name: 'Foundations',
-          set_code: 'FDN',
-          collector_number: '740',
-          mana_cost: '{3}{W}{W}',
-          type_line: 'Creature — Angel',
-          oracle_text: "Flying\nVigilance (Attacking doesn't cause this creature to tap.)",
-          image_small: 'https://cards.scryfall.io/small/front/b/8/b8c5e74c-96e7-4a1f-93b7-14d776fe4b2d.jpg?1787563091',
-          image_normal: 'https://cards.scryfall.io/normal/front/b/8/b8c5e74c-96e7-4a1f-93b7-14d776fe4b2d.jpg?1787563091',
-          image_url: 'https://cards.scryfall.io/normal/front/b/8/b8c5e74c-96e7-4a1f-93b7-14d776fe4b2d.jpg?1787563091'
-        },
-        callouts: [
-          { label: 'Card Name', field: 'name', detail: 'The card name identifies this game object.' },
-          { label: 'Mana Cost', field: 'manaCost', detail: 'The symbols in the upper corner show what mana is needed to cast it.' },
-          { label: 'Type Line', field: 'typeLine', detail: 'The type line tells you what kind of card it is.' },
-          { label: 'Rules Text', field: 'rulesText', detail: 'Rules text explains what the card does in the game.' }
-        ]
-      }
-    }),
-    magicLearnLesson(2, 'learn-what-you-need', 'What You Need to Play', 'A beginner game needs decks, a way to track life, enough table space for zones, and a shared understanding of the format being played.', {
-      previousSlug: 'learn-what-is-magic',
       nextSlug: 'learn-understanding-a-card',
-      officialTerms: ['Library', 'Hand', 'Battlefield', 'Graveyard', 'Life total'],
-      introduction: 'Magic is easiest to learn when the table is physically organized. This lesson explains the minimum materials and setup language a new player should know before shuffling.',
-      core: ['Each player needs a deck appropriate for the format. For ordinary casual Constructed learning games, decks are commonly at least 60 cards; Commander is different and uses a commander plus a 99-card deck.', 'Use dice, an app, paper, or another clear tracker for life totals. Also leave room for lands, creatures, artifacts, enchantments, planeswalkers, and cards that go to the graveyard.'],
-      steps: ['Put your library face down where you can draw from it. Keep your hand private, place permanents on the battlefield, put used instants and sorceries in the graveyard, and keep exiled cards visibly separate if exile appears.', 'Agree on the format before the game starts. Format choice affects deck size, card legality, sideboards, multiplayer expectations, and whether Commander-specific rules apply.'],
-      example: 'Example: two starter decks, two life counters set to 20, and a clear battlefield/graveyard layout are enough for a clean first game.',
-      mistakes: ['Do not mix graveyard and exile. They are different public zones and many cards care which one a card is in.', 'Do not start a Commander game using ordinary 60-card deck assumptions; Commander has its own construction and multiplayer expectations.'],
-      relatedTopics: ['learn-setting-up', 'reference-zones', 'reference-formats']
+      officialTerms: ['Deck', 'Opponent', 'Life total', 'Format', 'Commander'],
+      introduction: 'Magic is easiest to learn when the table starts simple: each player needs a deck, an opponent, a way to track life, and enough table space to keep cards organized.',
+      core: ['Deck construction changes depending on the format being played, so there is no single universal Magic deck size.', 'Commander is a useful Main Phase beginner example: it normally uses 100 total cards including one commander, singleton deck construction except basic lands, commander color identity, and 40 starting life.'],
+      steps: ['Bring a deck built for the format, sit across from an opponent, choose a clear life tracker, and leave room for decks, hands, battlefield cards, and graveyards.', 'Before shuffling, agree on the format so deck size, starting life, color identity, and format-specific rules are clear.'],
+      example: 'Example: for Commander, one commander normally starts in the command zone and the 99-card deck follows that commander color identity.',
+      mistakes: ['Do not assume every Magic format uses the same deck size or starting life total.', 'Do not apply Commander deck construction to every first game; it is a format-specific example.'],
+      relatedTopics: ['learn-understanding-a-card', 'learn-setting-up', 'reference-formats', 'reference-commander']
     }),
-    magicLearnLesson(3, 'learn-understanding-a-card', 'Understanding a Magic Card', 'A Magic card communicates its name, cost, color, type line, rules text, combat stats, and collector information through consistent card parts.', {
-      previousSlug: 'learn-what-you-need',
-      nextSlug: 'learn-mana-and-colors',
+    magicLearnLesson(2, 'learn-understanding-a-card', 'Understanding a Magic Card', 'A Magic card communicates its name, cost, color, type line, rules text, combat stats, and collector information through consistent card parts.', {
+      previousSlug: 'learn-what-is-magic',
+      nextSlug: 'learn-setting-up',
       officialTerms: ['Mana cost', 'Type line', 'Rules text', 'Power', 'Toughness', 'Loyalty'],
       introduction: 'Reading the card correctly is the foundation of playing correctly. The Main Phase catalog can show real printings, but this lesson explains the rules meaning of the information printed on a card.',
       core: ['The name identifies the card. The mana cost in the upper corner tells you what mana is needed to cast it and usually determines color. The art helps identify the card but normally has no rules meaning.', 'The type line tells you whether the card is a creature, instant, sorcery, artifact, enchantment, planeswalker, land, battle, or a combination. Subtypes such as Goblin, Aura, Equipment, Forest, or Siege matter when card text asks for them.'],
@@ -458,7 +420,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       }
     }),
     magicLearnLesson(4, 'learn-mana-and-colors', 'Mana and the Five Colors', 'Mana pays for spells and abilities, and Magic uses white, blue, black, red, green, generic, and true colorless costs in distinct ways.', {
-      previousSlug: 'learn-understanding-a-card',
+      previousSlug: 'learn-setting-up',
       nextSlug: 'learn-card-types',
       officialTerms: ['Mana', 'Generic mana', 'Colorless mana', 'Mana pool', 'Tap'],
       introduction: 'Mana is the resource system that lets games build over time. Learning the difference between colored, generic, and colorless mana prevents many early mistakes.',
@@ -482,7 +444,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
     }),
     magicLearnLesson(5, 'learn-card-types', 'Card Types', 'Magic card types determine timing, whether a spell becomes a permanent, and where a card goes after it resolves.', {
       previousSlug: 'learn-mana-and-colors',
-      nextSlug: 'learn-setting-up',
+      nextSlug: 'learn-zones',
       officialTerms: ['Land', 'Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Planeswalker', 'Battle'],
       introduction: 'A new player does not need every subtype on day one, but they do need to know the major card types. Card type tells you when you can use a card and what happens after it resolves.',
       core: ['Lands are played as a special action and usually make mana. Creatures are permanents that can attack and block. Artifacts and enchantments are permanents that often provide ongoing effects. Planeswalkers are permanents with loyalty abilities. Battles are permanents that can be attacked under their own rules.', 'Instants can usually be cast whenever you have priority. Sorceries usually require your main phase, an empty stack, and priority. After resolving, instants and sorceries go to the graveyard instead of staying on the battlefield.'],
@@ -491,9 +453,9 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       mistakes: ['Do not cast lands. Playing a land is not casting a spell and does not use the stack.', 'Do not put creatures directly onto the battlefield when you announce them. They are spells first, then permanents after they resolve.'],
       relatedTopics: ['reference-card-types', 'reference-permanents', 'reference-spells']
     }),
-    magicLearnLesson(6, 'learn-setting-up', 'Setting Up a Game', 'A normal two-player Magic game starts with shuffled decks, opening seven-card hands, mulligans, 20 life, and a chosen starting player.', {
-      previousSlug: 'learn-card-types',
-      nextSlug: 'learn-zones',
+    magicLearnLesson(3, 'learn-setting-up', 'Setting Up Your Play Area', 'A normal two-player Magic game starts with shuffled decks, opening seven-card hands, mulligans, 20 life, and a chosen starting player.', {
+      previousSlug: 'learn-understanding-a-card',
+      nextSlug: 'learn-mana-and-colors',
       officialTerms: ['Shuffle', 'Opening hand', 'Mulligan', 'Starting player', 'Draw step'],
       introduction: 'Setup is where players agree on the format and create the starting game state. This lesson covers ordinary Magic and calls out where Commander differs.',
       core: ['For a normal two-player Constructed learning game, each player shuffles, presents their deck, draws seven cards, takes mulligans if needed, and starts at 20 life. Players determine who goes first before turns begin.', 'In a normal two-player game, the starting player skips the draw step of their first turn. Commander is not the same: it is normally multiplayer, starts at 40 life, uses commanders, and has different deck construction.'],
@@ -502,8 +464,8 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       mistakes: ['Do not draw on the first turn if you are the starting player in an ordinary two-player game.', 'Do not apply Commander starting life or commander-zone rules to a normal starter-deck game.'],
       relatedTopics: ['reference-zones', 'reference-formats', 'reference-commander']
     }),
-    magicLearnLesson(7, 'learn-zones', 'Zones', 'Zones are the named places cards and objects can exist, including library, hand, battlefield, graveyard, exile, stack, and command zone.', {
-      previousSlug: 'learn-setting-up',
+    magicLearnLesson(6, 'learn-zones', 'Zones', 'Zones are the named places cards and objects can exist, including library, hand, battlefield, graveyard, exile, stack, and command zone.', {
+      previousSlug: 'learn-card-types',
       nextSlug: 'learn-starting-hand-and-mulligans',
       officialTerms: ['Library', 'Hand', 'Battlefield', 'Graveyard', 'Exile', 'Stack', 'Command zone'],
       introduction: 'Zones are how Magic keeps the game organized. Knowing zones helps players understand where a spell goes while being cast, what counts as in play, and where cards move after resolving or being destroyed.',
@@ -513,7 +475,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       mistakes: ['Do not call the battlefield your field if that makes zones unclear; rules questions often depend on exact zone names.', 'Do not put exiled cards into the graveyard unless an effect specifically says to move them there.'],
       relatedTopics: ['reference-zones', 'reference-stack', 'reference-command-zone']
     }),
-    magicLearnLesson(8, 'learn-starting-hand-and-mulligans', 'Opening Hand and Mulligans', 'Players draw an opening hand of seven cards and may mulligan to improve unplayable hands, keeping fewer cards under current mulligan procedure.', {
+    magicLearnLesson(7, 'learn-starting-hand-and-mulligans', 'Opening Hand and Mulligans', 'Players draw an opening hand of seven cards and may mulligan to improve unplayable hands, keeping fewer cards under current mulligan procedure.', {
       previousSlug: 'learn-zones',
       nextSlug: 'learn-taking-your-turn',
       officialTerms: ['Opening hand', 'Mulligan', 'Library', 'Hand'],
@@ -524,7 +486,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       mistakes: ['Do not keep every seven-card hand just because seven is more than six. A smaller functional hand often plays better than a full hand that cannot cast spells.', 'Do not mulligan only for your best card; learn to keep hands that let you participate in the game.'],
       relatedTopics: ['learn-setting-up', 'learn-mana-and-colors', 'reference-deck-construction']
     }),
-    magicLearnLesson(9, 'learn-taking-your-turn', 'Taking Your Turn', 'A Magic turn uses beginning, first main, combat, second main, and ending phases, with specific steps and priority windows inside them.', {
+    magicLearnLesson(8, 'learn-taking-your-turn', 'Taking Your Turn', 'A Magic turn uses beginning, first main, combat, second main, and ending phases, with specific steps and priority windows inside them.', {
       previousSlug: 'learn-starting-hand-and-mulligans',
       nextSlug: 'learn-casting-spells',
       officialTerms: ['Untap step', 'Upkeep step', 'Draw step', 'Main phase', 'Combat phase', 'End step', 'Cleanup step', 'Priority'],
@@ -551,7 +513,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         ]
       }
     }),
-    magicLearnLesson(10, 'learn-casting-spells', 'Playing Lands and Casting Spells', 'Playing a land is a special action; casting a spell means announcing it, making choices, paying costs, and putting it on the stack.', {
+    magicLearnLesson(9, 'learn-casting-spells', 'Playing Lands and Casting Spells', 'Playing a land is a special action; casting a spell means announcing it, making choices, paying costs, and putting it on the stack.', {
       previousSlug: 'learn-taking-your-turn',
       nextSlug: 'learn-combat',
       officialTerms: ['Cast', 'Spell', 'Land play', 'Mana ability', 'Resolve'],
@@ -562,7 +524,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       mistakes: ['Do not pay mana after seeing whether an opponent will respond. Costs are paid as part of casting the spell.', 'Do not put a creature onto the battlefield before opponents have the chance to respond to the creature spell.'],
       relatedTopics: ['reference-spells', 'reference-costs', 'reference-stack']
     }),
-    magicLearnLesson(11, 'learn-combat', 'Combat', 'Combat lets creatures attack players, planeswalkers, and battles, then blockers and combat damage determine what survives.', {
+    magicLearnLesson(10, 'learn-combat', 'Combat', 'Combat lets creatures attack players, planeswalkers, and battles, then blockers and combat damage determine what survives.', {
       previousSlug: 'learn-casting-spells',
       nextSlug: 'learn-instants-and-responses',
       officialTerms: ['Summoning sickness', 'Declare attackers', 'Declare blockers', 'Combat damage', 'Lethal damage', 'State-based actions'],
@@ -585,7 +547,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         ]
       }
     }),
-    magicLearnLesson(12, 'learn-instants-and-responses', 'Instants and Responses', 'Instants and many activated abilities can be used when a player has priority, letting players answer spells and combat decisions before they resolve.', {
+    magicLearnLesson(11, 'learn-instants-and-responses', 'Instants and Responses', 'Instants and many activated abilities can be used when a player has priority, letting players answer spells and combat decisions before they resolve.', {
       previousSlug: 'learn-combat',
       nextSlug: 'learn-stack',
       officialTerms: ['Instant', 'Priority', 'Activated ability', 'Response', 'Resolve'],
@@ -607,7 +569,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         ]
       }
     }),
-    magicLearnLesson(13, 'learn-stack', 'The Stack', 'The stack is the waiting area for spells and most abilities; the newest object resolves first after all players pass priority.', {
+    magicLearnLesson(12, 'learn-stack', 'The Stack', 'The stack is the waiting area for spells and most abilities; the newest object resolves first after all players pass priority.', {
       previousSlug: 'learn-instants-and-responses',
       nextSlug: 'learn-abilities-and-triggers',
       officialTerms: ['Stack', 'Priority', 'Spell', 'Ability', 'Resolve'],
@@ -629,7 +591,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         ]
       }
     }),
-    magicLearnLesson(14, 'learn-abilities-and-triggers', 'Abilities and Triggers', 'Magic abilities are static, activated, triggered, or mana abilities, and each type behaves differently at the table.', {
+    magicLearnLesson(13, 'learn-abilities-and-triggers', 'Abilities and Triggers', 'Magic abilities are static, activated, triggered, or mana abilities, and each type behaves differently at the table.', {
       previousSlug: 'learn-stack',
       nextSlug: 'learn-winning-and-losing',
       officialTerms: ['Static ability', 'Activated ability', 'Triggered ability', 'Mana ability', 'Cost', 'Target'],
@@ -652,7 +614,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
         ]
       }
     }),
-    magicLearnLesson(15, 'learn-winning-and-losing', 'Winning and Losing', 'Common Magic losses happen at 0 or less life, drawing from an empty library, having enough poison counters, card-specific effects, or concession.', {
+    magicLearnLesson(14, 'learn-winning-and-losing', 'Winning and Losing', 'Common Magic losses happen at 0 or less life, drawing from an empty library, having enough poison counters, card-specific effects, or concession.', {
       previousSlug: 'learn-abilities-and-triggers',
       nextSlug: 'learn-building-first-deck',
       officialTerms: ['Lose the game', 'Win the game', 'Poison counter', 'Concede', 'Empty library'],
@@ -663,7 +625,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       mistakes: ['Do not confuse damage with loss of life; both can reduce a life total, but prevention, lifelink, and trigger text may care about the difference.', 'Do not remove poison counters when life changes. They are separate resources.'],
       relatedTopics: ['reference-state-based-actions', 'reference-multiplayer']
     }),
-    magicLearnLesson(16, 'learn-building-first-deck', 'Building Your First Deck', 'A first Constructed deck should follow format size, copy limits, basic-land exceptions, color choices, and a playable mana curve.', {
+    magicLearnLesson(15, 'learn-building-first-deck', 'Building Your First Deck', 'A first Constructed deck should follow format size, copy limits, basic-land exceptions, color choices, and a playable mana curve.', {
       previousSlug: 'learn-winning-and-losing',
       nextSlug: 'learn-where-to-go-next',
       officialTerms: ['Constructed deck', 'Sideboard', 'Four-card limit', 'Basic land', 'Format'],
@@ -674,7 +636,7 @@ export const ENCYCLOPEDIA_RULE_TOPICS = Object.freeze({
       mistakes: ['Do not use Commander singleton rules for every Magic deck. Singleton is a Commander feature, not a universal Constructed rule.', 'Do not add too many colors before your lands can reliably produce them. Mana problems make it hard to learn the rest of the game.'],
       relatedTopics: ['reference-deck-construction', 'reference-formats', 'reference-commander']
     }),
-    magicLearnLesson(17, 'learn-where-to-go-next', 'Where to Go Next', 'After the first game, players can deepen their rules knowledge through formats, keywords, stack timing, Commander, and set browsing.', {
+    magicLearnLesson(16, 'learn-where-to-go-next', 'Where to Go Next', 'After the first game, players can deepen their rules knowledge through formats, keywords, stack timing, Commander, and set browsing.', {
       previousSlug: 'learn-building-first-deck',
       nextSlug: null,
       officialTerms: ['Format', 'Keyword ability', 'Rules reference', 'Commander'],
