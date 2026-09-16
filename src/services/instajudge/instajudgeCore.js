@@ -1,5 +1,7 @@
+import { judgeMagicScenario } from './magic/magicRulesEngine.js';
+
 export const INSTAJUDGE_GAMES = Object.freeze([
-  { id: 'magic', routeKey: 'magic', label: 'Magic: The Gathering', readiness: 'verified-v1', depth: 'Magic V1 supports exact card lookup, Commander/legalities where catalog legalities exist, targeting checks, priority, and stack response patterns.' },
+  { id: 'magic', routeKey: 'magic', label: 'Magic: The Gathering', readiness: 'verified-v1', depth: 'Magic V1 uses the deterministic Magic rules engine for supported stack, targeting, protection, damage, timing, state-based action, and Commander state checks.' },
   { id: 'pokemon', routeKey: 'pokemon', label: 'Pokémon', readiness: 'limited-v1', depth: 'Pokémon V1 supports exact card lookup, catalog legalities where present, attacks, abilities, evolution, and Special Conditions topic grounding.' },
   { id: 'yugioh', routeKey: 'yugioh', label: 'Yu-Gi-Oh!', readiness: 'limited-v1', depth: 'Yu-Gi-Oh! V1 supports exact card lookup, TCG Advanced banlist checks, and chain/spell-speed clarification.' },
   { id: 'lorcana', routeKey: 'lorcana', label: 'Disney Lorcana', readiness: 'rules-grounding-only', depth: 'Lorcana V1 can retrieve Main Phase rules topics, but returns unverified for card interaction rulings until deeper structured coverage exists.' },
@@ -131,7 +133,11 @@ export function rankRulesForScenario(gameId, message, topics = []) {
     ['priority', /priority|respond|response|instant|activate|before resolves/.test(text)],
     ['stack', /stack|counter|counterspell|respond|resolve|spell/.test(text)],
     ['targets', /target|targets|targeting/.test(text)],
+    ['protection', /protection|gods willing|illegal target|black|white|blue|red|green/.test(text)],
     ['combat', /combat|attack|attacks|block|damage/.test(text)],
+    ['state-based actions', /state based|lethal|dies|destroy|0 or less toughness/.test(text)],
+    ['replacement', /replacement|instead|prevent|would/.test(text)],
+    ['triggered abilities', /trigger|when|whenever|at the beginning/.test(text)],
     ['special conditions', /asleep|poisoned|burned|paralyzed|confused|special condition/.test(text)],
     ['abilities', /ability|abilities|trigger|activated/.test(text)],
     ['chains', /chain|spell speed|respond/.test(text)],
@@ -151,16 +157,6 @@ export function rankRulesForScenario(gameId, message, topics = []) {
     .sort((left, right) => right.score - left.score)
     .slice(0, 3)
     .map((entry) => entry.topic);
-}
-
-function cardText(card = {}) {
-  const raw = card.raw || {};
-  return String(card.oracle_text || card.oracleText || card.rules_text || card.rulesText || card.description || card.text || raw.oracle_text || raw.rules_text || raw.description || raw.text || '');
-}
-
-function cardType(card = {}) {
-  const raw = card.raw || {};
-  return String(card.type_line || card.typeLine || card.type || raw.type_line || raw.type || raw.card_type || '');
 }
 
 export function buildUnsupportedResult({ game, cards = [], rules = [], latencyMs = 0 }) {
@@ -211,46 +207,7 @@ export function buildRulesRuling({ game, message, cards = [], rules = [], latenc
   const text = normalizeJudgeText(message);
 
   if (game.id === 'magic') {
-    if (/\brespond|counterspell|counter\b/.test(text) && /\bspell|cast|stack|respond|counterspell\b/.test(text)) {
-      return {
-        game: game.id,
-        verdict: 'yes',
-        answer: 'YES\nYou can respond to a spell while it is on the stack if you have priority. Counterspell can target a spell before that spell resolves.',
-        cards,
-        rules,
-        sourceVersion: rules[0]?.sourceMeta?.rulesVersion || null,
-        latencyMs
-      };
-    }
-
-    if (/\btarget|targets|targeting\b/.test(text) && cards.length >= 2) {
-      const source = cards.find((card) => /target/i.test(cardText(card))) || cards[0];
-      const target = cards.find((card) => card !== source) || cards[1];
-      const sourceText = normalizeJudgeText(cardText(source));
-      const targetType = normalizeJudgeText(cardType(target));
-      if (sourceText.includes('target creature')) {
-        const canTarget = targetType.includes('creature');
-        return {
-          game: game.id,
-          verdict: canTarget ? 'yes' : 'no',
-          answer: `${canTarget ? 'YES' : 'NO'}\n${source.name} refers to "target creature," and ${target.name} ${canTarget ? 'has' : 'does not have'} Creature in its type line.`,
-          cards,
-          rules,
-          sourceVersion: rules[0]?.sourceMeta?.rulesVersion || null,
-          latencyMs
-        };
-      }
-      return {
-        game: game.id,
-        verdict: 'depends',
-        answer: `DEPENDS\nI found target wording on ${source.name}, but V1 needs the exact target restriction and current object type before giving a yes/no ruling.`,
-        cards,
-        rules,
-        clarificationNeeded: 'Confirm the exact card text being used and what object is being targeted.',
-        sourceVersion: rules[0]?.sourceMeta?.rulesVersion || null,
-        latencyMs
-      };
-    }
+    return judgeMagicScenario({ message, cards, rules, latencyMs });
   }
 
   if (game.id === 'pokemon' && /\basleep|special condition|attack|attacks\b/.test(text)) {

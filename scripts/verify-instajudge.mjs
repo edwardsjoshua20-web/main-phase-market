@@ -72,12 +72,26 @@ const murderTarget = buildRulesRuling({
   game: { id: 'magic' },
   message: 'Can Murder target Serra Angel?',
   cards: [
-    { name: 'Murder', oracleText: 'Destroy target creature.' },
-    { name: 'Serra Angel', typeLine: 'Creature - Angel' }
+    { name: 'Murder', oracleText: 'Destroy target creature.', typeLine: 'Instant', manaCost: '{1}{B}{B}' },
+    { name: 'Serra Angel', typeLine: 'Creature - Angel', power: 4, toughness: 4 }
   ],
   rules: magicRules
 });
-assert(murderTarget.verdict === 'yes' && /target creature/i.test(murderTarget.answer), 'Magic targeting test should be source-text grounded.');
+assert(murderTarget.verdict === 'yes' && murderTarget.engine === 'magic-rules-engine-v1', 'Magic targeting test should use the deterministic Magic rules engine.');
+assert(murderTarget.rules.length > 0, 'Magic targeting test must include rule references.');
+
+const protectionRegression = buildRulesRuling({
+  game: { id: 'magic' },
+  message: 'Player controls Serra Angel. Opponent casts Murder targeting Serra Angel. Player responds with Gods Willing targeting Serra Angel and chooses black. Does Murder destroy Serra Angel?',
+  cards: [
+    { name: 'Serra Angel', typeLine: 'Creature - Angel', oracleText: 'Flying, vigilance', manaCost: '{3}{W}{W}', colors: ['W'], power: 4, toughness: 4 },
+    { name: 'Murder', typeLine: 'Instant', oracleText: 'Destroy target creature.', manaCost: '{1}{B}{B}', colors: ['B'] },
+    { name: 'Gods Willing', typeLine: 'Instant', oracleText: 'Target creature you control gains protection from the color of your choice until end of turn. Scry 1.', manaCost: '{W}', colors: ['W'] }
+  ],
+  rules: magicRules
+});
+assert(protectionRegression.verdict === 'no', 'Mandatory Gods Willing / Murder regression must return NO.');
+assert(/protection from black/i.test(protectionRegression.answer) && /no legal targets/i.test(protectionRegression.answer), 'Protection regression must explain target recheck on resolution.');
 
 const pokemonRules = rankRulesForScenario('pokemon', 'Can Pikachu attack while Asleep?', ENCYCLOPEDIA_RULE_TOPICS.pokemon);
 const pokemonAsleep = buildRulesRuling({
