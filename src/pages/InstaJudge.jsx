@@ -149,7 +149,7 @@ export default function InstaJudge() {
                     className="flex min-h-12 min-w-0 items-center justify-between gap-3 overflow-hidden border border-slate-700 bg-slate-950/70 px-3 py-2 text-left text-sm font-bold text-slate-100 transition hover:border-cyan-300/60 hover:bg-slate-900"
                   >
                     <span className="min-w-0 break-words">{game.label}</span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                    <ArrowRight className="hidden h-4 w-4 shrink-0 text-slate-500 sm:block" aria-hidden="true" />
                   </button>
                 ))}
               </div>
