@@ -1,6 +1,7 @@
 import { isCreature, isInstant, isSorcery, normalizeMagicCard, normalizeMagicText, sourceHasQuality } from '../magicCards.js';
 import { rulesForPrimitives } from './comprehensiveRules.js';
 import { parseOracleSemantics } from './oracleSemantics.js';
+import { compileMagicScenario, extractGenericObjects } from './scenarioCompiler.js';
 import {
   addPermanent,
   collectTriggeredAbilities,
@@ -12,16 +13,6 @@ import {
   resolveTrigger,
   runStateBasedActionsRuntime
 } from './runtimeState.js';
-
-const NUMBER_WORDS = Object.freeze({
-  a: 1,
-  an: 1,
-  one: 1,
-  two: 2,
-  three: 3,
-  four: 4,
-  five: 5
-});
 
 function primitiveRules(primitives) {
   return rulesForPrimitives([...new Set(primitives)]);
@@ -55,103 +46,10 @@ function evaluated(verdict, summary, { cards = [], primitives = [], trace = [], 
   };
 }
 
-function genericNameFor(objects, fallback = 'Generic Creature') {
-  const letter = String.fromCharCode(65 + objects.length);
-  return `${fallback} ${letter}`;
-}
-
-function genericCard({ name, typeLine = 'Creature', power = null, toughness = null, abilities = [] } = {}) {
-  const card = {
-    name,
-    typeLine,
-    oracleText: abilities.join(', '),
-    power: Number.isFinite(power) ? power : '*',
-    toughness: Number.isFinite(toughness) ? toughness : '*',
-    abilities
-  };
-  return card;
-}
-
-function pushGenericObject(objects, object, spanKey = '') {
-  const key = spanKey || `${object.controller}:${object.name}:${object.power}:${object.toughness}:${object.card?.typeLine}:${object.card?.abilities?.join(',')}`;
-  if (objects.some((entry) => entry.compilerKey === key)) return;
-  objects.push({ ...object, compilerKey: key });
-}
-
-function controllerFromDescriptor(descriptor = '') {
-  const text = normalizeMagicText(descriptor);
-  if (/\bopponent|opponent's|their\b/.test(text)) return 'opponent';
-  return 'player';
-}
-
 function abilitiesFromDescriptor(descriptor = '') {
   const text = normalizeMagicText(descriptor);
   return ['hexproof', 'shroud', 'flying', 'indestructible', 'ward', 'vigilance', 'deathtouch', 'first strike', 'double strike']
     .filter((ability) => text.includes(ability));
-}
-
-function typeLineFromDescriptor(descriptor = '') {
-  const text = normalizeMagicText(descriptor);
-  const types = [];
-  if (text.includes('artifact')) types.push('Artifact');
-  if (text.includes('enchantment')) types.push('Enchantment');
-  if (text.includes('commander')) types.push('Legendary Creature');
-  else if (text.includes('creature') || types.length === 0) types.push('Creature');
-  if (text.includes('token')) types.push('Token');
-  return [...new Set(types)].join(' - ').replace('Artifact - Creature', 'Artifact Creature');
-}
-
-export function extractGenericObjects(message = '') {
-  const text = normalizeMagicText(message);
-  const objects = [];
-  for (const match of text.matchAll(/\b(one|two|three|four|five|\d+)\s+(\d+)\/(\d+)\s+creature tokens?\b/g)) {
-    const count = NUMBER_WORDS[match[1]] || Number(match[1]);
-    const power = Number(match[2]);
-    const toughness = Number(match[3]);
-    for (let index = 0; index < count; index += 1) {
-      const name = `Token ${String.fromCharCode(65 + objects.length)}`;
-      pushGenericObject(objects, {
-        name,
-        card: genericCard({ name, typeLine: 'Creature - Token', power, toughness }),
-        power,
-        toughness,
-        controller: /opponent controls/.test(text) ? 'opponent' : 'player',
-        token: true
-      }, `${match.index}:${index}`);
-    }
-  }
-  for (const match of text.matchAll(/\b(?:(my opponent's|opponent's|their|my own|my|your|i control|opponent controls|player controls|another)\s+)?(?:(one|two|three|four|five|\d+|a|an)\s+)?(?:(\d+)\/(\d+)\s+)?((?:tapped\s+)?(?:artifact\s+)?(?:commander|creature)(?:\s+tokens?)?(?:\s+(?:that has|has|with)\s+[a-z\s]+?)?)(?=\s+(?:for|and|gains?|gets?|is|are|from|target|targeting|tokens?|creature|can|in response|\.|\?|$)|$)/g)) {
-    const before = text.slice(Math.max(0, match.index - 28), match.index);
-    const descriptor = match[0];
-    if (/\bcard\b/.test(descriptor) && !/\bcreature\b/.test(descriptor)) continue;
-    const count = NUMBER_WORDS[match[2]] || Number(match[2] || 1);
-    const power = match[3] ? Number(match[3]) : null;
-    const toughness = match[4] ? Number(match[4]) : null;
-    if (!Number.isFinite(power) && /\b(target|targeting|targets)\b/.test(before) && /\b(my own|that creature|it)\b/.test(descriptor)) continue;
-    const nearby = text.slice(Math.max(0, match.index - 90), match.index + descriptor.length);
-    const controller = /\banother\b/.test(descriptor) && /\bmy opponent's|opponent's|opponent controls\b/.test(nearby)
-      ? 'opponent'
-      : controllerFromDescriptor(descriptor);
-    const typeLine = typeLineFromDescriptor(descriptor);
-    const abilities = abilitiesFromDescriptor(descriptor);
-    for (let index = 0; index < count; index += 1) {
-      const name = /\btokens?\b/.test(descriptor)
-        ? `Token ${String.fromCharCode(65 + objects.length)}`
-        : genericNameFor(objects, match[5].includes('commander') ? 'Generic Commander' : 'Generic Creature');
-      pushGenericObject(objects, {
-        name,
-        card: genericCard({ name, typeLine, power, toughness, abilities }),
-        power,
-        toughness,
-        controller,
-        owner: controller,
-        token: /\btokens?\b/.test(descriptor),
-        tapped: /\btapped\b/.test(descriptor),
-        commander: /\bcommander\b/.test(descriptor)
-      }, `${match.index}:${index}`);
-    }
-  }
-  return objects;
 }
 
 function sortedSpellCards(cards, message) {
@@ -397,12 +295,13 @@ function applyGlobalDamage({ state, sourceObject, effect }) {
   return { sequence, sba, triggers, primitives: [...primitives, 'lki'] };
 }
 
-function evaluateGlobalDamageTriggers({ message, cards, genericObjects }) {
+function evaluateGlobalDamageTriggers({ message, cards, genericObjects, scenario }) {
   const spells = sortedSpellCards(cards, message);
   const globalSpell = spells.find(({ semantics }) => semantics.spellEffects.some((effect) => effect.type === 'damage-each'));
   if (!globalSpell) return null;
 
-  const state = createMagicRuntimeState({ cards, genericObjects, message });
+  const state = createMagicRuntimeState({ cards, genericObjects, scenario, message });
+  state.trace.push({ type: 'ScenarioCompiled', scenario });
   const sourceObject = createGameObject({ card: globalSpell.card, controller: inferController(message, globalSpell.card.name), owner: inferController(message, globalSpell.card.name), zone: 'stack' });
   const effect = globalSpell.semantics.spellEffects.find((entry) => entry.type === 'damage-each');
   state.stack.push(sourceObject);
@@ -485,13 +384,14 @@ function applyCompiledResponses({ message, state, targetBindings }) {
   return responses;
 }
 
-function evaluateTargetedStack({ message, cards, genericObjects }) {
+function evaluateTargetedStack({ message, cards, genericObjects, scenario }) {
   const spells = sortedSpellCards(cards, message);
   if (spells.length === 0) return null;
   const hasTargeted = spells.some((spell) => targetedEffectsForSpell({ message, spell }).length > 0);
   if (!hasTargeted) return null;
 
-  const state = createMagicRuntimeState({ cards, genericObjects, message });
+  const state = createMagicRuntimeState({ cards, genericObjects, scenario, message });
+  state.trace.push({ type: 'ScenarioCompiled', scenario });
   state.trace.push({ type: 'InitialBattlefield', objects: state.battlefield.map(objectLabel) });
   const targetBindings = compileTargetBindings({ message, state, spells });
   compileScenarioTrace({ state, cards, targetBindings });
@@ -637,6 +537,7 @@ function evaluateTargetedStack({ message, cards, genericObjects }) {
 export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
   const normalizedCards = cards.map(normalizeMagicCard).filter((card) => card.name);
   const text = normalizeMagicText(message);
+  const scenario = compileMagicScenario({ message, cards: normalizedCards });
   if (/\b(humility|opalescence|layer|dependency|timestamp)\b/.test(text)) {
     return unsupported('This is a complex continuous-effect layer/dependency interaction outside the current runtime coverage.', {
       cards: normalizedCards,
@@ -645,13 +546,29 @@ export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
     });
   }
 
-  const genericObjects = extractGenericObjects(message);
-  const globalDamage = evaluateGlobalDamageTriggers({ message, cards: normalizedCards, genericObjects });
+  const genericObjects = scenario.objects
+    .filter((object) => object.name.startsWith('Generic ') || object.name.startsWith('Token '))
+    .map((object) => ({ ...object, card: object.card }));
+  if (scenario.objects.some((object) => object.abilities?.some((ability) => ability.keyword === 'ward'))
+    && scenario.actions.some((action) => action.targets.length > 0)) {
+    return unsupported('The scenario was compiled with ward and its payment choice, but ward stack execution is not certified until the cost/priority phase.', {
+      cards: normalizedCards,
+      primitives: ['targeting', 'ward', 'stack'],
+      trace: [{ type: 'ScenarioCompiled', scenario }]
+    });
+  }
+  const globalDamage = evaluateGlobalDamageTriggers({ message, cards: normalizedCards, genericObjects, scenario });
   if (globalDamage) return globalDamage;
-  const targetedStack = evaluateTargetedStack({ message, cards: normalizedCards, genericObjects });
+  const targetedStack = evaluateTargetedStack({ message, cards: normalizedCards, genericObjects, scenario });
   if (targetedStack) return targetedStack;
-  return null;
+  return unsupported('The authoritative Magic runtime does not yet execute every primitive in this compiled scenario.', {
+    cards: normalizedCards,
+    primitives: ['continuous'],
+    trace: [{ type: 'ScenarioCompiled', scenario }]
+  });
 }
+
+export { extractGenericObjects } from './scenarioCompiler.js';
 
 function currentPowerLabel(object) {
   return object.basePower ?? object.card.power ?? 0;

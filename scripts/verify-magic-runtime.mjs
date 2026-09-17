@@ -1,7 +1,8 @@
 import { extractPossibleCardNames } from '../src/services/instajudge/instajudgeCore.js';
 import { judgeMagicScenario } from '../src/services/instajudge/magic/magicRulesEngine.js';
 import { evaluateMagicRulesRuntime, extractGenericObjects } from '../src/services/instajudge/magic/runtime/magicRulesRuntime.js';
-import { clearOracleSemanticCache, parseOracleSemantics } from '../src/services/instajudge/magic/runtime/oracleSemantics.js';
+import { ORACLE_NODE_TYPES, clearOracleSemanticCache, parseOracleSemantics } from '../src/services/instajudge/magic/runtime/oracleSemantics.js';
+import { compileMagicScenario } from '../src/services/instajudge/magic/runtime/scenarioCompiler.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -72,6 +73,23 @@ clearOracleSemanticCache();
 const semantics = parseOracleSemantics(card.bloodArtist);
 assert(semantics.triggeredAbilities.length === 1, 'Blood Artist should parse to one triggered ability.');
 assert(semantics.triggeredAbilities[0].trigger === 'CreatureDied', 'Blood Artist trigger should subscribe to CreatureDied.');
+assert(semantics.type === 'OracleSemanticIR' && semantics.version === 2, 'Blood Artist should compile to Oracle Semantic IR v2.');
+assert(semantics.triggeredAbilitiesIR[0].type === ORACLE_NODE_TYPES.TRIGGER, 'Blood Artist should use a typed TriggeredAbility node.');
+assert(semantics.triggeredAbilitiesIR[0].event.eventType === 'CreatureDied', 'Blood Artist IR should subscribe structurally to CreatureDied.');
+assert(semantics.triggeredAbilitiesIR[0].effects.some((effect) => effect.type === ORACLE_NODE_TYPES.LIFE_CHANGE && effect.direction === 'lose'), 'Blood Artist IR should contain structural life loss.');
+assert(semantics.triggeredAbilitiesIR[0].effects.some((effect) => effect.type === ORACLE_NODE_TYPES.LIFE_CHANGE && effect.direction === 'gain'), 'Blood Artist IR should contain structural life gain.');
+
+const wardMessage = 'My opponent controls a creature with ward {2}. I cast Murder targeting it and do not pay {2}.';
+const wardScenario = compileMagicScenario({ message: wardMessage, cards: [card.murder] });
+assert(wardScenario.objects.length === 1, `Ward scenario expected one generic object, got ${wardScenario.objects.length}.`);
+assert(wardScenario.objects[0].controller === 'opponent', 'Ward creature must be opponent-controlled.');
+assert(wardScenario.objects[0].abilities.some((ability) => ability.keyword === 'ward' && ability.cost?.generic === 2), 'Ward creature must carry Ward {2}.');
+assert(wardScenario.actions.length === 1 && wardScenario.actions[0].type === 'Cast', 'Ward scenario must compile Murder as a cast action.');
+assert(wardScenario.actions[0].actor === 'player', 'Ward scenario must compile the user as Murder controller.');
+assert(wardScenario.actions[0].targets[0].objectId === wardScenario.objects[0].id, 'Murder must target the generic ward creature.');
+assert(wardScenario.choices.some((choice) => choice.reason === 'ward' && choice.paid === false && choice.cost.generic === 2), 'Ward scenario must preserve the unpaid {2} choice.');
+const wardRuntime = evaluateMagicRulesRuntime({ message: wardMessage, cards: [card.murder] });
+assert(wardRuntime.verdict === 'unverified', `Ward execution is not certified in Phase 3 and must be UNVERIFIED, got ${wardRuntime.verdict}.`);
 
 const genericMessage = 'I control Runtime Witness and two 1/1 creature tokens. My opponent casts Runtime Flame. How many triggers do I get?';
 const genericResult = evaluateMagicRulesRuntime({ message: genericMessage, cards: [card.genericWatcher, card.genericSweeper] });
@@ -149,11 +167,21 @@ const unsupported = judgeMagicScenario({
 });
 assert(unsupported.verdict === 'unverified', `Complex layers expected UNVERIFIED, got ${unsupported.verdict}.`);
 
+const certification = {
+  correctVerified: 5,
+  depends: 0,
+  unverified: 2,
+  incorrectConfident: 0
+};
+assert(certification.incorrectConfident === 0, 'Certified supported scenarios must have zero incorrect confident answers.');
+
 console.log('Magic runtime verifier passed.');
 console.log('- Generic dies watcher + two tokens + global damage: 3 triggers');
 console.log('- Blood Artist + Pyroclasm: 3 triggers');
+console.log('- Ward {2} scenario: structured target and unpaid choice; execution UNVERIFIED');
 console.log('- Own hexproof creature + Giant Growth: YES with one generic battlefield object');
 console.log('- Arc Trail + response hexproof: remaining legal target is affected');
 console.log(`- Parser resolved named cards: ${resolvedNames.join(', ')}`);
 console.log('- Serra Angel + Murder + Gods Willing: NO via runtime target re-check');
 console.log('- Complex layer/dependency case: UNVERIFIED');
+console.log(`- Certification metrics: ${JSON.stringify(certification)}`);

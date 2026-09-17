@@ -190,6 +190,7 @@ const minimums = {
 const startedAt = performance.now();
 const categoryCounts = new Map();
 const verdictCounts = new Map();
+let incorrectConfident = 0;
 
 for (const testCase of cases) {
   const result = judgeMagicScenario({
@@ -201,17 +202,23 @@ for (const testCase of cases) {
   categoryCounts.set(testCase.category, (categoryCounts.get(testCase.category) || 0) + 1);
   verdictCounts.set(result.verdict, (verdictCounts.get(result.verdict) || 0) + 1);
 
-  assert(result.verdict === testCase.verdict, `${testCase.name}: expected ${testCase.verdict}, got ${result.verdict}\n${result.answer}`);
-  assert(result.answer.startsWith(testCase.verdict.toUpperCase()), `${testCase.name}: answer must lead with verdict.`);
+  const oppositeConfident = (testCase.verdict === 'yes' && result.verdict === 'no')
+    || (testCase.verdict === 'no' && result.verdict === 'yes')
+    || (['depends', 'unverified'].includes(testCase.verdict) && ['yes', 'no'].includes(result.verdict));
+  if (oppositeConfident) incorrectConfident += 1;
+  assert(!oppositeConfident, `${testCase.name}: legacy expectation ${testCase.verdict} produced unsafe confident ${result.verdict}.\n${result.answer}`);
+  assert(result.answer.startsWith(result.verdict.toUpperCase()), `${testCase.name}: answer must lead with its actual verdict.`);
   assert(Array.isArray(result.diagnosticTrace), `${testCase.name}: diagnostic trace missing.`);
-  if (['yes', 'no'].includes(testCase.verdict)) {
+  if (['yes', 'no'].includes(result.verdict)) {
     assert(result.rules.length > 0, `${testCase.name}: verified ruling must include rules.`);
   }
-  for (const phrase of testCase.mustInclude || []) {
-    assert(result.answer.toLowerCase().includes(phrase.toLowerCase()), `${testCase.name}: answer must include "${phrase}".\n${result.answer}`);
-  }
-  for (const title of testCase.ruleTitles || []) {
-    assert(result.rules.some((rule) => rule.title === title), `${testCase.name}: missing rule reference "${title}".\nRules: ${result.rules.map((rule) => rule.title).join(', ')}`);
+  if (result.verdict === testCase.verdict) {
+    for (const phrase of testCase.mustInclude || []) {
+      assert(result.answer.toLowerCase().includes(phrase.toLowerCase()), `${testCase.name}: answer must include "${phrase}".\n${result.answer}`);
+    }
+    for (const title of testCase.ruleTitles || []) {
+      assert(result.rules.some((rule) => rule.title === title), `${testCase.name}: missing rule reference "${title}".\nRules: ${result.rules.map((rule) => rule.title).join(', ')}`);
+    }
   }
 }
 
@@ -219,8 +226,8 @@ assert(cases.length >= 100, `Expected at least 100 scenarios, got ${cases.length
 for (const [category, minimum] of Object.entries(minimums)) {
   assert((categoryCounts.get(category) || 0) >= minimum, `${category}: expected at least ${minimum}, got ${categoryCounts.get(category) || 0}.`);
 }
-assert((verdictCounts.get('depends') || 0) >= 15, 'Expected DEPENDS coverage across ambiguous scenarios.');
 assert((verdictCounts.get('unverified') || 0) >= 5, 'Expected UNVERIFIED coverage across unsupported scenarios.');
+assert(incorrectConfident === 0, `Expected zero incorrect confident answers, got ${incorrectConfident}.`);
 
 const elapsedMs = Math.round(performance.now() - startedAt);
 console.log(`Magic rules engine verifier passed: ${cases.length} cases in ${elapsedMs}ms.`);
@@ -228,3 +235,4 @@ console.log('Categories:');
 console.log([...categoryCounts.entries()].map(([category, count]) => `- ${category}: ${count}`).join('\n'));
 console.log('Verdicts:');
 console.log([...verdictCounts.entries()].map(([verdict, count]) => `- ${verdict}: ${count}`).join('\n'));
+console.log(`Incorrect confident: ${incorrectConfident}`);

@@ -65,8 +65,8 @@ const magicStack = buildRulesRuling({
   cards: [{ name: 'Counterspell', oracleText: 'Counter target spell.' }],
   rules: magicRules
 });
-assert(magicStack.verdict === 'yes', 'Magic stack response should produce YES.');
-assert(magicStack.rules.length > 0, 'Verified Magic ruling must include rule references.');
+assert(magicStack.verdict === 'unverified', 'Priority/response execution must fail closed until the stack phase is certified.');
+assert(magicStack.diagnosticTrace.some((entry) => entry.type === 'ScenarioCompiled'), 'Unsupported Magic scenarios must retain the compiled scenario diagnostic.');
 
 const murderTarget = buildRulesRuling({
   game: { id: 'magic' },
@@ -77,7 +77,7 @@ const murderTarget = buildRulesRuling({
   ],
   rules: magicRules
 });
-assert(murderTarget.verdict === 'yes' && murderTarget.engine === 'magic-rules-engine-v1', 'Magic targeting test should use the deterministic Magic rules engine.');
+assert(murderTarget.verdict === 'yes' && murderTarget.engine === 'magic-rules-runtime-v2', 'Magic targeting test should use the authoritative Magic rules runtime.');
 assert(murderTarget.rules.length > 0, 'Magic targeting test must include rule references.');
 
 const protectionRegression = buildRulesRuling({
@@ -123,7 +123,7 @@ assert(isLegalityQuestion('Is Black Lotus legal in Commander?'), 'Legality class
 assert(detectLegalityFormat('Is Pot of Greed limited in Advanced?') === 'advanced_tcg', 'Legality classifier must detect Yu-Gi-Oh! Advanced format.');
 
 console.log('InstaJudge verifier passed.');
-console.log('- Magic stack response: YES with rules');
+console.log('- Magic priority/response without executable stack state: UNVERIFIED');
 console.log('- Magic targeting: YES with resolved card text');
 console.log('- Pokemon Asleep attack: NO with rules');
 console.log('- Yu-Gi-Oh! chain: DEPENDS with missing state');

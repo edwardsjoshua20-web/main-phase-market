@@ -1,6 +1,6 @@
 import { evaluateMagicScenario } from './ruleEvaluator.js';
 
-export const MAGIC_ENGINE_VERSION = 'magic-rules-engine-v1';
+export const MAGIC_ENGINE_VERSION = 'magic-rules-runtime-v2';
 
 export function judgeMagicScenario(input = {}) {
   const result = evaluateMagicScenario(input);
