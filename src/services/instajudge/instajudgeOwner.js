@@ -102,8 +102,14 @@ async function resolveCandidate(game, candidate) {
   return exact ? normalizeCard(exact, candidate) : null;
 }
 
+function isFollowUpRuling(message = '') {
+  const text = normalizeJudgeText(message);
+  return /\b(it|that|this|same|previous|earlier|instead|what about|then|after that|in response to that|the spell|that creature|the creature i targeted earlier)\b/.test(text)
+    && !/\b(i cast|my opponent casts|opponent casts|i control|opponent controls|player controls|can i cast|targeting)\b/.test(text);
+}
+
 async function resolveCards(game, message, session = {}) {
-  const remembered = Array.isArray(session.resolvedCards) ? session.resolvedCards : [];
+  const remembered = isFollowUpRuling(message) && Array.isArray(session.resolvedCards) ? session.resolvedCards : [];
   const candidates = extractPossibleCardNames(message);
   const resolved = [];
 

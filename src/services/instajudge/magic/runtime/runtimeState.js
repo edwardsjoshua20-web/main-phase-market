@@ -23,7 +23,7 @@ export function createPlayer(id, overrides = {}) {
   };
 }
 
-export function createGameObject({ card, controller = 'player', owner = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null } = {}) {
+export function createGameObject({ card, controller = 'player', owner = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false } = {}) {
   const normalizedCard = card ? normalizeMagicCard(card) : normalizeMagicCard({
     name: name || 'Creature Token',
     typeLine: 'Creature - Token',
@@ -38,12 +38,12 @@ export function createGameObject({ card, controller = 'player', owner = controll
     owner,
     controller,
     zone,
-    tapped: false,
+    tapped,
     counters: {},
     damageMarked: 0,
     token,
     faceState: 'front',
-    commander: false,
+    commander,
     basePower: power ?? normalizedCard.power,
     baseToughness: toughness ?? normalizedCard.toughness,
     effects: [],
@@ -69,11 +69,13 @@ export function snapshotObject(object) {
 }
 
 export function currentPower(object) {
-  return object.effects.reduce((value, effect) => value + (effect.power || 0), object.basePower ?? object.card.power ?? 0);
+  const base = object.basePower ?? object.card.power;
+  return object.effects.reduce((value, effect) => value + (effect.power || 0), Number.isFinite(base) ? base : null);
 }
 
 export function currentToughness(object) {
-  return object.effects.reduce((value, effect) => value + (effect.toughness || 0), object.baseToughness ?? object.card.toughness ?? 0);
+  const base = object.baseToughness ?? object.card.toughness;
+  return object.effects.reduce((value, effect) => value + (effect.toughness || 0), Number.isFinite(base) ? base : null);
 }
 
 export function objectIsCreature(object) {
@@ -112,7 +114,7 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], messa
   }
 
   for (const object of genericObjects) {
-    addPermanent(state, createGameObject({ ...object, token: true, controller: object.controller || 'player', owner: object.owner || 'player' }));
+    addPermanent(state, createGameObject({ ...object, token: Boolean(object.token), controller: object.controller || 'player', owner: object.owner || 'player' }));
   }
 
   return state;

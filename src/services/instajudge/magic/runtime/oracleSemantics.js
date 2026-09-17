@@ -32,8 +32,13 @@ function parseSpellEffects(card, text) {
   if (text.includes('counter target spell')) {
     effects.push({ type: 'counter', target: { kind: 'spell' }, primitives: ['targeting', 'stack', 'resolving'] });
   }
+  const splitTargetedDamage = text.match(/\bdeals? (\d+) damage to (any target|one target|target [^.]+?) and (\d+) damage to another target\b/);
+  if (splitTargetedDamage) {
+    effects.push({ type: 'damage', amount: parseNumber(splitTargetedDamage[1]), target: targetRestrictionFrom(splitTargetedDamage[2]), targetIndex: 0, primitives: ['damage', 'targeting', 'state-based-actions'] });
+    effects.push({ type: 'damage', amount: parseNumber(splitTargetedDamage[3]), target: { kind: 'any' }, targetIndex: 1, primitives: ['damage', 'targeting', 'state-based-actions'] });
+  }
   const targetedDamage = text.match(/\bdeals? (\d+) damage to (any target|target [^.]+)\b/);
-  if (targetedDamage) {
+  if (targetedDamage && !splitTargetedDamage) {
     effects.push({ type: 'damage', amount: parseNumber(targetedDamage[1]), target: targetRestrictionFrom(text), primitives: ['damage', 'targeting', 'state-based-actions'] });
   }
   const globalCreatureDamage = text.match(/\bdeals? (\d+) damage to each creature\b/);

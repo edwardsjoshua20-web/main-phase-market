@@ -24,6 +24,27 @@ const card = {
     manaCost: '{1}{R}',
     colors: ['R']
   },
+  giantGrowth: {
+    name: 'Giant Growth',
+    typeLine: 'Instant',
+    oracleText: 'Target creature gets +3/+3 until end of turn.',
+    manaCost: '{G}',
+    colors: ['G']
+  },
+  arcTrail: {
+    name: 'Arc Trail',
+    typeLine: 'Sorcery',
+    oracleText: 'Arc Trail deals 2 damage to one target and 1 damage to another target.',
+    manaCost: '{1}{R}',
+    colors: ['R']
+  },
+  arcTrailCollapsed: {
+    name: 'Arc Trail',
+    typeLine: 'Sorcery',
+    oracleText: 'Arc Trail deals 2 damage to any target.',
+    manaCost: '{1}{R}',
+    colors: ['R']
+  },
   genericWatcher: {
     name: 'Runtime Witness',
     typeLine: 'Creature - Cleric',
@@ -75,6 +96,45 @@ assert(!candidates.some((candidate) => /how to start a riot/i.test(candidate)), 
 const resolvedNames = candidates.filter((candidate) => ['Blood Artist', 'Pyroclasm'].includes(candidate)).sort();
 assert(JSON.stringify(resolvedNames) === JSON.stringify(['Blood Artist', 'Pyroclasm']), `Resolved names must be Blood Artist and Pyroclasm only, got ${resolvedNames.join(', ')}.`);
 
+const hexproofGrowthMessage = 'I control a creature that has hexproof. Can I still cast Giant Growth targeting my own creature?';
+const hexproofGrowth = evaluateMagicRulesRuntime({ message: hexproofGrowthMessage, cards: [card.giantGrowth] });
+assert(hexproofGrowth?.status === 'evaluated', 'Giant Growth against own hexproof creature should evaluate through runtime.');
+assert(hexproofGrowth.verdict === 'yes', `Own hexproof Giant Growth expected YES, got ${hexproofGrowth.verdict}.`);
+const hexproofCompiler = hexproofGrowth.trace.find((entry) => entry.type === 'ScenarioCompiler');
+assert(hexproofCompiler.objects.length === 1, `Own hexproof scenario should create one generic creature, got ${hexproofCompiler.objects.length}.`);
+assert(hexproofCompiler.objects[0].controller === 'player', 'Own hexproof creature should be controlled by player.');
+assert(hexproofCompiler.objects[0].abilities.includes('hexproof'), 'Own hexproof creature should carry hexproof in compiler trace.');
+assert(hexproofCompiler.targets[0].target === 'Generic Creature A', 'Giant Growth should target the existing generic creature.');
+
+const arcTrailMessage = 'I cast Arc Trail targeting my opponent’s 2/2 creature for 2 damage and another 1/1 creature for 1 damage. In response, my opponent gives the 2/2 hexproof. What happens when Arc Trail resolves?';
+const arcTrail = evaluateMagicRulesRuntime({ message: arcTrailMessage, cards: [card.arcTrail] });
+assert(arcTrail?.status === 'evaluated', 'Arc Trail partial target scenario should evaluate through runtime.');
+assert(arcTrail.verdict === 'yes', `Arc Trail partial target scenario expected YES, got ${arcTrail.verdict}.`);
+assert(arcTrail.sequence.some((step) => /ignores illegal target Generic Creature A/i.test(step)), 'Arc Trail should ignore the 2/2 after it gains hexproof.');
+assert(arcTrail.sequence.some((step) => /deals 1 damage to Generic Creature B/i.test(step)), 'Arc Trail should still affect the remaining 1/1 target.');
+const arcCompiler = arcTrail.trace.find((entry) => entry.type === 'ScenarioCompiler');
+assert(arcCompiler.objects.length === 2, `Arc Trail should create two generic creatures, got ${arcCompiler.objects.length}.`);
+assert(arcCompiler.objects.every((object) => object.controller === 'opponent'), 'Arc Trail generic creatures should be controlled by opponent.');
+assert(arcCompiler.targets.map((entry) => entry.target).join(',') === 'Generic Creature A,Generic Creature B', 'Arc Trail should bind target 1 and target 2 distinctly.');
+assert(!arcTrail.cards.some((resolvedCard) => resolvedCard.name === 'Giant Growth'), 'Arc Trail runtime card list must not contain Giant Growth.');
+
+const arcTrailCollapsed = evaluateMagicRulesRuntime({ message: arcTrailMessage, cards: [card.arcTrailCollapsed] });
+assert(arcTrailCollapsed?.status === 'evaluated', 'Scenario compiler should expand explicit multi-target damage even if card semantics expose one damage effect.');
+assert(arcTrailCollapsed.sequence.some((step) => /deals 1 damage to Generic Creature B/i.test(step)), 'Compiler-expanded Arc Trail should still affect target 2.');
+
+const genericParserCases = [
+  ['my 3/3 creature', (objects) => objects.length === 1 && objects[0].power === 3 && objects[0].toughness === 3 && objects[0].controller === 'player'],
+  ['an artifact creature', (objects) => objects.length === 1 && /artifact/i.test(objects[0].card.typeLine)],
+  ['a tapped creature with flying', (objects) => objects.length === 1 && objects[0].tapped === true && objects[0].card.abilities.includes('flying')],
+  ['two creature tokens', (objects) => objects.length === 2 && objects.every((object) => object.token)],
+  ['my opponent’s commander', (objects) => objects.length === 1 && objects[0].controller === 'opponent' && objects[0].commander],
+  ['the creature I targeted earlier', (objects) => objects.length === 0]
+];
+for (const [prompt, predicate] of genericParserCases) {
+  const objects = extractGenericObjects(prompt);
+  assert(predicate(objects), `Generic parser case failed for "${prompt}": ${JSON.stringify(objects)}`);
+}
+
 const stackResult = judgeMagicScenario({
   message: 'Player controls Serra Angel. Opponent casts Murder targeting Serra Angel. Player responds with Gods Willing targeting Serra Angel and chooses black. Does Murder destroy Serra Angel?',
   cards: [card.serra, card.murder, card.godsWilling]
@@ -92,6 +152,8 @@ assert(unsupported.verdict === 'unverified', `Complex layers expected UNVERIFIED
 console.log('Magic runtime verifier passed.');
 console.log('- Generic dies watcher + two tokens + global damage: 3 triggers');
 console.log('- Blood Artist + Pyroclasm: 3 triggers');
+console.log('- Own hexproof creature + Giant Growth: YES with one generic battlefield object');
+console.log('- Arc Trail + response hexproof: remaining legal target is affected');
 console.log(`- Parser resolved named cards: ${resolvedNames.join(', ')}`);
 console.log('- Serra Angel + Murder + Gods Willing: NO via runtime target re-check');
 console.log('- Complex layer/dependency case: UNVERIFIED');
