@@ -3,6 +3,7 @@ import { detectMagicMechanics, isComplexLayerQuestion, isReplacementChoiceQuesti
 import { createGameState } from './gameState.js';
 import { evaluateCommonMagicPattern } from './commonPatternEvaluator.js';
 import { normalizeMagicCard, normalizeMagicText } from './magicCards.js';
+import { evaluateMagicRulesRuntime } from './runtime/magicRulesRuntime.js';
 import { formatMagicRuling, publicMechanicList, selectRelevantRules } from './rulingFormatter.js';
 import { parseMagicScenario } from './scenarioParser.js';
 import { buildStack, resolveStack, validateTargetsOnAnnouncement } from './stackEngine.js';
@@ -90,6 +91,42 @@ export function evaluateMagicScenario({ message = '', cards = [], rules = [], le
       latencyMs,
       trace,
       reason: 'I cannot verify a Magic ruling until at least one card identity is resolved from the catalog.'
+    });
+  }
+
+  const runtime = evaluateMagicRulesRuntime({ message, cards: normalizedCards });
+  if (runtime) {
+    if (runtime.status === 'depends') {
+      return depends({
+        cards: normalizedCards,
+        rules: runtime.rules,
+        mechanics: runtime.mechanics,
+        latencyMs,
+        trace: runtime.trace,
+        summary: runtime.summary,
+        clarificationNeeded: runtime.clarificationNeeded,
+        sequence: runtime.sequence
+      });
+    }
+    if (runtime.status === 'unsupported') {
+      return unsupported({
+        cards: normalizedCards,
+        rules: runtime.rules,
+        mechanics: runtime.mechanics,
+        latencyMs,
+        trace: runtime.trace,
+        reason: runtime.summary
+      });
+    }
+    return confident({
+      verdict: runtime.verdict,
+      cards: normalizedCards,
+      rules: runtime.rules,
+      mechanics: runtime.mechanics,
+      latencyMs,
+      trace: runtime.trace,
+      summary: runtime.summary,
+      sequence: runtime.sequence
     });
   }
 

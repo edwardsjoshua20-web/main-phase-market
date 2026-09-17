@@ -72,9 +72,15 @@ function normalizeCard(card = {}, requestedName = '') {
 }
 
 function isExactEnough(candidate, result) {
-  const wanted = normalizeJudgeText(candidate);
-  const found = normalizeJudgeText(result?.name);
-  return Boolean(wanted && found && (wanted === found || found.includes(wanted) || wanted.includes(found)));
+  const wanted = strictNameKey(candidate);
+  const found = strictNameKey(result?.name);
+  return Boolean(wanted && found && wanted === found);
+}
+
+function strictNameKey(value = '') {
+  return normalizeJudgeText(value)
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
 }
 
 function dedupeCards(cards = []) {
@@ -93,8 +99,7 @@ async function resolveCandidate(game, candidate) {
   const searchGame = SEARCH_GAME_BY_ID[game.id] || game.id;
   const results = await searchOwner.searchPreviewByGame(candidate, searchGame, 5, { includeInventory: false });
   const exact = results.find((result) => isExactEnough(candidate, result));
-  const chosen = exact || results[0] || null;
-  return chosen ? normalizeCard(chosen, candidate) : null;
+  return exact ? normalizeCard(exact, candidate) : null;
 }
 
 async function resolveCards(game, message, session = {}) {
