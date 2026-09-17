@@ -37,12 +37,15 @@ function inferController(message, card, index) {
 function inferTarget(message, source, cards, sourceIndex) {
   const normalized = normalizeMagicText(message);
   const afterSource = normalized.slice(sourceIndex, Math.min(normalized.length, sourceIndex + 220));
+  const explicitTargets = [];
 
   for (const card of cards) {
     if (card.name === source.name) continue;
     const targetPattern = new RegExp(`\\b(target|targeting|targets)\\s+(?:the\\s+)?${escapeRegExp(card.normalizedName)}\\b`);
-    if (targetPattern.test(afterSource)) return [card];
+    const andPattern = new RegExp(`\\b(?:and|plus|then)\\s+(?:the\\s+)?${escapeRegExp(card.normalizedName)}\\b`);
+    if (targetPattern.test(afterSource) || (explicitTargets.length > 0 && andPattern.test(afterSource))) explicitTargets.push(card);
   }
+  if (explicitTargets.length > 0) return explicitTargets;
 
   if (/\btarget spell\b/.test(source.normalizedText)) {
     const priorSpell = cards.find((card) => card.name !== source.name && (isInstant(card) || isSorcery(card) || !isPermanentType(card)));

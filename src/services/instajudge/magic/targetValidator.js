@@ -14,6 +14,10 @@ function requiresCreatureTarget(source = {}) {
   return /\btarget creature\b/.test(normalizeMagicText(source.oracleText));
 }
 
+function requiresNonblackCreatureTarget(source = {}) {
+  return /\btarget nonblack creature\b/.test(normalizeMagicText(source.oracleText));
+}
+
 function requiresControlledCreatureTarget(source = {}) {
   return /\btarget creature you control\b/.test(normalizeMagicText(source.oracleText));
 }
@@ -36,6 +40,10 @@ export function validateTarget({ source, target, state, sourceController = 'play
 
   if (requiresCreatureTarget(source) && !isCreature(target)) {
     failures.push(`${target.name} is not a creature.`);
+  }
+
+  if (requiresNonblackCreatureTarget(source) && target.colors?.includes('black')) {
+    failures.push(`${target.name} is black, so it is not a nonblack creature.`);
   }
 
   if (requiresControlledCreatureTarget(source)) {

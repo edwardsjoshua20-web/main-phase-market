@@ -39,11 +39,15 @@ function ChatBubble({ message }) {
           <div className="mt-3 border-t border-slate-800 pt-3">
             <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-500">Rules</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {message.result.rules.map((rule) => (
+              {message.result.rules.map((rule) => (rule.path ? (
                 <a key={rule.slug} href={rule.path} className="border border-slate-700 bg-slate-900/80 px-2 py-1 text-xs font-semibold text-cyan-100 hover:border-cyan-300/70">
                   {rule.title}
                 </a>
-              ))}
+              ) : (
+                <span key={rule.slug} className="border border-slate-700 bg-slate-900/80 px-2 py-1 text-xs font-semibold text-slate-200">
+                  {rule.title}
+                </span>
+              )))}
             </div>
           </div>
         ) : null}

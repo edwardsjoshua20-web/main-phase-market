@@ -2,6 +2,7 @@ import { normalizeMagicText } from './magicCards.js';
 
 const MECHANIC_PATTERNS = Object.freeze([
   ['targeting', /\btarget\b|\btargets\b|\blegal target\b/],
+  ['resolving', /\bresolve\b|\bresolves\b|\brespond\b|\bresponds\b|\bresponded\b|\bin response\b|\bno legal targets\b/],
   ['protection', /\bprotection from\b|\bgains protection\b/],
   ['hexproof', /\bhexproof\b/],
   ['shroud', /\bshroud\b/],

@@ -1,6 +1,7 @@
 const RULE_TITLE_BY_MECHANIC = Object.freeze({
   targeting: 'Targets',
   protection: 'Protection',
+  resolving: 'Resolving Spells and Abilities',
   stack: 'Stack',
   timing: 'Timing Permissions',
   priority: 'Priority',
@@ -13,14 +14,30 @@ const RULE_TITLE_BY_MECHANIC = Object.freeze({
   legality: 'Commander'
 });
 
+function syntheticRuleFor(title) {
+  return {
+    slug: `instajudge-${String(title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`,
+    title,
+    path: null,
+    synthetic: true
+  };
+}
+
 export function selectRelevantRules(mechanics = [], rules = []) {
-  const wanted = new Set(
-    mechanics
-      .map((mechanic) => RULE_TITLE_BY_MECHANIC[mechanic] || mechanic)
-      .map((title) => String(title).toLowerCase())
-  );
+  const wantedByKey = new Map();
+  for (const mechanic of mechanics) {
+    const title = RULE_TITLE_BY_MECHANIC[mechanic] || mechanic;
+    const key = String(title).toLowerCase();
+    if (!wantedByKey.has(key)) wantedByKey.set(key, title);
+  }
+  const wanted = new Set(wantedByKey.keys());
   const selected = rules.filter((rule) => wanted.has(String(rule.title || '').toLowerCase()));
-  return selected.length ? selected.slice(0, 4) : rules.slice(0, 3);
+  const selectedTitles = new Set(selected.map((rule) => String(rule.title || '').toLowerCase()));
+  const supplemental = [...wanted]
+    .filter((title) => title && !selectedTitles.has(title))
+    .map((title) => syntheticRuleFor(wantedByKey.get(title)));
+  const resolved = [...selected, ...supplemental];
+  return resolved.length ? resolved.slice(0, 6) : rules.slice(0, 3);
 }
 
 export function formatMagicRuling(result) {

@@ -1,6 +1,7 @@
 import { evaluateCommanderQuestion } from './commanderRules.js';
 import { detectMagicMechanics, isComplexLayerQuestion, isReplacementChoiceQuestion } from './mechanicDetector.js';
 import { createGameState } from './gameState.js';
+import { evaluateCommonMagicPattern } from './commonPatternEvaluator.js';
 import { normalizeMagicCard, normalizeMagicText } from './magicCards.js';
 import { formatMagicRuling, publicMechanicList, selectRelevantRules } from './rulingFormatter.js';
 import { parseMagicScenario } from './scenarioParser.js';
@@ -129,6 +130,18 @@ export function evaluateMagicScenario({ message = '', cards = [], rules = [], le
 
   const timing = evaluateTimingQuestion({ message, cards: normalizedCards });
   if (timing && !/\btarget|destroy|damage|protection|hexproof|shroud|ward\b/i.test(message)) {
+    if (timing.verdict === 'depends') {
+      return depends({
+        cards: normalizedCards,
+        rules: selectRelevantRules(timing.mechanics, rules),
+        mechanics: timing.mechanics,
+        latencyMs,
+        trace,
+        summary: timing.summary,
+        clarificationNeeded: 'Tell me whose turn it is, the current phase or step, and what is currently on the stack.',
+        sequence: timing.sequence
+      });
+    }
     return confident({
       verdict: timing.verdict,
       cards: normalizedCards,
@@ -150,6 +163,43 @@ export function evaluateMagicScenario({ message = '', cards = [], rules = [], le
       trace,
       summary: 'Replacement effects can change the event before it happens, but this scenario needs the exact affected object/player choice.',
       clarificationNeeded: 'Tell me which replacement or prevention effects apply and who controls or is affected by each one.'
+    });
+  }
+
+  const commonPattern = evaluateCommonMagicPattern({ message, cards: normalizedCards });
+  if (commonPattern) {
+    const commonRules = selectRelevantRules(commonPattern.mechanics, rules);
+    if (commonPattern.verdict === 'depends') {
+      return depends({
+        cards: normalizedCards,
+        rules: commonRules,
+        mechanics: commonPattern.mechanics,
+        latencyMs,
+        trace,
+        summary: commonPattern.summary,
+        clarificationNeeded: commonPattern.clarificationNeeded,
+        sequence: commonPattern.sequence
+      });
+    }
+    if (commonPattern.verdict === 'unverified') {
+      return unsupported({
+        cards: normalizedCards,
+        rules: commonRules,
+        mechanics: commonPattern.mechanics,
+        latencyMs,
+        trace,
+        reason: commonPattern.summary
+      });
+    }
+    return confident({
+      verdict: commonPattern.verdict,
+      cards: normalizedCards,
+      rules: commonRules,
+      mechanics: commonPattern.mechanics,
+      latencyMs,
+      trace,
+      summary: commonPattern.summary,
+      sequence: commonPattern.sequence
     });
   }
 

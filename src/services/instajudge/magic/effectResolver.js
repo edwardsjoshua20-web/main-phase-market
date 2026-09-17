@@ -23,6 +23,18 @@ function isIndestructible(card = {}) {
   return card.abilities?.includes('indestructible') || /\bindestructible\b/.test(normalizeMagicText(card.oracleText));
 }
 
+function wardStatus(stackObject, legalTargets, scenario, state) {
+  const text = normalizeMagicText(scenario.message);
+  for (const target of legalTargets) {
+    const permanent = state.getPermanent(target);
+    if (!target.abilities?.includes('ward') || permanent?.controller === stackObject.controller) continue;
+    if (/\bward (cost )?(was )?paid\b|\bpays? ward\b/.test(text)) return { status: 'paid', target };
+    if (/\bward (cost )?(was )?(not paid|unpaid)\b|\bdoes not pay ward\b|\bdid not pay ward\b/.test(text)) return { status: 'unpaid', target };
+    return { status: 'unknown', target };
+  }
+  return { status: 'none', target: null };
+}
+
 export function resolveStackObject(stackObject, state, scenario) {
   const trace = [];
   const targetCheck = validateAllTargets(stackObject, state, 'resolution');
@@ -46,6 +58,28 @@ export function resolveStackObject(stackObject, state, scenario) {
   const legalTargets = targetCheck.legalTargets;
   const stateBasedActions = [];
   const summaries = [];
+  const ward = wardStatus(stackObject, legalTargets, scenario, state);
+
+  if (ward.status === 'unknown') {
+    return {
+      resolved: false,
+      needsClarification: `Did ${ward.target.name}'s ward cost get paid?`,
+      summary: `${ward.target.name} has ward, so the engine needs to know whether the ward cost was paid.`,
+      trace,
+      stateBasedActions
+    };
+  }
+
+  if (ward.status === 'unpaid') {
+    state.moveToZone(stackObject.card, 'graveyard', `${ward.target.name} ward trigger`);
+    return {
+      resolved: true,
+      wardCountered: true,
+      summary: `${ward.target.name}'s ward trigger counters ${stackObject.card.name} because the ward cost was not paid.`,
+      trace,
+      stateBasedActions
+    };
+  }
 
   if (/gains? protection from/.test(text)) {
     const quality = chosenColorFromScenario(scenario.message, stackObject.card.oracleText);
