@@ -34,7 +34,7 @@ export function createPlayer(id, overrides = {}) {
   };
 }
 
-export function createGameObject({ id = null, card, controller = 'player', owner = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false, counters = {}, timestamp = null, abilities = [] } = {}) {
+export function createGameObject({ id = null, card, controller = 'player', owner = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false, counters = {}, timestamp = null, abilities = [], summoningSick = false, enteredTurn = null, attackRestrictions = [], blockRestrictions = [] } = {}) {
   const normalizedCard = card ? normalizeMagicCard(card) : normalizeMagicCard({ name: name || 'Generic Object', typeLine: 'Creature', oracleText: '', power, toughness });
   const objectId = id ? reserveId(id) : makeId(token ? 'token' : 'object');
   const object = {
@@ -45,6 +45,10 @@ export function createGameObject({ id = null, card, controller = 'player', owner
     owner, controller, zone,
     timestamp: timestamp ?? nextObjectId,
     tapped,
+    summoningSick,
+    enteredTurn,
+    attackRestrictions: [...attackRestrictions],
+    blockRestrictions: [...blockRestrictions],
     counters: { ...counters },
     damageMarked: 0,
     damagedByDeathtouch: false,
@@ -152,6 +156,7 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
     nextContinuousEffectId: 1, nextContinuousTimestamp: 1,
     trace: [], scenario
   };
+  state.combat = null;
 
   const scenarioNames = new Set((scenario?.objects || []).filter((entry) => !entry.name.startsWith('Generic ') && !entry.name.startsWith('Token ')).map((entry) => normalizeMagicText(entry.name)));
   for (const card of cards) {
@@ -159,7 +164,7 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
     if (!normalizeMagicText(message).includes(normalized.normalizedName) || /instant|sorcery/i.test(normalized.typeLine)) continue;
     const descriptor = scenario?.objects?.find((entry) => normalizeMagicText(entry.name) === normalized.normalizedName);
     if (scenario && scenarioNames.has(normalized.normalizedName) && !descriptor) continue;
-    addPermanent(state, createGameObject({ card: normalized, controller: descriptor?.controller || inferController(message, normalized), owner: descriptor?.owner || inferController(message, normalized), commander: descriptor?.commander || false, abilities: descriptor?.abilities || [] }));
+    addPermanent(state, createGameObject({ id: descriptor?.id || null, card: normalized, controller: descriptor?.controller || inferController(message, normalized), owner: descriptor?.owner || inferController(message, normalized), commander: descriptor?.commander || false, abilities: descriptor?.abilities || [], summoningSick: descriptor?.summoningSick || false }));
   }
   for (const object of genericObjects) addPermanent(state, createGameObject({ ...object, id: object.id || null, token: Boolean(object.token), controller: object.controller || 'player', owner: object.owner || object.controller || 'player' }));
   registerScenarioContinuousEffects(state, scenario?.continuousEffects || []);
@@ -381,16 +386,16 @@ function preventionEffectsFor(state, event) {
     if (effect.targetId && effect.targetId !== event.affected?.id) return false;
     return typeof effect.applies === 'function' ? effect.applies(event, state) : true;
   });
-  const protection = deriveCharacteristics(state, event.affected).abilities
+  const protection = event.affected ? deriveCharacteristics(state, event.affected).abilities
     .filter((ability) => normalizeMagicText(ability).startsWith('protection from '))
     .map((ability, index) => ({ quality: normalizeMagicText(ability).replace('protection from ', ''), index }))
     .filter(({ quality }) => event.source?.runtimeState ? derivedHasQuality(state, event.source, quality) : sourceHasQuality(event.source?.card || {}, quality))
-    .map(({ index }) => ({ id: `protection:${event.affected.id}:${index}`, remaining: null, source: event.affected, protection: true }));
+    .map(({ index }) => ({ id: `protection:${event.affected.id}:${index}`, remaining: null, source: event.affected, protection: true })) : [];
   return [...registered, ...protection];
 }
 
-export function markDamageWithResult(state, object, amount, source, metadata = {}, options = {}) {
-  const pipeline = proposeRuntimeEvent(state, 'Damage', { source, affected: object, object, amount, metadata }, options);
+function applyDamageWithResult(state, { object = null, playerId = null, amount, source, metadata = {}, options = {} }) {
+  const pipeline = proposeRuntimeEvent(state, 'Damage', { source, affected: object, object, player: playerId, amount, metadata }, options);
   if (pipeline.status !== 'ready') return pipeline;
   let remaining = pipeline.event.amount;
   const preventedBy = [];
@@ -404,11 +409,35 @@ export function markDamageWithResult(state, object, amount, source, metadata = {
     if (remaining === 0) break;
   }
   if (remaining > 0) {
-    object.damageMarked += remaining;
-    if (metadata.deathtouch) object.damagedByDeathtouch = true;
-    emitEvent(state, 'DamageDealt', { source, affected: object, amount: remaining, final: { damageMarked: object.damageMarked }, metadata: { ...metadata, replacements: pipeline.applied } });
+    if (object) {
+      object.damageMarked += remaining;
+      if (metadata.deathtouch) object.damagedByDeathtouch = true;
+    } else if (state.players[playerId]) {
+      state.players[playerId].life -= remaining;
+    }
+    emitEvent(state, 'DamageDealt', {
+      source, affected: object, object, player: playerId, amount: remaining,
+      final: object ? { damageMarked: object.damageMarked } : { life: state.players[playerId]?.life },
+      metadata: { ...metadata, replacements: pipeline.applied }
+    });
+    if (metadata.lifelink && source) {
+      const controller = source.runtimeState ? deriveCharacteristics(state, source).controller : source.controller;
+      if (state.players[controller]) {
+        state.players[controller].life += remaining;
+        emitEvent(state, 'LifeGained', { source, player: controller, amount: remaining, metadata: { lifelink: true, damageEvent: true } });
+      }
+    }
   }
   return { status: 'committed', proposed: amount, replacedAmount: pipeline.event.amount, dealt: remaining, prevented: pipeline.event.amount - remaining, preventedBy, replacements: pipeline.applied };
+}
+
+export function markDamageWithResult(state, object, amount, source, metadata = {}, options = {}) {
+  return applyDamageWithResult(state, { object, amount, source, metadata, options });
+}
+
+export function dealDamageToPlayerWithResult(state, playerId, amount, source, metadata = {}, options = {}) {
+  if (!state.players[playerId]) return { status: 'unsupported', reason: `Unknown player ${playerId}.` };
+  return applyDamageWithResult(state, { playerId, amount, source, metadata, options });
 }
 
 export function markDamage(state, object, amount, source, metadata = {}, options = {}) {
@@ -491,6 +520,9 @@ function sourceSnapshotsForEvents(state, events) {
 
 function triggerMatches(ability, source, event) {
   if (!ability?.event?.eventType || ability.event.eventType !== event.type) return false;
+  if (ability.event.filter?.sourceSelf && source.id !== event.source?.id) return false;
+  if (ability.event.filter?.combat && event.metadata?.combat !== true) return false;
+  if (ability.event.filter?.player && !event.player) return false;
   if (event.type === 'CreatureDied') {
     const self = source.id === event.previous?.id;
     if (self && !ability.event.filter.includeSelf) return false;

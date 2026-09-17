@@ -92,15 +92,13 @@ export function normalizeMagicCard(card = {}) {
   const oracleText = getOracleText(card);
   const powerToughness = getPowerToughness(card);
   const normalizedText = normalizeMagicText(oracleText);
-  const abilities = [
-    normalizedText.includes('indestructible') ? 'indestructible' : null,
-    normalizedText.includes('hexproof') ? 'hexproof' : null,
-    normalizedText.includes('shroud') ? 'shroud' : null,
-    normalizedText.includes('ward') ? 'ward' : null,
-    normalizedText.includes('deathtouch') ? 'deathtouch' : null,
-    normalizedText.includes('first strike') ? 'first strike' : null,
-    normalizedText.includes('double strike') ? 'double strike' : null
-  ].filter(Boolean);
+  const supportedKeywords = [
+    'double strike', 'first strike', 'deathtouch', 'indestructible', 'vigilance', 'hexproof', 'shroud',
+    'flying', 'reach', 'trample', 'lifelink', 'menace', 'haste', 'defender', 'ward'
+  ];
+  const protections = [...normalizedText.matchAll(/\bprotection from (white|blue|black|red|green|colorless|artifacts?|creatures?)\b/g)]
+    .map((match) => `protection from ${match[1].replace(/s$/, '')}`);
+  const abilities = [...supportedKeywords.filter((keyword) => normalizedText.includes(keyword)), ...protections];
   return {
     ...card,
     id: clean(card.id || card.oracle_id || card.name),

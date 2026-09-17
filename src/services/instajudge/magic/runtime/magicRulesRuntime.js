@@ -14,6 +14,14 @@ import {
 } from './continuousEffects.js';
 import { castSpell, checkTimingPermission, passPriority, resolveTopOfStack } from './stackRuntime.js';
 import {
+  beginCombat,
+  declareAttackers,
+  declareBlockers,
+  endCombat,
+  executeCombat,
+  removeBlockerFromCombat
+} from './combatRuntime.js';
+import {
   addPermanent,
   collectTriggeredAbilities,
   createGameObject,
@@ -21,6 +29,7 @@ import {
   currentToughness,
   markDamage,
   moveObject,
+  moveObjectWithResult,
   resolveTrigger,
   runStateBasedActionsRuntime
 } from './runtimeState.js';
@@ -770,6 +779,111 @@ function evaluateContinuousScenario({ message, cards, genericObjects, scenario }
   });
 }
 
+function combatAssignments(state, scenario) {
+  const text = normalizeMagicText(scenario.sourceText);
+  if (!/\b(?:remaining|excess|rest of the) damage\b.{0,50}\b(?:player|opponent)\b|\btrample(?:s)? over\b/.test(text)) return {};
+  const assignments = {};
+  for (const attackerEntry of state.combat.attackers) {
+    const attacker = state.objects.get(attackerEntry.objectId);
+    const blockers = attackerEntry.blockerIds.map((id) => state.objects.get(id)).filter((object) => object?.zone === 'battlefield');
+    if (blockers.length !== 1 || !derivedHasAbility(state, attacker, 'trample')) continue;
+    const characteristics = deriveCharacteristics(state, attacker);
+    const blocker = blockers[0];
+    const lethal = derivedHasAbility(state, attacker, 'deathtouch') ? 1 : Math.max(0, deriveCharacteristics(state, blocker).toughness - blocker.damageMarked);
+    assignments[attacker.id] = { [blocker.id]: Math.min(characteristics.power, lethal), defender: Math.max(0, characteristics.power - lethal) };
+  }
+  return assignments;
+}
+
+function evaluateCombatPriorityQuestion({ message, cards, scenario }) {
+  const text = normalizeMagicText(message);
+  if (!/\bcan (?:i|player|you) cast\b/.test(text) || !/\bafter blockers(?: are declared)?\b/.test(text) || !/\bbefore (?:combat )?damage\b/.test(text)) return null;
+  const card = cards.find((candidate) => text.includes(candidate.normalizedName) && (isInstant(candidate) || isSorcery(candidate)));
+  if (!card) return null;
+  const state = createMagicRuntimeState({ cards: [], genericObjects: [], scenario: null, message });
+  beginCombat(state, { attackingPlayer: 'player', defendingPlayer: 'opponent' });
+  state.combat.step = 'declare-blockers';
+  state.game.phase = 'combat';
+  state.game.step = 'declare-blockers';
+  state.game.priorityHolder = 'player';
+  const timing = checkTimingPermission({
+    state, card, actionType: 'Cast', playerId: 'player',
+    factsProvided: { priority: true, turn: true, phase: true, stack: true }
+  });
+  const summary = timing.allowed
+    ? `${card.name} can be cast in the priority window after blockers and before combat damage.`
+    : `${card.name} cannot be cast in that combat priority window. ${timing.reason || ''}`.trim();
+  return evaluated(timing.allowed ? 'yes' : 'no', summary, {
+    cards, primitives: ['combat', 'timing', 'casting', 'stack'], trace: state.trace, state,
+    runtime: { combatStep: state.combat.step, priorityHolder: state.game.priorityHolder }
+  });
+}
+
+function evaluateCombatScenario({ message, cards, genericObjects, scenario }) {
+  if (!scenario.combat) return null;
+  if (scenario.combat.status === 'unsupported') return unsupported(scenario.combat.reason, {
+    cards, primitives: ['combat'], trace: [{ type: 'CombatCompileUnsupported', reason: scenario.combat.reason }]
+  });
+  if (scenario.combat.blockedButUnidentified) {
+    return {
+      status: 'depends', verdict: 'depends', summary: 'Combat damage depends on the unidentified blocker and the damage assignment.',
+      cards, rules: primitiveRules(['combat', 'blockers', 'damage', 'trample']), mechanics: ['combat', 'blockers', 'damage', 'trample'],
+      trace: [{ type: 'CombatStateIncomplete', missing: ['blocking creature', 'damage assignment'] }], sequence: [],
+      clarificationNeeded: 'What creature is blocking, and how is combat damage assigned?'
+    };
+  }
+  if (scenario.actions.length > 0 && scenario.combat.interventionWindow) return unsupported('Casting a compiled spell inside a combat priority window is not yet connected to automatic combat continuation.', {
+    cards, primitives: ['combat', 'timing', 'stack'], trace: [{ type: 'CombatInterventionUnsupported', window: scenario.combat.interventionWindow }]
+  });
+  const state = createMagicRuntimeState({ cards, genericObjects, scenario, message });
+  const begun = beginCombat(state, scenario.combat);
+  if (begun.status !== 'ready') return unsupported(begun.reason, { cards, primitives: ['combat'], trace: state.trace });
+  const attackers = declareAttackers(state, scenario.combat.attackers);
+  if (attackers.status === 'unsupported') return unsupported(attackers.reason, { cards, primitives: ['combat', 'attackers'], trace: state.trace });
+  if (attackers.status === 'illegal') return evaluated('no', attackers.reason, { cards, primitives: ['combat', 'attackers'], trace: state.trace, state });
+  const blockers = declareBlockers(state, scenario.combat.blocks);
+  if (blockers.status === 'unsupported') return unsupported(blockers.reason, { cards, primitives: ['combat', 'blockers'], trace: state.trace });
+  if (blockers.status === 'illegal') return evaluated('no', blockers.reason, { cards, primitives: ['combat', 'blockers'], trace: state.trace, state });
+  for (const blockerId of scenario.combat.removedBeforeDamage || []) {
+    const blocker = state.objects.get(blockerId);
+    if (!blocker) continue;
+    removeBlockerFromCombat(state, blocker);
+    moveObjectWithResult(state, blocker, 'graveyard', 'scenario: blocker removed before combat damage');
+  }
+  const resolution = executeCombat(state, { assignments: combatAssignments(state, scenario) });
+  if (resolution.status === 'depends') {
+    return {
+      status: 'depends', verdict: 'depends', summary: resolution.reason,
+      cards, rules: primitiveRules(['combat', 'damage', 'trample']), mechanics: ['combat', 'damage', 'trample'],
+      trace: state.trace, sequence: [], clarificationNeeded: 'How is combat damage assigned?'
+    };
+  }
+  if (resolution.status !== 'resolved') return unsupported(resolution.reason || 'Combat damage could not be resolved safely.', {
+    cards, primitives: ['combat', 'damage'], trace: state.trace
+  });
+  endCombat(state);
+  const text = normalizeMagicText(message);
+  const attacker = state.objects.get(scenario.combat.attackers[0]?.objectId);
+  const blocker = state.objects.get(scenario.combat.blocks[0]?.blockerIds?.[0]);
+  const asksAttackerDies = /\b(?:does|will) (?:my |the )?(?:attacker|attacking creature|creature) die\b/.test(text);
+  const asksBlockerDies = /\b(?:does|will) (?:their |the )?blocker die\b/.test(text);
+  const subject = asksBlockerDies ? blocker : attacker;
+  const diesQuestion = asksAttackerDies || asksBlockerDies;
+  const died = subject?.zone === 'graveyard';
+  const playerDamage = state.combat.damageAssignments.filter((entry) => entry.targetId === scenario.combat.defendingPlayer).reduce((sum, entry) => sum + entry.amount, 0);
+  const summary = diesQuestion
+    ? `${subject?.name || 'The creature'} ${died ? 'dies' : 'survives'} after combat damage and state-based actions.`
+    : `Combat resolves with ${playerDamage} damage assigned to ${scenario.combat.defendingPlayer}.`;
+  return evaluated(diesQuestion ? (died ? 'yes' : 'no') : 'yes', summary, {
+    cards,
+    primitives: ['combat', 'attackers', 'blockers', 'damage', 'state-based-actions', 'triggers', 'timing'],
+    trace: state.trace,
+    sequence: state.trace.filter((entry) => ['AttackDeclared', 'BlockDeclared', 'DamageDealt', 'CreatureDied'].includes(entry.type)).map((entry) => entry.type),
+    state,
+    runtime: { combat: state.combat, playerDamage, attackerZone: attacker?.zone, blockerZone: blocker?.zone }
+  });
+}
+
 function typedExecutionSummary(card, effect, target, targetPlayer, result) {
   if (effect.type === 'LifeChange') return `${targetPlayer || 'The player'} ${effect.direction === 'gain' ? 'gains' : 'loses'} ${effect.amount.value} life.`;
   if (effect.type === 'DrawEffect') return `${card.name}'s controller draws ${result.drawn?.length || 0} cards.`;
@@ -798,6 +912,10 @@ export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
   const genericObjects = scenario.objects
     .filter((object) => object.name.startsWith('Generic ') || object.name.startsWith('Token '))
     .map((object) => ({ ...object, card: object.card }));
+  const combatTiming = evaluateCombatPriorityQuestion({ message, cards: normalizedCards, scenario });
+  if (combatTiming) return combatTiming;
+  const combat = evaluateCombatScenario({ message, cards: normalizedCards, genericObjects, scenario });
+  if (combat) return combat;
   const timing = evaluateTimingPermissionQuestion({ message, cards: normalizedCards, genericObjects, scenario });
   if (timing) return timing;
   const wardStack = evaluateWardStack({ message, cards: normalizedCards, genericObjects, scenario });

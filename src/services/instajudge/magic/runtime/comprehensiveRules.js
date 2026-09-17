@@ -16,6 +16,21 @@ const RULES_BY_PRIMITIVE = Object.freeze({
   damage: [
     { ruleId: 'CR-120', section: '120', title: 'Damage', enginePrimitive: 'damage', canonicalMeaning: 'Damage to creatures is marked and later evaluated by state-based actions.', keywords: ['damage'], effectiveDate: '2026-09-16', sourceVersion: MAGIC_CR_VERSION }
   ],
+  combat: [
+    { ruleId: 'CR-506', section: '506', title: 'Combat Phase', enginePrimitive: 'combat', canonicalMeaning: 'Combat proceeds through beginning, attacker declaration, blocker declaration, combat damage, and end steps with priority between turn-based actions.', keywords: ['combat', 'combat phase'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  attackers: [
+    { ruleId: 'CR-508', section: '508', title: 'Declare Attackers Step', enginePrimitive: 'attackers', canonicalMeaning: 'Attackers are declared simultaneously, must satisfy attack restrictions, and tap unless an effect such as vigilance says otherwise.', keywords: ['attack', 'attacker', 'vigilance'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  blockers: [
+    { ruleId: 'CR-509', section: '509', title: 'Declare Blockers Step', enginePrimitive: 'blockers', canonicalMeaning: 'Blocks are declared simultaneously and must satisfy evasion, protection, menace, and other blocking restrictions.', keywords: ['block', 'blocker', 'flying', 'reach', 'menace'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  trample: [
+    { ruleId: 'CR-702.19', section: '702.19', title: 'Trample', enginePrimitive: 'trample', canonicalMeaning: 'A trampling attacker may assign excess combat damage to its attack target only after assigning lethal damage to its blockers.', keywords: ['trample', 'excess damage'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  'first-double-strike': [
+    { ruleId: 'CR-702.4-702.7', section: '702.4, 702.7', title: 'Double Strike and First Strike', enginePrimitive: 'first-double-strike', canonicalMeaning: 'First strike and double strike can create an additional combat damage step, with double strike participating in both steps if still eligible.', keywords: ['first strike', 'double strike'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
   'state-based-actions': [
     { ruleId: 'CR-704', section: '704', title: 'State-Based Actions', enginePrimitive: 'state-based-actions', canonicalMeaning: 'State-based actions clean up lethal damage, zero toughness, life totals, illegal attachments, and related game states.', keywords: ['sba', 'lethal damage', 'dies'], effectiveDate: '2026-09-16', sourceVersion: MAGIC_CR_VERSION }
   ],

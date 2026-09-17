@@ -110,8 +110,31 @@ Certified Phase 6 proofs include:
 - Equipment and Aura bonuses follow attachment state; an illegal Aura goes to the graveyard and Equipment detaches.
 - Glorious Anthem, Giant Growth, Clone, Control Magic, Animate Land, Bonesplitter, Flight, Moonlace, and Maro match their generic layer primitives within the supported grammar.
 
+## Phase 7: Executable Combat
+
+`combatRuntime.js` owns explicit two-player combat state. It tracks the attacking and defending players, combat step, attackers and attack targets, blocker assignments, persistent blocked state, damage order, first-strike participation, damage assignments, damage-step count, priority windows, and unsupported restrictions.
+
+The executable sequence is beginning of combat, declare attackers, declare blockers, optional first-strike combat damage, regular combat damage, and end of combat. Attack and block declarations emit normal events, run state-based actions, collect and stack triggers, and open priority. Combat cannot advance while the stack is nonempty.
+
+Attacker legality uses derived controller, creature type, tapped state, summoning sickness, haste, defender, vigilance, and supported attack restrictions. Block legality uses derived controller/type, tapped state, flying, reach, menace, protection, and supported blocking restrictions. Unsupported restrictions fail closed.
+
+Combat damage uses the existing `DamageProposed`/`DamageDealt` replacement and prevention pipeline. Creature damage is marked for the shared SBA engine; player damage changes life through the same event path. Deathtouch sets lethal-damage state, lifelink gains life as part of the damage result, protection prevents qualifying damage, and indestructible remains owned by the SBA engine.
+
+Blocked state persists after blockers leave combat. A blocked attacker without trample assigns no damage to its attack target; a trampling attacker with no remaining blockers may assign through. Multiple blockers, blocker order, and trample splits require explicit assignments whenever the choice changes the result. Missing choices return `DEPENDS`.
+
+Certified Phase 7 proofs include:
+
+- basic 2/2 into 3/3 combat with simultaneous damage and SBA cleanup;
+- first strike plus deathtouch killing a 6/6 before regular damage;
+- unblocked double strike dealing damage in both combat damage steps;
+- trample and deathtouch/trample lethal-assignment thresholds;
+- flying, reach, menace, vigilance, haste, summoning sickness, and defender legality;
+- lifelink, protection blocking and prevention, and indestructible versus deathtouch;
+- removed blockers, multiple blockers, attack triggers, and priority-window pauses;
+- Serra Angel, Typhoid Rats, Youthful Knight, Colossal Dreadmaw, Fencing Ace, and Healer's Hawk parity.
+
 ## Deliberately Unsupported
 
-X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer priority and ambiguous multiplayer trigger ordering are not certified. Special actions, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, combat execution, complete turn progression, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
+X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer combat/priority and ambiguous multiplayer trigger ordering are not certified. Special actions, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, unusual attack/block permissions, banding, planeswalker/battle attack targets, automatic spell continuation through combat windows, complete turn progression, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
 
-The next phase should add combat declaration, blocking restrictions, damage assignment, first/double strike steps, trample, deathtouch, lifelink, and combat-trigger execution on the same derived-characteristics foundation.
+The next phase should add complete turn progression, cleanup/reset semantics, and broader phase/step orchestration around the existing stack, continuous-effect, and combat owners.

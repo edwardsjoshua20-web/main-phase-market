@@ -228,12 +228,14 @@ function triggerEvent(triggerText, card) {
   }
   if (value.includes('enters the battlefield')) return { type: 'EventPattern', eventType: 'PermanentEntered', filter: {} };
   if (value.includes('leaves the battlefield')) return { type: 'EventPattern', eventType: 'PermanentLeft', filter: {} };
-  if (value.includes('attacks')) return { type: 'EventPattern', eventType: 'AttackDeclared', filter: {} };
-  if (value.includes('blocks')) return { type: 'EventPattern', eventType: 'BlockDeclared', filter: {} };
+  if (value.includes('becomes blocked')) return { type: 'EventPattern', eventType: 'AttackerBecameBlocked', filter: { sourceSelf: true } };
+  if (value.includes('attacks')) return { type: 'EventPattern', eventType: 'AttackDeclared', filter: { sourceSelf: !/\b(?:a|one or more|two or more) creatures? attacks\b/.test(value) } };
+  if (value.includes('blocks')) return { type: 'EventPattern', eventType: 'BlockDeclared', filter: { sourceSelf: true } };
   if (value.includes('cast')) return { type: 'EventPattern', eventType: 'SpellCast', filter: {} };
   if (value.includes('upkeep')) return { type: 'EventPattern', eventType: 'StepBegan', filter: { step: 'upkeep' } };
   if (value.includes('end step')) return { type: 'EventPattern', eventType: 'StepBegan', filter: { step: 'end' } };
-  if (value.includes('deals damage')) return { type: 'EventPattern', eventType: 'DamageDealt', filter: {} };
+  if (value.includes('end of combat')) return { type: 'EventPattern', eventType: 'EndOfCombat', filter: {} };
+  if (/\bdeals? (?:combat )?damage\b/.test(value)) return { type: 'EventPattern', eventType: 'DamageDealt', filter: { sourceSelf: true, combat: value.includes('combat damage'), player: value.includes('to a player') || value.includes('to an opponent') } };
   if (value.includes('gain life')) return { type: 'EventPattern', eventType: 'LifeGained', filter: {} };
   if (value.includes('lose life')) return { type: 'EventPattern', eventType: 'LifeLost', filter: {} };
   return { type: 'EventPattern', eventType: null, filter: {} };

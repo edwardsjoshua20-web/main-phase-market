@@ -57,7 +57,7 @@ function parseWardCost(text = '') {
 
 function parseKeywordAbilities(text = '') {
   const normalized = normalizeMagicText(text);
-  return KEYWORDS.filter((keyword) => normalized.includes(keyword)).map((keyword) => {
+  const abilities = KEYWORDS.filter((keyword) => normalized.includes(keyword)).map((keyword) => {
     const ability = { type: 'KeywordAbility', keyword };
     if (keyword === 'ward') {
       const cost = parseWardCost(text);
@@ -65,6 +65,10 @@ function parseKeywordAbilities(text = '') {
     }
     return ability;
   });
+  for (const match of normalized.matchAll(/\bprotection from (white|blue|black|red|green|colorless|artifacts?|creatures?)\b/g)) {
+    abilities.push({ type: 'KeywordAbility', keyword: `protection from ${match[1].replace(/s$/, '')}` });
+  }
+  return abilities;
 }
 
 function genericCard({ name, typeLine, power, toughness, abilities }) {
@@ -137,7 +141,7 @@ function compileGenericObjects(message, makeId) {
     }
   }
 
-  const descriptorPattern = /\b(?:(my opponent's|opponent's|their|my own|my|your|i control|opponent controls|player controls)\s+)?(?:(one|two|three|four|five|six|\d+|a|an)\s+)?(?:(\d+)\/(\d+)\s+)?((?:tapped\s+)?(?:legendary\s+)?(?:artifact\s+)?(?:commander|creature)(?:\s+tokens?)?(?:\s+(?:that has|has|with)\s+(?:double strike|first strike|deathtouch|indestructible|vigilance|hexproof|shroud|flying|reach|trample|lifelink|menace|haste|defender|flash|ward(?:\s+\d+)?)(?:\s+and\s+(?:[a-z ]+))?)?)(?=\s+(?:for|and|gains?|gets?|is|are|from|target|targeting|can|in response|i cast|\. |\?|$)|$)/g;
+  const descriptorPattern = /\b(?:(my opponent's|opponent's|their|my own|my|your|i control|opponent controls|player controls)\s+)?(?:(one|two|three|four|five|six|\d+|a|an)\s+)?(?:(\d+)\/(\d+)\s+)?((?:tapped\s+)?(?:legendary\s+)?(?:artifact\s+)?(?:commander|creature)(?:\s+tokens?)?(?:\s+(?:that has|has|with)\s+(?:double strike|first strike|deathtouch|indestructible|vigilance|hexproof|shroud|flying|reach|trample|lifelink|menace|haste|defender|flash|ward(?:\s+\d+)?|protection from (?:white|blue|black|red|green|colorless|artifacts?|creatures?))(?:\s+and\s+(?:[a-z ]+))?)?)(?=\s+(?:attacks?|blocks?|for|and|gains?|gets?|is|are|from|target|targeting|can|in response|i cast|\. |\?|$)|$)/g;
   for (const match of normalized.matchAll(descriptorPattern)) {
     if (/\bcreate\s+$/.test(normalized.slice(Math.max(0, match.index - 16), match.index))) continue;
     if (objects.some((entry) => entry.sourceKey.startsWith(`${match.index}:`))) continue;
@@ -313,6 +317,64 @@ function compileContinuousEffects(message, objects) {
   return effects;
 }
 
+function objectWithPowerToughness(objects, power, toughness, excluded = new Set()) {
+  return objects.find((object) => !excluded.has(object.id) && object.power === Number(power) && object.toughness === Number(toughness)) || null;
+}
+
+function compileCombat(message, objects, cards) {
+  const text = normalizeMagicText(message);
+  if (!/\battack(?:s|ed|ing)?\b|\bblock(?:s|ed|ing)?\b/.test(text)) return null;
+  const attackingPlayer = /\b(?:my opponent|opponent|they) attack/.test(text) ? 'opponent' : 'player';
+  const defendingPlayer = attackingPlayer === 'player' ? 'opponent' : 'player';
+  const used = new Set();
+  const attackPt = text.match(/\b(?:i attack with|attack with|my)\s+(?:my\s+)?(\d+)\/(\d+)(?:\s+[a-z ]+?)?(?:\s+attacks?)?\b/)
+    || text.match(/\b(\d+)\/(\d+)\s+(?:[a-z ]+\s+)?creature\s+attacks?\b/);
+  let attacker = attackPt ? objectWithPowerToughness(objects, attackPt[1], attackPt[2], used) : null;
+  if (!attacker) {
+    const named = cards.find((card) => new RegExp(`(?:attack(?:s|ed)? with|${escapeRegExp(card.normalizedName)} attacks?)`).test(text) && text.includes(card.normalizedName));
+    attacker = named ? objects.find((object) => normalizeMagicText(object.name) === named.normalizedName) : null;
+  }
+  attacker ||= objects.find((object) => object.controller === attackingPlayer && normalizeMagicText(object.card.typeLine).includes('creature')) || null;
+  if (!attacker) return { status: 'unsupported', reason: 'No attacking creature could be identified safely.', attackingPlayer, defendingPlayer, attackers: [], blocks: [] };
+  attacker.controller = attackingPlayer;
+  attacker.owner = attacker.owner || attackingPlayer;
+  attacker.summoningSick = /\b(?:just entered|summoning sick|entered this turn)\b/.test(text) && !/\bhaste\b/.test(text);
+  used.add(attacker.id);
+
+  const blockerMatches = [...text.matchAll(/\b(?:they|my opponent|opponent|their creature)?\s*blocks?(?: it| my [a-z ]+)?\s+with\s+(?:their\s+)?(?:a\s+)?(\d+)\/(\d+)/g)];
+  const blockerIds = [];
+  for (const match of blockerMatches) {
+    const blocker = objectWithPowerToughness(objects, match[1], match[2], used);
+    if (!blocker) continue;
+    blocker.controller = defendingPlayer;
+    blocker.owner = blocker.owner || defendingPlayer;
+    used.add(blocker.id);
+    blockerIds.push(blocker.id);
+  }
+  if (blockerIds.length === 0 && /\b(?:block|blocks|blocked)\b/.test(text)) {
+    const candidates = objects.filter((object) => object.id !== attacker.id && normalizeMagicText(object.card.typeLine).includes('creature'));
+    const requested = text.match(/\b(two|three|four|\d+) creatures? block/);
+    const count = requested ? numberFrom(requested[1]) : 1;
+    for (const blocker of candidates.slice(0, count)) {
+      blocker.controller = defendingPlayer;
+      blocker.owner = blocker.owner || defendingPlayer;
+      blockerIds.push(blocker.id);
+    }
+  }
+  const removedBeforeDamage = /\bblocker (?:dies|is destroyed|is exiled|leaves) before (?:combat )?damage\b/.test(text);
+  const blockedButUnidentified = blockerIds.length === 0 && /\b(?:is|becomes|became|was) blocked\b/.test(text);
+  return {
+    status: 'compiled',
+    attackingPlayer,
+    defendingPlayer,
+    attackers: [{ objectId: attacker.id, attackTarget: defendingPlayer }],
+    blocks: blockerIds.length ? [{ attackerId: attacker.id, blockerIds, damageOrder: [] }] : [],
+    blockedButUnidentified,
+    removedBeforeDamage: removedBeforeDamage ? [...blockerIds] : [],
+    interventionWindow: /\bafter blockers(?: are declared)?\b/.test(text) ? 'after-blockers' : null
+  };
+}
+
 export function compileMagicScenario({ message = '', cards = [] } = {}) {
   const makeId = makeIdFactory();
   const normalizedCards = cards.map(normalizeMagicCard).filter((card) => card.name);
@@ -343,6 +405,7 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
   const actions = compileActions(message, normalizedCards, objects, makeId);
   const choices = compileChoices(message, objects, actions, makeId);
   const continuousEffects = compileContinuousEffects(message, objects);
+  const combat = compileCombat(message, objects, normalizedCards);
   return {
     type: 'MagicScenario',
     version: 1,
@@ -355,6 +418,7 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
     zones: ['battlefield', 'hand', 'graveyard', 'exile', 'library', 'stack', 'command'],
     actions,
     continuousEffects,
+    combat,
     choices,
     sequence: [...actions].sort((left, right) => left.index - right.index).map((action) => action.id),
     game: {
@@ -386,7 +450,8 @@ export function extractGenericObjects(message = '') {
     token: object.token,
     tapped: object.tapped,
     commander: object.commander,
-    abilities: object.abilities
+    abilities: object.abilities,
+    summoningSick: object.summoningSick
   }));
 }
 
