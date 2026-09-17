@@ -61,6 +61,7 @@ function parseTriggeredAbilities(card, text) {
   const abilities = [];
   if (/\bwhenever\b.*\bcreature\b.*\bdies\b/.test(text)) {
     const selfOrAnother = /\bthis or another creature dies\b/.test(text)
+      || /\bthis creature or another creature dies\b/.test(text)
       || text.includes(`${card.normalizedName} or another creature dies`);
     const another = /\banother creature dies\b/.test(text);
     const losesLife = text.match(/\b(target opponent|target player|each opponent|that player) loses? (\d+) life\b/);
