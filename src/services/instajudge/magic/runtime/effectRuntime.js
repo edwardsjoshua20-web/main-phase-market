@@ -1,5 +1,13 @@
-import { isCreature, normalizeMagicText } from '../magicCards.js';
+import { normalizeMagicText } from '../magicCards.js';
 import { ORACLE_NODE_TYPES } from './oracleSemantics.js';
+import {
+  CONTINUOUS_LAYERS,
+  PT_SUBLAYERS,
+  createContinuousEffect,
+  createCopyEffect,
+  deriveCharacteristics,
+  invalidateCharacteristics
+} from './continuousEffects.js';
 import {
   addPermanent,
   createGameObject,
@@ -129,8 +137,8 @@ export function millCards(state, { playerId, amount, source = null, allowPlaceho
 
 function sacrificeCandidates(state, playerId, requirement = 'permanent') {
   return state.battlefield.filter((object) => object.zone === 'battlefield'
-    && object.controller === playerId
-    && (requirement !== 'creature' || isCreature(object.card))
+    && deriveCharacteristics(state, object).controller === playerId
+    && (requirement !== 'creature' || deriveCharacteristics(state, object).types.includes('creature'))
     && !/can(?:not|'t) be sacrificed/i.test(object.card.oracleText));
 }
 
@@ -183,6 +191,7 @@ export function modifyCounters(state, { object, counter, amount, operation = 'ad
   if (pipeline.status !== 'ready') return pipeline;
   const current = object.counters[counter] || 0;
   object.counters[counter] = operation === 'remove' ? Math.max(0, current - numeric) : current + numeric;
+  invalidateCharacteristics(state);
   emitEvent(state, 'CountersChanged', { source, object, amount: numeric, metadata: { counter, operation, total: object.counters[counter] } });
   runStateBasedActionsRuntime(state);
   return { status: 'executed', object, counter, total: object.counters[counter], power: currentPower(object), toughness: currentToughness(object) };
@@ -241,9 +250,55 @@ export function executeTypedEffect({ state, effect, sourceObject = null, control
       return target && Number.isFinite(amount) ? markDamageWithResult(state, target, amount, sourceObject, choices.damageMetadata || {}) : unsupported('Damage needs a target and fixed amount.');
     case ORACLE_NODE_TYPES.PT_MODIFICATION:
       if (!target || !Number.isFinite(fixedAmount(effect.power)) || !Number.isFinite(fixedAmount(effect.toughness))) return unsupported('P/T modification needs a target and fixed values.');
-      target.effects.push({ type: 'pt-modifier', power: fixedAmount(effect.power), toughness: fixedAmount(effect.toughness), source: sourceObject?.name || 'effect', duration: effect.duration });
+      createContinuousEffect(state, {
+        source: sourceObject,
+        controller,
+        layer: CONTINUOUS_LAYERS.POWER_TOUGHNESS,
+        sublayer: effect.setBase ? PT_SUBLAYERS.SET : PT_SUBLAYERS.MODIFY,
+        duration: effect.duration || 'indefinite',
+        appliesTo: { objectId: target.id },
+        modification: { kind: 'pt', mode: effect.setBase ? 'set' : 'modify', power: fixedAmount(effect.power), toughness: fixedAmount(effect.toughness) }
+      });
       runStateBasedActionsRuntime(state);
       return { status: 'executed', object: target, power: currentPower(target), toughness: currentToughness(target) };
+    case ORACLE_NODE_TYPES.COPY:
+      if (effect.unsupportedExceptions) return unsupported('Copy exceptions are outside the executable copy subset.');
+      if (!target || !choices.copySource) return unsupported('A copy effect requires both a target and a copy source.');
+      return { status: 'executed', effect: createCopyEffect(state, { target, source: choices.copySource, duration: effect.duration || 'indefinite', controller }) };
+    case ORACLE_NODE_TYPES.CONTROL_CHANGE:
+      if (!target) return unsupported('A control-changing effect requires a target permanent.');
+      return { status: 'executed', effect: createContinuousEffect(state, {
+        source: sourceObject, controller, layer: CONTINUOUS_LAYERS.CONTROL, duration: effect.duration || 'indefinite',
+        appliesTo: { objectId: target.id }, modification: { kind: 'control', controller: effect.controller === 'effect-controller' ? controller : effect.controller }
+      }), controller: deriveCharacteristics(state, target).controller };
+    case ORACLE_NODE_TYPES.TEXT_CHANGE:
+      if (!target || !effect.from || !effect.to) return unsupported('A text-changing effect requires a target and supported word substitution.');
+      return { status: 'executed', effect: createContinuousEffect(state, {
+        source: sourceObject, controller, layer: CONTINUOUS_LAYERS.TEXT, duration: effect.duration || 'indefinite',
+        appliesTo: { objectId: target.id }, modification: { kind: 'text', from: effect.from, to: effect.to }
+      }) };
+    case ORACLE_NODE_TYPES.TYPE_CHANGE:
+      if (!target) return unsupported('A type-changing effect requires a target.');
+      return { status: 'executed', effect: createContinuousEffect(state, {
+        source: sourceObject, controller, layer: CONTINUOUS_LAYERS.TYPE, duration: effect.duration || 'indefinite',
+        appliesTo: { objectId: target.id }, modification: { kind: 'type', mode: effect.mode || 'add', types: effect.types, subtypes: effect.subtypes, supertypes: effect.supertypes }
+      }) };
+    case ORACLE_NODE_TYPES.COLOR_CHANGE:
+      if (!target) return unsupported('A color-changing effect requires a target.');
+      return { status: 'executed', effect: createContinuousEffect(state, {
+        source: sourceObject, controller, layer: CONTINUOUS_LAYERS.COLOR, duration: effect.duration || 'indefinite',
+        appliesTo: { objectId: target.id }, modification: { kind: 'color', mode: effect.mode || 'set', colors: effect.colors || [] }
+      }) };
+    case ORACLE_NODE_TYPES.ABILITY_CHANGE:
+    case ORACLE_NODE_TYPES.KEYWORD_GRANT:
+      if (!target) return unsupported('An ability-changing effect requires a target.');
+      {
+        const grantedAbilities = effect.quality ? [`protection from ${effect.quality}`] : effect.abilities || [effect.keyword];
+      return { status: 'executed', effect: createContinuousEffect(state, {
+        source: sourceObject, controller, layer: CONTINUOUS_LAYERS.ABILITY, duration: effect.duration || 'indefinite',
+        appliesTo: { objectId: target.id }, modification: { kind: 'ability', mode: effect.mode || 'add', abilities: grantedAbilities, keywordAbilities: effect.keyword && !effect.quality ? [{ type: 'KeywordAbility', keyword: effect.keyword }] : undefined }
+      }) };
+      }
     case ORACLE_NODE_TYPES.PREVENTION: {
       const shield = registerPreventionEffect(state, {
         id: `prevention-${state.preventionEffects.length + 1}`,

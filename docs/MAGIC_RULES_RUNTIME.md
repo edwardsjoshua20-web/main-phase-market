@@ -90,8 +90,28 @@ Certified Phase 5 proofs include:
 
 The Phase 5 verifier reports parsed, executable, and unsupported Oracle IR separately and blocks certification if any supported case produces an incorrect confident ruling.
 
+## Phase 6: Continuous Effects and Layers
+
+`continuousEffects.js` is the canonical owner for current object characteristics. Runtime objects retain immutable printed/base characteristics and separate copyable values. A derived query evaluates current name, controller, text, supertypes, types, subtypes, colors, abilities, power, toughness, loyalty, and copy state without destructively rewriting the printed card.
+
+Structured continuous effects carry source, controller, layer, optional sublayer, timestamp, duration, dependency keys, applicability, and modification data. The executable layer order is copy, control, text, type, color, abilities, and power/toughness. Power/toughness evaluation applies CDA values, set values, modifiers, counters, and switching in sublayers 7a through 7e.
+
+Supported durations include until end of turn, this turn, source-on-battlefield, as long as, for as long as, while, and indefinite effects. Cleanup removes turn effects through the game-step transition. Battlefield static effects stop when their source leaves; supported characteristic-defining abilities remain available in other zones.
+
+Independent effects within one layer use timestamp order. Explicit read/write dependency keys topologically order basic dependent effects before timestamp fallback. A dependency cycle returns `UNVERIFIED` rather than guessing. Derived values are cached by runtime revision and invalidated by relevant object, zone, counter, attachment, and effect mutations.
+
+Certified Phase 6 proofs include:
+
+- An other-creatures anthem buffs two controlled creatures without buffing itself.
+- Losing all abilities removes hexproof for targeting, then cleanup restores the printed ability.
+- A land becomes a 3/3 creature while remaining a land, then reverts at cleanup.
+- A copy uses copyable 2/2 values without copying a +1/+1 counter; later anthem effects apply to both objects.
+- Independent same-layer effects obey timestamp order, while a same-layer dependency overrides timestamp.
+- Equipment and Aura bonuses follow attachment state; an illegal Aura goes to the graveyard and Equipment detaches.
+- Glorious Anthem, Giant Growth, Clone, Control Magic, Animate Land, Bonesplitter, Flight, Moonlace, and Maro match their generic layer primitives within the supported grammar.
+
 ## Deliberately Unsupported
 
-X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer priority and ambiguous multiplayer trigger ordering are not certified. Special actions, arbitrary replacement/prevention scopes, continuous layers, combat execution, complete turn progression, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required replacement choice.
+X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer priority and ambiguous multiplayer trigger ordering are not certified. Special actions, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, combat execution, complete turn progression, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
 
-The next phase should broaden continuous effects, layers, and duration handling on the same typed event foundation, without restoring pattern verdicts.
+The next phase should add combat declaration, blocking restrictions, damage assignment, first/double strike steps, trample, deathtouch, lifelink, and combat-trigger execution on the same derived-characteristics foundation.

@@ -1,9 +1,17 @@
-import { isCreature, isInstant, isSorcery, normalizeMagicCard, normalizeMagicText, sourceHasQuality } from '../magicCards.js';
+import { isInstant, isSorcery, normalizeMagicCard, normalizeMagicText, sourceHasQuality } from '../magicCards.js';
 import { rulesForPrimitives } from './comprehensiveRules.js';
 import { parseOracleSemantics } from './oracleSemantics.js';
 import { compileMagicScenario, extractGenericObjects } from './scenarioCompiler.js';
 import { PAYMENT_STATUS } from './costSystem.js';
 import { executeTypedEffect } from './effectRuntime.js';
+import {
+  CONTINUOUS_LAYERS,
+  PT_SUBLAYERS,
+  createContinuousEffect,
+  deriveCharacteristics,
+  derivedHasAbility,
+  derivedHasQuality
+} from './continuousEffects.js';
 import { castSpell, checkTimingPermission, passPriority, resolveTopOfStack } from './stackRuntime.js';
 import {
   addPermanent,
@@ -76,26 +84,27 @@ function inferController(message, cardName) {
 }
 
 function objectHasAbility(object, ability) {
-  return object?.card?.abilities?.includes(ability) || object?.effects?.some((effect) => effect.type === 'ability' && effect.ability === ability);
+  return object ? derivedHasAbility(object.runtimeState, object, ability) : false;
 }
 
 function objectLabel(object) {
-  const pt = Number.isFinite(object?.basePower) && Number.isFinite(object?.baseToughness) ? ` ${object.basePower}/${object.baseToughness}` : '';
-  const abilities = [...new Set([...(object?.card?.abilities || []), ...(object?.effects || []).filter((effect) => effect.type === 'ability').map((effect) => effect.ability)])];
-  const abilityText = abilities.length ? ` ${abilities.join(', ')}` : '';
-  return `${object.name}${pt}${abilityText}`.trim();
+  const derived = deriveCharacteristics(object?.runtimeState, object);
+  const pt = Number.isFinite(derived.power) && Number.isFinite(derived.toughness) ? ` ${derived.power}/${derived.toughness}` : '';
+  const abilityText = derived.abilities.length ? ` ${derived.abilities.join(', ')}` : '';
+  return `${derived.name}${pt}${abilityText}`.trim();
 }
 
 function descriptorMatchesObject(descriptor = '', object) {
   const text = normalizeMagicText(descriptor);
   if (!object || object.zone !== 'battlefield') return false;
-  if (/\bmy opponent's|opponent's|opponent controls|their\b/.test(text) && object.controller !== 'opponent') return false;
-  if (!/\bmy opponent's\b/.test(text) && /\bmy|my own|i control|your\b/.test(text) && object.controller !== 'player') return false;
-  if (/\bcreature\b/.test(text) && !isCreature(object.card)) return false;
-  if (/\bartifact\b/.test(text) && !normalizeMagicText(object.card.typeLine).includes('artifact')) return false;
+  const derived = deriveCharacteristics(object.runtimeState, object);
+  if (/\bmy opponent's|opponent's|opponent controls|their\b/.test(text) && derived.controller !== 'opponent') return false;
+  if (!/\bmy opponent's\b/.test(text) && /\bmy|my own|i control|your\b/.test(text) && derived.controller !== 'player') return false;
+  if (/\bcreature\b/.test(text) && !derived.types.includes('creature')) return false;
+  if (/\bartifact\b/.test(text) && !derived.types.includes('artifact')) return false;
   if (/\bcommander\b/.test(text) && !object.commander) return false;
   const pt = text.match(/\b(\d+)\/(\d+)\b/);
-  if (pt && (object.basePower !== Number(pt[1]) || object.baseToughness !== Number(pt[2]))) return false;
+  if (pt && (derived.power !== Number(pt[1]) || derived.toughness !== Number(pt[2]))) return false;
   for (const ability of abilitiesFromDescriptor(text)) {
     if (!objectHasAbility(object, ability)) return false;
   }
@@ -107,8 +116,8 @@ function resolveReference({ descriptor = '', state, previousTargets = [] } = {})
   if (/\bfirst target\b/.test(text)) return previousTargets[0] || null;
   if (/\bsecond target\b/.test(text)) return previousTargets[1] || null;
   if (/\bother creature|another\b/.test(text)) {
-    return state.battlefield.find((object) => object.zone === 'battlefield' && isCreature(object.card) && !previousTargets.includes(object) && descriptorMatchesObject(descriptor, object))
-      || state.battlefield.find((object) => object.zone === 'battlefield' && isCreature(object.card) && !previousTargets.includes(object))
+    return state.battlefield.find((object) => object.zone === 'battlefield' && deriveCharacteristics(state, object).types.includes('creature') && !previousTargets.includes(object) && descriptorMatchesObject(descriptor, object))
+      || state.battlefield.find((object) => object.zone === 'battlefield' && deriveCharacteristics(state, object).types.includes('creature') && !previousTargets.includes(object))
       || null;
   }
   if (/\bit|that creature|the creature i targeted earlier\b/.test(text) && previousTargets.length > 0) return previousTargets.at(-1);
@@ -161,13 +170,13 @@ function compileScenarioTrace({ state, cards, targetBindings = [], responses = [
     type: 'ScenarioCompiler',
     players: ['player', 'opponent'],
     objects: state.battlefield.map((object) => ({
-      name: object.name,
-      controller: object.controller,
+      name: deriveCharacteristics(state, object).name,
+      controller: deriveCharacteristics(state, object).controller,
       zone: object.zone,
-      typeLine: object.card.typeLine,
-      power: object.basePower,
-      toughness: object.baseToughness,
-      abilities: object.card.abilities || [],
+      types: deriveCharacteristics(state, object).types,
+      power: deriveCharacteristics(state, object).power,
+      toughness: deriveCharacteristics(state, object).toughness,
+      abilities: deriveCharacteristics(state, object).abilities,
       token: object.token,
       commander: object.commander
     })),
@@ -211,7 +220,7 @@ function chosenProtectionQuality(message, effect) {
   return null;
 }
 
-function validateTarget({ sourceObject, target, effect }) {
+export function validateTarget({ sourceObject, target, effect }) {
   const failures = [];
   if (!target) failures.push('No target was identified.');
   if (effect.target?.kind === 'spell') {
@@ -221,15 +230,18 @@ function validateTarget({ sourceObject, target, effect }) {
   }
   if (!target || target.zone !== 'battlefield') failures.push(`${target?.name || 'Target'} is not on the battlefield.`);
   if (!target) return { legal: false, failures };
-  if (effect.target?.requiredTypes?.includes('creature') && !isCreature(target?.card || {})) failures.push(`${target.name} is not a creature.`);
-  if (effect.target?.excludedColors?.some((color) => target.card.colors?.includes(color))) failures.push(`${target.name} is ${effect.target.excludedColors.join(', ')}.`);
-  if (effect.target?.controller === 'self' && target.controller !== sourceObject.controller) failures.push(`${target.name} is not controlled by ${sourceObject.controller}.`);
+  const state = target.runtimeState;
+  const targetCharacteristics = deriveCharacteristics(state, target);
+  const sourceCharacteristics = sourceObject.runtimeState ? deriveCharacteristics(sourceObject.runtimeState, sourceObject) : { controller: sourceObject.controller };
+  if (effect.target?.requiredTypes?.includes('creature') && !targetCharacteristics.types.includes('creature')) failures.push(`${target.name} is not a creature.`);
+  if (effect.target?.excludedColors?.some((color) => targetCharacteristics.colors.includes(color))) failures.push(`${target.name} is ${effect.target.excludedColors.join(', ')}.`);
+  if (effect.target?.controller === 'self' && targetCharacteristics.controller !== sourceCharacteristics.controller) failures.push(`${target.name} is not controlled by ${sourceCharacteristics.controller}.`);
   if (objectHasAbility(target, 'shroud')) failures.push(`${target.name} has shroud.`);
-  if (objectHasAbility(target, 'hexproof') && target.controller !== sourceObject.controller) failures.push(`${target.name} has hexproof.`);
-  for (const continuous of target?.effects || []) {
-    if (continuous.type === 'protection' && sourceHasQuality(sourceObject.card, continuous.quality)) {
-      failures.push(`${target.name} has protection from ${continuous.quality}.`);
-    }
+  if (objectHasAbility(target, 'hexproof') && targetCharacteristics.controller !== sourceCharacteristics.controller) failures.push(`${target.name} has hexproof.`);
+  for (const ability of targetCharacteristics.abilities.filter((candidate) => normalizeMagicText(candidate).startsWith('protection from '))) {
+    const quality = normalizeMagicText(ability).replace('protection from ', '');
+    const blocked = sourceObject.runtimeState ? derivedHasQuality(sourceObject.runtimeState, sourceObject, quality) : sourceHasQuality(sourceObject.card, quality);
+    if (blocked) failures.push(`${target.name} has protection from ${quality}.`);
   }
   return { legal: failures.length === 0, failures };
 }
@@ -240,7 +252,14 @@ function applyEffect({ state, sourceObject, effect, target, message }) {
   if (effect.type === 'grant-protection') {
     const quality = chosenProtectionQuality(message, effect);
     if (!quality) return { needsClarification: 'Which protection quality was chosen?', sequence, primitives };
-    target.effects.push({ type: 'protection', quality, source: sourceObject.name });
+    createContinuousEffect(state, {
+      source: sourceObject,
+      controller: sourceObject.controller,
+      layer: CONTINUOUS_LAYERS.ABILITY,
+      duration: 'until-end-of-turn',
+      appliesTo: { objectId: target.id },
+      modification: { kind: 'ability', mode: 'add', abilities: [`protection from ${quality}`] }
+    });
     sequence.push(`${target.name} gains protection from ${quality}.`);
     state.trace.push({ type: 'ContinuousEffectAdded', effect: 'protection', appliesTo: target.name, quality });
     return { sequence, primitives: [...primitives, 'protection', 'continuous'] };
@@ -270,7 +289,15 @@ function applyEffect({ state, sourceObject, effect, target, message }) {
     return { sequence, primitives };
   }
   if (effect.type === 'modify-pt') {
-    target.effects.push({ type: 'pt-modifier', power: effect.power, toughness: effect.toughness, source: sourceObject.name });
+    createContinuousEffect(state, {
+      source: sourceObject,
+      controller: sourceObject.controller,
+      layer: CONTINUOUS_LAYERS.POWER_TOUGHNESS,
+      sublayer: PT_SUBLAYERS.MODIFY,
+      duration: 'until-end-of-turn',
+      appliesTo: { objectId: target.id },
+      modification: { kind: 'pt', mode: 'modify', power: effect.power, toughness: effect.toughness }
+    });
     sequence.push(`${target.name} gets ${effect.power}/${effect.toughness}.`);
     return { sequence, primitives: [...primitives, 'continuous'] };
   }
@@ -280,7 +307,7 @@ function applyEffect({ state, sourceObject, effect, target, message }) {
 function applyGlobalDamage({ state, sourceObject, effect }) {
   const sequence = [];
   const primitives = [...(effect.primitives || [])];
-  const affected = state.battlefield.filter((object) => object.zone === 'battlefield' && isCreature(object.card));
+  const affected = state.battlefield.filter((object) => object.zone === 'battlefield' && deriveCharacteristics(state, object).types.includes('creature'));
   for (const object of affected) {
     markDamage(state, object, effect.amount, sourceObject);
     sequence.push(`${sourceObject.name} deals ${effect.amount} damage to ${object.name}.`);
@@ -370,7 +397,13 @@ function applyCompiledResponses({ message, state, targetBindings }) {
     }) || targetBindings.find((binding) => descriptorMatchesObject(descriptor, binding.target))?.target;
     if (!target) continue;
     if (!objectHasAbility(target, ability)) {
-      target.effects.push({ type: 'ability', ability, source: 'scenario response' });
+      createContinuousEffect(state, {
+        controller: target.controller,
+        layer: CONTINUOUS_LAYERS.ABILITY,
+        duration: 'until-end-of-turn',
+        appliesTo: { objectId: target.id },
+        modification: { kind: 'ability', mode: 'add', abilities: [ability] }
+      });
     }
     const response = `${target.name} gains ${ability}.`;
     responses.push(response);
@@ -711,6 +744,32 @@ function evaluateTypedSpellEffects({ message, cards, genericObjects, scenario })
   });
 }
 
+function evaluateContinuousScenario({ message, cards, genericObjects, scenario }) {
+  if (scenario.actions.length > 0 || scenario.continuousEffects.length === 0 || genericObjects.length === 0) return null;
+  const state = createMagicRuntimeState({ cards, genericObjects, scenario, message });
+  const target = state.objects.get(scenario.continuousEffects[0]?.targetObjectId) || state.battlefield[0];
+  if (!target) return null;
+  const characteristics = deriveCharacteristics(state, target);
+  if (characteristics.status !== 'ready') return unsupported(characteristics.reason || 'The continuous-effect dependency graph could not be resolved safely.', {
+    cards, primitives: ['continuous', 'layers', 'dependencies'], trace: state.trace
+  });
+  const text = normalizeMagicText(message);
+  const expectedPt = text.match(/\b(?:is it|does it become|is (?:the|my) [a-z ]+) (?:a )?(\d+)\/(\d+)\b/);
+  if (!expectedPt) return unsupported('The layer runtime derived the object, but the requested characteristic comparison was not identified safely.', {
+    cards, primitives: ['continuous', 'layers'], trace: state.trace
+  });
+  const matches = characteristics.power === Number(expectedPt[1]) && characteristics.toughness === Number(expectedPt[2]);
+  const summary = `${characteristics.name} is ${characteristics.power}/${characteristics.toughness} after continuous effects are applied in layer order.`;
+  return evaluated(matches ? 'yes' : 'no', summary, {
+    cards,
+    primitives: ['continuous', 'layers', 'timestamps', 'dependencies'],
+    trace: state.trace,
+    sequence: [summary],
+    state,
+    runtime: { characteristics, continuousEffectIds: characteristics.appliedEffects }
+  });
+}
+
 function typedExecutionSummary(card, effect, target, targetPlayer, result) {
   if (effect.type === 'LifeChange') return `${targetPlayer || 'The player'} ${effect.direction === 'gain' ? 'gains' : 'loses'} ${effect.amount.value} life.`;
   if (effect.type === 'DrawEffect') return `${card.name}'s controller draws ${result.drawn?.length || 0} cards.`;
@@ -749,6 +808,8 @@ export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
   if (targetedStack) return targetedStack;
   const typedEffects = evaluateTypedSpellEffects({ message, cards: normalizedCards, genericObjects, scenario });
   if (typedEffects) return typedEffects;
+  const continuousScenario = evaluateContinuousScenario({ message, cards: normalizedCards, genericObjects, scenario });
+  if (continuousScenario) return continuousScenario;
   return unsupported('The authoritative Magic runtime does not yet execute every primitive in this compiled scenario.', {
     cards: normalizedCards,
     primitives: ['continuous'],

@@ -100,6 +100,17 @@ function compileGenericObjects(message, makeId) {
   const normalized = normalizeMagicText(message);
   const objects = [];
 
+  for (const match of normalized.matchAll(/\b(?:(my opponent's|opponent's|their|my|your) )?(?:basic )?land\b/g)) {
+    const controller = ownerFrom(match[0]);
+    const name = `Generic Land ${String.fromCharCode(65 + objects.length)}`;
+    pushObject(objects, {
+      id: makeId('object'), kind: 'object', name, owner: controller, controller,
+      zone: 'battlefield', token: false, tapped: false, commander: false,
+      power: null, toughness: null, counters: {}, abilities: [],
+      card: genericCard({ name, typeLine: 'Land', power: null, toughness: null, abilities: [] })
+    }, `${match.index}:land`);
+  }
+
   for (const match of normalized.matchAll(/\b(one|two|three|four|five|six|\d+)\s+(\d+)\/(\d+)\s+creature tokens?\b/g)) {
     if (/\bcreate\s+$/.test(normalized.slice(Math.max(0, match.index - 16), match.index))) continue;
     const count = numberFrom(match[1]);
@@ -269,6 +280,39 @@ function compileChoices(message, objects, actions, makeId) {
   return choices;
 }
 
+function compileContinuousEffects(message, objects) {
+  const text = normalizeMagicText(message);
+  const effects = [];
+  const primary = objects[0];
+  const secondary = objects[1];
+  if (!primary) return effects;
+  const duration = /\buntil end of turn|this turn\b/.test(text) ? 'until-end-of-turn' : 'indefinite';
+  const modifier = text.match(/\b(?:it|my (?:\d+\/\d+ )?creature|that creature) gets ([+-]\d+)\/([+-]\d+)/);
+  if (modifier) effects.push({
+    kind: 'pt', targetObjectId: primary.id, duration, sublayer: '7c',
+    modification: { mode: 'modify', power: Number(modifier[1]), toughness: Number(modifier[2]) }
+  });
+  if (/\b(?:it|my (?:\d+\/\d+ )?creature|that creature) loses all abilities\b/.test(text)) effects.push({
+    kind: 'ability', targetObjectId: primary.id, duration,
+    modification: { mode: 'clear', abilities: [] }
+  });
+  const animation = text.match(/\b(?:it|my land|that land) becomes (?:a )?(\d+)\/(\d+) creature(?: that is still a land)?/);
+  if (animation) {
+    effects.push({ kind: 'type', targetObjectId: primary.id, duration, modification: { mode: text.includes('still a land') ? 'add' : 'set', types: ['creature'] } });
+    effects.push({ kind: 'pt', targetObjectId: primary.id, duration, sublayer: '7b', modification: { mode: 'set', power: Number(animation[1]), toughness: Number(animation[2]) } });
+  }
+  if (/\bmy opponent controls it now\b/.test(text)) effects.push({
+    kind: 'control', targetObjectId: primary.id, duration: 'indefinite',
+    modification: { controller: 'opponent' }
+  });
+  if (/\b(?:this|it) copies (?:that|the other) creature\b/.test(text) && secondary) effects.push({
+    kind: 'copy', targetObjectId: primary.id, sourceObjectId: secondary.id, duration: 'indefinite'
+  });
+  const counters = text.match(/\b(?:it|my (?:\d+\/\d+ )?creature|that creature) has (one|two|three|four|five|\d+) \+1\/\+1 counters?\b/);
+  if (counters) primary.counters['+1/+1'] = numberFrom(counters[1]);
+  return effects;
+}
+
 export function compileMagicScenario({ message = '', cards = [] } = {}) {
   const makeId = makeIdFactory();
   const normalizedCards = cards.map(normalizeMagicCard).filter((card) => card.name);
@@ -298,6 +342,7 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
 
   const actions = compileActions(message, normalizedCards, objects, makeId);
   const choices = compileChoices(message, objects, actions, makeId);
+  const continuousEffects = compileContinuousEffects(message, objects);
   return {
     type: 'MagicScenario',
     version: 1,
@@ -309,6 +354,7 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
     objects,
     zones: ['battlefield', 'hand', 'graveyard', 'exile', 'library', 'stack', 'command'],
     actions,
+    continuousEffects,
     choices,
     sequence: [...actions].sort((left, right) => left.index - right.index).map((action) => action.id),
     game: {

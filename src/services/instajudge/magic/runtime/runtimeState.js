@@ -1,5 +1,16 @@
 import { isCreature, normalizeMagicCard, normalizeMagicText, sourceHasQuality } from '../magicCards.js';
 import { parseOracleSemantics } from './oracleSemantics.js';
+import {
+  deriveCharacteristics,
+  detachObject,
+  derivedHasAbility,
+  derivedHasQuality,
+  initializeObjectCharacteristics,
+  invalidateCharacteristics,
+  registerScenarioContinuousEffects,
+  registerStaticContinuousEffects,
+  removeSourceStaticEffects
+} from './continuousEffects.js';
 
 let nextObjectId = 1;
 let nextEventId = 1;
@@ -26,7 +37,7 @@ export function createPlayer(id, overrides = {}) {
 export function createGameObject({ id = null, card, controller = 'player', owner = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false, counters = {}, timestamp = null, abilities = [] } = {}) {
   const normalizedCard = card ? normalizeMagicCard(card) : normalizeMagicCard({ name: name || 'Generic Object', typeLine: 'Creature', oracleText: '', power, toughness });
   const objectId = id ? reserveId(id) : makeId(token ? 'token' : 'object');
-  return {
+  const object = {
     id: objectId,
     card: normalizedCard,
     oracleId: normalizedCard.oracle_id || normalizedCard.id || null,
@@ -50,35 +61,34 @@ export function createGameObject({ id = null, card, controller = 'player', owner
     lastKnown: null,
     semantics: parseOracleSemantics(normalizedCard)
   };
+  initializeObjectCharacteristics(object);
+  return object;
 }
 
 export function currentPower(object) {
-  const base = object.basePower ?? object.card.power;
-  const counterDelta = (object.counters['+1/+1'] || 0) - (object.counters['-1/-1'] || 0);
-  return object.effects.reduce((value, effect) => value + (effect.power || 0), Number.isFinite(base) ? base + counterDelta : null);
+  return deriveCharacteristics(object?.runtimeState, object).power;
 }
 
 export function currentToughness(object) {
-  const base = object.baseToughness ?? object.card.toughness;
-  const counterDelta = (object.counters['+1/+1'] || 0) - (object.counters['-1/-1'] || 0);
-  return object.effects.reduce((value, effect) => value + (effect.toughness || 0), Number.isFinite(base) ? base + counterDelta : null);
+  return deriveCharacteristics(object?.runtimeState, object).toughness;
 }
 
 export function snapshotObject(object) {
+  const derived = deriveCharacteristics(object?.runtimeState, object);
   return {
-    id: object.id, name: object.name, card: object.card, oracleId: object.oracleId,
-    owner: object.owner, controller: object.controller, zone: object.zone,
+    id: object.id, name: derived.name, card: object.card, oracleId: object.oracleId,
+    owner: object.owner, controller: derived.controller, zone: object.zone,
     timestamp: object.timestamp, token: object.token, commander: object.commander,
-    power: currentPower(object), toughness: currentToughness(object),
+    power: derived.power, toughness: derived.toughness,
     damageMarked: object.damageMarked, damagedByDeathtouch: object.damagedByDeathtouch,
     counters: { ...object.counters }, tapped: object.tapped,
     attachments: [...object.attachments], attachedTo: object.attachedTo,
-    semantics: object.semantics
+    semantics: object.semantics, characteristics: derived
   };
 }
 
 export function objectIsCreature(object) {
-  return object.zone === 'battlefield' && (isCreature(object.card) || normalizeMagicText(object.card.typeLine).includes('creature'));
+  return object.zone === 'battlefield' && deriveCharacteristics(object?.runtimeState, object).types.includes('creature');
 }
 
 function eventRecord(type, data = {}) {
@@ -138,6 +148,8 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
     battlefield: [], stack: [], pendingTriggers: [], pendingChoices: [],
     events: [], eventQueue: [],
     replacementEffects: [], preventionEffects: [], continuousEffects: [],
+    characteristicRevision: 0, characteristicCache: new Map(),
+    nextContinuousEffectId: 1, nextContinuousTimestamp: 1,
     trace: [], scenario
   };
 
@@ -150,12 +162,16 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
     addPermanent(state, createGameObject({ card: normalized, controller: descriptor?.controller || inferController(message, normalized), owner: descriptor?.owner || inferController(message, normalized), commander: descriptor?.commander || false, abilities: descriptor?.abilities || [] }));
   }
   for (const object of genericObjects) addPermanent(state, createGameObject({ ...object, id: object.id || null, token: Boolean(object.token), controller: object.controller || 'player', owner: object.owner || object.controller || 'player' }));
+  registerScenarioContinuousEffects(state, scenario?.continuousEffects || []);
   return state;
 }
 
 function registerObject(state, object) {
+  initializeObjectCharacteristics(object);
+  Object.defineProperty(object, 'runtimeState', { value: state, writable: true, configurable: true, enumerable: false });
   state.objects.set(object.id, object);
   if (!state.zones[object.zone]?.includes(object.id)) state.zones[object.zone]?.push(object.id);
+  invalidateCharacteristics(state);
   return object;
 }
 
@@ -168,6 +184,8 @@ export function addPermanent(state, object) {
   registerObject(state, object);
   if (!state.battlefield.includes(object)) state.battlefield.push(object);
   if (!state.players[object.controller]?.battlefield.includes(object.id)) state.players[object.controller]?.battlefield.push(object.id);
+  invalidateCharacteristics(state);
+  registerStaticContinuousEffects(state, object);
   emitEvent(state, 'PermanentEntered', { object, controller: object.controller, final: snapshotObject(object) });
   emitEvent(state, 'PermanentEnteredBattlefield', { object, controller: object.controller, final: snapshotObject(object) });
   return object;
@@ -324,6 +342,7 @@ export function moveObjectWithResult(state, object, zone, reason, metadata = {},
     return { ...pipeline, object };
   }
   const finalZone = pipeline.event.to;
+  if (from === 'battlefield') removeSourceStaticEffects(state, object.id);
   removeFromZone(state, from, object.id);
   object.zone = finalZone;
   object.lastKnown = previous;
@@ -333,7 +352,9 @@ export function moveObjectWithResult(state, object, zone, reason, metadata = {},
   if (finalZone === 'battlefield') {
     if (!state.battlefield.includes(object)) state.battlefield.push(object);
     if (!state.players[object.controller]?.battlefield.includes(object.id)) state.players[object.controller]?.battlefield.push(object.id);
+    registerStaticContinuousEffects(state, object);
   }
+  invalidateCharacteristics(state);
   const eventMetadata = { reason, replacements: pipeline.applied, ...metadata };
   emitEvent(state, 'ZoneChanged', { object, affected: object, previous, from, to: finalZone, final: snapshotObject(object), metadata: eventMetadata });
   if (from !== 'battlefield' && finalZone === 'battlefield') {
@@ -360,9 +381,11 @@ function preventionEffectsFor(state, event) {
     if (effect.targetId && effect.targetId !== event.affected?.id) return false;
     return typeof effect.applies === 'function' ? effect.applies(event, state) : true;
   });
-  const protection = (event.affected?.effects || [])
-    .filter((effect) => effect.type === 'protection' && sourceHasQuality(event.source?.card || {}, effect.quality))
-    .map((effect, index) => ({ id: `protection:${event.affected.id}:${index}`, remaining: null, source: event.affected, protection: true }));
+  const protection = deriveCharacteristics(state, event.affected).abilities
+    .filter((ability) => normalizeMagicText(ability).startsWith('protection from '))
+    .map((ability, index) => ({ quality: normalizeMagicText(ability).replace('protection from ', ''), index }))
+    .filter(({ quality }) => event.source?.runtimeState ? derivedHasQuality(state, event.source, quality) : sourceHasQuality(event.source?.card || {}, quality))
+    .map(({ index }) => ({ id: `protection:${event.affected.id}:${index}`, remaining: null, source: event.affected, protection: true }));
   return [...registered, ...protection];
 }
 
@@ -393,13 +416,14 @@ export function markDamage(state, object, amount, source, metadata = {}, options
   return state.events.at(-1) || result;
 }
 
-function cancelOpposingCounters(object) {
+function cancelOpposingCounters(state, object) {
   const positive = object.counters['+1/+1'] || 0;
   const negative = object.counters['-1/-1'] || 0;
   const cancellation = Math.min(positive, negative);
   if (cancellation <= 0) return false;
   object.counters['+1/+1'] = positive - cancellation;
   object.counters['-1/-1'] = negative - cancellation;
+  invalidateCharacteristics(state);
   return true;
 }
 
@@ -409,13 +433,26 @@ export function runStateBasedActionsRuntime(state) {
   while (changed) {
     changed = false;
     for (const object of state.battlefield.filter((candidate) => candidate.zone === 'battlefield')) {
-      if (cancelOpposingCounters(object)) { applied.push(`${object.name}'s opposing +1/+1 and -1/-1 counters cancel.`); changed = true; }
+      if (cancelOpposingCounters(state, object)) { applied.push(`${object.name}'s opposing +1/+1 and -1/-1 counters cancel.`); changed = true; }
+    }
+    for (const attachment of state.battlefield.filter((candidate) => candidate.zone === 'battlefield' && candidate.attachedTo)) {
+      const attached = state.objects.get(attachment.attachedTo);
+      if (attached?.zone === 'battlefield') continue;
+      const characteristics = deriveCharacteristics(state, attachment);
+      if (characteristics.subtypes.includes('aura')) {
+        moveObject(state, attachment, 'graveyard', 'state-based action: illegal Aura attachment');
+        applied.push(`${attachment.name} is put into its owner's graveyard because it is not legally attached.`);
+      } else {
+        detachObject(state, attachment);
+        applied.push(`${attachment.name} becomes unattached.`);
+      }
+      changed = true;
     }
     const doomed = state.battlefield.filter((object) => {
       if (!objectIsCreature(object)) return false;
       const toughness = currentToughness(object);
       if (Number.isFinite(toughness) && toughness <= 0) return true;
-      return Number.isFinite(toughness) && (object.damageMarked >= toughness || object.damagedByDeathtouch) && !object.card.abilities?.includes('indestructible');
+      return Number.isFinite(toughness) && (object.damageMarked >= toughness || object.damagedByDeathtouch) && !derivedHasAbility(state, object, 'indestructible');
     });
     for (const object of doomed) {
       const toughness = currentToughness(object);
@@ -480,10 +517,11 @@ export function collectTriggeredAbilities(state, events = state.events) {
         const key = `${source.id}:${event.id}:${ability.text}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const trigger = { id: makeId('trigger'), key, type: 'triggered-ability', source, controller: source.controller, event, ability, effect: legacyTriggerEffect(ability), optional: ability.optional, targets: ability.targets };
+        const sourceController = deriveCharacteristics(state, source).controller;
+        const trigger = { id: makeId('trigger'), key, type: 'triggered-ability', source, controller: sourceController, event, ability, effect: legacyTriggerEffect(ability), optional: ability.optional, targets: ability.targets };
         triggerInstances.push(trigger);
         state.pendingTriggers.push(trigger);
-        emitEvent(state, 'TriggerCreated', { source, affected: event.previous || event.affected, controller: source.controller, metadata: { triggerEvent: event.type, triggerId: trigger.id } });
+        emitEvent(state, 'TriggerCreated', { source, affected: event.previous || event.affected, controller: sourceController, metadata: { triggerEvent: event.type, triggerId: trigger.id } });
       }
     }
   }

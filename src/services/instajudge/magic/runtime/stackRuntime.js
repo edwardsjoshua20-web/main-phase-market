@@ -1,5 +1,6 @@
 import { isInstant, isSorcery, normalizeMagicCard } from '../magicCards.js';
 import { COST_TYPES, PAYMENT_STATUS, createTriggeredPaymentCost, normalizeCost, payCost } from './costSystem.js';
+import { deriveCharacteristics, expireContinuousEffects } from './continuousEffects.js';
 import { createGameObject, emitEvent, moveObject, registerGameObject, runStateBasedActionsRuntime } from './runtimeState.js';
 
 export const STACK_OBJECT_TYPES = Object.freeze({
@@ -83,6 +84,7 @@ export function advanceGameStep(state) {
   const index = Math.max(0, STEP_ORDER.indexOf(current));
   const next = STEP_ORDER[index + 1] || 'beginning';
   if (next === 'beginning') {
+    expireContinuousEffects(state, { step: 'cleanup' });
     state.game.turn += 1;
     state.game.activePlayer = opponentOf(state.game.activePlayer);
   }
@@ -132,18 +134,20 @@ export function checkTimingPermission({ state, card = null, actionType = 'Cast',
   return { allowed: null, status: 'unverified', reason: 'This action type has no certified timing rule.' };
 }
 
-function wardAbilities(target) {
-  return (target?.keywordAbilities || []).filter((ability) => ability.keyword === 'ward' && ability.cost);
+function wardAbilities(state, target) {
+  return deriveCharacteristics(state, target).keywordAbilities.filter((ability) => ability.keyword === 'ward' && ability.cost);
 }
 
 export function createWardTriggers(state, targetEvent) {
   const target = targetEvent.object || targetEvent.affected;
   const sourceStackObject = state.stack.find((entry) => entry.id === targetEvent.metadata?.stackObjectId);
-  if (!target || !sourceStackObject || target.controller === sourceStackObject.controller) return [];
-  const triggers = wardAbilities(target).map((ability) => createStackObject({
+  if (!target || !sourceStackObject) return [];
+  const targetController = deriveCharacteristics(state, target).controller;
+  if (targetController === sourceStackObject.controller) return [];
+  const triggers = wardAbilities(state, target).map((ability) => createStackObject({
     kind: STACK_OBJECT_TYPES.TRIGGERED_ABILITY,
     sourceObject: target,
-    controller: target.controller,
+    controller: targetController,
     targets: [{ type: 'StackObjectTarget', stackObjectId: sourceStackObject.id }],
     costs: [createTriggeredPaymentCost(ability.cost, { reason: 'ward', payer: sourceStackObject.controller })],
     effectIR: [{ type: 'CounterUnlessPaid', stackObjectId: sourceStackObject.id }],

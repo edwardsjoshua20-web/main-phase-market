@@ -60,8 +60,10 @@ export function getPowerToughness(card = {}) {
     return { raw: pt, power, toughness };
   }
   if (pt && /^(\*|\d+\s*\/\s*\*|\*\s*\/\s*\d+)$/i.test(pt)) return { raw: pt, power: null, toughness: null };
-  const power = Number(card.power ?? readRaw(card, 'power'));
-  const toughness = Number(card.toughness ?? readRaw(card, 'toughness'));
+  const rawPower = card.power ?? readRaw(card, 'power');
+  const rawToughness = card.toughness ?? readRaw(card, 'toughness');
+  const power = rawPower == null || rawPower === '' ? null : Number(rawPower);
+  const toughness = rawToughness == null || rawToughness === '' ? null : Number(rawToughness);
   if (Number.isFinite(power) && Number.isFinite(toughness)) return { raw: `${power}/${toughness}`, power, toughness };
   return { raw: pt || '', power: null, toughness: null };
 }

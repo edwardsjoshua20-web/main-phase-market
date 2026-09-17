@@ -31,6 +31,27 @@ const RULES_BY_PRIMITIVE = Object.freeze({
   continuous: [
     { ruleId: 'CR-613', section: '613', title: 'Continuous Effects', enginePrimitive: 'continuous-effects', canonicalMeaning: 'Continuous effects are applied through the layer system.', keywords: ['layers', 'continuous effect'], effectiveDate: '2026-09-16', sourceVersion: MAGIC_CR_VERSION }
   ],
+  layers: [
+    { ruleId: 'CR-613.1', section: '613.1', title: 'Interaction of Continuous Effects', enginePrimitive: 'layers', canonicalMeaning: 'Continuous effects apply in copy, control, text, type, color, ability, and power/toughness layer order.', keywords: ['layer', 'continuous effect'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  timestamps: [
+    { ruleId: 'CR-613.7', section: '613.7', title: 'Timestamp Order', enginePrimitive: 'timestamps', canonicalMeaning: 'Independent effects in the same layer or sublayer normally apply in timestamp order.', keywords: ['timestamp'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  dependencies: [
+    { ruleId: 'CR-613.8', section: '613.8', title: 'Dependency Order', enginePrimitive: 'dependencies', canonicalMeaning: 'A dependent effect applies after the effect on which it depends, before timestamp fallback.', keywords: ['dependency', 'depends on'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  cda: [
+    { ruleId: 'CR-604.3', section: '604.3', title: 'Characteristic-Defining Abilities', enginePrimitive: 'characteristic-defining-abilities', canonicalMeaning: 'Characteristic-defining abilities function in applicable zones and apply in their designated layers or sublayers.', keywords: ['characteristic-defining ability', 'cda'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  copy: [
+    { ruleId: 'CR-707', section: '707', title: 'Copying Objects', enginePrimitive: 'copy-effects', canonicalMeaning: 'Copy effects use copyable values rather than counters or later continuous modifications.', keywords: ['copy', 'copyable values'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  control: [
+    { ruleId: 'CR-611.2', section: '611.2', title: 'Continuous Effects from Resolving Spells and Abilities', enginePrimitive: 'control-effects', canonicalMeaning: 'Control-changing continuous effects alter controller without changing ownership and obey their duration and timestamp.', keywords: ['gain control', 'controller'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  attachments: [
+    { ruleId: 'CR-301.5', section: '301.5', title: 'Equipment', enginePrimitive: 'attachments', canonicalMeaning: 'Equipment and Aura continuous effects follow their attachment state; illegal attachments are handled by state-based actions.', keywords: ['attach', 'equip', 'enchant'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
   timing: [
     { ruleId: 'CR-117', section: '117', title: 'Timing and Priority', enginePrimitive: 'timing', canonicalMeaning: 'Priority and timing permissions determine when players can take game actions.', keywords: ['priority', 'timing'], effectiveDate: '2026-09-16', sourceVersion: MAGIC_CR_VERSION }
   ],

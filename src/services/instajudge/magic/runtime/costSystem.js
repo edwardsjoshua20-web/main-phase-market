@@ -1,4 +1,5 @@
 import { emitEvent, moveObjectWithResult, proposeRuntimeEvent } from './runtimeState.js';
+import { deriveCharacteristics } from './continuousEffects.js';
 
 export const COST_TYPES = Object.freeze({
   MANA: 'ManaCost',
@@ -118,7 +119,7 @@ export function payCost({ state, playerId, cost: rawCost, choice = PAYMENT_STATU
   if (cost.type === COST_TYPES.SACRIFICE) {
     const candidates = cost.objectId ? selectedObjects(state, [cost.objectId]) : selectedObjects(state, choice?.objectIds || []);
     if (!cost.objectId && !choice?.objectIds?.length) return { supported: true, status: PAYMENT_STATUS.PAID, paid: true, cost, stateMutation: 'declared-payment' };
-    if (candidates.length < cost.count || candidates.some((object) => object.controller !== playerId || object.zone !== 'battlefield')) {
+    if (candidates.length < cost.count || candidates.some((object) => deriveCharacteristics(state, object).controller !== playerId || object.zone !== 'battlefield')) {
       return { supported: true, status: PAYMENT_STATUS.CANNOT_PAY, paid: false, cost };
     }
     const selected = candidates.slice(0, cost.count);

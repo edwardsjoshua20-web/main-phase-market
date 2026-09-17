@@ -9,7 +9,9 @@ export const ORACLE_NODE_TYPES = Object.freeze({
   TOKEN_CREATION: 'TokenCreation', COUNTER_MODIFICATION: 'CounterModification', LIFE_CHANGE: 'LifeChange',
   DRAW: 'DrawEffect', DISCARD: 'DiscardEffect', SEARCH: 'SearchEffect', COPY: 'CopyEffect',
   CONTROL_CHANGE: 'ControlChangeEffect', TAP_CHANGE: 'TapChangeEffect', MILL: 'MillEffect',
-  SACRIFICE: 'SacrificeEffect', UNSUPPORTED: 'UnsupportedEffect'
+  SACRIFICE: 'SacrificeEffect', TEXT_CHANGE: 'TextChangeEffect', TYPE_CHANGE: 'TypeChangeEffect',
+  COLOR_CHANGE: 'ColorChangeEffect', ABILITY_CHANGE: 'AbilityChangeEffect', CDA: 'CharacteristicDefiningAbility',
+  PT_SWITCH: 'PowerToughnessSwitch', UNSUPPORTED: 'UnsupportedEffect'
 });
 
 export const ORACLE_GRAMMAR_CAPABILITIES = Object.freeze({
@@ -35,15 +37,20 @@ export const ORACLE_GRAMMAR_CAPABILITIES = Object.freeze({
   tokenCreation: 'fixed-token-executable',
   counterModification: 'fixed-counter-executable',
   zoneChange: 'executable-subset',
-  copy: 'structural',
-  controlChange: 'structural',
+  copy: 'executable-subset',
+  controlChange: 'executable-subset',
+  textChange: 'simple-word-substitution-executable',
+  typeChange: 'executable-subset',
+  colorChange: 'executable-subset',
+  abilityChange: 'keyword-and-clear-executable',
+  characteristicDefiningAbilities: 'hand-size-and-generic-runtime-subset',
   variableX: 'structural-no-value-solving',
   additionalCosts: 'partial-structural',
   alternateCosts: 'unsupported',
   forEach: 'unsupported',
   unless: 'unsupported',
   asLongAs: 'unsupported',
-  continuousLayers: 'unsupported'
+  continuousLayers: 'executable-subset'
 });
 
 const cache = new Map();
@@ -89,6 +96,7 @@ function parseCost(text = '') {
 
 function parseEffects(text = '') {
   const value = normalizeMagicText(text);
+  const duration = value.includes('until end of turn') || value.includes('this turn') ? 'until-end-of-turn' : null;
   const effects = [];
   const target = value.includes('target') ? targetSpec(value) : null;
   const push = (node) => effects.push({ ...node, text: String(text).trim() });
@@ -107,12 +115,12 @@ function parseEffects(text = '') {
   const global = value.match(/\bdeals? (\d+|x) damage to each creature\b/);
   if (global) push({ type: ORACLE_NODE_TYPES.DAMAGE, amount: amount(global[1]), affected: { kind: 'each', filter: { type: 'creature' } } });
   const pt = value.match(/\btarget [^.]+ gets ([+-]\d+|x)\/([+-]\d+|x)/);
-  if (pt) push({ type: ORACLE_NODE_TYPES.PT_MODIFICATION, power: amount(pt[1]), toughness: amount(pt[2]), target, duration: value.includes('until end of turn') ? 'until-end-of-turn' : null });
+  if (pt) push({ type: ORACLE_NODE_TYPES.PT_MODIFICATION, power: amount(pt[1]), toughness: amount(pt[2]), target, duration });
   const protection = value.match(/\bgains? protection from (the color of your choice|white|blue|black|red|green|artifacts?|creatures?)/);
-  if (protection) push({ type: ORACLE_NODE_TYPES.KEYWORD_GRANT, keyword: 'protection', quality: protection[1], target, duration: value.includes('until end of turn') ? 'until-end-of-turn' : null });
+  if (protection) push({ type: ORACLE_NODE_TYPES.KEYWORD_GRANT, keyword: 'protection', quality: protection[1], target, duration });
   for (const keyword of KEYWORDS) {
     if (['ward', 'equip', 'enchant'].includes(keyword)) continue;
-    if (new RegExp(`\\bgains? ${keyword.replace(' ', '\\s+')}\\b`).test(value)) push({ type: ORACLE_NODE_TYPES.KEYWORD_GRANT, keyword, target, duration: value.includes('until end of turn') ? 'until-end-of-turn' : null });
+    if (new RegExp(`\\bgains? ${keyword.replace(' ', '\\s+')}\\b`).test(value)) push({ type: ORACLE_NODE_TYPES.KEYWORD_GRANT, keyword, target, duration });
   }
   const loss = value.match(/\b(target player|target opponent|each opponent|that player|you) loses? (\d+|x) life\b/);
   if (loss) push({ type: ORACLE_NODE_TYPES.LIFE_CHANGE, direction: 'lose', amount: amount(loss[2]), subject: loss[1], target: loss[1].startsWith('target') ? targetSpec(loss[1]) : null });
@@ -157,8 +165,52 @@ function parseEffects(text = '') {
   if (value.includes('sacrifice')) push({ type: ORACLE_NODE_TYPES.SACRIFICE, subject: value.replace(/^.*sacrifice\s+/, ''), target });
   if (value.includes('tap target')) push({ type: ORACLE_NODE_TYPES.TAP_CHANGE, tapped: true, target });
   if (value.includes('untap target')) push({ type: ORACLE_NODE_TYPES.TAP_CHANGE, tapped: false, target });
-  if (value.includes('copy target') || value.includes('copy of')) push({ type: ORACLE_NODE_TYPES.COPY, target });
-  if (value.includes('gain control of target')) push({ type: ORACLE_NODE_TYPES.CONTROL_CHANGE, controller: 'effect-controller', target });
+  if (value.includes('copy target') || value.includes('copy of')) push({
+    type: ORACLE_NODE_TYPES.COPY,
+    target,
+    duration,
+    unsupportedExceptions: /\bexcept\b|\bin addition to\b/.test(value)
+  });
+  if (value.includes('gain control of target') || value.includes('control enchanted')) push({
+    type: ORACLE_NODE_TYPES.CONTROL_CHANGE,
+    controller: 'effect-controller',
+    target,
+    duration: value.includes('control enchanted') ? 'source-on-battlefield' : duration,
+    static: value.includes('control enchanted'),
+    selector: value.includes('enchanted') ? { attachedToSource: true } : null
+  });
+  const textChange = value.match(/\bchange (?:the text of )?(white|blue|black|red|green|plains|island|swamp|mountain|forest) to (white|blue|black|red|green|plains|island|swamp|mountain|forest)\b/);
+  if (textChange) push({ type: ORACLE_NODE_TYPES.TEXT_CHANGE, from: textChange[1], to: textChange[2], target, duration });
+  if (/\bloses all abilities\b/.test(value)) push({ type: ORACLE_NODE_TYPES.ABILITY_CHANGE, mode: 'clear', abilities: [], target, duration });
+  const losesKeyword = value.match(/\bloses (flying|hexproof|indestructible|vigilance|trample|lifelink|deathtouch|first strike|double strike)\b/);
+  if (losesKeyword) push({ type: ORACLE_NODE_TYPES.ABILITY_CHANGE, mode: 'remove', abilities: [losesKeyword[1]], target, duration });
+  const colorChange = value.match(/\bbecomes? (white|blue|black|red|green|colorless)(?: until|$| and)/);
+  if (colorChange) push({ type: ORACLE_NODE_TYPES.COLOR_CHANGE, mode: 'set', colors: colorChange[1] === 'colorless' ? [] : [colorChange[1]], target, duration });
+  const animation = value.match(/\bbecomes? (?:a |an )?(\d+)\/(\d+) ([a-z ]*?)creature(?: (?:that is|that's) still a land)?/);
+  if (animation) {
+    push({ type: ORACLE_NODE_TYPES.TYPE_CHANGE, mode: value.includes('still a land') ? 'add' : 'set', types: ['creature'], subtypes: animation[3].trim() ? animation[3].trim().split(/\s+/) : [], target, duration });
+    push({ type: ORACLE_NODE_TYPES.PT_MODIFICATION, power: amount(animation[1]), toughness: amount(animation[2]), target, duration, setBase: true });
+  }
+  const anthem = value.match(/\b(other )?creatures you control get ([+-]\d+)\/([+-]\d+)\b/);
+  if (anthem) push({
+    type: ORACLE_NODE_TYPES.PT_MODIFICATION,
+    power: amount(anthem[2]), toughness: amount(anthem[3]), duration: 'source-on-battlefield', static: true,
+    selector: { controllerOfSource: true, types: ['creature'], otherThanSource: Boolean(anthem[1]) }
+  });
+  const attachedPt = value.match(/\b(?:equipped|enchanted) creature gets ([+-]\d+)\/([+-]\d+)\b/);
+  if (attachedPt) push({
+    type: ORACLE_NODE_TYPES.PT_MODIFICATION,
+    power: amount(attachedPt[1]), toughness: amount(attachedPt[2]), duration: 'source-on-battlefield', static: true,
+    selector: { attachedToSource: true }
+  });
+  const attachedKeyword = value.match(/\b(?:equipped|enchanted) creature (?:has|gains) (flying|hexproof|indestructible|vigilance|trample|lifelink|deathtouch|first strike|double strike)\b/);
+  if (attachedKeyword) push({
+    type: ORACLE_NODE_TYPES.ABILITY_CHANGE, mode: 'add', abilities: [attachedKeyword[1]], duration: 'source-on-battlefield', static: true,
+    selector: { attachedToSource: true }
+  });
+  if (/\bpower and toughness are each equal to the number of cards in your hand\b/.test(value)) {
+    push({ type: ORACLE_NODE_TYPES.CDA, characteristic: 'power-toughness', formula: 'controller-hand-size', static: true, duration: 'indefinite' });
+  }
   if (value.includes('prevent') && value.includes('damage')) push({
     type: ORACLE_NODE_TYPES.PREVENTION,
     event: 'DamageProposed',
@@ -259,7 +311,9 @@ export function parseOracleSemantics(cardInput = {}) {
   const triggers = triggeredAbilities(card);
   const activated = activatedAbilities(card);
   const replacementEffects = replacements(card);
-  const allEffects = [...spell, ...triggers, ...activated].flatMap((ability) => ability.effects);
+  const permanentEffects = isPermanentType(card) ? parseEffects(card.oracleText) : [];
+  const staticEffects = permanentEffects.filter((effect) => effect.static || effect.type === ORACLE_NODE_TYPES.CDA);
+  const allEffects = [...spell, ...triggers, ...activated].flatMap((ability) => ability.effects).concat(permanentEffects);
   const unsupportedText = [];
   if ((isInstant(card) || isSorcery(card)) && spell[0]?.effects.length === 0) unsupportedText.push('unsupported-oracle-semantics');
   if (/\b(layer|dependency|opalescence|humility)\b/.test(normalizeMagicText(card.oracleText))) unsupportedText.push('complex-layer-or-dependency-text');
@@ -267,9 +321,13 @@ export function parseOracleSemantics(cardInput = {}) {
     type: 'OracleSemanticIR', version: 2, card,
     objectTypes: { permanent: isPermanentType(card), creature: isCreature(card), instant: isInstant(card), sorcery: isSorcery(card) },
     keywords: KEYWORDS.filter((keyword) => normalizeMagicText(card.oracleText).includes(keyword)),
-    abilities: [...spell, ...triggers, ...activated], spellAbilities: spell, triggeredAbilitiesIR: triggers, activatedAbilitiesIR: activated,
+    abilities: [...spell, ...triggers, ...activated], spellAbilities: spell, triggeredAbilitiesIR: triggers, activatedAbilitiesIR: activated, staticEffects,
     replacementEffects, preventionEffects: allEffects.filter((effect) => effect.type === ORACLE_NODE_TYPES.PREVENTION),
-    continuousEffects: allEffects.filter((effect) => [ORACLE_NODE_TYPES.PT_MODIFICATION, ORACLE_NODE_TYPES.KEYWORD_GRANT, ORACLE_NODE_TYPES.CONTROL_CHANGE].includes(effect.type)),
+    continuousEffects: allEffects.filter((effect) => [
+      ORACLE_NODE_TYPES.COPY, ORACLE_NODE_TYPES.CONTROL_CHANGE, ORACLE_NODE_TYPES.TEXT_CHANGE,
+      ORACLE_NODE_TYPES.TYPE_CHANGE, ORACLE_NODE_TYPES.COLOR_CHANGE, ORACLE_NODE_TYPES.ABILITY_CHANGE,
+      ORACLE_NODE_TYPES.KEYWORD_GRANT, ORACLE_NODE_TYPES.PT_MODIFICATION, ORACLE_NODE_TYPES.CDA, ORACLE_NODE_TYPES.PT_SWITCH
+    ].includes(effect.type)),
     unsupportedText,
     coverage: { parsedAbilityCount: spell.length + triggers.length + activated.length, parsedEffectCount: allEffects.length, unsupported: unsupportedText.length > 0, capabilities: ORACLE_GRAMMAR_CAPABILITIES },
     spellEffects: spell.flatMap((ability) => ability.effects).map(legacyEffect).filter(Boolean),
