@@ -1,3 +1,5 @@
+import { emitEvent, moveObjectWithResult, proposeRuntimeEvent } from './runtimeState.js';
+
 export const COST_TYPES = Object.freeze({
   MANA: 'ManaCost',
   LIFE: 'LifeCost',
@@ -98,13 +100,19 @@ export function payCost({ state, playerId, cost: rawCost, choice = PAYMENT_STATU
   if (!player) return { supported: false, status: PAYMENT_STATUS.CANNOT_PAY, paid: false, cost, reason: 'The paying player is unavailable.' };
   if (cost.type === COST_TYPES.LIFE) {
     if (player.life < cost.amount) return { supported: true, status: PAYMENT_STATUS.CANNOT_PAY, paid: false, cost };
+    const pipeline = proposeRuntimeEvent(state, 'LifeChange', { player: playerId, amount: cost.amount, metadata: { direction: 'lose', asCost: true } });
+    if (pipeline.status !== 'ready') return { supported: true, status: PAYMENT_STATUS.UNSPECIFIED, paid: false, cost, pipeline };
     player.life -= cost.amount;
+    emitEvent(state, 'LifeLost', { player: playerId, amount: cost.amount, metadata: { asCost: true } });
     return { supported: true, status: PAYMENT_STATUS.PAID, paid: true, cost };
   }
   if (cost.type === COST_TYPES.TAP) {
     const object = state.objects.get(cost.sourceObjectId || sourceObject?.id);
     if (!object || object.tapped || object.zone !== 'battlefield') return { supported: true, status: PAYMENT_STATUS.CANNOT_PAY, paid: false, cost };
+    const pipeline = proposeRuntimeEvent(state, 'TapChange', { object, affected: object, metadata: { tapped: true, asCost: true } });
+    if (pipeline.status !== 'ready') return { supported: true, status: PAYMENT_STATUS.UNSPECIFIED, paid: false, cost, pipeline };
     object.tapped = true;
+    emitEvent(state, 'PermanentTapped', { object, metadata: { asCost: true } });
     return { supported: true, status: PAYMENT_STATUS.PAID, paid: true, cost };
   }
   if (cost.type === COST_TYPES.SACRIFICE) {
@@ -114,7 +122,13 @@ export function payCost({ state, playerId, cost: rawCost, choice = PAYMENT_STATU
       return { supported: true, status: PAYMENT_STATUS.CANNOT_PAY, paid: false, cost };
     }
     const selected = candidates.slice(0, cost.count);
-    for (const object of selected) moveObject(state, object, 'graveyard', 'sacrifice cost');
+    for (const object of selected) {
+      const pipeline = proposeRuntimeEvent(state, 'Sacrifice', { object, affected: object, player: playerId, from: 'battlefield', to: 'graveyard', metadata: { asCost: true } });
+      if (pipeline.status !== 'ready') return { supported: true, status: PAYMENT_STATUS.UNSPECIFIED, paid: false, cost, pipeline };
+      const moved = moveObjectWithResult(state, object, 'graveyard', 'sacrifice cost');
+      if (moved.status !== 'committed') return { supported: true, status: PAYMENT_STATUS.UNSPECIFIED, paid: false, cost, pipeline: moved };
+      emitEvent(state, 'PermanentSacrificed', { object, player: playerId, from: 'battlefield', to: moved.to, metadata: { asCost: true } });
+    }
     return { supported: true, status: PAYMENT_STATUS.PAID, paid: true, cost, selectedObjects: selected };
   }
   if (cost.type === COST_TYPES.DISCARD) {
@@ -125,7 +139,13 @@ export function payCost({ state, playerId, cost: rawCost, choice = PAYMENT_STATU
       return { supported: true, status: PAYMENT_STATUS.CANNOT_PAY, paid: false, cost };
     }
     const selected = cards.slice(0, cost.count);
-    for (const object of selected) moveObject(state, object, 'graveyard', 'discard cost');
+    const pipeline = proposeRuntimeEvent(state, 'Discard', { player: playerId, amount: selected.length, metadata: { asCost: true, cardIds: selected.map((object) => object.id) } });
+    if (pipeline.status !== 'ready') return { supported: true, status: PAYMENT_STATUS.UNSPECIFIED, paid: false, cost, pipeline };
+    for (const object of selected) {
+      const moved = moveObjectWithResult(state, object, 'graveyard', 'discard cost');
+      if (moved.status !== 'committed') return { supported: true, status: PAYMENT_STATUS.UNSPECIFIED, paid: false, cost, pipeline: moved };
+      emitEvent(state, 'CardDiscarded', { object, player: playerId, metadata: { asCost: true } });
+    }
     return { supported: true, status: PAYMENT_STATUS.PAID, paid: true, cost, selectedObjects: selected };
   }
   if (cost.type === COST_TYPES.ADDITIONAL) {
@@ -135,4 +155,3 @@ export function payCost({ state, playerId, cost: rawCost, choice = PAYMENT_STATU
   }
   return { supported: false, status: PAYMENT_STATUS.CANNOT_PAY, paid: false, cost, reason: `Unsupported cost type ${cost.type}.` };
 }
-import { moveObject } from './runtimeState.js';

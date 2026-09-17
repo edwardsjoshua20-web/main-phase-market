@@ -187,7 +187,7 @@ export function castSpell(state, { card, controller, targets = [], modes = [], c
     modes,
     costs,
     chosenValues,
-    effectIR: sourceObject.semantics?.spellEffects || [],
+    effectIR: sourceObject.semantics?.spellAbilities?.[0]?.effects || [],
     ruleReferences: ['CR-601', 'CR-405']
   });
   const targetChecks = targets.map((target, index) => validateTarget ? validateTarget({ sourceObject, target, effect: stackObject.effectIR[index] || stackObject.effectIR[0] }) : { legal: Boolean(target) });

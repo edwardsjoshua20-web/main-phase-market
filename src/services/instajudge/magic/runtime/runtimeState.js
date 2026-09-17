@@ -1,4 +1,4 @@
-import { isCreature, normalizeMagicCard, normalizeMagicText } from '../magicCards.js';
+import { isCreature, normalizeMagicCard, normalizeMagicText, sourceHasQuality } from '../magicCards.js';
 import { parseOracleSemantics } from './oracleSemantics.js';
 
 let nextObjectId = 1;
@@ -18,6 +18,7 @@ export function createPlayer(id, overrides = {}) {
     poison: overrides.poison ?? 0,
     hand: [], library: [], graveyard: [], exile: [], battlefield: [], commandZone: [],
     commanderDamage: {},
+    failedDraw: false,
     lost: false
   };
 }
@@ -168,6 +169,7 @@ export function addPermanent(state, object) {
   if (!state.battlefield.includes(object)) state.battlefield.push(object);
   if (!state.players[object.controller]?.battlefield.includes(object.id)) state.players[object.controller]?.battlefield.push(object.id);
   emitEvent(state, 'PermanentEntered', { object, controller: object.controller, final: snapshotObject(object) });
+  emitEvent(state, 'PermanentEnteredBattlefield', { object, controller: object.controller, final: snapshotObject(object) });
   return object;
 }
 
@@ -179,27 +181,216 @@ function removeFromZone(state, zone, objectId) {
   }
 }
 
-export function moveObject(state, object, zone, reason, metadata = {}) {
+function semanticReplacementEffects(state, event) {
+  const effects = [];
+  for (const source of state.battlefield.filter((object) => object.zone === 'battlefield')) {
+    for (const [index, replacement] of (source.semantics?.replacementEffects || []).entries()) {
+      if (!replacement.runtime) continue;
+      effects.push({
+        id: `${source.id}:replacement:${index}`,
+        source,
+        mandatory: replacement.runtime.mandatory !== false,
+        chooser: replacement.runtime.chooser || 'affected-player',
+        eventType: replacement.runtime.eventType,
+        applies: (candidate) => {
+          if (replacement.runtime.eventType !== candidate.type) return false;
+          if (replacement.runtime.to && replacement.runtime.to !== candidate.to) return false;
+          if (replacement.runtime.from && replacement.runtime.from !== candidate.from) return false;
+          if (replacement.runtime.objectId === 'self' && source.id !== candidate.object?.id) return false;
+          return true;
+        },
+        replace: () => ({ ...(replacement.runtime.replace || {}) }),
+        text: replacement.text
+      });
+    }
+  }
+  return effects.filter((effect) => effect.applies(event));
+}
+
+function registeredReplacementEffects(state, event) {
+  return state.replacementEffects.filter((effect) => {
+    if (effect.eventType && effect.eventType !== event.type) return false;
+    return typeof effect.applies === 'function' ? effect.applies(event, state) : true;
+  });
+}
+
+function rulesReplacementEffects(event) {
+  if (event.type !== 'ZoneChange' || !event.object?.commander || !['hand', 'library'].includes(event.to)) return [];
+  return [{
+    id: `commander-zone:${event.object.id}`,
+    source: event.object,
+    mandatory: false,
+    chooser: event.object.owner,
+    eventType: 'ZoneChange',
+    applies: () => true,
+    replace: { to: 'command' },
+    text: 'The commander may be put into the command zone instead.'
+  }];
+}
+
+export function registerReplacementEffect(state, effect) {
+  const normalized = { mandatory: true, chooser: 'affected-player', ...effect };
+  state.replacementEffects.push(normalized);
+  return normalized;
+}
+
+export function registerPreventionEffect(state, effect) {
+  const normalized = { remaining: null, ...effect };
+  state.preventionEffects.push(normalized);
+  return normalized;
+}
+
+export function applyReplacementPipeline(state, proposedEvent, { replacementChoices = [] } = {}) {
+  let event = { ...proposedEvent, metadata: { ...(proposedEvent.metadata || {}) } };
+  const applied = [];
+  const declined = [];
+  let choiceIndex = 0;
+  for (let iteration = 0; iteration < 16; iteration += 1) {
+    const candidates = [
+      ...rulesReplacementEffects(event),
+      ...semanticReplacementEffects(state, event),
+      ...registeredReplacementEffects(state, event)
+    ].filter((effect) => !applied.includes(effect.id) && !declined.includes(effect.id));
+    if (candidates.length === 0) return { status: 'ready', event, applied, declined };
+    const decision = replacementChoices[choiceIndex];
+    const declinedId = String(decision || '').startsWith('decline:') ? String(decision).slice('decline:'.length) : null;
+    const declinedEffect = candidates.find((effect) => effect.id === declinedId && effect.mandatory === false);
+    if (declinedEffect) {
+      choiceIndex += 1;
+      declined.push(declinedEffect.id);
+      emitEvent(state, 'ReplacementDeclined', {
+        source: declinedEffect.source || null,
+        affected: event.object || event.affected,
+        player: event.player,
+        from: event.from,
+        to: event.to,
+        metadata: { replacementId: declinedEffect.id, originalEventType: proposedEvent.type }
+      });
+      continue;
+    }
+    let selected = candidates[0];
+    if (candidates.length > 1) {
+      const requestedId = decision;
+      selected = candidates.find((effect) => effect.id === requestedId);
+      if (!selected) {
+        return {
+          status: 'depends',
+          event,
+          applied,
+          choices: candidates.map((effect) => ({ id: effect.id, source: effect.source?.name || null, text: effect.text || null })),
+          clarificationNeeded: 'Which applicable replacement effect should be applied next?'
+        };
+      }
+      choiceIndex += 1;
+    } else if (selected.mandatory === false && decision !== selected.id) {
+      return {
+        status: 'depends',
+        event,
+        applied,
+        choices: [{ id: selected.id, source: selected.source?.name || null, text: selected.text || null }],
+        clarificationNeeded: 'Should the optional replacement effect be applied?'
+      };
+    } else if (selected.mandatory === false) {
+      choiceIndex += 1;
+    }
+    const patch = typeof selected.replace === 'function' ? selected.replace(event, state) : selected.replace || {};
+    event = { ...event, ...patch, metadata: { ...event.metadata, ...(patch.metadata || {}) } };
+    applied.push(selected.id);
+    emitEvent(state, 'ReplacementApplied', {
+      source: selected.source || null,
+      affected: event.object || event.affected,
+      player: event.player,
+      from: proposedEvent.from,
+      to: event.to,
+      metadata: { replacementId: selected.id, originalEventType: proposedEvent.type }
+    });
+  }
+  return { status: 'unsupported', event, applied, declined, reason: 'Replacement processing did not stabilize.' };
+}
+
+export function proposeRuntimeEvent(state, type, data = {}, options = {}) {
+  const proposedEvent = { type, ...data, metadata: { ...(data.metadata || {}) } };
+  emitEvent(state, `${type}Proposed`, { ...data, proposed: proposedEvent });
+  return applyReplacementPipeline(state, proposedEvent, options);
+}
+
+export function moveObjectWithResult(state, object, zone, reason, metadata = {}, options = {}) {
   const from = object.zone;
   const previous = snapshotObject(object);
-  emitEvent(state, 'ZoneChangeProposed', { object, affected: object, previous, from, to: zone, proposed: { zone }, metadata: { reason, ...metadata } });
+  const pipeline = proposeRuntimeEvent(state, 'ZoneChange', { object, affected: object, previous, from, to: zone, metadata: { reason, ...metadata } }, options);
+  if (pipeline.status !== 'ready') {
+    state.lastPipelineResult = pipeline;
+    if (pipeline.status === 'depends') emitEvent(state, 'ReplacementChoiceRequired', { object, affected: object, previous, from, to: zone, metadata: { choices: pipeline.choices } });
+    return { ...pipeline, object };
+  }
+  const finalZone = pipeline.event.to;
   removeFromZone(state, from, object.id);
-  object.zone = zone;
+  object.zone = finalZone;
   object.lastKnown = previous;
-  if (!state.zones[zone]?.includes(object.id)) state.zones[zone]?.push(object.id);
-  const playerZone = zone === 'command' ? 'commandZone' : zone;
+  if (!state.zones[finalZone]?.includes(object.id)) state.zones[finalZone]?.push(object.id);
+  const playerZone = finalZone === 'command' ? 'commandZone' : finalZone;
   if (state.players[object.owner]?.[playerZone] && !state.players[object.owner][playerZone].includes(object.id)) state.players[object.owner][playerZone].push(object.id);
-  emitEvent(state, 'ZoneChanged', { object, affected: object, previous, from, to: zone, final: snapshotObject(object), metadata: { reason, ...metadata } });
-  if (from === 'battlefield') emitEvent(state, 'PermanentLeft', { object, affected: object, previous, from, to: zone, metadata: { reason, ...metadata } });
-  if (from === 'battlefield' && zone === 'graveyard' && isCreature(previous.card)) emitEvent(state, 'CreatureDied', { object, affected: object, previous, controller: previous.controller, from, to: zone, metadata: { lki: true, reason, ...metadata } });
+  if (finalZone === 'battlefield') {
+    if (!state.battlefield.includes(object)) state.battlefield.push(object);
+    if (!state.players[object.controller]?.battlefield.includes(object.id)) state.players[object.controller]?.battlefield.push(object.id);
+  }
+  const eventMetadata = { reason, replacements: pipeline.applied, ...metadata };
+  emitEvent(state, 'ZoneChanged', { object, affected: object, previous, from, to: finalZone, final: snapshotObject(object), metadata: eventMetadata });
+  if (from !== 'battlefield' && finalZone === 'battlefield') {
+    emitEvent(state, 'PermanentEntered', { object, controller: object.controller, from, to: finalZone, final: snapshotObject(object), metadata: eventMetadata });
+    emitEvent(state, 'PermanentEnteredBattlefield', { object, controller: object.controller, from, to: finalZone, final: snapshotObject(object), metadata: eventMetadata });
+  }
+  if (from === 'battlefield') {
+    emitEvent(state, 'PermanentLeft', { object, affected: object, previous, from, to: finalZone, metadata: eventMetadata });
+    emitEvent(state, 'PermanentLeftBattlefield', { object, affected: object, previous, from, to: finalZone, metadata: eventMetadata });
+  }
+  if (from === 'battlefield' && finalZone === 'graveyard' && isCreature(previous.card)) emitEvent(state, 'CreatureDied', { object, affected: object, previous, controller: previous.controller, from, to: finalZone, metadata: { lki: true, ...eventMetadata } });
+  return { status: 'committed', object, from, to: finalZone, replaced: finalZone !== zone, replacements: pipeline.applied };
+}
+
+export function moveObject(state, object, zone, reason, metadata = {}, options = {}) {
+  moveObjectWithResult(state, object, zone, reason, metadata, options);
   return object;
 }
 
-export function markDamage(state, object, amount, source, metadata = {}) {
-  emitEvent(state, 'DamageProposed', { source, affected: object, amount, proposed: { amount }, metadata });
-  object.damageMarked += amount;
-  if (metadata.deathtouch) object.damagedByDeathtouch = true;
-  return emitEvent(state, 'DamageDealt', { source, affected: object, amount, final: { damageMarked: object.damageMarked }, metadata });
+function preventionEffectsFor(state, event) {
+  const registered = state.preventionEffects.filter((effect) => {
+    if (effect.remaining === 0) return false;
+    if (effect.sourceId && effect.sourceId !== event.source?.id) return false;
+    if (effect.targetId && effect.targetId !== event.affected?.id) return false;
+    return typeof effect.applies === 'function' ? effect.applies(event, state) : true;
+  });
+  const protection = (event.affected?.effects || [])
+    .filter((effect) => effect.type === 'protection' && sourceHasQuality(event.source?.card || {}, effect.quality))
+    .map((effect, index) => ({ id: `protection:${event.affected.id}:${index}`, remaining: null, source: event.affected, protection: true }));
+  return [...registered, ...protection];
+}
+
+export function markDamageWithResult(state, object, amount, source, metadata = {}, options = {}) {
+  const pipeline = proposeRuntimeEvent(state, 'Damage', { source, affected: object, object, amount, metadata }, options);
+  if (pipeline.status !== 'ready') return pipeline;
+  let remaining = pipeline.event.amount;
+  const preventedBy = [];
+  for (const prevention of preventionEffectsFor(state, pipeline.event)) {
+    const prevented = prevention.remaining == null ? remaining : Math.min(remaining, prevention.remaining);
+    if (prevented <= 0) continue;
+    remaining -= prevented;
+    if (prevention.remaining != null) prevention.remaining -= prevented;
+    preventedBy.push(prevention.id);
+    emitEvent(state, 'DamagePrevented', { source, affected: object, amount: prevented, metadata: { preventionId: prevention.id } });
+    if (remaining === 0) break;
+  }
+  if (remaining > 0) {
+    object.damageMarked += remaining;
+    if (metadata.deathtouch) object.damagedByDeathtouch = true;
+    emitEvent(state, 'DamageDealt', { source, affected: object, amount: remaining, final: { damageMarked: object.damageMarked }, metadata: { ...metadata, replacements: pipeline.applied } });
+  }
+  return { status: 'committed', proposed: amount, replacedAmount: pipeline.event.amount, dealt: remaining, prevented: pipeline.event.amount - remaining, preventedBy, replacements: pipeline.applied };
+}
+
+export function markDamage(state, object, amount, source, metadata = {}, options = {}) {
+  const result = markDamageWithResult(state, object, amount, source, metadata, options);
+  return state.events.at(-1) || result;
 }
 
 function cancelOpposingCounters(object) {
@@ -234,9 +425,9 @@ export function runStateBasedActionsRuntime(state) {
       changed = true;
     }
     for (const [playerId, player] of Object.entries(state.players)) {
-      if (!player.lost && (player.life <= 0 || player.poison >= 10)) {
+      if (!player.lost && (player.life <= 0 || player.poison >= 10 || player.failedDraw)) {
         player.lost = true;
-        const reason = player.life <= 0 ? 'life total' : 'poison counters';
+        const reason = player.life <= 0 ? 'life total' : player.poison >= 10 ? 'poison counters' : 'drawing from an empty library';
         emitEvent(state, 'PlayerLost', { player: playerId, metadata: { reason } });
         applied.push(`${playerId} loses the game because of ${reason}.`);
         changed = true;

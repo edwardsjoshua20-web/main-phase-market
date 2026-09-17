@@ -40,6 +40,15 @@ const RULES_BY_PRIMITIVE = Object.freeze({
   costs: [
     { ruleId: 'CR-118', section: '118', title: 'Costs', enginePrimitive: 'costs', canonicalMeaning: 'A cost must be paid in full; unsupported or unspecified payments cannot be assumed.', keywords: ['cost', 'pay'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
   ],
+  effects: [
+    { ruleId: 'CR-609', section: '609', title: 'Effects', enginePrimitive: 'effects', canonicalMeaning: 'One-shot effects change game state as instructed and create the corresponding game events.', keywords: ['effect', 'resolve'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  zones: [
+    { ruleId: 'CR-400', section: '400', title: 'Zones', enginePrimitive: 'zones', canonicalMeaning: 'Objects move between zones as discrete game events and become new objects where the rules specify.', keywords: ['zone', 'hand', 'graveyard', 'exile', 'library'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  prevention: [
+    { ruleId: 'CR-615', section: '615', title: 'Prevention Effects', enginePrimitive: 'prevention', canonicalMeaning: 'Prevention effects modify damage events before damage is dealt.', keywords: ['prevent', 'damage'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
   ward: [
     { ruleId: 'CR-702.21', section: '702.21', title: 'Ward', enginePrimitive: 'ward', canonicalMeaning: 'Ward triggers when an opponent-controlled spell or ability targets the permanent and counters that stack object unless the ward cost is paid.', keywords: ['ward'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
   ],

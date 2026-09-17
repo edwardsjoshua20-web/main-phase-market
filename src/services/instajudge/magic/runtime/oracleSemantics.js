@@ -18,8 +18,8 @@ export const ORACLE_GRAMMAR_CAPABILITIES = Object.freeze({
   modes: 'structural',
   triggers: 'structural',
   interveningIf: 'structural-no-condition-execution',
-  replacementInstead: 'structural-no-execution',
-  prevention: 'structural-no-execution',
+  replacementInstead: 'executable-subset',
+  prevention: 'executable-subset',
   optionalMay: 'partial',
   damage: 'executable-subset',
   destroy: 'executable-subset',
@@ -27,14 +27,14 @@ export const ORACLE_GRAMMAR_CAPABILITIES = Object.freeze({
   counter: 'executable-subset',
   ptModification: 'executable-subset',
   keywordGrant: 'protection-only-executable',
-  lifeChange: 'dies-trigger-subset-executable',
-  draw: 'structural',
-  discard: 'structural',
-  search: 'structural',
-  mill: 'structural',
-  tokenCreation: 'structural',
-  counterModification: 'structural',
-  zoneChange: 'structural',
+  lifeChange: 'executable-subset',
+  draw: 'executable-subset',
+  discard: 'executable-subset',
+  search: 'simple-criteria-executable',
+  mill: 'executable-subset',
+  tokenCreation: 'fixed-token-executable',
+  counterModification: 'fixed-counter-executable',
+  zoneChange: 'executable-subset',
   copy: 'structural',
   controlChange: 'structural',
   variableX: 'structural-no-value-solving',
@@ -118,23 +118,53 @@ function parseEffects(text = '') {
   if (loss) push({ type: ORACLE_NODE_TYPES.LIFE_CHANGE, direction: 'lose', amount: amount(loss[2]), subject: loss[1], target: loss[1].startsWith('target') ? targetSpec(loss[1]) : null });
   const gain = value.match(/\b(you|target player) gains? (\d+|x) life\b/);
   if (gain) push({ type: ORACLE_NODE_TYPES.LIFE_CHANGE, direction: 'gain', amount: amount(gain[2]), subject: gain[1], target: gain[1].startsWith('target') ? targetSpec(gain[1]) : null });
-  const draw = value.match(/\bdraw (a|one|two|three|four|five|\d+) cards?\b/);
-  if (draw) push({ type: ORACLE_NODE_TYPES.DRAW, amount: amount(draw[1]), subject: 'you' });
-  const discard = value.match(/\b(target player|you|that player) discards? (a|one|two|three|four|five|\d+) cards?\b/);
+  const draw = value.match(/\b(you|target player|that player)?\s*draws? (a|one|two|three|four|five|\d+) cards?\b/);
+  if (draw) push({ type: ORACLE_NODE_TYPES.DRAW, amount: amount(draw[2]), subject: draw[1] || 'you', target: draw[1] === 'target player' ? targetSpec('target player') : null });
+  const discard = value.match(/\b(target player|each player|you|that player) discards? (a|one|two|three|four|five|\d+) cards?\b/);
   if (discard) push({ type: ORACLE_NODE_TYPES.DISCARD, amount: amount(discard[2]), subject: discard[1] });
-  const mill = value.match(/\bmills? (a|one|two|three|four|five|\d+) cards?\b/);
-  if (mill) push({ type: ORACLE_NODE_TYPES.MILL, amount: amount(mill[1]) });
-  if (value.includes('search your library')) push({ type: ORACLE_NODE_TYPES.SEARCH, zone: 'library', controller: 'self' });
-  if (value.includes('create') && value.includes('token')) push({ type: ORACLE_NODE_TYPES.TOKEN_CREATION, amount: amount(value.match(/\bcreate (a|one|two|three|four|five|\d+)\b/)?.[1] || 1) });
-  if (/\bput .+ counters? on\b/.test(value)) push({ type: ORACLE_NODE_TYPES.COUNTER_MODIFICATION, operation: 'add' });
-  if (/\bremove .+ counters? from\b/.test(value)) push({ type: ORACLE_NODE_TYPES.COUNTER_MODIFICATION, operation: 'remove' });
+  const mill = value.match(/\b(target player|each opponent|you|that player)?\s*mills? (a|one|two|three|four|five|\d+) cards?\b/);
+  if (mill) push({ type: ORACLE_NODE_TYPES.MILL, amount: amount(mill[2]), subject: mill[1] || 'target player', target: mill[1] === 'target player' ? targetSpec('target player') : null });
+  if (value.includes('search your library')) {
+    const criteria = value.includes('basic land') ? { type: 'basic-land' } : value.includes('creature card') ? { type: 'creature' } : value.includes('land card') ? { type: 'land' } : null;
+    const destination = value.includes('onto the battlefield') ? 'battlefield' : value.includes('into your graveyard') ? 'graveyard' : 'hand';
+    push({ type: ORACLE_NODE_TYPES.SEARCH, zone: 'library', controller: 'self', criteria, destination, shuffle: value.includes('shuffle') });
+  }
+  const token = value.match(/\bcreate (a|an|one|two|three|four|five|\d+) (?:(\d+)\/(\d+) )?((?:white|blue|black|red|green|colorless) )?([a-z ]+?) creature tokens?(?: with ([^.]+))?(?:\.|$)/);
+  if (token) {
+    const words = token[5].trim().split(/\s+/);
+    push({
+      type: ORACLE_NODE_TYPES.TOKEN_CREATION,
+      amount: amount(token[1]),
+      token: {
+        name: words.at(-1) || 'Creature Token',
+        power: token[2] ? Number(token[2]) : null,
+        toughness: token[3] ? Number(token[3]) : null,
+        colors: token[4] ? [token[4].trim()] : [],
+        types: ['Creature'],
+        subtypes: words.map((word) => word[0]?.toUpperCase() + word.slice(1)),
+        abilities: KEYWORDS.filter((keyword) => normalizeMagicText(token[6] || '').includes(keyword))
+      }
+    });
+  }
+  const counterAdd = value.match(/\bput (a|an|one|two|three|four|five|\d+) ([+\-]\d+\/[+\-]\d+|[a-z0-9+\-/]+) counters? on\b/);
+  if (counterAdd) push({ type: ORACLE_NODE_TYPES.COUNTER_MODIFICATION, operation: 'add', amount: amount(counterAdd[1]), counter: counterAdd[2], target });
+  const counterRemove = value.match(/\bremove (a|an|one|two|three|four|five|\d+) ([+\-]\d+\/[+\-]\d+|[a-z0-9+\-/]+) counters? from\b/);
+  if (counterRemove) push({ type: ORACLE_NODE_TYPES.COUNTER_MODIFICATION, operation: 'remove', amount: amount(counterRemove[1]), counter: counterRemove[2], target });
   if (value.includes('return') && value.includes("owner's hand")) push({ type: ORACLE_NODE_TYPES.ZONE_CHANGE, from: 'battlefield', to: 'hand', target });
+  if (/\breturn target [^.]+ card from (?:your|a) graveyard to (?:your|its owner's) hand\b/.test(value)) push({ type: ORACLE_NODE_TYPES.ZONE_CHANGE, from: 'graveyard', to: 'hand', target });
+  if (/\breturn target [^.]+ card from (?:your|a) graveyard to the battlefield\b/.test(value)) push({ type: ORACLE_NODE_TYPES.ZONE_CHANGE, from: 'graveyard', to: 'battlefield', target });
+  if (/\bput target [^.]+ into (?:its owner's|a) graveyard\b/.test(value)) push({ type: ORACLE_NODE_TYPES.ZONE_CHANGE, from: null, to: 'graveyard', target });
   if (value.includes('sacrifice')) push({ type: ORACLE_NODE_TYPES.SACRIFICE, subject: value.replace(/^.*sacrifice\s+/, ''), target });
   if (value.includes('tap target')) push({ type: ORACLE_NODE_TYPES.TAP_CHANGE, tapped: true, target });
   if (value.includes('untap target')) push({ type: ORACLE_NODE_TYPES.TAP_CHANGE, tapped: false, target });
   if (value.includes('copy target') || value.includes('copy of')) push({ type: ORACLE_NODE_TYPES.COPY, target });
   if (value.includes('gain control of target')) push({ type: ORACLE_NODE_TYPES.CONTROL_CHANGE, controller: 'effect-controller', target });
-  if (value.includes('prevent') && value.includes('damage')) push({ type: ORACLE_NODE_TYPES.PREVENTION, event: 'DamageProposed', amount: amount(value.match(/\bprevent (?:the next )?(\d+|x|all)\b/)?.[1] || 'all') });
+  if (value.includes('prevent') && value.includes('damage')) push({
+    type: ORACLE_NODE_TYPES.PREVENTION,
+    event: 'DamageProposed',
+    amount: amount(value.match(/\bprevent (?:the next )?(\d+|x|all)\b/)?.[1] || 'all'),
+    combatOnly: value.includes('combat damage')
+  });
   return effects;
 }
 
@@ -185,7 +215,15 @@ function spellAbilities(card) {
 function replacements(card) {
   return String(card.oracleText).split(/(?<=\.)\s+/).flatMap((sentence) => {
     const match = sentence.match(/\bif (.+?) would (.+?),? instead (.+)/i) || sentence.match(/\bif (.+?) would (.+?),? (.+?) instead\b/i);
-    return match ? [{ type: ORACLE_NODE_TYPES.REPLACEMENT, proposedEvent: match[2], applicability: { type: ORACLE_NODE_TYPES.CONDITION, text: match[1] }, replacementResult: match[3], text: sentence.trim() }] : [];
+    if (!match) return [];
+    const value = normalizeMagicText(sentence);
+    let runtime = null;
+    if (value.includes('would be put into a graveyard') && value.includes('exile it instead')) {
+      runtime = { eventType: 'ZoneChange', to: 'graveyard', replace: { to: 'exile' }, mandatory: true };
+    } else if (value.includes('would die') && value.includes('exile it instead')) {
+      runtime = { eventType: 'ZoneChange', from: 'battlefield', to: 'graveyard', objectId: 'self', replace: { to: 'exile' }, mandatory: true };
+    }
+    return [{ type: ORACLE_NODE_TYPES.REPLACEMENT, proposedEvent: match[2], applicability: { type: ORACLE_NODE_TYPES.CONDITION, text: match[1] }, replacementResult: match[3], runtime, executable: Boolean(runtime), text: sentence.trim() }];
   });
 }
 

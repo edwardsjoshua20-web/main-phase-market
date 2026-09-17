@@ -3,6 +3,7 @@ import { rulesForPrimitives } from './comprehensiveRules.js';
 import { parseOracleSemantics } from './oracleSemantics.js';
 import { compileMagicScenario, extractGenericObjects } from './scenarioCompiler.js';
 import { PAYMENT_STATUS } from './costSystem.js';
+import { executeTypedEffect } from './effectRuntime.js';
 import { castSpell, checkTimingPermission, passPriority, resolveTopOfStack } from './stackRuntime.js';
 import {
   addPermanent,
@@ -581,9 +582,10 @@ function evaluateWardStack({ message, cards, genericObjects, scenario }) {
       const targetCheck = validateTarget({ sourceObject: stackObject.sourceObject, target: effectTarget, effect });
       resolutionState.trace.push({ type: 'TargetCheckOnResolution', source: stackObject.sourceObject.name, target: effectTarget?.name || null, legal: targetCheck.legal, failures: targetCheck.failures });
       if (!targetCheck.legal) return { targetCheck, sequence: [] };
-      const result = applyEffect({ state: resolutionState, sourceObject: stackObject.sourceObject, effect, target: effectTarget, message });
-      effectSequence.push(...(result.sequence || []));
-      return { targetCheck, ...result };
+      const result = executeTypedEffect({ state: resolutionState, sourceObject: stackObject.sourceObject, controller: stackObject.controller, effect, target: effectTarget });
+      const summary = typedEffectSummary(stackObject.sourceObject, effect, effectTarget, result);
+      if (summary) effectSequence.push(summary);
+      return { targetCheck, result };
     }
   });
   passPriority(state, state.game.priorityHolder, { resolve: resolveSpell });
@@ -598,6 +600,16 @@ function evaluateWardStack({ message, cards, genericObjects, scenario }) {
     state,
     runtime: { paymentStatus, spellStatus: cast.stackObject.status, targetZone: target.zone, stackDepth: state.stack.length }
   });
+}
+
+function typedEffectSummary(sourceObject, effect, target, result) {
+  if (!result || result.status === 'unsupported' || result.status === 'depends') return null;
+  if (effect.type === 'DestroyEffect' && result.to === 'graveyard') return `${sourceObject.name} destroys ${target.name}.`;
+  if (effect.type === 'DestroyEffect' && result.survived) return `${target.name} is indestructible, so it is not destroyed.`;
+  if (effect.type === 'ExileEffect' && result.to === 'exile') return `${sourceObject.name} exiles ${target.name}.`;
+  if (effect.type === 'ZoneChangeEffect' && result.to) return `${sourceObject.name} moves ${target.name} to ${result.to}.`;
+  if (effect.type === 'DamageEffect' && Number.isFinite(result.dealt)) return `${sourceObject.name} deals ${result.dealt} damage to ${target.name}.`;
+  return null;
 }
 
 function evaluateTimingPermissionQuestion({ message, cards, genericObjects, scenario }) {
@@ -639,6 +651,79 @@ function evaluateTimingPermissionQuestion({ message, cards, genericObjects, scen
   });
 }
 
+const PHASE_FIVE_EFFECTS = new Set([
+  'LifeChange', 'DrawEffect', 'DiscardEffect', 'MillEffect', 'SacrificeEffect',
+  'TokenCreation', 'CounterModification', 'ZoneChangeEffect', 'SearchEffect'
+]);
+
+function evaluateTypedSpellEffects({ message, cards, genericObjects, scenario }) {
+  const action = scenario.actions[0];
+  if (!action || scenario.actions.length !== 1) return null;
+  const card = cards.find((candidate) => normalizeMagicText(candidate.name) === normalizeMagicText(action.source.name));
+  if (!card) return null;
+  const semantics = parseOracleSemantics(card);
+  const effects = semantics.spellAbilities?.[0]?.effects || [];
+  if (effects.length === 0 || !effects.every((effect) => PHASE_FIVE_EFFECTS.has(effect.type))) return null;
+  const state = createMagicRuntimeState({ cards, genericObjects, scenario, message });
+  const sourceObject = createGameObject({ card, controller: action.actor, owner: action.actor, zone: 'stack' });
+  const sequence = [];
+  const results = [];
+  for (let index = 0; index < effects.length; index += 1) {
+    const effect = effects[index];
+    const targetId = action.targets[index]?.objectId || action.targets[0]?.objectId;
+    const target = targetId ? state.objects.get(targetId) : null;
+    const targetPlayer = effect.subject?.includes('opponent') || effect.target?.kind === 'player' ? opponentOf(action.actor) : null;
+    const result = executeTypedEffect({
+      state,
+      effect,
+      sourceObject,
+      controller: action.actor,
+      target,
+      targetPlayer,
+      allowPlaceholders: ['DrawEffect', 'MillEffect'].includes(effect.type)
+    });
+    results.push(result);
+    if (result.status === 'depends') {
+      return {
+        status: 'depends', verdict: 'depends',
+        summary: `${card.name} needs a player choice before its typed effect can finish.`,
+        cards, rules: primitiveRules(['effects', 'zones', 'replacement']), mechanics: ['effects', 'zones', 'replacement'],
+        trace: state.trace, sequence,
+        clarificationNeeded: result.clarificationNeeded || 'Which legal choice is made?'
+      };
+    }
+    if (result.status === 'unsupported') {
+      return unsupported(result.reason || `${card.name} contains a parsed effect outside current execution coverage.`, {
+        cards, primitives: ['effects'], trace: state.trace
+      });
+    }
+    sequence.push(typedExecutionSummary(card, effect, target, targetPlayer, result));
+  }
+  runStateBasedActionsRuntime(state);
+  collectTriggeredAbilities(state);
+  return evaluated('yes', sequence.filter(Boolean).at(-1) || `${card.name}'s typed effects resolve.`, {
+    cards,
+    primitives: ['effects', 'zones', 'replacement', 'state-based-actions', 'triggers'],
+    trace: state.trace,
+    sequence: sequence.filter(Boolean),
+    state,
+    runtime: { typedEffects: effects.map((effect) => effect.type), results }
+  });
+}
+
+function typedExecutionSummary(card, effect, target, targetPlayer, result) {
+  if (effect.type === 'LifeChange') return `${targetPlayer || 'The player'} ${effect.direction === 'gain' ? 'gains' : 'loses'} ${effect.amount.value} life.`;
+  if (effect.type === 'DrawEffect') return `${card.name}'s controller draws ${result.drawn?.length || 0} cards.`;
+  if (effect.type === 'DiscardEffect') return `${targetPlayer || 'The player'} discards ${result.discarded?.length || result.results?.[0]?.discarded?.length || 0} cards.`;
+  if (effect.type === 'MillEffect') return `${targetPlayer || 'The player'} mills ${result.milled?.length || 0} cards.`;
+  if (effect.type === 'TokenCreation') return `${card.name} creates ${result.created?.length || 0} creature tokens.`;
+  if (effect.type === 'CounterModification') return `${target?.name || 'The permanent'} now has ${result.total} ${effect.counter} counters.`;
+  if (effect.type === 'ZoneChangeEffect') return `${card.name} moves ${target?.name || 'the target'} to ${result.to}.`;
+  if (effect.type === 'SearchEffect') return result.found ? `${card.name} finds ${result.found.name} and moves it to ${result.destination}.` : `${card.name}'s controller may search and fail to find a matching card.`;
+  if (effect.type === 'SacrificeEffect') return `${result.object?.name || 'The chosen permanent'} is sacrificed.`;
+  return `${card.name}'s ${effect.type} resolves.`;
+}
+
 export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
   const normalizedCards = cards.map(normalizeMagicCard).filter((card) => card.name);
   const text = normalizeMagicText(message);
@@ -662,6 +747,8 @@ export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
   if (globalDamage) return globalDamage;
   const targetedStack = evaluateTargetedStack({ message, cards: normalizedCards, genericObjects, scenario });
   if (targetedStack) return targetedStack;
+  const typedEffects = evaluateTypedSpellEffects({ message, cards: normalizedCards, genericObjects, scenario });
+  if (typedEffects) return typedEffects;
   return unsupported('The authoritative Magic runtime does not yet execute every primitive in this compiled scenario.', {
     cards: normalizedCards,
     primitives: ['continuous'],
@@ -677,4 +764,8 @@ function currentPowerLabel(object) {
 
 function escapeRegExp(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function opponentOf(playerId) {
+  return playerId === 'player' ? 'opponent' : 'player';
 }

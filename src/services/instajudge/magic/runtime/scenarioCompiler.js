@@ -101,6 +101,7 @@ function compileGenericObjects(message, makeId) {
   const objects = [];
 
   for (const match of normalized.matchAll(/\b(one|two|three|four|five|six|\d+)\s+(\d+)\/(\d+)\s+creature tokens?\b/g)) {
+    if (/\bcreate\s+$/.test(normalized.slice(Math.max(0, match.index - 16), match.index))) continue;
     const count = numberFrom(match[1]);
     const controller = ownerFrom(normalized.slice(Math.max(0, match.index - 50), match.index + match[0].length));
     for (let index = 0; index < count; index += 1) {
@@ -127,6 +128,7 @@ function compileGenericObjects(message, makeId) {
 
   const descriptorPattern = /\b(?:(my opponent's|opponent's|their|my own|my|your|i control|opponent controls|player controls)\s+)?(?:(one|two|three|four|five|six|\d+|a|an)\s+)?(?:(\d+)\/(\d+)\s+)?((?:tapped\s+)?(?:legendary\s+)?(?:artifact\s+)?(?:commander|creature)(?:\s+tokens?)?(?:\s+(?:that has|has|with)\s+(?:double strike|first strike|deathtouch|indestructible|vigilance|hexproof|shroud|flying|reach|trample|lifelink|menace|haste|defender|flash|ward(?:\s+\d+)?)(?:\s+and\s+(?:[a-z ]+))?)?)(?=\s+(?:for|and|gains?|gets?|is|are|from|target|targeting|can|in response|i cast|\. |\?|$)|$)/g;
   for (const match of normalized.matchAll(descriptorPattern)) {
+    if (/\bcreate\s+$/.test(normalized.slice(Math.max(0, match.index - 16), match.index))) continue;
     if (objects.some((entry) => entry.sourceKey.startsWith(`${match.index}:`))) continue;
     const descriptor = match[0];
     const before = normalized.slice(Math.max(0, match.index - 32), match.index);
