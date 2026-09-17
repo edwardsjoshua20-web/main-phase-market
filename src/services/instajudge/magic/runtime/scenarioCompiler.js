@@ -331,7 +331,7 @@ function compileCombat(message, objects, cards) {
     || text.match(/\b(\d+)\/(\d+)\s+(?:[a-z ]+\s+)?creature\s+attacks?\b/);
   let attacker = attackPt ? objectWithPowerToughness(objects, attackPt[1], attackPt[2], used) : null;
   if (!attacker) {
-    const named = cards.find((card) => new RegExp(`(?:attack(?:s|ed)? with|${escapeRegExp(card.normalizedName)} attacks?)`).test(text) && text.includes(card.normalizedName));
+    const named = cards.find((card) => new RegExp(`(?:attack(?:s|ed)? with ${escapeRegExp(card.normalizedName)}|${escapeRegExp(card.normalizedName)} attacks?)`).test(text));
     attacker = named ? objects.find((object) => normalizeMagicText(object.name) === named.normalizedName) : null;
   }
   attacker ||= objects.find((object) => object.controller === attackingPlayer && normalizeMagicText(object.card.typeLine).includes('creature')) || null;

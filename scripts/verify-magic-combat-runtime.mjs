@@ -257,6 +257,14 @@ const compiled = compileMagicScenario({ message: 'My 2/2 creature attacks and th
 assert(compiled.combat?.attackers.length === 1 && compiled.combat.blocks[0]?.blockerIds.length === 1, 'Scenario compiler must build attacker and blocker assignments from generic combat prose.');
 const publicCombat = evaluateMagicRulesRuntime({ message: 'My 2/2 creature attacks and their 3/3 creature blocks. Does my creature die?', cards: [] });
 assert(publicCombat.status === 'evaluated' && publicCombat.verdict === 'yes', 'The public runtime must answer a supported generic combat question from executable combat state.');
+const namedCombat = evaluateMagicRulesRuntime({
+  message: 'I attack with Grizzly Bears and my opponent blocks with Black Knight. Does my creature die?',
+  cards: [
+    { name: 'Black Knight', typeLine: 'Creature - Human Knight', oracleText: 'First strike, protection from white', power: 2, toughness: 2 },
+    { name: 'Grizzly Bears', typeLine: 'Creature - Bear', oracleText: '', power: 2, toughness: 2 }
+  ]
+});
+assert(namedCombat.status === 'evaluated' && namedCombat.verdict === 'yes' && /Grizzly Bears dies/.test(namedCombat.summary), 'Named attacker compilation must bind "attack with" to that card instead of catalog result order.');
 const combatTiming = evaluateMagicRulesRuntime({
   message: 'Can I cast Giant Growth after blockers are declared but before combat damage?',
   cards: [{ name: 'Giant Growth', typeLine: 'Instant', oracleText: 'Target creature gets +3/+3 until end of turn.', manaCost: '{G}' }]
