@@ -46,8 +46,30 @@ The certified SBA subset repeats until stable and covers zero toughness, lethal 
 - Gods Willing granting black protection in response to Murder: target re-check prevents Murder from resolving against Serra Angel.
 - Arc Trail with one target becoming illegal: the remaining legal target is still affected.
 
+## Phase 4: Stack, Priority, Costs, and Ward
+
+`stackRuntime.js` owns executable `Spell`, `ActivatedAbility`, and `TriggeredAbility` stack objects. Each object carries its runtime ID, source object, controller, targets, modes, costs, chosen values, effect IR, order, and rule references. The top of `state.stack` resolves first.
+
+The two-player priority runtime records the priority holder and consecutive passes. An action resets the pass count. Two passes resolve the top object when the stack is nonempty, or advance the step when it is empty. After a resolution, the active player receives priority.
+
+`costSystem.js` owns typed fixed costs and payment results. The certified cost nodes are `ManaCost`, `LifeCost`, `TapCost`, `SacrificeCost`, `DiscardCost`, `AdditionalCost`, and `TriggeredPaymentCost`. Mana retains generic, white, blue, black, red, green, and colorless quantities. Payment is always one of `paid`, `unpaid`, `cannot-pay`, or `unspecified`; an unspecified outcome needed by a ruling returns `DEPENDS`.
+
+The casting order used by the runtime is:
+
+1. announce and create the spell object;
+2. retain chosen modes, targets, and values;
+3. determine and pay supported costs;
+4. put the spell on the stack and emit `SpellCast`;
+5. emit one first-class `TargetChosen` event per target;
+6. collect and place resulting triggers in APNAP order;
+7. give the active player priority.
+
+Ward is a generic `TargetChosen` subscriber. An opponent-controlled spell or ability targeting a permanent with Ward creates a `TriggeredAbility` above its source stack object. The Ward trigger contains a `TriggeredPaymentCost` and a `CounterUnlessPaid` effect. A paid cost leaves the source object on the stack; unpaid or cannot-pay counters it through the generic counter primitive; unspecified payment returns `DEPENDS`. Ward never changes target legality.
+
+Certified Phase 4 proofs cover generic `Destroy target creature` and Murder parity for paid, unpaid, cannot-pay, and unspecified Ward; LIFO response stacks; counter and counter-counter operations; APNAP trigger placement; response windows; empty-stack step advancement; and instant, sorcery, and activated-ability timing.
+
 ## Deliberately Unsupported
 
-Ward cost/trigger execution, priority passing, general stack execution, replacement/prevention choice, continuous layers, combat, turn progression, and Commander modifications remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state.
+X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer priority and ambiguous multiplayer trigger ordering are not certified. Special actions, replacement/prevention choices, continuous layers, combat, complete turn progression, and Commander modifications also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state.
 
-The next phase should implement stack/priority and costs on top of the compiled scenario, typed Oracle IR, and event state rather than restoring pattern verdicts.
+The next phase should broaden typed effect execution and replacement/prevention choices on the same stack/event foundation, without restoring pattern verdicts.

@@ -79,7 +79,7 @@ addMany('protection-hexproof-shroud-ward', [
   ['Shroud stops opponents', 'Opponent casts Murder targeting Blastoderm. Can Murder target Blastoderm?', [card.murder, card.blastoderm], 'no'],
   ['Shroud stops controller', 'Player casts Gods Willing targeting Blastoderm. Is the target legal through shroud?', [card.godsWilling, card.blastoderm], 'no'],
   ['Ward paid', 'Opponent casts Murder targeting Graveyard Trespasser and pays ward. Does Murder resolve?', [card.murder, card.trespasser], 'yes'],
-  ['Ward unpaid', 'Opponent casts Murder targeting Graveyard Trespasser and ward unpaid. Does ward counter Murder?', [card.murder, card.trespasser], 'yes'],
+  ['Ward unpaid', 'Opponent casts Murder targeting Graveyard Trespasser and ward unpaid. Does ward counter Murder?', [card.murder, card.trespasser], 'no'],
   ['Ward payment unknown', 'Opponent casts Murder targeting Graveyard Trespasser. Does the spell get countered by ward?', [card.murder, card.trespasser], 'depends']
 ]);
 

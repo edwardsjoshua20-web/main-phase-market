@@ -34,6 +34,15 @@ const RULES_BY_PRIMITIVE = Object.freeze({
   timing: [
     { ruleId: 'CR-117', section: '117', title: 'Timing and Priority', enginePrimitive: 'timing', canonicalMeaning: 'Priority and timing permissions determine when players can take game actions.', keywords: ['priority', 'timing'], effectiveDate: '2026-09-16', sourceVersion: MAGIC_CR_VERSION }
   ],
+  casting: [
+    { ruleId: 'CR-601', section: '601', title: 'Casting Spells', enginePrimitive: 'casting', canonicalMeaning: 'Casting announces a spell, chooses modes and targets, determines and pays costs, then completes the cast.', keywords: ['cast', 'cost', 'target'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  costs: [
+    { ruleId: 'CR-118', section: '118', title: 'Costs', enginePrimitive: 'costs', canonicalMeaning: 'A cost must be paid in full; unsupported or unspecified payments cannot be assumed.', keywords: ['cost', 'pay'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
+  ward: [
+    { ruleId: 'CR-702.21', section: '702.21', title: 'Ward', enginePrimitive: 'ward', canonicalMeaning: 'Ward triggers when an opponent-controlled spell or ability targets the permanent and counters that stack object unless the ward cost is paid.', keywords: ['ward'], effectiveDate: '2026-09-17', sourceVersion: MAGIC_CR_VERSION }
+  ],
   commander: [
     { ruleId: 'CR-903', section: '903', title: 'Commander', enginePrimitive: 'commander', canonicalMeaning: 'Commander modifies deck construction, the command zone, commander tax, and commander damage.', keywords: ['commander', 'command zone'], effectiveDate: '2026-09-16', sourceVersion: MAGIC_CR_VERSION }
   ]

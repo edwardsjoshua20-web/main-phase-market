@@ -89,7 +89,10 @@ assert(wardScenario.actions[0].actor === 'player', 'Ward scenario must compile t
 assert(wardScenario.actions[0].targets[0].objectId === wardScenario.objects[0].id, 'Murder must target the generic ward creature.');
 assert(wardScenario.choices.some((choice) => choice.reason === 'ward' && choice.paid === false && choice.cost.generic === 2), 'Ward scenario must preserve the unpaid {2} choice.');
 const wardRuntime = evaluateMagicRulesRuntime({ message: wardMessage, cards: [card.murder] });
-assert(wardRuntime.verdict === 'unverified', `Ward execution is not certified in Phase 3 and must be UNVERIFIED, got ${wardRuntime.verdict}.`);
+assert(wardRuntime.verdict === 'no', `Unpaid Ward expected NO, got ${wardRuntime.verdict}.`);
+assert(wardRuntime.runtime.paymentStatus === 'unpaid', `Ward payment should be unpaid, got ${wardRuntime.runtime.paymentStatus}.`);
+assert(wardRuntime.runtime.spellStatus === 'countered', `Murder should be countered by Ward, got ${wardRuntime.runtime.spellStatus}.`);
+assert(wardRuntime.runtime.targetZone === 'battlefield', 'The Ward permanent should remain on the battlefield when Murder is countered.');
 
 const genericMessage = 'I control Runtime Witness and two 1/1 creature tokens. My opponent casts Runtime Flame. How many triggers do I get?';
 const genericResult = evaluateMagicRulesRuntime({ message: genericMessage, cards: [card.genericWatcher, card.genericSweeper] });
@@ -168,9 +171,9 @@ const unsupported = judgeMagicScenario({
 assert(unsupported.verdict === 'unverified', `Complex layers expected UNVERIFIED, got ${unsupported.verdict}.`);
 
 const certification = {
-  correctVerified: 5,
+  correctVerified: 6,
   depends: 0,
-  unverified: 2,
+  unverified: 1,
   incorrectConfident: 0
 };
 assert(certification.incorrectConfident === 0, 'Certified supported scenarios must have zero incorrect confident answers.');
@@ -178,7 +181,7 @@ assert(certification.incorrectConfident === 0, 'Certified supported scenarios mu
 console.log('Magic runtime verifier passed.');
 console.log('- Generic dies watcher + two tokens + global damage: 3 triggers');
 console.log('- Blood Artist + Pyroclasm: 3 triggers');
-console.log('- Ward {2} scenario: structured target and unpaid choice; execution UNVERIFIED');
+console.log('- Ward {2} unpaid: trigger counters Murder through executable stack/cost machinery');
 console.log('- Own hexproof creature + Giant Growth: YES with one generic battlefield object');
 console.log('- Arc Trail + response hexproof: remaining legal target is affected');
 console.log(`- Parser resolved named cards: ${resolvedNames.join(', ')}`);

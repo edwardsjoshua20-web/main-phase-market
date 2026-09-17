@@ -5,6 +5,12 @@ let nextObjectId = 1;
 let nextEventId = 1;
 function makeId(prefix) { return `${prefix}-${nextObjectId++}`; }
 
+function reserveId(id) {
+  const suffix = Number(String(id || '').match(/-(\d+)$/)?.[1]);
+  if (Number.isFinite(suffix)) nextObjectId = Math.max(nextObjectId, suffix + 1);
+  return id;
+}
+
 export function createPlayer(id, overrides = {}) {
   return {
     id,
@@ -16,10 +22,11 @@ export function createPlayer(id, overrides = {}) {
   };
 }
 
-export function createGameObject({ id = null, card, controller = 'player', owner = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false, counters = {}, timestamp = null } = {}) {
+export function createGameObject({ id = null, card, controller = 'player', owner = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false, counters = {}, timestamp = null, abilities = [] } = {}) {
   const normalizedCard = card ? normalizeMagicCard(card) : normalizeMagicCard({ name: name || 'Generic Object', typeLine: 'Creature', oracleText: '', power, toughness });
+  const objectId = id ? reserveId(id) : makeId(token ? 'token' : 'object');
   return {
-    id: id || makeId(token ? 'token' : 'object'),
+    id: objectId,
     card: normalizedCard,
     oracleId: normalizedCard.oracle_id || normalizedCard.id || null,
     name: name || normalizedCard.name,
@@ -38,6 +45,7 @@ export function createGameObject({ id = null, card, controller = 'player', owner
     basePower: power ?? normalizedCard.power,
     baseToughness: toughness ?? normalizedCard.toughness,
     effects: [],
+    keywordAbilities: abilities.map((ability) => ({ ...ability })),
     lastKnown: null,
     semantics: parseOracleSemantics(normalizedCard)
   };
@@ -138,7 +146,7 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
     if (!normalizeMagicText(message).includes(normalized.normalizedName) || /instant|sorcery/i.test(normalized.typeLine)) continue;
     const descriptor = scenario?.objects?.find((entry) => normalizeMagicText(entry.name) === normalized.normalizedName);
     if (scenario && scenarioNames.has(normalized.normalizedName) && !descriptor) continue;
-    addPermanent(state, createGameObject({ card: normalized, controller: descriptor?.controller || inferController(message, normalized), owner: descriptor?.owner || inferController(message, normalized), commander: descriptor?.commander || false }));
+    addPermanent(state, createGameObject({ card: normalized, controller: descriptor?.controller || inferController(message, normalized), owner: descriptor?.owner || inferController(message, normalized), commander: descriptor?.commander || false, abilities: descriptor?.abilities || [] }));
   }
   for (const object of genericObjects) addPermanent(state, createGameObject({ ...object, id: object.id || null, token: Boolean(object.token), controller: object.controller || 'player', owner: object.owner || object.controller || 'player' }));
   return state;
@@ -148,6 +156,10 @@ function registerObject(state, object) {
   state.objects.set(object.id, object);
   if (!state.zones[object.zone]?.includes(object.id)) state.zones[object.zone]?.push(object.id);
   return object;
+}
+
+export function registerGameObject(state, object) {
+  return registerObject(state, object);
 }
 
 export function addPermanent(state, object) {

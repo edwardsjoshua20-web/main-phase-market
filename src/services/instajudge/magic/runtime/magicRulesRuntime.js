@@ -2,6 +2,8 @@ import { isCreature, isInstant, isSorcery, normalizeMagicCard, normalizeMagicTex
 import { rulesForPrimitives } from './comprehensiveRules.js';
 import { parseOracleSemantics } from './oracleSemantics.js';
 import { compileMagicScenario, extractGenericObjects } from './scenarioCompiler.js';
+import { PAYMENT_STATUS } from './costSystem.js';
+import { castSpell, checkTimingPermission, passPriority, resolveTopOfStack } from './stackRuntime.js';
 import {
   addPermanent,
   collectTriggeredAbilities,
@@ -231,14 +233,6 @@ function validateTarget({ sourceObject, target, effect }) {
   return { legal: failures.length === 0, failures };
 }
 
-function wardStatus({ sourceObject, target, message }) {
-  if (!objectHasAbility(target, 'ward') || target.controller === sourceObject.controller) return 'none';
-  const text = normalizeMagicText(message);
-  if (/\bward (cost )?(was )?paid\b|\bpays? ward\b/.test(text)) return 'paid';
-  if (/\bward (cost )?(was )?(not paid|unpaid)\b|\bdoes not pay ward\b|\bdid not pay ward\b/.test(text)) return 'unpaid';
-  return 'unknown';
-}
-
 function applyEffect({ state, sourceObject, effect, target, message }) {
   const sequence = [];
   const primitives = [...(effect.primitives || [])];
@@ -460,27 +454,6 @@ function evaluateTargetedStack({ message, cards, genericObjects, scenario }) {
       sequence.push(`${entry.sourceObject.name} has no legal targets as it resolves.`);
       continue;
     }
-    const firstLegalIndex = resolutionChecks.findIndex((targetCheck) => targetCheck.legal);
-    const firstLegalTarget = entry.targets[firstLegalIndex];
-    const ward = wardStatus({ sourceObject: entry.sourceObject, target: firstLegalTarget, message });
-    if (ward === 'unknown') {
-      return {
-        status: 'depends',
-        verdict: 'depends',
-        summary: `${firstLegalTarget.name} has ward, so the runtime needs to know whether the ward cost was paid.`,
-        cards,
-        rules: primitiveRules([...primitives, 'targeting', 'ward']),
-        mechanics: [...primitives, 'targeting', 'ward'],
-        trace: state.trace,
-        sequence,
-        clarificationNeeded: `Did ${firstLegalTarget.name}'s ward cost get paid?`
-      };
-    }
-    if (ward === 'unpaid') {
-      moveObject(state, entry.sourceObject, 'graveyard', `${firstLegalTarget.name} ward trigger`);
-      sequence.push(`${firstLegalTarget.name}'s ward trigger counters ${entry.sourceObject.name} because the ward cost was not paid.`);
-      continue;
-    }
     for (let index = 0; index < entry.effects.length; index += 1) {
       if (!resolutionChecks[index].legal) {
         sequence.push(`${entry.sourceObject.name} ignores illegal target ${entry.targets[index]?.name || index + 1}.`);
@@ -534,6 +507,138 @@ function evaluateTargetedStack({ message, cards, genericObjects, scenario }) {
   });
 }
 
+function evaluateWardStack({ message, cards, genericObjects, scenario }) {
+  const wardObjectDescriptor = scenario.objects.find((object) => object.abilities?.some((ability) => ability.keyword === 'ward'));
+  const action = scenario.actions.find((candidate) => candidate.targets.some((target) => target.objectId === wardObjectDescriptor?.id));
+  if (!wardObjectDescriptor || !action) return null;
+  const spellCard = cards.find((card) => normalizeMagicText(card.name) === normalizeMagicText(action.source.name));
+  if (!spellCard) return null;
+
+  const state = createMagicRuntimeState({ cards, genericObjects, scenario, message });
+  const target = state.objects.get(action.targets[0]?.objectId)
+    || state.battlefield.find((object) => normalizeMagicText(object.name) === normalizeMagicText(wardObjectDescriptor.name));
+  if (!target) return null;
+  const cast = castSpell(state, {
+    card: spellCard,
+    controller: action.actor,
+    targets: [target],
+    modes: action.modes,
+    costs: action.costs,
+    chosenValues: {},
+    skipTiming: true,
+    validateTarget
+  });
+  if (!cast.cast) {
+    const failures = cast.targetChecks?.flatMap((check) => check.failures || []) || [];
+    return evaluated('no', `${spellCard.name} cannot be cast with that target.`, {
+      cards,
+      primitives: ['casting', 'targeting', 'stack'],
+      trace: state.trace,
+      sequence: failures
+    });
+  }
+
+  const paymentChoice = scenario.choices.find((choice) => choice.reason === 'ward');
+  const paymentChoices = paymentChoice ? [{ ...paymentChoice, sourceObjectId: target.id }] : [];
+  const sequence = [`${spellCard.name} is cast targeting ${target.name}.`, `${target.name}'s ward ability triggers and is put on the stack above ${spellCard.name}.`];
+  const resolveWard = () => resolveTopOfStack(state, { paymentChoices });
+  passPriority(state, state.game.priorityHolder, { resolve: resolveWard });
+  const wardPass = passPriority(state, state.game.priorityHolder, { resolve: resolveWard });
+  const wardResolution = wardPass.result;
+
+  if (wardResolution?.status === 'depends') {
+    return {
+      status: 'depends',
+      verdict: 'depends',
+      summary: `${target.name} has ward, so the result depends on whether its ward cost is paid.`,
+      cards,
+      rules: primitiveRules(['casting', 'targeting', 'triggers', 'stack', 'costs', 'ward', 'timing']),
+      mechanics: ['casting', 'targeting', 'triggers', 'stack', 'costs', 'ward', 'timing'],
+      trace: state.trace,
+      sequence,
+      clarificationNeeded: `Was ${target.name}'s ward cost paid?`
+    };
+  }
+
+  const paymentStatus = wardResolution?.payment?.status || PAYMENT_STATUS.UNSPECIFIED;
+  if (wardResolution?.countered) {
+    sequence.push(`${target.name}'s ward trigger resolves with payment status ${paymentStatus}.`);
+    sequence.push(`${spellCard.name} is countered and put into its owner's graveyard.`);
+    return evaluated('no', `${spellCard.name} is countered by Ward because the Ward cost was not paid.`, {
+      cards,
+      primitives: ['casting', 'targeting', 'triggers', 'stack', 'costs', 'ward', 'timing'],
+      trace: state.trace,
+      sequence,
+      state,
+      runtime: { paymentStatus, spellStatus: cast.stackObject.status, targetZone: target.zone, stackDepth: state.stack.length }
+    });
+  }
+
+  sequence.push(`${target.name}'s ward trigger resolves with its cost paid; ${spellCard.name} remains on the stack.`);
+  const effectSequence = [];
+  const resolveSpell = () => resolveTopOfStack(state, {
+    resolveEffect: ({ state: resolutionState, stackObject, effect, target: effectTarget }) => {
+      const targetCheck = validateTarget({ sourceObject: stackObject.sourceObject, target: effectTarget, effect });
+      resolutionState.trace.push({ type: 'TargetCheckOnResolution', source: stackObject.sourceObject.name, target: effectTarget?.name || null, legal: targetCheck.legal, failures: targetCheck.failures });
+      if (!targetCheck.legal) return { targetCheck, sequence: [] };
+      const result = applyEffect({ state: resolutionState, sourceObject: stackObject.sourceObject, effect, target: effectTarget, message });
+      effectSequence.push(...(result.sequence || []));
+      return { targetCheck, ...result };
+    }
+  });
+  passPriority(state, state.game.priorityHolder, { resolve: resolveSpell });
+  passPriority(state, state.game.priorityHolder, { resolve: resolveSpell });
+  sequence.push(...effectSequence);
+  const affected = target.zone !== 'battlefield';
+  return evaluated(affected ? 'yes' : 'no', effectSequence.at(-1) || `${spellCard.name} resolves after the Ward cost is paid.`, {
+    cards,
+    primitives: ['casting', 'targeting', 'triggers', 'stack', 'costs', 'ward', 'timing', 'resolving'],
+    trace: state.trace,
+    sequence,
+    state,
+    runtime: { paymentStatus, spellStatus: cast.stackObject.status, targetZone: target.zone, stackDepth: state.stack.length }
+  });
+}
+
+function evaluateTimingPermissionQuestion({ message, cards, genericObjects, scenario }) {
+  const text = normalizeMagicText(message);
+  if (!/\bcan (?:i|player|you) (?:cast|activate)\b/.test(text) || !/\b(?:right now|now)\b/.test(text)) return null;
+  const action = scenario.actions[0];
+  const card = cards.find((candidate) => normalizeMagicText(candidate.name) === normalizeMagicText(action?.source?.name));
+  if (!action || !card) return null;
+  const state = createMagicRuntimeState({ cards, genericObjects, scenario, message });
+  if (scenario.game.stackEmpty === false) state.stack.push({ id: 'stack-context', kind: 'UnknownStackObject' });
+  if (!scenario.game.factsProvided.priority) state.game.priorityHolder = action.actor;
+  const timing = checkTimingPermission({
+    state,
+    card,
+    actionType: action.type,
+    playerId: action.actor,
+    factsProvided: { ...scenario.game.factsProvided, priority: true }
+  });
+  const primitives = ['timing', 'casting', 'stack'];
+  if (timing.status === 'depends') {
+    const required = ['whose turn it is', 'the current phase', 'whether the stack is empty'];
+    return {
+      status: 'depends',
+      verdict: 'depends',
+      summary: `${card.name}'s timing depends on turn, phase, and stack state.`,
+      cards,
+      rules: primitiveRules(primitives),
+      mechanics: primitives,
+      trace: [{ type: 'TimingPermissionChecked', card: card.name, actionType: action.type, status: 'depends', missing: timing.missing }],
+      sequence: [],
+      clarificationNeeded: `Whose turn is it, which phase is it, and is the stack empty? (${required.join('; ')})`
+    };
+  }
+  return evaluated(timing.allowed ? 'yes' : 'no', timing.allowed ? `${card.name} can be cast in the supplied game state.` : timing.reason, {
+    cards,
+    primitives,
+    trace: [{ type: 'TimingPermissionChecked', card: card.name, actionType: action.type, status: timing.status }],
+    state
+  });
+}
+
 export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
   const normalizedCards = cards.map(normalizeMagicCard).filter((card) => card.name);
   const text = normalizeMagicText(message);
@@ -549,14 +654,10 @@ export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
   const genericObjects = scenario.objects
     .filter((object) => object.name.startsWith('Generic ') || object.name.startsWith('Token '))
     .map((object) => ({ ...object, card: object.card }));
-  if (scenario.objects.some((object) => object.abilities?.some((ability) => ability.keyword === 'ward'))
-    && scenario.actions.some((action) => action.targets.length > 0)) {
-    return unsupported('The scenario was compiled with ward and its payment choice, but ward stack execution is not certified until the cost/priority phase.', {
-      cards: normalizedCards,
-      primitives: ['targeting', 'ward', 'stack'],
-      trace: [{ type: 'ScenarioCompiled', scenario }]
-    });
-  }
+  const timing = evaluateTimingPermissionQuestion({ message, cards: normalizedCards, genericObjects, scenario });
+  if (timing) return timing;
+  const wardStack = evaluateWardStack({ message, cards: normalizedCards, genericObjects, scenario });
+  if (wardStack) return wardStack;
   const globalDamage = evaluateGlobalDamageTriggers({ message, cards: normalizedCards, genericObjects, scenario });
   if (globalDamage) return globalDamage;
   const targetedStack = evaluateTargetedStack({ message, cards: normalizedCards, genericObjects, scenario });

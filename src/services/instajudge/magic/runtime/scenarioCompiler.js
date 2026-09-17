@@ -1,4 +1,5 @@
 import { isInstant, isPermanentType, isSorcery, normalizeMagicCard, normalizeMagicText } from '../magicCards.js';
+import { PAYMENT_STATUS, createDiscardCost, createLifeCost, createManaCost, createSacrificeCost } from './costSystem.js';
 
 const NUMBER_WORDS = Object.freeze({
   a: 1,
@@ -40,21 +41,18 @@ function numberFrom(value, fallback = 1) {
   return NUMBER_WORDS[value] ?? Number(value) ?? fallback;
 }
 
-function parseManaCost(value = '') {
-  const symbols = String(value).match(/\{[^}]+\}/g) || [];
-  return {
-    type: 'Cost',
-    costType: 'mana',
-    symbols,
-    generic: symbols.reduce((sum, symbol) => {
-      const amount = Number(symbol.slice(1, -1));
-      return sum + (Number.isFinite(amount) ? amount : 0);
-    }, 0)
-  };
-}
-
 function ownerFrom(text = '') {
   return /\b(opponent|opponent's|their)\b/.test(normalizeMagicText(text)) ? 'opponent' : 'player';
+}
+
+function parseWardCost(text = '') {
+  const mana = String(text).match(/\bward\s*(?:[-—]\s*)?(\{[^}]+\}|\d+)/i);
+  if (mana) return createManaCost(mana[1].startsWith('{') ? mana[1] : `{${mana[1]}}`);
+  const life = String(text).match(/\bward\s*[-—]\s*pay\s+(\d+)\s+life/i);
+  if (life) return createLifeCost(Number(life[1]));
+  if (/\bward\s*[-—]\s*discard\s+(?:a|one)\s+card/i.test(text)) return createDiscardCost({ count: 1 });
+  if (/\bward\s*[-—]\s*sacrifice\s+(?:a|one)\s+permanent/i.test(text)) return createSacrificeCost({ count: 1 });
+  return null;
 }
 
 function parseKeywordAbilities(text = '') {
@@ -62,9 +60,8 @@ function parseKeywordAbilities(text = '') {
   return KEYWORDS.filter((keyword) => normalized.includes(keyword)).map((keyword) => {
     const ability = { type: 'KeywordAbility', keyword };
     if (keyword === 'ward') {
-      const source = String(text);
-      const ward = source.match(/\bward\s*(\{[^}]+\}|\d+)/i);
-      if (ward) ability.cost = parseManaCost(ward[1].startsWith('{') ? ward[1] : `{${ward[1]}}`);
+      const cost = parseWardCost(text);
+      if (cost) ability.cost = cost;
     }
     return ability;
   });
@@ -75,7 +72,7 @@ function genericCard({ name, typeLine, power, toughness, abilities }) {
     name,
     typeLine,
     oracleText: abilities.map((ability) => ability.cost
-      ? `${ability.keyword} ${ability.cost.symbols.join('')}`
+      ? `${ability.keyword} ${ability.cost.symbols?.join('') || ability.cost.type}`
       : ability.keyword).join(', '),
     power: Number.isFinite(power) ? power : '*',
     toughness: Number.isFinite(toughness) ? toughness : '*',
@@ -239,7 +236,7 @@ function compileActions(message, cards, objects, makeId) {
         zoneTo: 'stack',
         targets: descriptor ? [{ type: 'TargetChoice', descriptor, objectId: target?.id || null }] : [],
         modes: [],
-        costs: card.manaCost ? [parseManaCost(card.manaCost)] : [],
+        costs: card.manaCost ? [createManaCost(card.manaCost)] : [],
         index: text.indexOf(card.normalizedName)
       };
     });
@@ -250,9 +247,10 @@ function compileChoices(message, objects, actions, makeId) {
   const raw = String(message);
   const text = normalizeMagicText(message);
   const unpaid = /\b(?:do|does|did|choose|chooses|chose) not (?:to )?pay\b|\b(?:not paid|unpaid)\b/.test(text);
-  const paid = !unpaid && /\b(?:pay|pays|paid)\b/.test(text);
+  const cannotPay = /\b(?:cannot|can't|could not|couldn't) pay\b/.test(text);
+  const paid = !unpaid && !cannotPay && /\b(?:pay|pays|paid)\b/.test(text);
   const wardObject = objects.find((object) => object.abilities.some((ability) => ability.keyword === 'ward'));
-  if (wardObject && (unpaid || paid)) {
+  if (wardObject && actions.some((action) => action.targets.some((target) => target.objectId === wardObject.id))) {
     const ward = wardObject.abilities.find((ability) => ability.keyword === 'ward');
     const mentionedCost = raw.match(/(?:pay|ward)\s*(\{[^}]+\}|\d+)/i);
     choices.push({
@@ -261,8 +259,9 @@ function compileChoices(message, objects, actions, makeId) {
       reason: 'ward',
       player: actions[0]?.actor || 'player',
       sourceObjectId: wardObject.id,
-      cost: ward?.cost || parseManaCost(mentionedCost?.[1]?.startsWith('{') ? mentionedCost[1] : `{${mentionedCost?.[1] || ''}}`),
-      paid
+      cost: ward?.cost || createManaCost(mentionedCost?.[1]?.startsWith('{') ? mentionedCost[1] : `{${mentionedCost?.[1] || ''}}`),
+      status: cannotPay ? PAYMENT_STATUS.CANNOT_PAY : unpaid ? PAYMENT_STATUS.UNPAID : paid ? PAYMENT_STATUS.PAID : PAYMENT_STATUS.UNSPECIFIED,
+      paid: paid ? true : unpaid || cannotPay ? false : null
     });
   }
   return choices;
@@ -314,7 +313,14 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
       activePlayer: /opponent.?s turn/i.test(message) ? 'opponent' : 'player',
       phase: /combat/i.test(message) ? 'combat' : /end step/i.test(message) ? 'ending' : 'main',
       step: /cleanup/i.test(message) ? 'cleanup' : null,
-      priorityHolder: null
+      priorityHolder: /\bopponent has priority\b/i.test(message) ? 'opponent' : /\b(?:i|player|you) (?:have|has) priority\b/i.test(message) ? 'player' : null,
+      stackEmpty: /\bstack is empty\b/i.test(message) ? true : /\bstack is not empty\b|\bspell on the stack\b/i.test(message) ? false : null,
+      factsProvided: {
+        turn: /\b(?:my|your|player's|opponent's) turn\b/i.test(message),
+        phase: /\b(?:precombat |postcombat )?main phase\b|\bcombat\b|\bend step\b|\bcleanup\b/i.test(message),
+        stack: /\bstack is (?:not )?empty\b|\bspell on the stack\b/i.test(message),
+        priority: /\b(?:i|player|you|opponent) (?:have|has) priority\b/i.test(message)
+      }
     },
     resolvedCards: normalizedCards.map((card) => ({ id: card.id, name: card.name })),
     unresolved: []
