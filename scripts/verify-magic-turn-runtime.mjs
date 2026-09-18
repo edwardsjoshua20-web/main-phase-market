@@ -105,7 +105,7 @@ const cleanupTiming = evaluateMagicRulesRuntime({
   message: 'Can I cast Serra Angel right now during cleanup on my turn while the stack is empty and I have priority?',
   cards: [{ name: 'Serra Angel', typeLine: 'Creature - Angel', oracleText: 'Flying, vigilance', manaCost: '{3}{W}{W}', power: 4, toughness: 4 }]
 });
-expect(cleanupTiming.status === 'unsupported' && cleanupTiming.verdict === 'unverified', 'General cleanup casting permissions must remain UNVERIFIED until Phase 8C.');
+expect(cleanupTiming.status === 'evaluated' && cleanupTiming.verdict === 'no', 'Stable cleanup must deny casting even when the prompt incorrectly claims priority.');
 
 console.log('Magic canonical turn runtime verifier passed.');
 console.log('- Canonical steps: untap through cleanup and next-turn untap');

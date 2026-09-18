@@ -1,13 +1,38 @@
-import { isInstant, isSorcery, normalizeMagicCard } from '../magicCards.js';
+import { isInstant, isPermanentType, isSorcery, normalizeMagicCard, normalizeMagicText } from '../magicCards.js';
 import { COST_TYPES, PAYMENT_STATUS, createTriggeredPaymentCost, normalizeCost, payCost } from './costSystem.js';
 import { deriveCharacteristics } from './continuousEffects.js';
+import { parseOracleSemantics } from './oracleSemantics.js';
 import { createGameObject, emitEvent, moveObject, registerGameObject, runStateBasedActionsRuntime } from './runtimeState.js';
 import { advanceTurnStep } from './turnRuntime.js';
+import { TURN_STEPS } from './turnStructure.js';
 
 export const STACK_OBJECT_TYPES = Object.freeze({
   SPELL: 'Spell',
   ACTIVATED_ABILITY: 'ActivatedAbility',
   TRIGGERED_ABILITY: 'TriggeredAbility'
+});
+
+export const TIMING_MODES = Object.freeze({
+  INSTANT: 'instant',
+  SORCERY: 'sorcery',
+  ACTIVATED_ABILITY: 'activated-ability',
+  MANA_ABILITY: 'mana-ability'
+});
+
+export const TIMING_REASON_CODES = Object.freeze({
+  INSTANT_TIMING_ALLOWED: 'INSTANT_TIMING_ALLOWED',
+  SORCERY_TIMING_ALLOWED: 'SORCERY_TIMING_ALLOWED',
+  ACTIVATED_ABILITY_TIMING_ALLOWED: 'ACTIVATED_ABILITY_TIMING_ALLOWED',
+  NO_PRIORITY_WINDOW: 'NO_PRIORITY_WINDOW',
+  WRONG_PRIORITY_HOLDER: 'WRONG_PRIORITY_HOLDER',
+  WRONG_ACTIVE_PLAYER: 'WRONG_ACTIVE_PLAYER',
+  WRONG_PHASE: 'WRONG_PHASE',
+  STACK_NOT_EMPTY: 'STACK_NOT_EMPTY',
+  MISSING_TIMING_STATE: 'MISSING_TIMING_STATE',
+  UNSUPPORTED_SPELL_TYPE: 'UNSUPPORTED_SPELL_TYPE',
+  UNSUPPORTED_TIMING_RESTRICTION: 'UNSUPPORTED_TIMING_RESTRICTION',
+  UNSUPPORTED_MANA_ABILITY_TIMING: 'UNSUPPORTED_MANA_ABILITY_TIMING',
+  NOT_ACTIVATED_ABILITY: 'NOT_ACTIVATED_ABILITY'
 });
 
 let nextStackId = 1;
@@ -101,28 +126,186 @@ export function passPriority(state, playerId, { resolve = resolveTopOfStack } = 
   return { allowed: true, resolved: true, result };
 }
 
-export function checkTimingPermission({ state, card = null, actionType = 'Cast', playerId, factsProvided = {} } = {}) {
+function timingState(state, playerId) {
+  const step = state?.game?.step || null;
+  const cleanupException = step === TURN_STEPS.CLEANUP && state.game.cleanupState?.priorityActive === true;
+  const combatWindow = state?.game?.phase === 'combat'
+    ? Boolean(state.combat?.priorityWindows?.includes(step))
+    : null;
+  const actionComplete = state?.game?.turnBasedActionState?.status !== 'pending';
+  const priorityWindowOpen = step === TURN_STEPS.UNTAP
+    ? false
+    : step === TURN_STEPS.CLEANUP
+      ? cleanupException
+      : state?.game?.phase === 'combat'
+        ? combatWindow
+        : step === TURN_STEPS.DRAW
+          ? actionComplete && state.game.priorityHolder != null
+          : state?.game?.priorityHolder != null;
+  return {
+    activePlayer: state?.game?.activePlayer || null,
+    actingPlayer: playerId || null,
+    priorityHolder: state?.game?.priorityHolder || null,
+    priorityWindowOpen,
+    phase: state?.game?.phase || null,
+    step,
+    stackEmpty: (state?.stack?.length || 0) === 0,
+    stackDepth: state?.stack?.length || 0,
+    combatWindow,
+    cleanupException
+  };
+}
+
+function timingResult({ allowed, status, code, reason, requiredTiming, currentTimingState, missing = [] }) {
+  return {
+    allowed,
+    status,
+    code,
+    reason,
+    requiredTiming,
+    currentTimingState,
+    missing,
+    support: status === 'unverified' ? 'unsupported' : status === 'depends' ? 'missing-state' : 'proven'
+  };
+}
+
+function denied(code, reason, requiredTiming, currentTimingState) {
+  return timingResult({ allowed: false, status: 'denied', code, reason, requiredTiming, currentTimingState });
+}
+
+function unverified(code, reason, requiredTiming, currentTimingState) {
+  return timingResult({ allowed: null, status: 'unverified', code, reason, requiredTiming, currentTimingState });
+}
+
+function ordinaryFlashStatus(card) {
+  const oracleText = String(card.oracleText || '');
+  if (!/\bflash\b/i.test(oracleText)) return { hasFlash: false, unsupported: false };
+  if (/as though (?:it|they|those|this spell) (?:had|have) flash|spells? you cast have flash|gains? flash|with flash/i.test(oracleText)) {
+    return { hasFlash: false, unsupported: true };
+  }
+  return {
+    hasFlash: /(?:^|[\n,.;]\s*)flash(?:\s*[,.;\n]|$)/i.test(oracleText.trim()),
+    unsupported: false
+  };
+}
+
+function castingTimingMode(cardInput) {
+  const card = normalizeMagicCard(cardInput || {});
+  const type = card.normalizedType;
+  const text = card.normalizedText;
+  if (!type) return { status: 'unverified', code: TIMING_REASON_CODES.UNSUPPORTED_SPELL_TYPE, reason: 'The spell type cannot be determined safely.' };
+  if (/\bland\b/.test(type)) return { status: 'unverified', code: TIMING_REASON_CODES.UNSUPPORTED_SPELL_TYPE, reason: 'Playing a land is a special action and is deferred beyond Phase 8C.' };
+  if (/\b(?:cast this spell only|this spell can only be cast|you may cast this spell only)\b/.test(text)) {
+    return { status: 'unverified', code: TIMING_REASON_CODES.UNSUPPORTED_TIMING_RESTRICTION, reason: 'This spell has a casting restriction outside the supported timing model.' };
+  }
+  if (isInstant(card)) return { status: 'ready', mode: TIMING_MODES.INSTANT, card };
+  const flash = ordinaryFlashStatus(card);
+  if (flash.unsupported) return { status: 'unverified', code: TIMING_REASON_CODES.UNSUPPORTED_TIMING_RESTRICTION, reason: 'This flash-like casting permission is not represented safely.' };
+  if (flash.hasFlash) return { status: 'ready', mode: TIMING_MODES.INSTANT, card, flash: true };
+  if (isSorcery(card) || isPermanentType(card)) return { status: 'ready', mode: TIMING_MODES.SORCERY, card };
+  return { status: 'unverified', code: TIMING_REASON_CODES.UNSUPPORTED_SPELL_TYPE, reason: `The runtime does not recognize ${card.typeLine || 'this card'} as a supported spell type.` };
+}
+
+function activatedAbilityFor({ ability, sourceObject, card }) {
+  if (ability) return { status: 'ready', ability };
+  const abilities = sourceObject?.semantics?.activatedAbilitiesIR
+    || (card ? parseOracleSemantics(card).activatedAbilitiesIR : []);
+  if (abilities.length === 1) return { status: 'ready', ability: abilities[0] };
+  if (abilities.length > 1) return { status: 'unverified', reason: 'Which activated ability is being activated is not specified.' };
+  return { status: 'unverified', reason: 'The runtime cannot prove that the proposed action is an activated ability.' };
+}
+
+function activatedTimingMode(input) {
+  const resolved = activatedAbilityFor(input);
+  if (resolved.status !== 'ready') return { ...resolved, code: TIMING_REASON_CODES.NOT_ACTIVATED_ABILITY };
+  const ability = resolved.ability;
+  if (ability.type !== 'ActivatedAbility' && !String(ability.text || '').includes(':')) {
+    return { status: 'unverified', code: TIMING_REASON_CODES.NOT_ACTIVATED_ABILITY, reason: 'The selected ability is not proven to be activated.' };
+  }
+  const normalizedText = normalizeMagicText(ability.text || '');
+  if (/\badd \{?[wubrgc0-9]+\}?\b/.test(normalizedText) && !/\btarget\b/.test(normalizedText)) {
+    return { status: 'unverified', code: TIMING_REASON_CODES.UNSUPPORTED_MANA_ABILITY_TIMING, reason: 'Mana-ability timing remains owned by the cost/payment runtime and is not broadened in Phase 8C.', ability };
+  }
+  const restrictions = ability.restrictions || [];
+  if (restrictions.some((restriction) => restriction.mode === 'unsupported')) {
+    return { status: 'unverified', code: TIMING_REASON_CODES.UNSUPPORTED_TIMING_RESTRICTION, reason: 'The activated ability has an unsupported timing restriction.', ability };
+  }
+  return {
+    status: 'ready',
+    mode: restrictions.some((restriction) => restriction.mode === 'sorcery') ? TIMING_MODES.SORCERY : TIMING_MODES.ACTIVATED_ABILITY,
+    ability
+  };
+}
+
+function factKnown(factsProvided, fact) {
+  return factsProvided == null || factsProvided[fact] === true;
+}
+
+export function checkTimingPermission({ state, card = null, ability = null, sourceObject = null, actionType = 'Cast', playerId, factsProvided = null } = {}) {
+  if (!state?.game || !playerId) {
+    return unverified(TIMING_REASON_CODES.UNSUPPORTED_TIMING_RESTRICTION, 'Canonical game state and an acting player are required.', null, timingState(state, playerId));
+  }
+  const action = String(actionType || '').toLowerCase();
+  const classification = action === 'cast'
+    ? castingTimingMode(card)
+    : action === 'activate'
+      ? activatedTimingMode({ ability, sourceObject, card })
+      : { status: 'unverified', code: TIMING_REASON_CODES.UNSUPPORTED_TIMING_RESTRICTION, reason: `Unsupported action type: ${actionType}.` };
+  const currentTimingState = timingState(state, playerId);
+  if (classification.status !== 'ready') {
+    return unverified(classification.code || TIMING_REASON_CODES.UNSUPPORTED_TIMING_RESTRICTION, classification.reason, null, currentTimingState);
+  }
+  const requiredTiming = classification.mode;
+  const requiresSorceryTiming = requiredTiming === TIMING_MODES.SORCERY;
+
+  if (factKnown(factsProvided, 'phase') && !currentTimingState.priorityWindowOpen) {
+    return denied(TIMING_REASON_CODES.NO_PRIORITY_WINDOW, `Players do not have a supported priority window during ${currentTimingState.step || 'this step'}.`, requiredTiming, currentTimingState);
+  }
+  if (requiresSorceryTiming && factKnown(factsProvided, 'turn') && currentTimingState.activePlayer !== playerId) {
+    return denied(TIMING_REASON_CODES.WRONG_ACTIVE_PLAYER, 'Sorcery timing is available only to the active player.', requiredTiming, currentTimingState);
+  }
+  if (requiresSorceryTiming && factKnown(factsProvided, 'phase')
+    && ![TURN_STEPS.PRECOMBAT_MAIN, TURN_STEPS.POSTCOMBAT_MAIN].includes(currentTimingState.step)) {
+    return denied(TIMING_REASON_CODES.WRONG_PHASE, 'Sorcery timing is available only during a main phase.', requiredTiming, currentTimingState);
+  }
+  if (requiresSorceryTiming && factKnown(factsProvided, 'stack') && !currentTimingState.stackEmpty) {
+    return denied(TIMING_REASON_CODES.STACK_NOT_EMPTY, 'Sorcery timing requires an empty stack.', requiredTiming, currentTimingState);
+  }
+  if (factKnown(factsProvided, 'priority') && currentTimingState.priorityHolder !== playerId) {
+    return denied(TIMING_REASON_CODES.WRONG_PRIORITY_HOLDER, `${playerId} does not have priority.`, requiredTiming, currentTimingState);
+  }
+
   const missing = [];
-  if (!factsProvided.priority && !state?.game?.priorityHolder) missing.push('who has priority');
-  if (actionType === 'Cast' && isSorcery(normalizeMagicCard(card || {}))) {
-    if (!factsProvided.turn) missing.push('whose turn it is');
-    if (!factsProvided.phase) missing.push('the current phase');
-    if (!factsProvided.stack) missing.push('whether the stack is empty');
+  if (!factKnown(factsProvided, 'priority')) missing.push('who has priority');
+  if (requiresSorceryTiming && !factKnown(factsProvided, 'turn')) missing.push('whose turn it is');
+  if (requiresSorceryTiming && !factKnown(factsProvided, 'phase')) missing.push('the current phase');
+  if (requiresSorceryTiming && !factKnown(factsProvided, 'stack')) missing.push('whether the stack is empty');
+  if (missing.length) {
+    return timingResult({
+      allowed: null,
+      status: 'depends',
+      code: TIMING_REASON_CODES.MISSING_TIMING_STATE,
+      reason: 'The timing permission depends on missing canonical game state.',
+      requiredTiming,
+      currentTimingState,
+      missing
+    });
   }
-  if (missing.length) return { allowed: null, status: 'depends', missing };
-  if (state.game.priorityHolder !== playerId) return { allowed: false, status: 'denied', reason: `${playerId} does not have priority.` };
-  if (actionType === 'Activate') return { allowed: true, status: 'allowed' };
-  const normalized = normalizeMagicCard(card || {});
-  if (isInstant(normalized)) return { allowed: true, status: 'allowed' };
-  if (isSorcery(normalized)) {
-    const ownTurn = state.game.activePlayer === playerId;
-    const main = state.game.phase === 'main';
-    const empty = state.stack.length === 0;
-    return ownTurn && main && empty
-      ? { allowed: true, status: 'allowed' }
-      : { allowed: false, status: 'denied', reason: 'Sorcery timing requires your main phase, an empty stack, and priority.' };
-  }
-  return { allowed: null, status: 'unverified', reason: 'This action type has no certified timing rule.' };
+
+  return timingResult({
+    allowed: true,
+    status: 'allowed',
+    code: requiresSorceryTiming
+      ? TIMING_REASON_CODES.SORCERY_TIMING_ALLOWED
+      : requiredTiming === TIMING_MODES.ACTIVATED_ABILITY
+        ? TIMING_REASON_CODES.ACTIVATED_ABILITY_TIMING_ALLOWED
+        : TIMING_REASON_CODES.INSTANT_TIMING_ALLOWED,
+    reason: requiresSorceryTiming
+      ? 'The active player has priority during a main phase with an empty stack.'
+      : 'The acting player has priority in a supported priority window.',
+    requiredTiming,
+    currentTimingState
+  });
 }
 
 function wardAbilities(state, target) {
@@ -170,7 +353,7 @@ export function putPendingStackTriggers(state) {
   return ordered;
 }
 
-export function castSpell(state, { card, controller, targets = [], modes = [], costs = [], chosenValues = {}, paymentChoices = [], skipTiming = false, factsProvided = {}, validateTarget = null } = {}) {
+export function castSpell(state, { card, controller, targets = [], modes = [], costs = [], chosenValues = {}, paymentChoices = [], skipTiming = false, factsProvided = null, validateTarget = null } = {}) {
   const timing = skipTiming ? { allowed: true, status: 'allowed' } : checkTimingPermission({ state, card, actionType: 'Cast', playerId: controller, factsProvided });
   if (timing.allowed !== true) return { cast: false, timing };
   const sourceObject = registerGameObject(state, createGameObject({ card, controller, owner: controller, zone: 'stack' }));
@@ -214,12 +397,13 @@ export function castSpell(state, { card, controller, targets = [], modes = [], c
   }));
   for (const event of targetEvents) createWardTriggers(state, event);
   putPendingStackTriggers(state);
-  grantPriority(state, state.game.activePlayer);
+  grantPriority(state, controller);
   return { cast: true, stackObject, sourceObject, targetChecks, targetEvents, costPayments };
 }
 
-export function activateAbility(state, { sourceObject, controller, targets = [], costs = [], effectIR = [], factsProvided = {} } = {}) {
-  const timing = checkTimingPermission({ state, actionType: 'Activate', playerId: controller, factsProvided });
+export function activateAbility(state, { sourceObject, ability = null, controller, targets = [], costs = [], effectIR = [], factsProvided = null } = {}) {
+  const timingAbility = ability || (sourceObject?.semantics?.activatedAbilitiesIR?.length === 1 ? sourceObject.semantics.activatedAbilitiesIR[0] : null);
+  const timing = checkTimingPermission({ state, actionType: 'Activate', playerId: controller, sourceObject, ability: timingAbility, factsProvided });
   if (timing.allowed !== true) return { activated: false, timing };
   const costPayments = costs.map((cost) => payCost({ state, playerId: controller, cost, choice: PAYMENT_STATUS.PAID, sourceObject }));
   const failedPayment = costPayments.find((payment) => !payment.paid);
@@ -236,7 +420,7 @@ export function activateAbility(state, { sourceObject, controller, targets = [],
   }));
   for (const event of targetEvents) createWardTriggers(state, event);
   putPendingStackTriggers(state);
-  grantPriority(state, state.game.activePlayer);
+  grantPriority(state, controller);
   return { activated: true, stackObject, costPayments, targetEvents };
 }
 

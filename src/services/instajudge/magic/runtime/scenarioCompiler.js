@@ -239,7 +239,7 @@ function compileActions(message, cards, objects, makeId) {
   return cards
     .map(normalizeMagicCard)
     .map((card) => ({ card, index: text.indexOf(card.normalizedName) }))
-    .filter(({ card, index }) => index >= 0 && (isInstant(card) || isSorcery(card) || /\bactivate/.test(text)))
+    .filter(({ card, index }) => index >= 0 && (isInstant(card) || isSorcery(card) || isPermanentType(card) || /\bactivate/.test(text)))
     .sort((left, right) => left.index - right.index)
     .map(({ card }) => {
       const descriptor = targetDescriptor(message, card.name);
@@ -257,6 +257,32 @@ function compileActions(message, cards, objects, makeId) {
         index: text.indexOf(card.normalizedName)
       };
     });
+}
+
+function inferredTurnStep(text) {
+  if (/\buntap step\b/.test(text)) return 'untap';
+  if (/\bupkeep\b/.test(text)) return 'upkeep';
+  if (/\bdraw step\b/.test(text)) return 'draw';
+  if (/\b(?:precombat|first) main(?: phase)?\b/.test(text)) return 'precombat-main';
+  if (/\b(?:postcombat|second) main(?: phase)?\b|\bafter combat\b/.test(text)) return 'postcombat-main';
+  if (/\bbeginning of combat\b/.test(text)) return 'beginning-of-combat';
+  if (/\bafter attackers(?: are| were)? declared\b/.test(text)) return 'declare-attackers';
+  if (/\bafter blockers(?: are| were)? declared\b/.test(text)) return 'declare-blockers';
+  if (/\bbetween first strike (?:damage )?and (?:normal|regular) (?:combat )?damage\b|\bafter first strike (?:combat )?damage\b/.test(text)) return 'first-strike-combat-damage';
+  if (/\bafter (?:regular )?combat damage\b/.test(text)) return 'combat-damage';
+  if (/\bend of combat\b/.test(text)) return 'end-of-combat';
+  if (/\bend step\b/.test(text)) return 'end-step';
+  if (/\bcleanup\b/.test(text)) return 'cleanup';
+  if (/\bmain phase\b/.test(text)) return 'precombat-main';
+  return null;
+}
+
+function phaseForStep(step) {
+  if (['untap', 'upkeep', 'draw'].includes(step)) return 'beginning';
+  if (['precombat-main', 'postcombat-main'].includes(step)) return 'main';
+  if (['beginning-of-combat', 'declare-attackers', 'declare-blockers', 'first-strike-combat-damage', 'combat-damage', 'end-of-combat'].includes(step)) return 'combat';
+  if (['end-step', 'cleanup'].includes(step)) return 'ending';
+  return 'main';
 }
 
 function compileChoices(message, objects, actions, makeId) {
@@ -406,13 +432,18 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
   const choices = compileChoices(message, objects, actions, makeId);
   const continuousEffects = compileContinuousEffects(message, objects);
   const combat = compileCombat(message, objects, normalizedCards);
+  const text = normalizeMagicText(message);
+  const step = inferredTurnStep(text);
+  const phase = phaseForStep(step);
+  const opponentTurn = /\bopponent'?s turn\b|\btheir turn\b/.test(text);
+  const stackNonempty = /\bstack is not empty\b|\bspell (?:is |already )?on the stack\b|\bin response to\b/.test(text);
   return {
     type: 'MagicScenario',
     version: 1,
     sourceText: message,
     players: [
-      { id: 'player', role: 'user', active: !/opponent.?s turn/i.test(message) },
-      { id: 'opponent', role: 'opponent', active: /opponent.?s turn/i.test(message) }
+      { id: 'player', role: 'user', active: !opponentTurn },
+      { id: 'opponent', role: 'opponent', active: opponentTurn }
     ],
     objects,
     zones: ['battlefield', 'hand', 'graveyard', 'exile', 'library', 'stack', 'command'],
@@ -422,15 +453,15 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
     choices,
     sequence: [...actions].sort((left, right) => left.index - right.index).map((action) => action.id),
     game: {
-      activePlayer: /opponent.?s turn/i.test(message) ? 'opponent' : 'player',
-      phase: /combat/i.test(message) ? 'combat' : /end step/i.test(message) ? 'ending' : 'main',
-      step: /cleanup/i.test(message) ? 'cleanup' : null,
+      activePlayer: opponentTurn ? 'opponent' : 'player',
+      phase,
+      step,
       priorityHolder: /\bopponent has priority\b/i.test(message) ? 'opponent' : /\b(?:i|player|you) (?:have|has) priority\b/i.test(message) ? 'player' : null,
-      stackEmpty: /\bstack is empty\b/i.test(message) ? true : /\bstack is not empty\b|\bspell on the stack\b/i.test(message) ? false : null,
+      stackEmpty: /\bstack is empty\b/i.test(message) ? true : stackNonempty ? false : null,
       factsProvided: {
-        turn: /\b(?:my|your|player's|opponent's) turn\b/i.test(message),
-        phase: /\b(?:precombat |postcombat )?main phase\b|\bcombat\b|\bend step\b|\bcleanup\b/i.test(message),
-        stack: /\bstack is (?:not )?empty\b|\bspell on the stack\b/i.test(message),
+        turn: /\b(?:my|your|player'?s|opponent'?s|their) turn\b/i.test(message),
+        phase: step != null,
+        stack: /\bstack is (?:not )?empty\b/i.test(message) || stackNonempty,
         priority: /\b(?:i|player|you|opponent) (?:have|has) priority\b/i.test(message)
       }
     },

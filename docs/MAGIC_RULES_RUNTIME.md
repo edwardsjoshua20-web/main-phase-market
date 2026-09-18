@@ -147,10 +147,22 @@ The active player's ordinary permanents untap before upkeep without a priority w
 
 Cleanup uses each player's canonical `maximumHandSize` (default 7). Supplied discard choices execute through the typed discard pipeline; missing choices create a pending choice and return `DEPENDS` without advancing the turn. Cleanup removes marked damage without removing counters, expires Phase 6 `until-end-of-turn` effects, then runs existing SBA and trigger collection. If an SBA or trigger occurs, conditional priority opens and another cleanup iteration is required after the stack/priority interaction finishes. Active-player rotation occurs only after cleanup is stable.
 
-Phase 8B does not certify exhaustive untap/replacement interactions, arbitrary cleanup-trigger resolution, or the broader timing and special-action layer. Turn-based actions remain canonical runtime actions, never artificial stack objects.
+Phase 8B does not certify exhaustive untap/replacement interactions or arbitrary cleanup-trigger resolution. Turn-based actions remain canonical runtime actions, never artificial stack objects; Phase 8C adds the supported general timing layer below.
+
+## Phase 8C: Canonical Timing Permission
+
+`stackRuntime.js` now owns one structured `checkTimingPermission` authority for casting and activated-ability timing. It returns stable reason codes together with the required timing mode and a snapshot of the current timing state. Complete supported state produces a proven allow or denial; missing public scenario facts return `DEPENDS`; unsupported card text returns `UNVERIFIED`.
+
+Certified spell timing covers instants, sorceries, ordinary noninstant permanent spells, and standalone Flash. Sorcery timing requires the acting player to be active, in a precombat or postcombat main phase, with priority and an empty stack. Instant timing requires the acting player to hold priority in a real runtime priority window. Casting restrictions and flash-like permissions that cannot be represented safely fail closed.
+
+Certified activated-ability timing covers ordinary activated abilities and explicit `Activate only as a sorcery` restrictions parsed into Oracle IR. Mana-ability timing remains with the existing cost/payment machinery and is not broadened here. After a spell is cast or an ability is activated, the acting player retains priority; after stack resolution, the active player receives priority through the existing stack owner.
+
+Combat permissions consume the Phase 7 combat runtime's actual beginning-of-combat, post-attackers, post-blockers, and first-strike damage priority windows. They do not synthesize priority during declaration actions. Cleanup consumes the Phase 8B cleanup state: stable cleanup denies priority, while an SBA or trigger can open the existing exceptional cleanup priority window and require another cleanup iteration.
+
+Phase 8C does not add land plays, special actions, multiplayer priority, arbitrary casting permissions/restrictions, exhaustive mana-ability timing, or UI behavior. Those boundaries remain fail-closed and this phase does not claim the larger turn/timing program complete.
 
 ## Deliberately Unsupported
 
 X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer combat/priority and ambiguous multiplayer trigger ordering are not certified. Special actions, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, unusual attack/block permissions, banding, planeswalker/battle attack targets, automatic spell continuation through combat windows, exhaustive untap restrictions and replacement interactions, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
 
-The broader Phase 8C timing and special-action layer remains deferred.
+Land plays and the remaining special-action layer remain deferred beyond Phase 8C.

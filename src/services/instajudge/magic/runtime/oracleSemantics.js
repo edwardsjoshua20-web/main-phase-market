@@ -252,10 +252,28 @@ function triggeredAbilities(card) {
 }
 
 function activatedAbilities(card) {
-  return String(card.oracleText).split(/(?<=\.)\s+/).filter((sentence) => sentence.includes(':')).map((sentence) => {
-    const index = sentence.indexOf(':');
-    return { type: ORACLE_NODE_TYPES.ACTIVATED, costs: parseCost(sentence.slice(0, index)), restrictions: [], effects: parseEffects(sentence.slice(index + 1)), text: sentence.trim() };
-  });
+  const abilities = [];
+  const sentences = String(card.oracleText).split(/(?<=\.)\s+|\n+/).map((sentence) => sentence.trim()).filter(Boolean);
+  for (const sentence of sentences) {
+    if (sentence.includes(':')) {
+      const index = sentence.indexOf(':');
+      abilities.push({
+        type: ORACLE_NODE_TYPES.ACTIVATED,
+        costs: parseCost(sentence.slice(0, index)),
+        restrictions: [],
+        effects: parseEffects(sentence.slice(index + 1)),
+        text: sentence
+      });
+      continue;
+    }
+    if (!/^activate only\b/i.test(sentence) || abilities.length === 0) continue;
+    abilities.at(-1).restrictions.push({
+      type: 'TimingRestriction',
+      mode: /activate only as a sorcery/i.test(sentence) ? 'sorcery' : 'unsupported',
+      text: sentence
+    });
+  }
+  return abilities;
 }
 
 function spellAbilities(card) {

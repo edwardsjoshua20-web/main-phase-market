@@ -19,6 +19,7 @@ import {
   declareBlockers,
   endCombat,
   executeCombat,
+  executeCombatDamageStep,
   removeBlockerFromCombat
 } from './combatRuntime.js';
 import {
@@ -656,46 +657,46 @@ function typedEffectSummary(sourceObject, effect, target, result) {
 
 function evaluateTimingPermissionQuestion({ message, cards, genericObjects, scenario }) {
   const text = normalizeMagicText(message);
-  if (!/\bcan (?:i|player|you) (?:cast|activate)\b/.test(text) || !/\b(?:right now|now)\b/.test(text)) return null;
+  if (!/\bcan (?:i|player|you) (?:cast|activate)\b/.test(text)
+    || !/\b(?:right now|now|during|after|before|between|in response)\b/.test(text)) return null;
   const action = scenario.actions[0];
   const card = cards.find((candidate) => normalizeMagicText(candidate.name) === normalizeMagicText(action?.source?.name));
   if (!action || !card) return null;
   const state = createMagicRuntimeState({ cards, genericObjects, scenario, message });
   if (scenario.game.stackEmpty === false) state.stack.push({ id: 'stack-context', kind: 'UnknownStackObject' });
-  if (!scenario.game.factsProvided.priority) state.game.priorityHolder = action.actor;
-  if (state.game.step === 'cleanup') {
-    return unsupported('General cleanup-step casting permissions are outside the Phase 8B turn-based-action scope.', {
-      cards,
-      primitives: ['timing', 'turn-structure'],
-      trace: [{ type: 'UnsupportedTimingWindow', step: state.game.step, reason: 'general cleanup timing permissions are deferred to Phase 8C' }]
-    });
-  }
   const timing = checkTimingPermission({
     state,
     card,
     actionType: action.type,
     playerId: action.actor,
-    factsProvided: { ...scenario.game.factsProvided, priority: true }
+    factsProvided: scenario.game.factsProvided
   });
   const primitives = ['timing', 'casting', 'stack'];
   if (timing.status === 'depends') {
-    const required = ['whose turn it is', 'the current phase', 'whether the stack is empty'];
     return {
       status: 'depends',
       verdict: 'depends',
-      summary: `${card.name}'s timing depends on turn, phase, and stack state.`,
+      summary: `${card.name}'s timing depends on missing game state.`,
       cards,
       rules: primitiveRules(primitives),
       mechanics: primitives,
-      trace: [{ type: 'TimingPermissionChecked', card: card.name, actionType: action.type, status: 'depends', missing: timing.missing }],
+      trace: [{ type: 'TimingPermissionChecked', card: card.name, actionType: action.type, status: timing.status, code: timing.code, missing: timing.missing }],
       sequence: [],
-      clarificationNeeded: `Whose turn is it, which phase is it, and is the stack empty? (${required.join('; ')})`
+      clarificationNeeded: `Please specify ${timing.missing.join(', ')}.`
     };
   }
-  return evaluated(timing.allowed ? 'yes' : 'no', timing.allowed ? `${card.name} can be cast in the supplied game state.` : timing.reason, {
+  if (timing.status === 'unverified') {
+    return unsupported(timing.reason, {
+      cards,
+      primitives,
+      trace: [{ type: 'TimingPermissionChecked', card: card.name, actionType: action.type, status: timing.status, code: timing.code }]
+    });
+  }
+  const actionVerb = action.type === 'Activate' ? 'activated' : 'cast';
+  return evaluated(timing.allowed ? 'yes' : 'no', timing.allowed ? `${card.name} can be ${actionVerb} in the supplied game state.` : timing.reason, {
     cards,
     primitives,
-    trace: [{ type: 'TimingPermissionChecked', card: card.name, actionType: action.type, status: timing.status }],
+    trace: [{ type: 'TimingPermissionChecked', card: card.name, actionType: action.type, status: timing.status, code: timing.code }],
     state
   });
 }
@@ -804,25 +805,41 @@ function combatAssignments(state, scenario) {
 
 function evaluateCombatPriorityQuestion({ message, cards, scenario }) {
   const text = normalizeMagicText(message);
-  if (!/\bcan (?:i|player|you) cast\b/.test(text) || !/\bafter blockers(?: are declared)?\b/.test(text) || !/\bbefore (?:combat )?damage\b/.test(text)) return null;
-  const card = cards.find((candidate) => text.includes(candidate.normalizedName) && (isInstant(candidate) || isSorcery(candidate)));
+  const timingWindow = /\bbeginning of combat\b/.test(text) ? 'beginning-of-combat'
+    : /\bafter attackers(?: are declared)?\b/.test(text) ? 'after-attackers'
+      : /\bafter blockers(?: are declared)?\b/.test(text) ? 'after-blockers'
+        : /\bbetween first strike (?:damage )?and (?:normal|regular) (?:combat )?damage\b|\bafter first strike (?:combat )?damage\b/.test(text) ? 'first-strike-gap'
+          : null;
+  if (!/\bcan (?:i|player|you) cast\b/.test(text) || !timingWindow) return null;
+  const card = cards.find((candidate) => text.includes(candidate.normalizedName));
   if (!card) return null;
   const state = createMagicRuntimeState({ cards: [], genericObjects: [], scenario: null, message });
   beginCombat(state, { attackingPlayer: 'player', defendingPlayer: 'opponent' });
-  state.combat.step = 'declare-blockers';
-  state.game.phase = 'combat';
-  state.game.step = 'declare-blockers';
-  state.game.priorityHolder = 'player';
+  if (['after-attackers', 'after-blockers', 'first-strike-gap'].includes(timingWindow)) {
+    const attacker = timingWindow === 'first-strike-gap'
+      ? addPermanent(state, createGameObject({ name: 'Timing First Striker', controller: 'player', owner: 'player', power: 1, toughness: 1, abilities: [{ keyword: 'first strike', text: 'first strike' }] }))
+      : null;
+    declareAttackers(state, attacker ? [attacker] : []);
+  }
+  if (['after-blockers', 'first-strike-gap'].includes(timingWindow)) declareBlockers(state, []);
+  if (timingWindow === 'first-strike-gap') executeCombatDamageStep(state, { step: 'first-strike-combat-damage' });
+  if (scenario.game.factsProvided.priority) state.game.priorityHolder = scenario.game.priorityHolder;
   const timing = checkTimingPermission({
-    state, card, actionType: 'Cast', playerId: 'player',
-    factsProvided: { priority: true, turn: true, phase: true, stack: true }
+    state, card, actionType: 'Cast', playerId: 'player'
   });
+  if (timing.status === 'unverified') {
+    return unsupported(timing.reason, {
+      cards,
+      primitives: ['combat', 'timing', 'casting', 'stack'],
+      trace: [{ type: 'TimingPermissionChecked', card: card.name, status: timing.status, code: timing.code }]
+    });
+  }
   const summary = timing.allowed
-    ? `${card.name} can be cast in the priority window after blockers and before combat damage.`
+    ? `${card.name} can be cast in the supported ${timingWindow} priority window.`
     : `${card.name} cannot be cast in that combat priority window. ${timing.reason || ''}`.trim();
   return evaluated(timing.allowed ? 'yes' : 'no', summary, {
     cards, primitives: ['combat', 'timing', 'casting', 'stack'], trace: state.trace, state,
-    runtime: { combatStep: state.combat.step, priorityHolder: state.game.priorityHolder }
+    runtime: { combatStep: state.combat.step, timingWindow, priorityHolder: state.game.priorityHolder }
   });
 }
 

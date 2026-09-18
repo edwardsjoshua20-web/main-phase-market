@@ -41,6 +41,7 @@ const cards = {
   murder: { name: 'Murder', typeLine: 'Instant', oracleText: 'Destroy target creature.', manaCost: '{1}{B}{B}', colors: ['B'] },
   destroy: { name: 'Runtime Verdict', typeLine: 'Instant', oracleText: 'Destroy target creature.', manaCost: '{1}{B}', colors: ['B'] }
 };
+const ordinaryAbility = { type: 'ActivatedAbility', text: '{T}: Target creature gets +1/+1 until end of turn.', restrictions: [] };
 
 function battlefieldCreature(state, { name = 'Target', controller = 'opponent', abilities = [] } = {}) {
   return addPermanent(state, createGameObject({
@@ -144,7 +145,7 @@ const abilityWardState = createMagicRuntimeState();
 abilityWardState.game.priorityHolder = 'player';
 const abilityWardTarget = battlefieldCreature(abilityWardState, { name: 'Ability Ward', abilities: [{ keyword: 'ward', cost: createManaCost('{2}') }] });
 const wardAbilitySource = battlefieldCreature(abilityWardState, { name: 'Targeting Source', controller: 'player' });
-activateAbility(abilityWardState, { sourceObject: wardAbilitySource, controller: 'player', targets: [abilityWardTarget], factsProvided: { priority: true } });
+activateAbility(abilityWardState, { sourceObject: wardAbilitySource, ability: ordinaryAbility, controller: 'player', targets: [abilityWardTarget], factsProvided: { priority: true } });
 assert(abilityWardState.stack.some((entry) => entry.kind === STACK_OBJECT_TYPES.TRIGGERED_ABILITY), 'An opponent-controlled activated ability that targets a Ward permanent must create a Ward trigger.');
 
 const timingState = createMagicRuntimeState();
@@ -156,12 +157,12 @@ assert(checkTimingPermission({ state: timingState, card: cards.bolt, playerId: '
 assert(checkTimingPermission({ state: timingState, card: cards.sorcery, playerId: 'player', factsProvided: fullFacts }).allowed, 'A sorcery is allowed during its controller own main phase with an empty stack and priority.');
 assert(checkTimingPermission({ state: timingState, card: cards.sorcery, playerId: 'player', factsProvided: {} }).status === 'depends', 'Missing sorcery timing state must return DEPENDS.');
 const missingTiming = evaluateMagicRulesRuntime({ message: 'Can I cast Runtime Sorcery right now?', cards: [cards.sorcery] });
-assert(missingTiming.verdict === 'depends' && /whose turn/i.test(missingTiming.clarificationNeeded) && /which phase/i.test(missingTiming.clarificationNeeded) && /stack empty/i.test(missingTiming.clarificationNeeded), 'A public sorcery timing question with missing state must ask for turn, phase, and stack state.');
+assert(missingTiming.verdict === 'depends' && /who has priority/i.test(missingTiming.clarificationNeeded) && /whose turn/i.test(missingTiming.clarificationNeeded) && /current phase/i.test(missingTiming.clarificationNeeded) && /stack is empty/i.test(missingTiming.clarificationNeeded), 'A public sorcery timing question with missing state must ask for priority, turn, phase, and stack state.');
 timingState.game.priorityHolder = 'opponent';
-assert(!checkTimingPermission({ state: timingState, actionType: 'Activate', playerId: 'player', factsProvided: { priority: true } }).allowed, 'An activated ability is denied without priority.');
+assert(!checkTimingPermission({ state: timingState, ability: ordinaryAbility, actionType: 'Activate', playerId: 'player', factsProvided: { priority: true } }).allowed, 'An activated ability is denied without priority.');
 timingState.game.priorityHolder = 'player';
 const abilitySource = battlefieldCreature(timingState, { name: 'Ability Source', controller: 'player' });
-assert(activateAbility(timingState, { sourceObject: abilitySource, controller: 'player', factsProvided: { priority: true } }).activated, 'An activated ability is allowed with priority.');
+assert(activateAbility(timingState, { sourceObject: abilitySource, ability: ordinaryAbility, controller: 'player', factsProvided: { priority: true } }).activated, 'An activated ability is allowed with priority.');
 
 function measure(label, execute, iterations = 100) {
   const started = performance.now();
