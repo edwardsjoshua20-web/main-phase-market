@@ -4,6 +4,7 @@ import {
   isDesignatedCommander
 } from '../src/services/instajudge/magic/runtime/commanderRuntime.js';
 import { createAdditionalCost, createManaCost } from '../src/services/instajudge/magic/runtime/costSystem.js';
+import { evaluateMagicScenario } from '../src/services/instajudge/magic/ruleEvaluator.js';
 import { evaluateMagicRulesRuntime } from '../src/services/instajudge/magic/runtime/magicRulesRuntime.js';
 import { compileMagicScenario } from '../src/services/instajudge/magic/runtime/scenarioCompiler.js';
 import {
@@ -194,7 +195,9 @@ const publicCases = [
   ['I cast my commander once, but I am not sure which source zone I am casting it from now. What is the tax?', 'depends']
 ];
 for (const [message, expected] of publicCases) {
-  const result = evaluateMagicRulesRuntime({ message, cards: [] });
+  const runtimeResult = evaluateMagicRulesRuntime({ message, cards: [] });
+  verify(runtimeResult.verdict === expected, `Runtime question expected ${expected} but received ${runtimeResult.verdict}: ${message}`);
+  const result = evaluateMagicScenario({ message, cards: [], rules: [] });
   verify(result.verdict === expected, `Public question expected ${expected} but received ${result.verdict}: ${message}`);
   if (expected === 'depends') metrics.depends += 1;
   else metrics.verifiedSupported += 1;
