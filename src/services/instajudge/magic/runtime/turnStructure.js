@@ -33,9 +33,9 @@ export const PRIORITY_POLICIES = Object.freeze({
 });
 
 export const TURN_STEP_METADATA = Object.freeze({
-  [TURN_STEPS.UNTAP]: Object.freeze({ phase: MAGIC_PHASES.BEGINNING, priority: PRIORITY_POLICIES.NONE, turnBasedAction: 'untap-permanents', actionImplemented: false }),
+  [TURN_STEPS.UNTAP]: Object.freeze({ phase: MAGIC_PHASES.BEGINNING, priority: PRIORITY_POLICIES.NONE, turnBasedAction: 'untap-permanents', actionImplemented: true }),
   [TURN_STEPS.UPKEEP]: Object.freeze({ phase: MAGIC_PHASES.BEGINNING, priority: PRIORITY_POLICIES.NORMAL, turnBasedAction: null, actionImplemented: true }),
-  [TURN_STEPS.DRAW]: Object.freeze({ phase: MAGIC_PHASES.BEGINNING, priority: PRIORITY_POLICIES.NORMAL, priorityAfter: 'draw-step-draw', turnBasedAction: 'draw-card', actionImplemented: false }),
+  [TURN_STEPS.DRAW]: Object.freeze({ phase: MAGIC_PHASES.BEGINNING, priority: PRIORITY_POLICIES.NORMAL, priorityAfter: 'draw-step-draw', turnBasedAction: 'draw-card', actionImplemented: true }),
   [TURN_STEPS.PRECOMBAT_MAIN]: Object.freeze({ phase: MAGIC_PHASES.MAIN, priority: PRIORITY_POLICIES.NORMAL, turnBasedAction: null, actionImplemented: true }),
   [TURN_STEPS.BEGINNING]: Object.freeze({ phase: MAGIC_PHASES.COMBAT, priority: PRIORITY_POLICIES.COMBAT_RUNTIME, turnBasedAction: null, actionImplemented: true }),
   [TURN_STEPS.DECLARE_ATTACKERS]: Object.freeze({ phase: MAGIC_PHASES.COMBAT, priority: PRIORITY_POLICIES.COMBAT_RUNTIME, turnBasedAction: 'declare-attackers', actionImplemented: true }),
@@ -45,7 +45,7 @@ export const TURN_STEP_METADATA = Object.freeze({
   [TURN_STEPS.END]: Object.freeze({ phase: MAGIC_PHASES.COMBAT, priority: PRIORITY_POLICIES.COMBAT_RUNTIME, turnBasedAction: null, actionImplemented: true }),
   [TURN_STEPS.POSTCOMBAT_MAIN]: Object.freeze({ phase: MAGIC_PHASES.MAIN, priority: PRIORITY_POLICIES.NORMAL, turnBasedAction: null, actionImplemented: true }),
   [TURN_STEPS.END_STEP]: Object.freeze({ phase: MAGIC_PHASES.ENDING, priority: PRIORITY_POLICIES.NORMAL, turnBasedAction: null, actionImplemented: true }),
-  [TURN_STEPS.CLEANUP]: Object.freeze({ phase: MAGIC_PHASES.ENDING, priority: PRIORITY_POLICIES.CONDITIONAL, turnBasedAction: 'cleanup', actionImplemented: false })
+  [TURN_STEPS.CLEANUP]: Object.freeze({ phase: MAGIC_PHASES.ENDING, priority: PRIORITY_POLICIES.CONDITIONAL, turnBasedAction: 'cleanup', actionImplemented: true })
 });
 
 export const TURN_STEP_ORDER = Object.freeze([
@@ -80,9 +80,10 @@ export function createCanonicalTurnState({ turn = 1, activePlayer = 'player', ph
   const currentStep = inferredStep(phase, step);
   const metadata = TURN_STEP_METADATA[currentStep];
   const currentTurn = Math.max(1, Number(turn) || 1);
+  const actionKey = `${currentTurn}:${activePlayer}:${currentStep}${currentStep === TURN_STEPS.CLEANUP ? ':1' : ''}`;
   return {
     type: 'MagicTurnState',
-    version: 1,
+    version: 2,
     turn: currentTurn,
     turnId: `turn-${currentTurn}:${activePlayer}`,
     activePlayer,
@@ -95,7 +96,15 @@ export function createCanonicalTurnState({ turn = 1, activePlayer = 'player', ph
     priorityAfter: metadata.priorityAfter || null,
     turnBasedAction: metadata.turnBasedAction,
     turnBasedActionImplemented: metadata.actionImplemented,
-    priorityHolder: metadata.priority === PRIORITY_POLICIES.NORMAL && metadata.actionImplemented
+    turnBasedActionState: {
+      key: actionKey,
+      status: metadata.turnBasedAction ? 'pending' : 'complete',
+      result: null
+    },
+    cleanupState: currentStep === TURN_STEPS.CLEANUP
+      ? { iteration: 1, repeatRequired: false, priorityActive: false }
+      : null,
+    priorityHolder: metadata.priority === PRIORITY_POLICIES.NORMAL && metadata.actionImplemented && !metadata.turnBasedAction
       ? priorityHolder || activePlayer
       : null,
     consecutivePasses

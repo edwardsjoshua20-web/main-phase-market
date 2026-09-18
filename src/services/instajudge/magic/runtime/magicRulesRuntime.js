@@ -664,10 +664,10 @@ function evaluateTimingPermissionQuestion({ message, cards, genericObjects, scen
   if (scenario.game.stackEmpty === false) state.stack.push({ id: 'stack-context', kind: 'UnknownStackObject' });
   if (!scenario.game.factsProvided.priority) state.game.priorityHolder = action.actor;
   if (state.game.step === 'cleanup') {
-    return unsupported('Cleanup-step priority exceptions are outside the Phase 8A turn skeleton.', {
+    return unsupported('General cleanup-step casting permissions are outside the Phase 8B turn-based-action scope.', {
       cards,
       primitives: ['timing', 'turn-structure'],
-      trace: [{ type: 'UnsupportedTimingWindow', step: state.game.step, reason: 'cleanup priority exceptions are deferred' }]
+      trace: [{ type: 'UnsupportedTimingWindow', step: state.game.step, reason: 'general cleanup timing permissions are deferred to Phase 8C' }]
     });
   }
   const timing = checkTimingPermission({

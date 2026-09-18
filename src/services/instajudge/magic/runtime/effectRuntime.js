@@ -69,18 +69,21 @@ export function changeLife(state, { playerId, amount, direction = 'gain', source
   return { status: 'executed', playerId, amount: finalAmount, direction: finalDirection, life: state.players[playerId].life, replacements: pipeline.applied };
 }
 
-export function drawCards(state, { playerId, amount, source = null, allowPlaceholders = false } = {}) {
+export function drawCards(state, { playerId, amount, source = null, allowPlaceholders = false, replacementChoices = [] } = {}) {
   const numeric = fixedAmount(amount);
   if (!Number.isFinite(numeric)) return unsupported('Draw amount is not fixed.');
-  const pipeline = proposeRuntimeEvent(state, 'CardDraw', { source, player: playerId, amount: numeric });
+  const pipeline = proposeRuntimeEvent(state, 'CardDraw', { source, player: playerId, amount: numeric }, { replacementChoices });
   if (pipeline.status !== 'ready') return pipeline;
+  if (pipeline.event.type !== 'CardDraw') return unsupported('The draw was replaced by an event this runtime cannot safely execute.');
+  const finalAmount = fixedAmount(pipeline.event.amount);
+  if (!Number.isFinite(finalAmount)) return unsupported('The replaced draw amount is not fixed.');
   const library = zoneObjects(state, playerId, 'library');
-  if (library.length < numeric && allowPlaceholders) {
-    for (let index = library.length; index < numeric; index += 1) createGenericZoneCard(state, { playerId, zone: 'library', name: `Unknown Library Card ${index + 1}` });
+  if (library.length < finalAmount && allowPlaceholders) {
+    for (let index = library.length; index < finalAmount; index += 1) createGenericZoneCard(state, { playerId, zone: 'library', name: `Unknown Library Card ${index + 1}` });
   }
   const available = zoneObjects(state, playerId, 'library');
   const drawn = [];
-  for (let index = 0; index < numeric; index += 1) {
+  for (let index = 0; index < finalAmount; index += 1) {
     const card = available.at(-(index + 1));
     if (!card) {
       state.players[playerId].failedDraw = true;
@@ -93,7 +96,7 @@ export function drawCards(state, { playerId, amount, source = null, allowPlaceho
     emitEvent(state, 'CardDrawn', { source, object: card, player: playerId });
   }
   runStateBasedActionsRuntime(state);
-  return { status: 'executed', drawn, failedDraw: state.players[playerId].failedDraw };
+  return { status: 'executed', drawn, failedDraw: state.players[playerId].failedDraw, replacements: pipeline.applied };
 }
 
 export function discardCards(state, { playerId, amount, cardIds = [], source = null } = {}) {

@@ -28,6 +28,7 @@ export function createPlayer(id, overrides = {}) {
     id,
     life: overrides.life ?? 20,
     poison: overrides.poison ?? 0,
+    maximumHandSize: overrides.maximumHandSize ?? 7,
     hand: [], library: [], graveyard: [], exile: [], battlefield: [], commandZone: [],
     commanderDamage: {},
     failedDraw: false,

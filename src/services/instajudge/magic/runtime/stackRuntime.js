@@ -92,7 +92,10 @@ export function passPriority(state, playerId, { resolve = resolveTopOfStack } = 
     return { allowed: true, resolved: false };
   }
   state.game.consecutivePasses = 0;
-  if (state.stack.length === 0) return { allowed: true, resolved: false, advancedTo: advanceGameStep(state) };
+  if (state.stack.length === 0) {
+    state.game.priorityHolder = null;
+    return { allowed: true, resolved: false, advancedTo: advanceGameStep(state) };
+  }
   const result = resolve(state);
   grantPriority(state, state.game.activePlayer);
   return { allowed: true, resolved: true, result };

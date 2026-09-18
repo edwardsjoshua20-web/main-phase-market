@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { addPermanent, createGameObject, createMagicRuntimeState } from '../src/services/instajudge/magic/runtime/runtimeState.js';
+import { createGenericZoneCard } from '../src/services/instajudge/magic/runtime/effectRuntime.js';
 import { evaluateMagicRulesRuntime } from '../src/services/instajudge/magic/runtime/magicRulesRuntime.js';
 import {
   PRIORITY_POLICIES,
@@ -37,12 +38,13 @@ function creature(state, { name, controller = 'player', power = 2, toughness = 2
 }
 
 const basic = stateAt(TURN_STEPS.UNTAP);
+createGenericZoneCard(basic, { playerId: 'player', zone: 'library', name: 'Turn Draw' });
 expect(basic.game.type === 'MagicTurnState' && basic.game.turnId === 'turn-1:player', 'Runtime state must use the canonical MagicTurnState identity.');
 expect(describeTurnStep(basic).priority === PRIORITY_POLICIES.NONE && basic.game.priorityHolder === null, 'Untap must not normally grant priority.');
 expect(advanceTurnStep(basic).to === TURN_STEPS.UPKEEP && basic.game.priorityHolder === 'player', 'Untap must advance to upkeep, where the active player gets priority.');
 const drawAdvance = advanceTurnStep(basic);
 expect(drawAdvance.to === TURN_STEPS.DRAW && drawAdvance.priorityAfter === 'draw-step-draw', 'Upkeep must advance to draw with priority ordered after the draw action.');
-expect(basic.game.priorityHolder === null && basic.game.turnBasedAction === 'draw-card' && !basic.game.turnBasedActionImplemented, 'The deferred draw action must prevent the skeleton from manufacturing a priority window.');
+expect(basic.game.priorityHolder === 'player' && basic.game.turnBasedAction === 'draw-card' && basic.game.turnBasedActionImplemented, 'The draw action must complete before draw-step priority is granted.');
 expect(advanceTurnStep(basic).to === TURN_STEPS.PRECOMBAT_MAIN, 'Draw must advance structurally to precombat main.');
 const combatEntry = advanceTurnStep(basic);
 expect(combatEntry.to === TURN_STEPS.BEGINNING && combatEntry.delegatedTo === 'combatRuntime', 'Precombat main must enter combat through the Phase 7 combat runtime.');
@@ -103,7 +105,7 @@ const cleanupTiming = evaluateMagicRulesRuntime({
   message: 'Can I cast Serra Angel right now during cleanup on my turn while the stack is empty and I have priority?',
   cards: [{ name: 'Serra Angel', typeLine: 'Creature - Angel', oracleText: 'Flying, vigilance', manaCost: '{3}{W}{W}', power: 4, toughness: 4 }]
 });
-expect(cleanupTiming.status === 'unsupported' && cleanupTiming.verdict === 'unverified', 'Cleanup timing exceptions must remain UNVERIFIED in Phase 8A.');
+expect(cleanupTiming.status === 'unsupported' && cleanupTiming.verdict === 'unverified', 'General cleanup casting permissions must remain UNVERIFIED until Phase 8C.');
 
 console.log('Magic canonical turn runtime verifier passed.');
 console.log('- Canonical steps: untap through cleanup and next-turn untap');

@@ -139,10 +139,18 @@ Certified Phase 7 proofs include:
 
 The turn owner orchestrates combat by calling the Phase 7 combat API for beginning combat, attacker and blocker declarations, conditional first-strike damage, regular damage, and end combat. It does not duplicate combat legality, assignment, triggers, priority windows, or state-based actions.
 
-Untap, the normal draw, and cleanup are represented as deferred turn-based-action hooks. Draw-step priority is explicitly ordered after the deferred draw action, and cleanup priority exceptions remain unsupported. Phase 8A does not add land plays, special actions, broad casting/activation timing, or cleanup exception handling.
+Phase 8A originally left untap, the normal draw, and cleanup as deferred turn-based-action hooks. Phase 8B implements those hooks in the same canonical turn owner without creating stack objects for them.
+
+## Phase 8B: Turn-Based Actions and Cleanup
+
+The active player's ordinary permanents untap before upkeep without a priority window. Unsupported untap restrictions, optional untaps, phasing, and stun-counter handling fail closed as `UNVERIFIED`. The draw-step action reuses the typed draw, replacement, event, and zone-change pipeline to move the known top library card before draw-step priority.
+
+Cleanup uses each player's canonical `maximumHandSize` (default 7). Supplied discard choices execute through the typed discard pipeline; missing choices create a pending choice and return `DEPENDS` without advancing the turn. Cleanup removes marked damage without removing counters, expires Phase 6 `until-end-of-turn` effects, then runs existing SBA and trigger collection. If an SBA or trigger occurs, conditional priority opens and another cleanup iteration is required after the stack/priority interaction finishes. Active-player rotation occurs only after cleanup is stable.
+
+Phase 8B does not certify exhaustive untap/replacement interactions, arbitrary cleanup-trigger resolution, or the broader timing and special-action layer. Turn-based actions remain canonical runtime actions, never artificial stack objects.
 
 ## Deliberately Unsupported
 
-X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer combat/priority and ambiguous multiplayer trigger ordering are not certified. Special actions, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, unusual attack/block permissions, banding, planeswalker/battle attack targets, automatic spell continuation through combat windows, turn-based untap/draw/cleanup actions, cleanup priority exceptions, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
+X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer combat/priority and ambiguous multiplayer trigger ordering are not certified. Special actions, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, unusual attack/block permissions, banding, planeswalker/battle attack targets, automatic spell continuation through combat windows, exhaustive untap restrictions and replacement interactions, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
 
-The next phase should implement one later Phase 8 slice without broadening 8A: either turn-based actions or certified priority/timing permissions.
+The broader Phase 8C timing and special-action layer remains deferred.
