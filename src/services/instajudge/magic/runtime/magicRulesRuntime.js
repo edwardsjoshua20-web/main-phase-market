@@ -885,11 +885,12 @@ function evaluateCombatPriorityQuestion({ message, cards, scenario }) {
   const timing = checkTimingPermission({
     state, card, actionType: 'Cast', playerId: 'player'
   });
+  state.trace.push({ type: 'TimingPermissionChecked', card: card.name, actionType: 'Cast', status: timing.status, code: timing.code });
   if (timing.status === 'unverified') {
     return unsupported(timing.reason, {
       cards,
       primitives: ['combat', 'timing', 'casting', 'stack'],
-      trace: [{ type: 'TimingPermissionChecked', card: card.name, status: timing.status, code: timing.code }]
+      trace: state.trace
     });
   }
   const summary = timing.allowed

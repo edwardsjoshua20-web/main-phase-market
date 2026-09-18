@@ -10,9 +10,12 @@ import {
 import { discardCards, drawCards } from './effectRuntime.js';
 import {
   collectTriggeredAbilities,
+  clearPendingRuntimeChoice,
   emitEvent,
+  getPendingRuntimeChoice,
   putPendingTriggersOnStack,
-  runStateBasedActionsRuntime
+  runStateBasedActionsRuntime,
+  setPendingRuntimeChoice
 } from './runtimeState.js';
 import {
   COMBAT_STEPS,
@@ -50,9 +53,7 @@ function completeTurnBasedAction(state, result) {
 }
 
 function pendingChoiceResult(state, choice) {
-  const existing = state.pendingChoices.findIndex((candidate) => candidate.id === choice.id);
-  if (existing >= 0) state.pendingChoices[existing] = choice;
-  else state.pendingChoices.push(choice);
+  setPendingRuntimeChoice(state, choice);
   return {
     status: 'depends',
     verdict: 'depends',
@@ -60,10 +61,6 @@ function pendingChoiceResult(state, choice) {
     choices: choice.choices,
     pendingChoice: choice
   };
-}
-
-function clearPendingChoice(state, choiceId) {
-  state.pendingChoices = state.pendingChoices.filter((choice) => choice.id !== choiceId);
 }
 
 function unsupportedUntapReason(state, object) {
@@ -116,7 +113,7 @@ function performDrawTurnBasedAction(state, options) {
       clarificationNeeded: result.clarificationNeeded || 'How is the draw replacement choice resolved?'
     });
   }
-  if (result.status === 'executed') clearPendingChoice(state, `draw:${state.game.turnId}`);
+  if (result.status === 'executed') clearPendingRuntimeChoice(state, `draw:${state.game.turnId}`);
   return result;
 }
 
@@ -183,7 +180,7 @@ function performCleanupTurnBasedAction(state, options) {
     });
     if (discardResult.status !== 'executed') return discardResult;
   }
-  clearPendingChoice(state, discardChoiceId);
+  clearPendingRuntimeChoice(state, discardChoiceId);
 
   const clearedDamage = removeMarkedDamage(state);
   const expiredEffects = expireContinuousEffects(state, { step: TURN_STEPS.CLEANUP });
@@ -413,6 +410,17 @@ export function advanceTurnStep(state, options = {}) {
   if (!expected) return { status: 'unsupported', reason: `Turn progression does not recognize the current step: ${from || 'unknown'}.` };
   if (options.to && options.to !== expected) {
     return { status: 'illegal', reason: `The legal transition from ${from} is ${expected}, not ${options.to}.`, from, expected, requested: options.to };
+  }
+  const pendingChoice = getPendingRuntimeChoice(state);
+  const resolvesPendingTurnChoice = pendingChoice?.type === 'CleanupDiscardChoice'
+    ? Boolean(options.discardCardIds?.length || options.cleanup?.discardCardIds?.length)
+    : pendingChoice?.type === 'DrawReplacementChoice'
+      ? Boolean(options.drawReplacementChoices?.length)
+      : pendingChoice?.type === 'CombatDamageChoice'
+        ? Boolean(Object.keys(options.assignments || {}).length)
+        : false;
+  if (pendingChoice && !resolvesPendingTurnChoice) {
+    return { status: 'depends', verdict: 'depends', reason: 'A pending runtime choice must be resolved before the turn can advance.', pendingChoice };
   }
   if (state.stack.length > 0) return { status: 'paused', reason: 'The stack must be empty before the turn can advance.', from, expected };
 

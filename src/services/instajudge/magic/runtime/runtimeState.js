@@ -135,6 +135,21 @@ export function emitEvent(state, type, data = {}) {
   return event;
 }
 
+export function getPendingRuntimeChoice(state) {
+  return state?.pendingChoices?.[0] || null;
+}
+
+export function setPendingRuntimeChoice(state, choice) {
+  const existing = state.pendingChoices.findIndex((candidate) => candidate.id === choice.id);
+  if (existing >= 0) state.pendingChoices[existing] = choice;
+  else state.pendingChoices.push(choice);
+  return choice;
+}
+
+export function clearPendingRuntimeChoice(state, choiceId) {
+  state.pendingChoices = state.pendingChoices.filter((choice) => choice.id !== choiceId);
+}
+
 export function createMagicRuntimeState({ cards = [], genericObjects = [], scenario = null, message = '' } = {}) {
   nextObjectId = 1;
   nextEventId = 1;
@@ -343,13 +358,26 @@ export function proposeRuntimeEvent(state, type, data = {}, options = {}) {
 
 export function moveObjectWithResult(state, object, zone, reason, metadata = {}, options = {}) {
   const from = object.zone;
+  const pendingChoiceId = `replacement:${object.id}:${from}:${zone}`;
   const previous = snapshotObject(object);
   const pipeline = proposeRuntimeEvent(state, 'ZoneChange', { object, affected: object, previous, from, to: zone, metadata: { reason, ...metadata } }, options);
   if (pipeline.status !== 'ready') {
     state.lastPipelineResult = pipeline;
-    if (pipeline.status === 'depends') emitEvent(state, 'ReplacementChoiceRequired', { object, affected: object, previous, from, to: zone, metadata: { choices: pipeline.choices } });
+    if (pipeline.status === 'depends') {
+      setPendingRuntimeChoice(state, {
+        id: pendingChoiceId,
+        type: 'ReplacementChoice',
+        objectId: object.id,
+        from,
+        to: zone,
+        choices: pipeline.choices || [],
+        clarificationNeeded: pipeline.clarificationNeeded || 'Which replacement effect applies?'
+      });
+      emitEvent(state, 'ReplacementChoiceRequired', { object, affected: object, previous, from, to: zone, metadata: { choices: pipeline.choices } });
+    }
     return { ...pipeline, object };
   }
+  clearPendingRuntimeChoice(state, pendingChoiceId);
   const finalZone = pipeline.event.to;
   if (from === 'battlefield') removeSourceStaticEffects(state, object.id);
   removeFromZone(state, from, object.id);

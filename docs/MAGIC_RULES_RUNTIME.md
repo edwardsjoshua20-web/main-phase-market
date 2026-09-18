@@ -171,6 +171,28 @@ A legal land action moves the existing object from hand to battlefield through t
 
 The framework recognizes unsupported face-up, morph/disguise, suspend, and foretell special-action requests and routes them to the special-action owner for `UNVERIFIED`. Phase 8D does not implement those mechanics, broad Commander behavior, or every Magic special action, and it does not claim Phase 8 complete.
 
+## Phase 8 Certification
+
+Phase 8 was certified as one integrated runtime after 8A through 8D, rather than as four isolated feature slices. The dedicated certification harness covers full ordinary turn progression, turn-based actions, two-player priority, stack resolution, combat timing, first-strike interaction, cleanup repetition, ordinary land play, activated-ability timing, Ward, replacement effects, state-based actions, and the public `magic-rules-runtime-v2` evaluator.
+
+The certified supported surface includes:
+
+- complete ordinary turn rotation, including empty combat and the conditional first-strike damage step;
+- instant, sorcery, noninstant permanent, standalone Flash, and ordinary or explicit sorcery-speed activated-ability timing;
+- stack response and resolution cycles without advancing the turn early;
+- first-strike damage, SBAs, priority, stack interaction, then regular damage after a new pass cycle;
+- ordinary draw, maximum-hand-size cleanup, damage clearing, end-of-turn expiry, cleanup exceptions, and stable turn rotation;
+- ordinary hand-to-battlefield land play, allowance exhaustion/reset, trusted numeric additional allowance, and stack interaction;
+- pending cleanup-discard, replacement, combat-assignment, and Ward-payment choices that block unrelated actions and progression until resolved;
+- Ward in main-phase and combat priority windows, using the existing stack and cost owners;
+- public natural-language routing for representative timing, land-play, cleanup, and unsupported-special-action questions.
+
+Certification fixed three cross-system defects in canonical owners: replacement and combat assignment choices now register with the shared pending-choice state; unspecified Ward payment now becomes a blocking stack-owned pending choice and does not manufacture priority while resolution is paused; and successful combat-window timing answers now retain their `TimingPermissionChecked` provenance trace. The certification harness is deterministic and contains 1,648 exhaustive or seeded compositional cases. Its final result is 1,740 verified supported assertions, 17 expected `DEPENDS`, 3 expected `UNVERIFIED`, and 0 incorrect confident rulings.
+
+Expected `DEPENDS` boundaries include omitted choices for cleanup discard, competing or optional replacements, combat damage assignment, and Ward payment, plus public questions missing required turn, phase, stack, priority, or land-allowance facts. Expected `UNVERIFIED` boundaries include dynamic flash-like permissions, mana-ability timing outside the cost owner, unsupported cleanup/untap modifiers, unusual-zone or Oracle-derived extra-land permissions, and special actions other than ordinary land play.
+
+This certification is not a claim of full Magic rules support. The unsupported areas below remain fail-closed, and Phase 9 and broader Commander behavior are outside this certification.
+
 ## Deliberately Unsupported
 
 X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer combat/priority and ambiguous multiplayer trigger ordering are not certified. Special actions beyond ordinary land play, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, unusual attack/block permissions, banding, planeswalker/battle attack targets, automatic spell continuation through combat windows, exhaustive untap restrictions and replacement interactions, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.

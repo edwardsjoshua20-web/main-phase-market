@@ -2,7 +2,7 @@ import { isInstant, isPermanentType, isSorcery, normalizeMagicCard, normalizeMag
 import { COST_TYPES, PAYMENT_STATUS, createTriggeredPaymentCost, normalizeCost, payCost } from './costSystem.js';
 import { deriveCharacteristics } from './continuousEffects.js';
 import { parseOracleSemantics } from './oracleSemantics.js';
-import { createGameObject, emitEvent, moveObject, registerGameObject, runStateBasedActionsRuntime } from './runtimeState.js';
+import { clearPendingRuntimeChoice, createGameObject, emitEvent, getPendingRuntimeChoice, moveObject, registerGameObject, runStateBasedActionsRuntime, setPendingRuntimeChoice } from './runtimeState.js';
 import { advanceTurnStep } from './turnRuntime.js';
 import { TURN_STEPS } from './turnStructure.js';
 
@@ -32,7 +32,8 @@ export const TIMING_REASON_CODES = Object.freeze({
   UNSUPPORTED_SPELL_TYPE: 'UNSUPPORTED_SPELL_TYPE',
   UNSUPPORTED_TIMING_RESTRICTION: 'UNSUPPORTED_TIMING_RESTRICTION',
   UNSUPPORTED_MANA_ABILITY_TIMING: 'UNSUPPORTED_MANA_ABILITY_TIMING',
-  NOT_ACTIVATED_ABILITY: 'NOT_ACTIVATED_ABILITY'
+  NOT_ACTIVATED_ABILITY: 'NOT_ACTIVATED_ABILITY',
+  PENDING_CHOICE: 'PENDING_CHOICE'
 });
 
 let nextStackId = 1;
@@ -109,6 +110,8 @@ export function advanceGameStep(state) {
 }
 
 export function passPriority(state, playerId, { resolve = resolveTopOfStack } = {}) {
+  const pendingChoice = getPendingRuntimeChoice(state);
+  if (pendingChoice) return { allowed: false, status: 'depends', reason: 'A pending runtime choice must be resolved before priority can pass.', pendingChoice };
   if (state.game.priorityHolder !== playerId) return { allowed: false, reason: `${playerId} does not have priority.` };
   state.game.consecutivePasses += 1;
   emitEvent(state, 'PriorityPassed', { player: playerId, metadata: { consecutivePasses: state.game.consecutivePasses } });
@@ -122,6 +125,10 @@ export function passPriority(state, playerId, { resolve = resolveTopOfStack } = 
     return { allowed: true, resolved: false, advancedTo: advanceGameStep(state) };
   }
   const result = resolve(state);
+  if (result?.status === 'depends') {
+    state.game.priorityHolder = null;
+    return { allowed: true, resolved: false, status: 'depends', result, pendingChoice: getPendingRuntimeChoice(state) };
+  }
   grantPriority(state, state.game.activePlayer);
   return { allowed: true, resolved: true, result };
 }
@@ -266,6 +273,18 @@ export function checkTimingModePermission({ state, requiredTiming, playerId, fac
     return unverified(TIMING_REASON_CODES.UNSUPPORTED_TIMING_RESTRICTION, `Unsupported timing mode: ${requiredTiming || 'unknown'}.`, requiredTiming || null, timingState(state, playerId));
   }
   const currentTimingState = timingState(state, playerId);
+  const pendingChoice = getPendingRuntimeChoice(state);
+  if (pendingChoice) {
+    return timingResult({
+      allowed: null,
+      status: 'depends',
+      code: TIMING_REASON_CODES.PENDING_CHOICE,
+      reason: 'A pending runtime choice must be resolved before another priority action can be taken.',
+      requiredTiming,
+      currentTimingState,
+      missing: [`resolve pending ${pendingChoice.type}`]
+    });
+  }
   const requiresSorceryTiming = requiredTiming === TIMING_MODES.SORCERY;
 
   if (factKnown(factsProvided, 'phase') && !currentTimingState.priorityWindowOpen) {
@@ -436,13 +455,31 @@ export function activateAbility(state, { sourceObject, ability = null, controlle
 
 export function resolveTopOfStack(state, { paymentChoices = [], resolveEffect = null } = {}) {
   const stackObject = state.stack.at(-1);
+  const pendingChoice = getPendingRuntimeChoice(state);
+  const resolvesWardChoice = pendingChoice?.type === 'WardPaymentChoice'
+    && pendingChoice.stackObjectId === stackObject?.id
+    && paymentChoices.length > 0;
+  if (pendingChoice && !resolvesWardChoice) return { resolved: false, status: 'depends', reason: 'A pending runtime choice must be resolved before the stack can resolve.', pendingChoice };
   if (!stackObject) return { resolved: false, reason: 'The stack is empty.' };
   if (stackObject.kind === STACK_OBJECT_TYPES.TRIGGERED_ABILITY && stackObject.effectIR.some((effect) => effect.type === 'CounterUnlessPaid')) {
     const effect = stackObject.effectIR.find((entry) => entry.type === 'CounterUnlessPaid');
     const payment = stackObject.costs.find((cost) => cost.type === COST_TYPES.TRIGGERED_PAYMENT);
     const choice = paymentChoices.find((entry) => entry.triggerId === stackObject.id || (entry.reason === 'ward' && entry.sourceObjectId === stackObject.sourceObject.id));
     const result = payCost({ state, playerId: payment.payer, cost: payment, choice: choice || PAYMENT_STATUS.UNSPECIFIED, sourceObject: stackObject.sourceObject });
-    if (result.status === PAYMENT_STATUS.UNSPECIFIED) return { resolved: false, status: 'depends', payment: result, stackObject };
+    const pendingChoiceId = `ward-payment:${stackObject.id}`;
+    if (result.status === PAYMENT_STATUS.UNSPECIFIED) {
+      const wardChoice = setPendingRuntimeChoice(state, {
+        id: pendingChoiceId,
+        type: 'WardPaymentChoice',
+        stackObjectId: stackObject.id,
+        sourceObjectId: stackObject.sourceObject.id,
+        payer: payment.payer,
+        cost: payment.cost,
+        clarificationNeeded: 'Was the ward cost paid?'
+      });
+      return { resolved: false, status: 'depends', payment: result, stackObject, pendingChoice: wardChoice };
+    }
+    clearPendingRuntimeChoice(state, pendingChoiceId);
     state.stack.pop();
     stackObject.status = 'resolved';
     const original = state.stack.find((entry) => entry.id === effect.stackObjectId);

@@ -1,11 +1,14 @@
 import { deriveCharacteristics, derivedHasAbility, derivedHasQuality } from './continuousEffects.js';
 import {
+  clearPendingRuntimeChoice,
   collectTriggeredAbilities,
   dealDamageToPlayerWithResult,
   emitEvent,
+  getPendingRuntimeChoice,
   markDamageWithResult,
   putPendingTriggersOnStack,
-  runStateBasedActionsRuntime
+  runStateBasedActionsRuntime,
+  setPendingRuntimeChoice
 } from './runtimeState.js';
 import { COMBAT_STEPS } from './turnStructure.js';
 
@@ -283,14 +286,27 @@ export function executeCombatDamageStep(state, { step = COMBAT_STEPS.COMBAT_DAMA
     return { status: 'illegal', reason: 'Combat damage cannot be assigned from the current combat step.' };
   }
   if (state.stack.length > 0) return { status: 'paused', reason: 'The stack must be empty before combat damage is assigned.' };
+  const pendingChoiceId = `combat-damage:${state.game.turnId}:${step}`;
+  const pendingChoice = getPendingRuntimeChoice(state);
+  if (pendingChoice && pendingChoice.id !== pendingChoiceId) return { status: 'depends', reason: 'A different pending runtime choice must be resolved first.', pendingChoice };
   if (step === COMBAT_STEPS.FIRST_STRIKE_DAMAGE && !combatNeedsFirstStrikeStep(state)) return { status: 'skipped', reason: 'No creature requires a first-strike combat damage step.' };
 
   const pending = [];
   for (const attackerEntry of state.combat.attackers) {
     const result = assignmentForAttacker(state, attackerEntry, step, assignments[attackerEntry.objectId]);
-    if (result.status !== 'ready') return result;
+    if (result.status !== 'ready') {
+      if (result.status === 'depends') setPendingRuntimeChoice(state, {
+        id: pendingChoiceId,
+        type: 'CombatDamageChoice',
+        step,
+        attackerId: attackerEntry.objectId,
+        clarificationNeeded: result.reason
+      });
+      return result;
+    }
     pending.push(...result.assignments);
   }
+  clearPendingRuntimeChoice(state, pendingChoiceId);
   pending.push(...blockerAssignments(state, step));
 
   const eventIndex = state.events.length;
