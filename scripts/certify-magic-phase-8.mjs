@@ -5,6 +5,7 @@ import { beginCombat, combatNeedsFirstStrikeStep, declareAttackers, declareBlock
 import { CONTINUOUS_LAYERS, PT_SUBLAYERS, createContinuousEffect } from '../src/services/instajudge/magic/runtime/continuousEffects.js';
 import { PAYMENT_STATUS, createManaCost } from '../src/services/instajudge/magic/runtime/costSystem.js';
 import { createGenericZoneCard } from '../src/services/instajudge/magic/runtime/effectRuntime.js';
+import { designateCommander } from '../src/services/instajudge/magic/runtime/commanderRuntime.js';
 import { evaluateMagicRulesRuntime } from '../src/services/instajudge/magic/runtime/magicRulesRuntime.js';
 import { parseOracleSemantics } from '../src/services/instajudge/magic/runtime/oracleSemantics.js';
 import { addPermanent, createGameObject, createMagicRuntimeState, moveObjectWithResult } from '../src/services/instajudge/magic/runtime/runtimeState.js';
@@ -48,10 +49,10 @@ const combatSteps = new Set([
   TURN_STEPS.END
 ]);
 
-function stateAt(step, { activePlayer = 'player', priorityHolder = activePlayer, stackDepth = 0, used = 0, allowed = 1, combatWindow = true } = {}) {
+function stateAt(step, { activePlayer = 'player', priorityHolder = activePlayer, stackDepth = 0, used = 0, allowed = 1, combatWindow = true, format = null } = {}) {
   const state = createMagicRuntimeState({
     scenario: {
-      objects: [], continuousEffects: [],
+      objects: [], continuousEffects: [], format,
       game: { activePlayer, phase: phaseFor(step), step, priorityHolder, landPlaysAllowed: allowed, landPlaysUsed: used }
     }
   });
@@ -292,13 +293,13 @@ cleanup.stack.length = 0;
 classify(advanceTurnStep(cleanup), 'depends', 'A pending cleanup choice must block turn advancement.');
 verify(executeCurrentTurnBasedAction(cleanup, { discardCardIds: [cleanupHand[0].id] }).status === 'executed' && cleanup.pendingChoices.length === 0, 'Supplying the cleanup choice must clear the canonical blocker.');
 
-const replacement = stateAt(TURN_STEPS.PRECOMBAT_MAIN);
+const replacement = stateAt(TURN_STEPS.PRECOMBAT_MAIN, { format: { id: 'commander', commanderDesignations: [] } });
 const commander = creature(replacement, { name: 'Certification Commander' });
-commander.commander = true;
+const replacementDesignation = designateCommander(replacement, commander);
 const replacementPending = moveObjectWithResult(replacement, commander, 'hand', 'certification replacement');
 classify(replacementPending, 'depends', 'An optional replacement must create a pending choice.');
 classify(checkTimingPermission({ state: replacement, card: cards.instant, actionType: 'Cast', playerId: 'player' }), 'depends', 'An unresolved replacement choice must block priority actions.');
-verify(moveObjectWithResult(replacement, commander, 'hand', 'certification replacement', {}, { replacementChoices: [`decline:commander-zone:${commander.id}`] }).status === 'committed' && replacement.pendingChoices.length === 0, 'Resolving the replacement choice must clear the blocker.');
+verify(moveObjectWithResult(replacement, commander, 'hand', 'certification replacement', {}, { replacementChoices: [`decline:commander-zone:${replacementDesignation.id}:battlefield:hand`] }).status === 'committed' && replacement.pendingChoices.length === 0, 'Resolving the replacement choice must clear the blocker.');
 
 const wardTurn = stateAt(TURN_STEPS.PRECOMBAT_MAIN);
 const wardedCreature = addPermanent(wardTurn, createGameObject({

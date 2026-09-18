@@ -34,7 +34,9 @@ export function evaluateMagicScenario({ message = '', cards = [], rules = [], le
   const normalizedCards = cards.map(normalizeMagicCard).filter((card) => card.name);
   const mechanics = detectMagicMechanics({ message, cards: normalizedCards });
   const selectedRules = selectRelevantRules(mechanics, rules);
-  if (normalizedCards.length === 0) {
+  const structuralCommanderQuestion = /\bcommander\b/i.test(message)
+    && /\b(?:command zone|dies?|died|graveyard|exil(?:e|ed)|hand|library|second copy|another copy)\b/i.test(message);
+  if (normalizedCards.length === 0 && !structuralCommanderQuestion) {
     return unsupported({ cards: [], rules: selectedRules, mechanics, latencyMs, trace: [], reason: 'I cannot verify a Magic ruling until at least one exact card identity is resolved from the catalog.' });
   }
 

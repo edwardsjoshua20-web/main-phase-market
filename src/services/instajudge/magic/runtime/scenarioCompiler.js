@@ -304,7 +304,7 @@ function inferredLandSourceZone(text) {
   return 'hand';
 }
 
-function compileChoices(message, objects, actions, makeId) {
+function compileChoices(message, objects, actions, makeId, format) {
   const choices = [];
   const raw = String(message);
   const text = normalizeMagicText(message);
@@ -326,7 +326,61 @@ function compileChoices(message, objects, actions, makeId) {
       paid: paid ? true : unpaid || cannotPay ? false : null
     });
   }
+  const commanderDesignation = format?.commanderDesignations?.[0];
+  if (commanderDesignation && /\b(?:dies?|died|graveyard|exil(?:e|ed)|hand|library|command zone)\b/.test(text)) {
+    const destination = /\bexil(?:e|ed)\b/.test(text) ? 'exile'
+      : /\bhand\b/.test(text) ? 'hand'
+        : /\blibrary\b/.test(text) ? 'library'
+          : 'graveyard';
+    const command = /\b(?:choose|chose|put|move|send|return).{0,40}\bcommand zone\b/.test(text);
+    const remain = new RegExp(`\\b(?:choose|chose|leave|remain|keep).{0,40}\\b${destination}\\b`).test(text);
+    choices.push({
+      id: makeId('choice'),
+      type: 'CommanderZoneReturnChoice',
+      commanderDesignationId: commanderDesignation.id,
+      objectId: commanderDesignation.objectId,
+      player: commanderDesignation.ownerId,
+      ownerId: commanderDesignation.ownerId,
+      originalDestination: destination,
+      decision: command ? 'command' : remain ? 'remain' : 'unspecified'
+    });
+  }
   return choices;
+}
+
+function compileCommanderFormat(message, cards, objects, makeId) {
+  const text = normalizeMagicText(message);
+  if (!/\bcommander\b/.test(text)) return { id: 'ordinary', commanderDesignations: [] };
+  const namedCandidates = cards
+    .filter((card) => isPermanentType(card) && text.includes(card.normalizedName))
+    .flatMap((card) => objects.filter((object) => normalizeMagicText(object.name) === card.normalizedName));
+  const commanderObject = namedCandidates[0] || objects.find((object) => object.commander) || null;
+  if (!commanderObject) return { id: 'commander', commanderDesignations: [] };
+  commanderObject.commander = true;
+  if (/\b(?:cast|casting).{0,50}\bcommander\b.{0,50}\bcommand zone\b|\bcommander\b.{0,50}\b(?:from|starts? in|begins? in) (?:my |the )?command zone\b/.test(text)) {
+    commanderObject.zone = 'command';
+  }
+  const designationId = `commander-designation:${commanderObject.owner}:${commanderObject.id}`;
+  commanderObject.commanderDesignationId = designationId;
+  if (/\b(?:second|another) copy\b/.test(text) && namedCandidates.length === 1) {
+    objects.push({
+      ...commanderObject,
+      id: makeId('object'),
+      commander: false,
+      commanderDesignationId: null,
+      zone: 'battlefield',
+      sourceKey: `${commanderObject.sourceKey}:same-name-copy`
+    });
+  }
+  return {
+    id: 'commander',
+    commanderDesignations: [{
+      id: designationId,
+      objectId: commanderObject.id,
+      ownerId: commanderObject.owner,
+      startingZone: commanderObject.zone
+    }]
+  };
 }
 
 function compileContinuousEffects(message, objects) {
@@ -447,8 +501,15 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
     });
   }
 
+  const format = compileCommanderFormat(message, normalizedCards, objects, makeId);
   const actions = compileActions(message, normalizedCards, objects, makeId);
-  const choices = compileChoices(message, objects, actions, makeId);
+  for (const action of actions) {
+    if (format.commanderDesignations.some((designation) => objects.find((object) => object.id === designation.objectId)?.name === action.source.name)
+      && /\bfrom (?:my |the )?command zone\b/.test(normalizeMagicText(message))) {
+      action.zoneFrom = 'command';
+    }
+  }
+  const choices = compileChoices(message, objects, actions, makeId, format);
   const continuousEffects = compileContinuousEffects(message, objects);
   const combat = compileCombat(message, objects, normalizedCards);
   const text = normalizeMagicText(message);
@@ -461,6 +522,7 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
     type: 'MagicScenario',
     version: 1,
     sourceText: message,
+    format,
     players: [
       { id: 'player', role: 'user', active: !opponentTurn },
       { id: 'opponent', role: 'opponent', active: opponentTurn }
@@ -505,6 +567,7 @@ export function extractGenericObjects(message = '') {
     token: object.token,
     tapped: object.tapped,
     commander: object.commander,
+    commanderDesignationId: object.commanderDesignationId,
     abilities: object.abilities,
     summoningSick: object.summoningSick
   }));

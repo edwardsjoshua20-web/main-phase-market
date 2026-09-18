@@ -151,16 +151,16 @@ addMany('timing-priority', [
 ]);
 
 addMany('commander', [
-  ['Commander tax missing casts', 'How much commander tax do I pay to cast Atraxa from the command zone?', [card.atraxa], 'depends'],
-  ['Commander damage missing state', 'Does my opponent lose from commander damage from Atraxa?', [card.atraxa], 'depends'],
-  ['Commander color identity', 'Is Lightning Bolt legal in my Atraxa commander deck by color identity?', [card.atraxa, card.lightningBolt], 'depends'],
-  ['Commander zone death choice', 'My commander dies and would go to graveyard. Can I put it in the command zone?', [card.atraxa], 'depends'],
-  ['Commander exile choice', 'My commander is exiled and command zone replacement applies. Can I move it to the command zone?', [card.atraxa], 'depends'],
+  ['Commander tax missing casts', 'How much commander tax do I pay to cast Atraxa from the command zone?', [card.atraxa], 'unverified'],
+  ['Commander damage missing state', 'Does my opponent lose from commander damage from Atraxa?', [card.atraxa], 'unverified'],
+  ['Commander color identity', 'Is Lightning Bolt legal in my Atraxa commander deck by color identity?', [card.atraxa, card.lightningBolt], 'unverified'],
+  ['Commander zone death choice', 'My commander dies and would go to graveyard. Can I put it in the command zone?', [card.atraxa], 'yes'],
+  ['Commander exile choice', 'My commander is exiled and command zone replacement applies. Can I move it to the command zone?', [card.atraxa], 'yes'],
   ['Commander legality delegated legal', 'Is Sol Ring legal in Commander?', [card.solRing], 'yes', { legalityResult: { status: 'legal', summary: 'Sol Ring is legal in Commander.' } }],
   ['Commander legality delegated banned', 'Is this card legal in Commander?', [card.serra], 'no', { legalityResult: { status: 'not_legal', summary: 'This card is not legal in Commander.' } }],
-  ['Command Tower identity', 'Does Command Tower produce colors outside my commander color identity?', [card.commandTower, card.atraxa], 'depends'],
-  ['Commander owner choice after graveyard', 'A commander goes to graveyard. Does its owner choose whether to move it to command zone?', [card.atraxa], 'depends'],
-  ['Commander deck singleton', 'Is a Commander deck legal with duplicate nonbasic cards?', [card.atraxa], 'depends']
+  ['Command Tower identity', 'Does Command Tower produce colors outside my commander color identity?', [card.commandTower, card.atraxa], 'unverified'],
+  ['Commander owner choice after graveyard', 'A commander goes to graveyard. Does its owner choose whether to move it to command zone?', [card.atraxa], 'yes'],
+  ['Commander deck singleton', 'Is a Commander deck legal with duplicate nonbasic cards?', [card.atraxa], 'unverified']
 ]);
 
 addMany('replacement-continuous-layers', [

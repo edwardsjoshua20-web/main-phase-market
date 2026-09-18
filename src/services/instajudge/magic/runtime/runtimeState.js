@@ -12,6 +12,15 @@ import {
   removeSourceStaticEffects
 } from './continuousEffects.js';
 import { createCanonicalTurnState } from './turnStructure.js';
+import {
+  commanderDesignationFor,
+  commanderReplacementEffects,
+  commanderReturnDecision,
+  createCommanderReturnChoice,
+  createFormatState,
+  initializeCommanderDesignations,
+  recordCommanderMovement
+} from './commanderRuntime.js';
 
 let nextObjectId = 1;
 let nextEventId = 1;
@@ -36,7 +45,7 @@ export function createPlayer(id, overrides = {}) {
   };
 }
 
-export function createGameObject({ id = null, card, controller = 'player', owner = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false, counters = {}, timestamp = null, abilities = [], summoningSick = false, enteredTurn = null, attackRestrictions = [], blockRestrictions = [] } = {}) {
+export function createGameObject({ id = null, card, controller = 'player', owner = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false, commanderDesignationId = null, counters = {}, timestamp = null, abilities = [], summoningSick = false, enteredTurn = null, attackRestrictions = [], blockRestrictions = [] } = {}) {
   const normalizedCard = card ? normalizeMagicCard(card) : normalizeMagicCard({ name: name || 'Generic Object', typeLine: 'Creature', oracleText: '', power, toughness });
   const objectId = id ? reserveId(id) : makeId(token ? 'token' : 'object');
   const object = {
@@ -58,6 +67,7 @@ export function createGameObject({ id = null, card, controller = 'player', owner
     ceasedToExist: false,
     faceState: 'front',
     commander,
+    commanderDesignationId,
     attachments: [],
     attachedTo: null,
     basePower: power ?? normalizedCard.power,
@@ -85,6 +95,7 @@ export function snapshotObject(object) {
     id: object.id, name: derived.name, card: object.card, oracleId: object.oracleId,
     owner: object.owner, controller: derived.controller, zone: object.zone,
     timestamp: object.timestamp, token: object.token, commander: object.commander,
+    commanderDesignationId: object.commanderDesignationId || null,
     power: derived.power, toughness: derived.toughness,
     damageMarked: object.damageMarked, damagedByDeathtouch: object.damagedByDeathtouch,
     counters: { ...object.counters }, tapped: object.tapped,
@@ -155,6 +166,7 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
   nextEventId = 1;
   const state = {
     type: 'MagicGameState', version: 2,
+    format: createFormatState(scenario?.format || null),
     players: { player: createPlayer('player'), opponent: createPlayer('opponent') },
     objects: new Map(),
     zones: { battlefield: [], hand: [], graveyard: [], exile: [], library: [], stack: [], command: [] },
@@ -177,15 +189,30 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
   };
   state.combat = null;
 
-  const scenarioNames = new Set((scenario?.objects || []).filter((entry) => !entry.name.startsWith('Generic ') && !entry.name.startsWith('Token ')).map((entry) => normalizeMagicText(entry.name)));
   for (const card of cards) {
     const normalized = normalizeMagicCard(card);
     if (!normalizeMagicText(message).includes(normalized.normalizedName) || /instant|sorcery/i.test(normalized.typeLine)) continue;
-    const descriptor = scenario?.objects?.find((entry) => normalizeMagicText(entry.name) === normalized.normalizedName);
-    if (scenario && scenarioNames.has(normalized.normalizedName) && !descriptor) continue;
-    addPermanent(state, createGameObject({ id: descriptor?.id || null, card: normalized, controller: descriptor?.controller || inferController(message, normalized), owner: descriptor?.owner || inferController(message, normalized), commander: descriptor?.commander || false, abilities: descriptor?.abilities || [], summoningSick: descriptor?.summoningSick || false }));
+    const descriptors = scenario?.objects?.filter((entry) => normalizeMagicText(entry.name) === normalized.normalizedName) || [];
+    const initializers = descriptors.length ? descriptors : [null];
+    for (const descriptor of initializers) {
+      addInitialObject(state, createGameObject({
+        id: descriptor?.id || null,
+        card: normalized,
+        controller: descriptor?.controller || inferController(message, normalized),
+        owner: descriptor?.owner || inferController(message, normalized),
+        zone: descriptor?.zone || 'battlefield',
+        commander: descriptor?.commander || false,
+        commanderDesignationId: descriptor?.commanderDesignationId || null,
+        abilities: descriptor?.abilities || [],
+        summoningSick: descriptor?.summoningSick || false
+      }));
+    }
   }
-  for (const object of genericObjects) addPermanent(state, createGameObject({ ...object, id: object.id || null, token: Boolean(object.token), controller: object.controller || 'player', owner: object.owner || object.controller || 'player' }));
+  for (const object of genericObjects) addInitialObject(state, createGameObject({ ...object, id: object.id || null, token: Boolean(object.token), controller: object.controller || 'player', owner: object.owner || object.controller || 'player' }));
+  const commanderDescriptors = scenario?.format?.commanderDesignations
+    || scenario?.objects?.filter((object) => object.commander).map((object) => ({ objectId: object.id, ownerId: object.owner, id: object.commanderDesignationId || null }))
+    || [];
+  initializeCommanderDesignations(state, commanderDescriptors);
   registerScenarioContinuousEffects(state, scenario?.continuousEffects || []);
   return state;
 }
@@ -203,6 +230,16 @@ export function registerGameObject(state, object) {
   return registerObject(state, object);
 }
 
+function addInitialObject(state, object) {
+  if (object.zone === 'battlefield') return addPermanent(state, object);
+  registerObject(state, object);
+  const playerZone = object.zone === 'command' ? 'commandZone' : object.zone;
+  if (state.players[object.owner]?.[playerZone] && !state.players[object.owner][playerZone].includes(object.id)) {
+    state.players[object.owner][playerZone].push(object.id);
+  }
+  return object;
+}
+
 export function addPermanent(state, object) {
   object.zone = 'battlefield';
   registerObject(state, object);
@@ -217,8 +254,9 @@ export function addPermanent(state, object) {
 
 function removeFromZone(state, zone, objectId) {
   if (state.zones[zone]) state.zones[zone] = state.zones[zone].filter((id) => id !== objectId);
+  const playerZone = zone === 'command' ? 'commandZone' : zone;
   for (const player of Object.values(state.players)) {
-    if (player[zone]) player[zone] = player[zone].filter((id) => id !== objectId);
+    if (player[playerZone]) player[playerZone] = player[playerZone].filter((id) => id !== objectId);
     if (zone === 'battlefield') player.battlefield = player.battlefield.filter((id) => id !== objectId);
   }
 }
@@ -256,20 +294,6 @@ function registeredReplacementEffects(state, event) {
   });
 }
 
-function rulesReplacementEffects(event) {
-  if (event.type !== 'ZoneChange' || !event.object?.commander || !['hand', 'library'].includes(event.to)) return [];
-  return [{
-    id: `commander-zone:${event.object.id}`,
-    source: event.object,
-    mandatory: false,
-    chooser: event.object.owner,
-    eventType: 'ZoneChange',
-    applies: () => true,
-    replace: { to: 'command' },
-    text: 'The commander may be put into the command zone instead.'
-  }];
-}
-
 export function registerReplacementEffect(state, effect) {
   const normalized = { mandatory: true, chooser: 'affected-player', ...effect };
   state.replacementEffects.push(normalized);
@@ -289,7 +313,7 @@ export function applyReplacementPipeline(state, proposedEvent, { replacementChoi
   let choiceIndex = 0;
   for (let iteration = 0; iteration < 16; iteration += 1) {
     const candidates = [
-      ...rulesReplacementEffects(event),
+      ...commanderReplacementEffects(state, event),
       ...semanticReplacementEffects(state, event),
       ...registeredReplacementEffects(state, event)
     ].filter((effect) => !applied.includes(effect.id) && !declined.includes(effect.id));
@@ -319,7 +343,7 @@ export function applyReplacementPipeline(state, proposedEvent, { replacementChoi
           status: 'depends',
           event,
           applied,
-          choices: candidates.map((effect) => ({ id: effect.id, source: effect.source?.name || null, text: effect.text || null })),
+          choices: candidates.map((effect) => ({ id: effect.id, source: effect.source?.name || null, chooser: effect.chooser || null, text: effect.text || null })),
           clarificationNeeded: 'Which applicable replacement effect should be applied next?'
         };
       }
@@ -329,7 +353,7 @@ export function applyReplacementPipeline(state, proposedEvent, { replacementChoi
         status: 'depends',
         event,
         applied,
-        choices: [{ id: selected.id, source: selected.source?.name || null, text: selected.text || null }],
+        choices: [{ id: selected.id, source: selected.source?.name || null, chooser: selected.chooser || null, text: selected.text || null }],
         clarificationNeeded: 'Should the optional replacement effect be applied?'
       };
     } else if (selected.mandatory === false) {
@@ -364,12 +388,17 @@ export function moveObjectWithResult(state, object, zone, reason, metadata = {},
   if (pipeline.status !== 'ready') {
     state.lastPipelineResult = pipeline;
     if (pipeline.status === 'depends') {
+      const commanderChoice = pipeline.choices?.find((choice) => String(choice.id).startsWith('commander-zone:')) || null;
       setPendingRuntimeChoice(state, {
         id: pendingChoiceId,
         type: 'ReplacementChoice',
         objectId: object.id,
         from,
         to: zone,
+        chooser: commanderChoice?.chooser || null,
+        ownerId: commanderChoice?.chooser || null,
+        timing: commanderChoice ? 'replacement' : null,
+        commanderDesignationId: commanderChoice ? commanderDesignationFor(state, object)?.id || null : null,
         choices: pipeline.choices || [],
         clarificationNeeded: pipeline.clarificationNeeded || 'Which replacement effect applies?'
       });
@@ -393,7 +422,7 @@ export function moveObjectWithResult(state, object, zone, reason, metadata = {},
   }
   invalidateCharacteristics(state);
   const eventMetadata = { reason, replacements: pipeline.applied, ...metadata };
-  emitEvent(state, 'ZoneChanged', { object, affected: object, previous, from, to: finalZone, final: snapshotObject(object), metadata: eventMetadata });
+  const zoneChangedEvent = emitEvent(state, 'ZoneChanged', { object, affected: object, previous, from, to: finalZone, final: snapshotObject(object), metadata: eventMetadata });
   if (from !== 'battlefield' && finalZone === 'battlefield') {
     emitEvent(state, 'PermanentEntered', { object, controller: object.controller, from, to: finalZone, final: snapshotObject(object), metadata: eventMetadata });
     emitEvent(state, 'PermanentEnteredBattlefield', { object, controller: object.controller, from, to: finalZone, final: snapshotObject(object), metadata: eventMetadata });
@@ -403,7 +432,102 @@ export function moveObjectWithResult(state, object, zone, reason, metadata = {},
     emitEvent(state, 'PermanentLeftBattlefield', { object, affected: object, previous, from, to: finalZone, metadata: eventMetadata });
   }
   if (from === 'battlefield' && finalZone === 'graveyard' && isCreature(previous.card)) emitEvent(state, 'CreatureDied', { object, affected: object, previous, controller: previous.controller, from, to: finalZone, metadata: { lki: true, ...eventMetadata } });
-  return { status: 'committed', object, from, to: finalZone, replaced: finalZone !== zone, replacements: pipeline.applied };
+  recordCommanderMovement(state, object, {
+    from,
+    to: finalZone,
+    reason,
+    eventId: zoneChangedEvent.id,
+    originalDestination: pipeline.event.metadata?.commanderOriginalDestination || zone,
+    timing: pipeline.event.metadata?.commanderChoiceTiming || 'zone-change'
+  });
+
+  const designation = commanderDesignationFor(state, object);
+  if (!options.skipCommanderReturnChoice && designation && ['graveyard', 'exile'].includes(finalZone)) {
+    const decision = commanderReturnDecision(options, designation, finalZone);
+    const choice = createCommanderReturnChoice(state, object, { from, to: finalZone, reason, eventId: zoneChangedEvent.id });
+    if (!decision) {
+      setPendingRuntimeChoice(state, choice);
+      emitEvent(state, 'CommanderReturnChoiceRequired', {
+        object,
+        affected: object,
+        player: designation.ownerId,
+        from,
+        to: finalZone,
+        metadata: { choiceId: choice.id, timing: choice.timing, commanderDesignationId: designation.id }
+      });
+      const result = {
+        status: 'depends',
+        movementCommitted: true,
+        object,
+        from,
+        to: finalZone,
+        replaced: finalZone !== zone,
+        replacements: pipeline.applied,
+        pendingChoice: choice,
+        clarificationNeeded: choice.clarificationNeeded
+      };
+      state.lastPipelineResult = result;
+      return result;
+    }
+    emitEvent(state, 'CommanderReturnChoiceMade', {
+      object,
+      affected: object,
+      player: designation.ownerId,
+      from,
+      to: finalZone,
+      metadata: { decision, timing: choice.timing, commanderDesignationId: designation.id }
+    });
+    if (decision === 'command') {
+      const commandMove = moveObjectWithResult(
+        state,
+        object,
+        'command',
+        'commander state-based action',
+        { commanderDesignationId: designation.id, commanderOriginalDestination: finalZone },
+        { skipCommanderReturnChoice: true }
+      );
+      return {
+        status: commandMove.status,
+        movementCommitted: true,
+        object,
+        from,
+        to: commandMove.to,
+        originalDestination: finalZone,
+        commanderReturn: 'command',
+        replacements: pipeline.applied
+      };
+    }
+  }
+  return { status: 'committed', object, from, to: finalZone, replaced: finalZone !== zone, replacements: pipeline.applied, commanderReturn: designation ? 'remain' : null };
+}
+
+export function resolveCommanderReturnChoice(state, choiceId, decision) {
+  const choice = state.pendingChoices.find((candidate) => candidate.id === choiceId && candidate.type === 'CommanderZoneReturnChoice');
+  if (!choice) return { status: 'unsupported', reason: 'The Commander return choice is not pending.' };
+  if (!['command', 'remain'].includes(decision)) return { status: 'depends', pendingChoice: choice, clarificationNeeded: choice.clarificationNeeded };
+  const object = state.objects.get(choice.objectId);
+  if (!object || object.zone !== choice.currentZone) {
+    return { status: 'unsupported', reason: 'The commander is no longer in the zone associated with this choice.' };
+  }
+  clearPendingRuntimeChoice(state, choice.id);
+  emitEvent(state, 'CommanderReturnChoiceMade', {
+    object,
+    affected: object,
+    player: choice.ownerId,
+    from: choice.from,
+    to: choice.currentZone,
+    metadata: { choiceId: choice.id, decision, timing: choice.timing, commanderDesignationId: choice.commanderDesignationId }
+  });
+  if (decision === 'remain') return { status: 'committed', object, from: choice.from, to: object.zone, commanderReturn: 'remain' };
+  const movement = moveObjectWithResult(
+    state,
+    object,
+    'command',
+    'commander state-based action',
+    { commanderDesignationId: choice.commanderDesignationId, commanderOriginalDestination: choice.originalDestination },
+    { skipCommanderReturnChoice: true }
+  );
+  return { ...movement, movementCommitted: true, commanderReturn: 'command', originalDestination: choice.originalDestination };
 }
 
 export function moveObject(state, object, zone, reason, metadata = {}, options = {}) {

@@ -74,7 +74,7 @@ Certified Phase 4 proofs cover generic `Destroy target creature` and Murder pari
 
 Effects propose events before mutating state. `runtimeState.js` applies registered and static Oracle replacement effects to proposed events, recomputes applicability after each replacement, and commits only the resulting event. Competing replacement effects without an explicit ordering choice return `DEPENDS` and leave state unchanged. Optional replacements without a supplied choice also return `DEPENDS`.
 
-The owner choice that replaces a commander's move to hand or library with a move to the command zone is represented as an optional rules replacement. Applying or declining it is explicit; an omitted decision returns `DEPENDS`. Commander movement from graveyard or exile is reserved for the separate state-based Commander subsystem.
+The owner choice that replaces a commander's move to hand or library with a move to the command zone is represented as an optional rules replacement. Applying or declining it is explicit; an omitted decision returns `DEPENDS`. Phase 9A adds the distinct post-move state-based choice for graveyard and exile without changing this replacement pipeline.
 
 Zone changes preserve stable object identity and emit proposed and committed events. Battlefield departures retain last-known information, `CreatureDied` is emitted only when the final destination is the graveyard, and entries emit `PermanentEnteredBattlefield`. Tokens are ordinary runtime objects with owner, controller, type, subtype, color, power, toughness, abilities, and token identity; state-based actions make them cease to exist outside the battlefield or stack.
 
@@ -191,10 +191,27 @@ Certification fixed four cross-system defects in canonical owners: replacement a
 
 Expected `DEPENDS` boundaries include omitted choices for cleanup discard, competing or optional replacements, combat damage assignment, and Ward payment, plus public questions missing required turn, phase, stack, priority, or land-allowance facts. Expected `UNVERIFIED` boundaries include dynamic flash-like permissions, mana-ability timing outside the cost owner, unsupported cleanup/untap modifiers, unusual-zone or Oracle-derived extra-land permissions, and special actions other than ordinary land play.
 
-This certification is not a claim of full Magic rules support. The unsupported areas below remain fail-closed, and Phase 9 and broader Commander behavior are outside this certification.
+This certification is not a claim of full Magic rules support. The unsupported areas below remain fail-closed. Phase 9A builds on this certified surface without changing its ordinary-Magic guarantees.
+
+## Phase 9A: Commander Identity and Command Zone
+
+`commanderRuntime.js` is a format adapter over the canonical Magic runtime. `state.format.id` gates Commander behavior, while `state.format.commander.designations` stores stable designation IDs, owner IDs, canonical card identity, current runtime object ID, command-zone membership, command-zone cast count, and movement history. Designation is attached explicitly to the designated object and is never inferred from card name, so another copy of the same card is not automatically a commander. The designation collection supports a two-player setup and does not hardcode exactly one commander.
+
+The command zone is the existing canonical `command` zone, mirrored by each owner's `commandZone` index. A starting commander is registered there through ordinary state initialization, and all later movement uses `moveObjectWithResult`; no Commander-only object store or direct zone mutation was added.
+
+Commander return handling follows the two current CR 903.9 timing models:
+
+- A move to hand or library offers the commander owner an optional replacement before the move. Accepting changes the destination to the command zone; declining commits the original destination; omission creates a centralized `ReplacementChoice` and returns `DEPENDS` without moving the object.
+- A move to graveyard or exile commits first, including normal death/zone events, then offers the owner a `CommanderZoneReturnChoice` with `state-based-action` timing. Accepting performs a second canonical move to the command zone; declining leaves the commander where it is; omission leaves the first move committed, registers a centralized blocking pending choice, and returns `DEPENDS`.
+
+Choice ownership comes from the commander designation owner, not the object's current controller. Pending Commander choices block priority, stack resolution, timing actions, and turn progression through the Phase 8 shared pending-choice authority.
+
+A designated commander owned by the acting player may be cast from the command zone at normal supported timing. Casting moves that existing object through the canonical zone pipeline, creates the ordinary `Spell` stack object, and uses ordinary permanent-spell resolution to enter the battlefield. Arbitrary command-zone objects receive no casting permission. The adapter records successful command-zone casts for later tax support; any repeat cast whose cost depends on commander tax returns `UNVERIFIED` because tax is not implemented in Phase 9A.
+
+Phase 9A explicitly defers commander tax, commander damage, broad multiplayer Commander, color-identity and singleton/deck-construction validation, partner/background/Doctor's companion and other multi-commander mechanics, and broad command-zone abilities. This phase is a foundation, not a claim of full Commander support.
 
 ## Deliberately Unsupported
 
-X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer combat/priority and ambiguous multiplayer trigger ordering are not certified. Special actions beyond ordinary land play, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, unusual attack/block permissions, banding, planeswalker/battle attack targets, automatic spell continuation through combat windows, exhaustive untap restrictions and replacement interactions, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
+X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer combat/priority and ambiguous multiplayer trigger ordering are not certified. Special actions beyond ordinary land play, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, unusual attack/block permissions, banding, planeswalker/battle attack targets, automatic spell continuation through combat windows, exhaustive untap restrictions and replacement interactions, Commander rules beyond the Phase 9A identity/zone foundation, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
 
 Additional-land effect derivation and the remaining special-action layer remain deferred beyond Phase 8D.

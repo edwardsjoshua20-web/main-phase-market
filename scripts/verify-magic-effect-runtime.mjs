@@ -3,6 +3,7 @@ import { executeTypedEffect, createGenericZoneCard, createTokens, modifyCounters
 import { evaluateMagicRulesRuntime } from '../src/services/instajudge/magic/runtime/magicRulesRuntime.js';
 import { ORACLE_NODE_TYPES, clearOracleSemanticCache, parseOracleSemantics } from '../src/services/instajudge/magic/runtime/oracleSemantics.js';
 import { PAYMENT_STATUS, createSacrificeCost, payCost } from '../src/services/instajudge/magic/runtime/costSystem.js';
+import { designateCommander } from '../src/services/instajudge/magic/runtime/commanderRuntime.js';
 import {
   addPermanent,
   collectTriggeredAbilities,
@@ -131,16 +132,18 @@ const reviveTarget = createGenericZoneCard(reviveState, { playerId: 'player', zo
 const reviveResult = executeTypedEffect({ state: reviveState, effect: effectFor(card.revive, ORACLE_NODE_TYPES.ZONE_CHANGE), controller: 'player', target: reviveTarget });
 assert(reviveResult.status === 'committed' && reviveTarget.zone === 'battlefield' && reviveState.events.some((event) => event.type === 'PermanentEnteredBattlefield' && event.object.id === reviveTarget.id), 'Graveyard-to-battlefield effects must emit a battlefield-entry event.');
 
-const commanderState = createMagicRuntimeState();
+const commanderState = createMagicRuntimeState({ scenario: { format: { id: 'commander', commanderDesignations: [] }, objects: [], continuousEffects: [] } });
 const commander = addPermanent(commanderState, createGameObject({ card: { name: 'Generic Commander', typeLine: 'Legendary Creature', oracleText: '' }, controller: 'player', owner: 'player', commander: true }));
-const commanderChoiceId = `commander-zone:${commander.id}`;
+const commanderDesignation = designateCommander(commanderState, commander);
+const commanderChoiceId = `commander-zone:${commanderDesignation.id}:battlefield:hand`;
 const missingCommanderChoice = moveObjectWithResult(commanderState, commander, 'hand', 'bounce commander');
 assert(missingCommanderChoice.status === 'depends' && commander.zone === 'battlefield', 'Commander hand/library replacement must require its owner choice before mutation.');
 const commandZoneChoice = moveObjectWithResult(commanderState, commander, 'hand', 'bounce commander', {}, { replacementChoices: [commanderChoiceId] });
 assert(commandZoneChoice.status === 'committed' && commander.zone === 'command', 'A chosen Commander replacement must move the commander to the command zone.');
-const commanderDeclineState = createMagicRuntimeState();
+const commanderDeclineState = createMagicRuntimeState({ scenario: { format: { id: 'commander', commanderDesignations: [] }, objects: [], continuousEffects: [] } });
 const declinedCommander = addPermanent(commanderDeclineState, createGameObject({ card: { name: 'Declined Commander', typeLine: 'Legendary Creature', oracleText: '' }, controller: 'player', owner: 'player', commander: true }));
-const commanderDecline = moveObjectWithResult(commanderDeclineState, declinedCommander, 'hand', 'bounce commander', {}, { replacementChoices: [`decline:commander-zone:${declinedCommander.id}`] });
+const declinedDesignation = designateCommander(commanderDeclineState, declinedCommander);
+const commanderDecline = moveObjectWithResult(commanderDeclineState, declinedCommander, 'hand', 'bounce commander', {}, { replacementChoices: [`decline:commander-zone:${declinedDesignation.id}:battlefield:hand`] });
 assert(commanderDecline.status === 'committed' && declinedCommander.zone === 'hand', 'A declined Commander replacement must preserve the original hand destination.');
 
 const genericReplacementState = createMagicRuntimeState();

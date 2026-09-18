@@ -13,6 +13,7 @@ import {
   derivedHasQuality
 } from './continuousEffects.js';
 import { castSpell, checkTimingPermission, passPriority, resolveTopOfStack } from './stackRuntime.js';
+import { commanderDesignationFor, isDesignatedCommander } from './commanderRuntime.js';
 import {
   SPECIAL_ACTION_TYPES,
   checkSpecialAction,
@@ -69,6 +70,22 @@ function evaluated(verdict, summary, { cards = [], primitives = [], trace = [], 
     sequence,
     state,
     runtime
+  };
+}
+
+function dependent(summary, { cards = [], primitives = [], trace = [], sequence = [], state = null, clarificationNeeded = null, runtime = {} } = {}) {
+  return {
+    status: 'depends',
+    verdict: 'depends',
+    summary,
+    cards,
+    rules: primitiveRules(primitives),
+    mechanics: primitives,
+    trace,
+    sequence,
+    state,
+    runtime,
+    clarificationNeeded: clarificationNeeded || 'A required player choice has not been supplied.'
   };
 }
 
@@ -980,10 +997,192 @@ function typedExecutionSummary(card, effect, target, targetPlayer, result) {
   return `${card.name}'s ${effect.type} resolves.`;
 }
 
+function commanderScenarioState(card, { zone = 'battlefield', controller = 'player', includeCopy = false, designated = true } = {}) {
+  const commanderId = 'commander-object-1';
+  const designationId = `commander-designation:player:${commanderId}`;
+  const objects = [{
+    id: commanderId,
+    name: card.name,
+    card,
+    owner: 'player',
+    controller,
+    zone,
+    commander: designated,
+    commanderDesignationId: designated ? designationId : null,
+    abilities: [],
+    counters: {}
+  }];
+  if (includeCopy) objects.push({
+    ...objects[0],
+    id: 'same-name-copy-1',
+    zone: 'battlefield',
+    commander: false,
+    commanderDesignationId: null
+  });
+  const scenario = {
+    type: 'MagicScenario',
+    version: 1,
+    format: {
+      id: 'commander',
+      commanderDesignations: designated ? [{ id: designationId, objectId: commanderId, ownerId: 'player', startingZone: zone }] : []
+    },
+    objects,
+    continuousEffects: [],
+    game: {
+      activePlayer: 'player',
+      phase: 'main',
+      step: 'precombat-main',
+      priorityHolder: 'player',
+      stackEmpty: true,
+      factsProvided: { turn: true, phase: true, stack: true, priority: true }
+    }
+  };
+  return createMagicRuntimeState({ cards: [card], scenario, message: card.name });
+}
+
+function explicitCommanderDecision(text, destination) {
+  if (/\bcan i (?:put|move|send|return)\b.{0,80}\bcommand zone\b/.test(text)) return 'command';
+  if (/\b(?:i |owner )?(?:choose|chose|put|move|send|return)\b.{0,80}\bcommand zone\b/.test(text)) return 'command';
+  if (new RegExp(`\\bcan i (?:leave|keep)\\b.{0,80}\\b${destination}\\b`).test(text)) return 'remain';
+  if (new RegExp(`\\b(?:i |owner )?(?:choose|chose|leave|keep|remain)\\b.{0,80}\\b${destination}\\b`).test(text)) return 'remain';
+  return null;
+}
+
+function evaluateCommanderScenario({ message, cards }) {
+  const text = normalizeMagicText(message);
+  if (!/\bcommander\b|\bcommand zone\b/.test(text)) return null;
+  if (/\bcommander damage\b|\b21 damage\b/.test(text)) {
+    return unsupported('Commander damage is deferred beyond Phase 9A.', { cards, primitives: ['commander', 'damage'] });
+  }
+  if (/\bpartner\b|\bbackground\b|\bdoctor'?s companion\b|\bmultiplayer\b|\bfour.player\b/.test(text)) {
+    return unsupported('This multi-commander or multiplayer Commander mechanic is deferred beyond Phase 9A.', { cards, primitives: ['commander'] });
+  }
+  if (/\bcommander tax\b|\badditional (?:mana|cost)\b|\bcosts? (?:more|now)\b|\bagain from (?:my |the )?command zone\b|\bsecond time from (?:my |the )?command zone\b/.test(text)) {
+    return unsupported('Commander tax is deferred until Phase 9B, so this casting-cost question cannot be verified yet.', {
+      cards,
+      primitives: ['commander', 'timing'],
+      clarificationNeeded: 'Phase 9A proves command-zone casting structure but does not calculate commander tax.'
+    });
+  }
+  if (/\bcolor identity\b|\bsingleton\b|\bdeck (?:legal|legality|construction)\b/.test(text)) return null;
+  if (!/\bcommander\b/.test(text)) {
+    return unsupported('A command-zone reference alone does not prove Commander format or commander designation.', {
+      cards,
+      primitives: ['commander'],
+      clarificationNeeded: 'Identify the Commander format and the designated commander.'
+    });
+  }
+  const card = cards.find((candidate) => /legendary|creature|artifact|enchantment|planeswalker/i.test(candidate.typeLine)) || cards[0] || normalizeMagicCard({
+    id: 'generic-designated-commander',
+    name: 'Designated Commander',
+    typeLine: 'Legendary Creature',
+    oracleText: '',
+    power: 1,
+    toughness: 1
+  });
+  const commanderLabel = cards.length ? card.name : 'the designated commander';
+
+  if (/\bnon.?commander\b/.test(text)) {
+    const state = commanderScenarioState(card, { designated: false });
+    const object = state.objects.get('commander-object-1');
+    const movement = moveObjectWithResult(state, object, /\bexil/.test(text) ? 'exile' : 'graveyard', 'public Commander scenario');
+    return evaluated('no', 'A noncommander does not receive the Commander rule that moves a designated commander to the command zone.', {
+      cards,
+      primitives: ['commander', 'zone-changes'],
+      trace: state.trace,
+      state,
+      runtime: { movement, pendingChoice: state.pendingChoices[0] || null }
+    });
+  }
+
+  if (/\b(?:second|another) copy\b/.test(text)) {
+    const state = commanderScenarioState(card, { includeCopy: true });
+    const designated = state.objects.get('commander-object-1');
+    const copy = state.objects.get('same-name-copy-1');
+    return evaluated('no', `The second copy of ${commanderLabel} is not the commander; commander designation is not inferred from its name.`, {
+      cards,
+      primitives: ['commander'],
+      trace: state.trace,
+      state,
+      runtime: { designated: isDesignatedCommander(state, designated), copyDesignated: isDesignatedCommander(state, copy) }
+    });
+  }
+
+  if (/\bcast\b.{0,100}\bcommand zone\b|\bcommand zone\b.{0,100}\bcast\b/.test(text)) {
+    const state = commanderScenarioState(card, { zone: 'command' });
+    const commander = state.objects.get('commander-object-1');
+    const cast = castSpell(state, {
+      sourceObject: commander,
+      controller: 'player',
+      factsProvided: state.scenario.game.factsProvided
+    });
+    if (!cast.cast) return unsupported(cast.commanderPermission?.reason || cast.timing?.reason || 'The command-zone cast could not be proven.', {
+      cards,
+      primitives: ['commander', 'timing', 'stack'],
+      trace: state.trace
+    });
+    return evaluated('yes', `${commanderLabel} can be cast from the command zone using the normal spell and stack process.`, {
+      cards,
+      primitives: ['commander', 'timing', 'stack'],
+      trace: state.trace,
+      sequence: ['command zone', 'stack'],
+      state,
+      runtime: { stackObjectType: cast.stackObject.kind, commanderDesignationId: commanderDesignationFor(state, commander)?.id || null }
+    });
+  }
+
+  const destination = /\bexil/.test(text) ? 'exile'
+    : /\bhand\b/.test(text) ? 'hand'
+      : /\blibrary\b/.test(text) ? 'library'
+        : /\b(?:dies?|died|graveyard)\b/.test(text) ? 'graveyard'
+          : null;
+  if (!destination) return unsupported('The Commander question does not identify a supported Phase 9A zone movement.', { cards, primitives: ['commander', 'zone-changes'] });
+  const controller = /\bopponent controls?\b|\bcontrolled by (?:my )?opponent\b/.test(text) ? 'opponent' : 'player';
+  const state = commanderScenarioState(card, { controller });
+  const commander = state.objects.get('commander-object-1');
+  const designation = commanderDesignationFor(state, commander);
+  const decision = explicitCommanderDecision(text, destination);
+  let movement;
+  if (['hand', 'library'].includes(destination)) {
+    const replacementId = `commander-zone:${designation.id}:battlefield:${destination}`;
+    const replacementChoices = decision === 'command' ? [replacementId] : decision === 'remain' ? [`decline:${replacementId}`] : [];
+    movement = moveObjectWithResult(state, commander, destination, 'public Commander scenario', {}, { replacementChoices });
+  } else {
+    movement = moveObjectWithResult(state, commander, destination, 'public Commander scenario', {}, { commanderReturnChoice: decision });
+  }
+  if (movement.status === 'depends') {
+    const summary = ['hand', 'library'].includes(destination)
+      ? `Before the commander moves to ${destination}, its owner must choose whether to put it into the command zone instead.`
+      : `The commander reaches ${destination}, then its owner must choose whether to move it to the command zone.`;
+    return dependent(summary, {
+      cards,
+      primitives: ['commander', 'zone-changes', 'state-based-actions'],
+      trace: state.trace,
+      state,
+      clarificationNeeded: movement.clarificationNeeded,
+      runtime: { movement, pendingChoice: state.pendingChoices[0] || null }
+    });
+  }
+  const finalZone = commander.zone;
+  const summary = decision === 'remain'
+    ? `Yes. The commander owner may leave ${commanderLabel} in ${destination}; its commander designation persists there.`
+    : `Yes. The commander owner may move ${commanderLabel} to the command zone${['hand', 'library'].includes(destination) ? ' instead' : ' after it reaches the destination zone'}.`;
+  return evaluated('yes', summary, {
+    cards,
+    primitives: ['commander', 'zone-changes', ...(['graveyard', 'exile'].includes(destination) ? ['state-based-actions'] : ['replacement'])],
+    trace: state.trace,
+    sequence: state.format.commander.movementHistory.map((entry) => `${entry.from} -> ${entry.to}`),
+    state,
+    runtime: { movement, finalZone, designation }
+  });
+}
+
 export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
   const normalizedCards = cards.map(normalizeMagicCard).filter((card) => card.name);
   const text = normalizeMagicText(message);
   const scenario = compileMagicScenario({ message, cards: normalizedCards });
+  const commander = evaluateCommanderScenario({ message, cards: normalizedCards });
+  if (commander) return commander;
   if (/\b(humility|opalescence|layer|dependency|timestamp)\b/.test(text)) {
     return unsupported('This is a complex continuous-effect layer/dependency interaction outside the current runtime coverage.', {
       cards: normalizedCards,

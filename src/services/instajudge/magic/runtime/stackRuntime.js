@@ -2,7 +2,8 @@ import { isInstant, isPermanentType, isSorcery, normalizeMagicCard, normalizeMag
 import { COST_TYPES, PAYMENT_STATUS, createTriggeredPaymentCost, normalizeCost, payCost } from './costSystem.js';
 import { deriveCharacteristics } from './continuousEffects.js';
 import { parseOracleSemantics } from './oracleSemantics.js';
-import { clearPendingRuntimeChoice, createGameObject, emitEvent, getPendingRuntimeChoice, moveObject, registerGameObject, runStateBasedActionsRuntime, setPendingRuntimeChoice } from './runtimeState.js';
+import { commanderCastPermission, recordCommanderCastFromCommandZone } from './commanderRuntime.js';
+import { clearPendingRuntimeChoice, createGameObject, emitEvent, getPendingRuntimeChoice, moveObject, moveObjectWithResult, registerGameObject, runStateBasedActionsRuntime, setPendingRuntimeChoice } from './runtimeState.js';
 import { advanceTurnStep } from './turnRuntime.js';
 import { TURN_STEPS } from './turnStructure.js';
 
@@ -382,10 +383,24 @@ export function putPendingStackTriggers(state) {
   return ordered;
 }
 
-export function castSpell(state, { card, controller, targets = [], modes = [], costs = [], chosenValues = {}, paymentChoices = [], skipTiming = false, factsProvided = null, validateTarget = null } = {}) {
-  const timing = skipTiming ? { allowed: true, status: 'allowed' } : checkTimingPermission({ state, card, actionType: 'Cast', playerId: controller, factsProvided });
+export function castSpell(state, { card = null, sourceObject: suppliedSourceObject = null, controller, targets = [], modes = [], costs = [], chosenValues = {}, paymentChoices = [], skipTiming = false, factsProvided = null, validateTarget = null } = {}) {
+  const castCard = card || suppliedSourceObject?.card;
+  const sourceZone = suppliedSourceObject?.zone || 'hand';
+  let commanderPermission = null;
+  if (suppliedSourceObject?.zone === 'command') {
+    commanderPermission = commanderCastPermission(state, suppliedSourceObject, controller);
+    if (commanderPermission.allowed !== true) return { cast: false, status: commanderPermission.status || 'unsupported', commanderPermission };
+  }
+  const timing = skipTiming ? { allowed: true, status: 'allowed' } : checkTimingPermission({ state, card: castCard, actionType: 'Cast', playerId: controller, factsProvided });
   if (timing.allowed !== true) return { cast: false, timing };
-  const sourceObject = registerGameObject(state, createGameObject({ card, controller, owner: controller, zone: 'stack' }));
+  let sourceObject = suppliedSourceObject;
+  if (sourceObject) {
+    sourceObject.controller = controller;
+    const movement = moveObjectWithResult(state, sourceObject, 'stack', 'casting spell', {}, { skipCommanderReturnChoice: true });
+    if (movement.status !== 'committed') return { cast: false, status: movement.status, timing, movement };
+  } else {
+    sourceObject = registerGameObject(state, createGameObject({ card: castCard, controller, owner: controller, zone: 'stack' }));
+  }
   const stackObject = createStackObject({
     kind: STACK_OBJECT_TYPES.SPELL,
     sourceObject,
@@ -399,7 +414,7 @@ export function castSpell(state, { card, controller, targets = [], modes = [], c
   });
   const targetChecks = targets.map((target, index) => validateTarget ? validateTarget({ sourceObject, target, effect: stackObject.effectIR[index] || stackObject.effectIR[0] }) : { legal: Boolean(target) });
   if (targetChecks.some((check) => !check.legal)) {
-    moveObject(state, sourceObject, 'hand', 'casting rolled back: illegal target');
+    moveObject(state, sourceObject, sourceZone, 'casting rolled back: illegal target', {}, { skipCommanderReturnChoice: true });
     return { cast: false, timing, targetChecks };
   }
   const costPayments = stackObject.costs.map((cost, index) => payCost({
@@ -411,7 +426,7 @@ export function castSpell(state, { card, controller, targets = [], modes = [], c
   }));
   const failedPayment = costPayments.find((payment) => !payment.paid);
   if (failedPayment) {
-    moveObject(state, sourceObject, 'hand', 'casting rolled back: cost not paid');
+    moveObject(state, sourceObject, sourceZone, 'casting rolled back: cost not paid', {}, { skipCommanderReturnChoice: true });
     return { cast: false, timing, targetChecks, costPayments, paymentFailure: failedPayment };
   }
   costPayments.forEach((payment) => emitEvent(state, 'CostPaid', { source: sourceObject, player: controller, metadata: { costType: payment.cost.type } }));
@@ -427,7 +442,8 @@ export function castSpell(state, { card, controller, targets = [], modes = [], c
   for (const event of targetEvents) createWardTriggers(state, event);
   putPendingStackTriggers(state);
   grantPriority(state, controller);
-  return { cast: true, stackObject, sourceObject, targetChecks, targetEvents, costPayments };
+  if (commanderPermission?.designation) recordCommanderCastFromCommandZone(state, sourceObject);
+  return { cast: true, stackObject, sourceObject, targetChecks, targetEvents, costPayments, commanderPermission };
 }
 
 export function activateAbility(state, { sourceObject, ability = null, controller, targets = [], costs = [], effectIR = [], factsProvided = null } = {}) {
@@ -500,7 +516,12 @@ export function resolveTopOfStack(state, { paymentChoices = [], resolveEffect = 
     }
   }
   if (stackObject.kind === STACK_OBJECT_TYPES.SPELL && stackObject.sourceObject.zone === 'stack') {
-    moveObject(state, stackObject.sourceObject, 'graveyard', 'spell resolved');
+    moveObject(
+      state,
+      stackObject.sourceObject,
+      isPermanentType(stackObject.sourceObject.card) ? 'battlefield' : 'graveyard',
+      'spell resolved'
+    );
   }
   stackObject.status = 'resolved';
   runStateBasedActionsRuntime(state);
