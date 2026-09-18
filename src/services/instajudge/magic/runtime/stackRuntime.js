@@ -255,21 +255,31 @@ export function checkTimingPermission({ state, card = null, ability = null, sour
   if (classification.status !== 'ready') {
     return unverified(classification.code || TIMING_REASON_CODES.UNSUPPORTED_TIMING_RESTRICTION, classification.reason, null, currentTimingState);
   }
-  const requiredTiming = classification.mode;
+  return checkTimingModePermission({ state, requiredTiming: classification.mode, playerId, factsProvided });
+}
+
+export function checkTimingModePermission({ state, requiredTiming, playerId, factsProvided = null, actionLabel = 'Sorcery timing' } = {}) {
+  if (!state?.game || !playerId) {
+    return unverified(TIMING_REASON_CODES.UNSUPPORTED_TIMING_RESTRICTION, 'Canonical game state and an acting player are required.', requiredTiming || null, timingState(state, playerId));
+  }
+  if (![TIMING_MODES.INSTANT, TIMING_MODES.SORCERY, TIMING_MODES.ACTIVATED_ABILITY].includes(requiredTiming)) {
+    return unverified(TIMING_REASON_CODES.UNSUPPORTED_TIMING_RESTRICTION, `Unsupported timing mode: ${requiredTiming || 'unknown'}.`, requiredTiming || null, timingState(state, playerId));
+  }
+  const currentTimingState = timingState(state, playerId);
   const requiresSorceryTiming = requiredTiming === TIMING_MODES.SORCERY;
 
   if (factKnown(factsProvided, 'phase') && !currentTimingState.priorityWindowOpen) {
     return denied(TIMING_REASON_CODES.NO_PRIORITY_WINDOW, `Players do not have a supported priority window during ${currentTimingState.step || 'this step'}.`, requiredTiming, currentTimingState);
   }
   if (requiresSorceryTiming && factKnown(factsProvided, 'turn') && currentTimingState.activePlayer !== playerId) {
-    return denied(TIMING_REASON_CODES.WRONG_ACTIVE_PLAYER, 'Sorcery timing is available only to the active player.', requiredTiming, currentTimingState);
+    return denied(TIMING_REASON_CODES.WRONG_ACTIVE_PLAYER, `${actionLabel} is available only to the active player.`, requiredTiming, currentTimingState);
   }
   if (requiresSorceryTiming && factKnown(factsProvided, 'phase')
     && ![TURN_STEPS.PRECOMBAT_MAIN, TURN_STEPS.POSTCOMBAT_MAIN].includes(currentTimingState.step)) {
-    return denied(TIMING_REASON_CODES.WRONG_PHASE, 'Sorcery timing is available only during a main phase.', requiredTiming, currentTimingState);
+    return denied(TIMING_REASON_CODES.WRONG_PHASE, `${actionLabel} is available only during a main phase.`, requiredTiming, currentTimingState);
   }
   if (requiresSorceryTiming && factKnown(factsProvided, 'stack') && !currentTimingState.stackEmpty) {
-    return denied(TIMING_REASON_CODES.STACK_NOT_EMPTY, 'Sorcery timing requires an empty stack.', requiredTiming, currentTimingState);
+    return denied(TIMING_REASON_CODES.STACK_NOT_EMPTY, `${actionLabel} requires an empty stack.`, requiredTiming, currentTimingState);
   }
   if (factKnown(factsProvided, 'priority') && currentTimingState.priorityHolder !== playerId) {
     return denied(TIMING_REASON_CODES.WRONG_PRIORITY_HOLDER, `${playerId} does not have priority.`, requiredTiming, currentTimingState);
@@ -301,7 +311,7 @@ export function checkTimingPermission({ state, card = null, ability = null, sour
         ? TIMING_REASON_CODES.ACTIVATED_ABILITY_TIMING_ALLOWED
         : TIMING_REASON_CODES.INSTANT_TIMING_ALLOWED,
     reason: requiresSorceryTiming
-      ? 'The active player has priority during a main phase with an empty stack.'
+      ? `${actionLabel} is permitted because the active player has priority during a main phase with an empty stack.`
       : 'The acting player has priority in a supported priority window.',
     requiredTiming,
     currentTimingState

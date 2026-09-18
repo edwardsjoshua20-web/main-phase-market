@@ -76,16 +76,26 @@ function inferredStep(phase, step) {
   return TURN_STEPS.PRECOMBAT_MAIN;
 }
 
-export function createCanonicalTurnState({ turn = 1, activePlayer = 'player', phase = MAGIC_PHASES.MAIN, step = null, priorityHolder = null, consecutivePasses = 0 } = {}) {
+export function createLandPlayState({ turnId, allowed = 1, used = 0, source = 'default-rule' } = {}) {
+  return {
+    turnId,
+    allowed: Math.max(0, Number(allowed) || 0),
+    used: Math.max(0, Number(used) || 0),
+    source
+  };
+}
+
+export function createCanonicalTurnState({ turn = 1, activePlayer = 'player', phase = MAGIC_PHASES.MAIN, step = null, priorityHolder = null, consecutivePasses = 0, landPlaysAllowed = 1, landPlaysUsed = 0 } = {}) {
   const currentStep = inferredStep(phase, step);
   const metadata = TURN_STEP_METADATA[currentStep];
   const currentTurn = Math.max(1, Number(turn) || 1);
   const actionKey = `${currentTurn}:${activePlayer}:${currentStep}${currentStep === TURN_STEPS.CLEANUP ? ':1' : ''}`;
+  const turnId = `turn-${currentTurn}:${activePlayer}`;
   return {
     type: 'MagicTurnState',
     version: 2,
     turn: currentTurn,
-    turnId: `turn-${currentTurn}:${activePlayer}`,
+    turnId,
     activePlayer,
     nonactivePlayer: opponentOf(activePlayer),
     phase: metadata.phase,
@@ -104,6 +114,12 @@ export function createCanonicalTurnState({ turn = 1, activePlayer = 'player', ph
     cleanupState: currentStep === TURN_STEPS.CLEANUP
       ? { iteration: 1, repeatRequired: false, priorityActive: false }
       : null,
+    landPlays: createLandPlayState({
+      turnId,
+      allowed: landPlaysAllowed,
+      used: landPlaysUsed,
+      source: landPlaysAllowed > 1 ? 'canonical-allowance' : 'default-rule'
+    }),
     priorityHolder: metadata.priority === PRIORITY_POLICIES.NORMAL && metadata.actionImplemented && !metadata.turnBasedAction
       ? priorityHolder || activePlayer
       : null,

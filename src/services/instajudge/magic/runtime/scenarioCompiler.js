@@ -190,6 +190,7 @@ function actionTypeBefore(message, cardName) {
   const text = normalizeMagicText(message);
   const index = text.indexOf(normalizeMagicText(cardName));
   const before = text.slice(Math.max(0, index - 50), index);
+  if (/\bplay|plays|played\b/.test(before)) return 'Play';
   if (/\bactivate|activates|activated\b/.test(before)) return 'Activate';
   if (/\battack|attacks|attacked\b/.test(before)) return 'Attack';
   return 'Cast';
@@ -199,8 +200,8 @@ function actorBefore(message, cardName) {
   const text = normalizeMagicText(message);
   const index = text.indexOf(normalizeMagicText(cardName));
   const before = text.slice(Math.max(0, index - 90), index);
-  if (/\b(?:i|player|you)\s+(?:cast|casts|activate|activates)\s*$/.test(before)) return 'player';
-  if (/\bopponent\s+(?:cast|casts|activate|activates)\s*$/.test(before)) return 'opponent';
+  if (/\b(?:i|player|you)\s+(?:cast|casts|activate|activates|play|plays)\s*$/.test(before)) return 'player';
+  if (/\bopponent\s+(?:cast|casts|activate|activates|play|plays)\s*$/.test(before)) return 'opponent';
   return /\bopponent\b/.test(before) ? 'opponent' : 'player';
 }
 
@@ -242,15 +243,16 @@ function compileActions(message, cards, objects, makeId) {
     .filter(({ card, index }) => index >= 0 && (isInstant(card) || isSorcery(card) || isPermanentType(card) || /\bactivate/.test(text)))
     .sort((left, right) => left.index - right.index)
     .map(({ card }) => {
+      const type = actionTypeBefore(message, card.name);
       const descriptor = targetDescriptor(message, card.name);
       const target = descriptor ? objects.find((object) => descriptorMatches(descriptor, object)) || null : null;
       return {
         id: makeId('action'),
-        type: actionTypeBefore(message, card.name),
+        type,
         actor: actorBefore(message, card.name),
         source: { kind: 'card', cardId: card.id, name: card.name },
         zoneFrom: 'hand',
-        zoneTo: 'stack',
+        zoneTo: type === 'Play' ? 'battlefield' : 'stack',
         targets: descriptor ? [{ type: 'TargetChoice', descriptor, objectId: target?.id || null }] : [],
         modes: [],
         costs: card.manaCost ? [createManaCost(card.manaCost)] : [],
@@ -283,6 +285,23 @@ function phaseForStep(step) {
   if (['beginning-of-combat', 'declare-attackers', 'declare-blockers', 'first-strike-combat-damage', 'combat-damage', 'end-of-combat'].includes(step)) return 'combat';
   if (['end-step', 'cleanup'].includes(step)) return 'ending';
   return 'main';
+}
+
+function inferredLandPlayState(text) {
+  const explicit = text.match(/\b(\d+)\s+of\s+(\d+)\s+land plays? used\b/);
+  if (explicit) return { used: Number(explicit[1]), allowed: Number(explicit[2]), known: true };
+  if (/\b(?:third land|two lands? already|played two lands?)\b/.test(text)) return { used: 2, allowed: 1, known: true };
+  if (/\b(?:second land|a land already|one land already|already played (?:a|one) land|used (?:my|the) land play)\b/.test(text)) return { used: 1, allowed: 1, known: true };
+  if (/\b(?:no lands? played|haven't played (?:a|any) lands?|have not played (?:a|any) lands?|0 of 1 land plays? used)\b/.test(text)) return { used: 0, allowed: 1, known: true };
+  return { used: 0, allowed: 1, known: false };
+}
+
+function inferredLandSourceZone(text) {
+  if (/\bfrom (?:my |the )?graveyard\b/.test(text)) return 'graveyard';
+  if (/\bfrom (?:my |the )?library|from the top of (?:my |the )?library\b/.test(text)) return 'library';
+  if (/\bfrom exile\b/.test(text)) return 'exile';
+  if (/\bfrom (?:my |the )?command zone\b/.test(text)) return 'command';
+  return 'hand';
 }
 
 function compileChoices(message, objects, actions, makeId) {
@@ -437,6 +456,7 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
   const phase = phaseForStep(step);
   const opponentTurn = /\bopponent'?s turn\b|\btheir turn\b/.test(text);
   const stackNonempty = /\bstack is not empty\b|\bspell (?:is |already )?on the stack\b|\bin response to\b/.test(text);
+  const landPlayState = inferredLandPlayState(text);
   return {
     type: 'MagicScenario',
     version: 1,
@@ -458,11 +478,15 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
       step,
       priorityHolder: /\bopponent has priority\b/i.test(message) ? 'opponent' : /\b(?:i|player|you) (?:have|has) priority\b/i.test(message) ? 'player' : null,
       stackEmpty: /\bstack is empty\b/i.test(message) ? true : stackNonempty ? false : null,
+      landPlaysAllowed: landPlayState.allowed,
+      landPlaysUsed: landPlayState.used,
+      landSourceZone: inferredLandSourceZone(text),
       factsProvided: {
         turn: /\b(?:my|your|player'?s|opponent'?s|their) turn\b/i.test(message),
         phase: step != null,
         stack: /\bstack is (?:not )?empty\b/i.test(message) || stackNonempty,
-        priority: /\b(?:i|player|you|opponent) (?:have|has) priority\b/i.test(message)
+        priority: /\b(?:i|player|you|opponent) (?:have|has) priority\b/i.test(message),
+        landAllowance: landPlayState.known
       }
     },
     resolvedCards: normalizedCards.map((card) => ({ id: card.id, name: card.name })),

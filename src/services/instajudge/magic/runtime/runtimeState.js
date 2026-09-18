@@ -149,7 +149,9 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
       phase: scenario?.game?.phase || (/combat/i.test(message) ? 'combat' : /end step/i.test(message) ? 'ending' : 'main'),
       step: scenario?.game?.step || (/cleanup/i.test(message) ? 'cleanup' : null),
       priorityHolder: scenario?.game?.priorityHolder || null,
-      consecutivePasses: 0
+      consecutivePasses: 0,
+      landPlaysAllowed: scenario?.game?.landPlaysAllowed ?? 1,
+      landPlaysUsed: scenario?.game?.landPlaysUsed ?? 0
     }),
     battlefield: [], stack: [], pendingTriggers: [], pendingChoices: [],
     events: [], eventQueue: [],

@@ -161,8 +161,18 @@ Combat permissions consume the Phase 7 combat runtime's actual beginning-of-comb
 
 Phase 8C does not add land plays, special actions, multiplayer priority, arbitrary casting permissions/restrictions, exhaustive mana-ability timing, or UI behavior. Those boundaries remain fail-closed and this phase does not claim the larger turn/timing program complete.
 
+## Phase 8D: Special Actions and Land Play
+
+`specialActionRuntime.js` is the canonical special-action authority. It reuses Phase 8C's shared sorcery-style action-point check without treating land play as casting. Ordinary land play requires the active player, their priority, a precombat or postcombat main phase, an empty stack, an exact land in that player's hand, and remaining land-play allowance.
+
+The canonical turn state stores numeric `allowed` and `used` land-play counts keyed to `turnId`. The default allowance is one, execution increments the used count, and the turn owner resets both counts when active-player identity rotates. A trusted runtime source may configure a larger numeric allowance; Oracle/static-effect derivation of additional-land permissions is not certified yet. If such text is detected while the default allowance is exhausted, the runtime returns `UNVERIFIED` rather than a false `NO`.
+
+A legal land action moves the existing object from hand to battlefield through the canonical zone-change pipeline, emits `LandPlayed`, leaves the stack unchanged, retains the active player's action opportunity, and does not advance the phase. Plays from graveyard, library, exile, command, or another unusual zone remain `UNVERIFIED` without a modeled permission.
+
+The framework recognizes unsupported face-up, morph/disguise, suspend, and foretell special-action requests and routes them to the special-action owner for `UNVERIFIED`. Phase 8D does not implement those mechanics, broad Commander behavior, or every Magic special action, and it does not claim Phase 8 complete.
+
 ## Deliberately Unsupported
 
-X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer combat/priority and ambiguous multiplayer trigger ordering are not certified. Special actions, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, unusual attack/block permissions, banding, planeswalker/battle attack targets, automatic spell continuation through combat windows, exhaustive untap restrictions and replacement interactions, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
+X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer combat/priority and ambiguous multiplayer trigger ordering are not certified. Special actions beyond ordinary land play, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, unusual attack/block permissions, banding, planeswalker/battle attack targets, automatic spell continuation through combat windows, exhaustive untap restrictions and replacement interactions, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
 
-Land plays and the remaining special-action layer remain deferred beyond Phase 8C.
+Additional-land effect derivation and the remaining special-action layer remain deferred beyond Phase 8D.

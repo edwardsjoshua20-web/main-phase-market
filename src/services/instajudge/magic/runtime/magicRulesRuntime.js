@@ -14,6 +14,11 @@ import {
 } from './continuousEffects.js';
 import { castSpell, checkTimingPermission, passPriority, resolveTopOfStack } from './stackRuntime.js';
 import {
+  SPECIAL_ACTION_TYPES,
+  checkSpecialAction,
+  inferUnsupportedSpecialAction
+} from './specialActionRuntime.js';
+import {
   beginCombat,
   declareAttackers,
   declareBlockers,
@@ -701,6 +706,59 @@ function evaluateTimingPermissionQuestion({ message, cards, genericObjects, scen
   });
 }
 
+function evaluateSpecialActionQuestion({ message, cards, scenario }) {
+  const text = normalizeMagicText(message);
+  if (!/\bcan (?:i|player|you)\b/.test(text)) return null;
+  const unsupportedAction = inferUnsupportedSpecialAction(text);
+  const landCard = cards.find((candidate) => /\bland\b/.test(candidate.normalizedType));
+  const landQuestion = /\bplay\b/.test(text) && (/\bland\b/.test(text) || Boolean(landCard && text.includes(landCard.normalizedName)));
+  if (!landQuestion && !unsupportedAction) return null;
+
+  const actionType = landQuestion ? SPECIAL_ACTION_TYPES.PLAY_LAND : unsupportedAction;
+  const state = createMagicRuntimeState({ cards: [], genericObjects: [], scenario, message });
+  if (scenario.game.stackEmpty === false) state.stack.push({ id: 'stack-context', kind: 'UnknownStackObject' });
+  const sourceZone = scenario.game.landSourceZone || null;
+  const legality = checkSpecialAction({
+    state,
+    actionType,
+    playerId: 'player',
+    card: landQuestion ? landCard || { name: 'Specified Land', typeLine: 'Land', oracleText: '' } : null,
+    sourceZone,
+    factsProvided: scenario.game.factsProvided
+  });
+  const primitives = ['timing'];
+  const trace = [{
+    type: 'SpecialActionPermissionChecked',
+    actionType,
+    status: legality.status,
+    code: legality.code,
+    currentActionState: legality.currentActionState
+  }];
+  if (legality.status === 'depends') {
+    return {
+      status: 'depends',
+      verdict: 'depends',
+      summary: 'The special-action legality depends on missing game state.',
+      cards,
+      rules: primitiveRules(primitives),
+      mechanics: primitives,
+      trace,
+      sequence: [],
+      clarificationNeeded: `Please specify ${legality.missing.join(', ')}.`
+    };
+  }
+  if (legality.status === 'unverified') {
+    return unsupported(legality.reason, { cards, primitives, trace });
+  }
+  return evaluated(legality.allowed ? 'yes' : 'no', legality.reason, {
+    cards,
+    primitives,
+    trace,
+    state,
+    runtime: legality.currentActionState
+  });
+}
+
 const PHASE_FIVE_EFFECTS = new Set([
   'LifeChange', 'DrawEffect', 'DiscardEffect', 'MillEffect', 'SacrificeEffect',
   'TokenCreation', 'CounterModification', 'ZoneChangeEffect', 'SearchEffect'
@@ -936,6 +994,8 @@ export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
   const genericObjects = scenario.objects
     .filter((object) => object.name.startsWith('Generic ') || object.name.startsWith('Token '))
     .map((object) => ({ ...object, card: object.card }));
+  const specialAction = evaluateSpecialActionQuestion({ message, cards: normalizedCards, scenario });
+  if (specialAction) return specialAction;
   const combatTiming = evaluateCombatPriorityQuestion({ message, cards: normalizedCards, scenario });
   if (combatTiming) return combatTiming;
   const combat = evaluateCombatScenario({ message, cards: normalizedCards, genericObjects, scenario });

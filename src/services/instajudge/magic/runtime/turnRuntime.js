@@ -20,6 +20,7 @@ import {
   PRIORITY_POLICIES,
   TURN_STEPS,
   TURN_STEP_METADATA,
+  createLandPlayState,
   getTurnStepMetadata,
   opponentOf
 } from './turnStructure.js';
@@ -308,6 +309,7 @@ function applyCanonicalStep(state, to, { nextTurn = false, actionOptions = {} } 
     state.game.activePlayer = opponentOf(state.game.activePlayer);
     state.game.nonactivePlayer = opponentOf(state.game.activePlayer);
     state.game.turnId = `turn-${state.game.turn}:${state.game.activePlayer}`;
+    state.game.landPlays = createLandPlayState({ turnId: state.game.turnId });
     state.combat = null;
   }
   const metadata = TURN_STEP_METADATA[to];
