@@ -7,15 +7,9 @@ import {
   putPendingTriggersOnStack,
   runStateBasedActionsRuntime
 } from './runtimeState.js';
+import { COMBAT_STEPS } from './turnStructure.js';
 
-export const COMBAT_STEPS = Object.freeze({
-  BEGINNING: 'beginning-of-combat',
-  DECLARE_ATTACKERS: 'declare-attackers',
-  DECLARE_BLOCKERS: 'declare-blockers',
-  FIRST_STRIKE_DAMAGE: 'first-strike-combat-damage',
-  COMBAT_DAMAGE: 'combat-damage',
-  END: 'end-of-combat'
-});
+export { COMBAT_STEPS } from './turnStructure.js';
 
 function opponentOf(playerId) {
   return playerId === 'opponent' ? 'player' : 'opponent';

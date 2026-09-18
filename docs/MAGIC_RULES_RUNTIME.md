@@ -133,8 +133,16 @@ Certified Phase 7 proofs include:
 - removed blockers, multiple blockers, attack triggers, and priority-window pauses;
 - Serra Angel, Typhoid Rats, Youthful Knight, Colossal Dreadmaw, Fencing Ace, and Healer's Hawk parity.
 
+## Phase 8A: Canonical Turn Progression Skeleton
+
+`turnStructure.js` defines the canonical `MagicTurnState`, thirteen turn steps, phase mapping, turn-based-action hooks, and per-step priority policy. `turnRuntime.js` is the sole progression owner. The former coarse stack-runtime step progression now delegates to it.
+
+The turn owner orchestrates combat by calling the Phase 7 combat API for beginning combat, attacker and blocker declarations, conditional first-strike damage, regular damage, and end combat. It does not duplicate combat legality, assignment, triggers, priority windows, or state-based actions.
+
+Untap, the normal draw, and cleanup are represented as deferred turn-based-action hooks. Draw-step priority is explicitly ordered after the deferred draw action, and cleanup priority exceptions remain unsupported. Phase 8A does not add land plays, special actions, broad casting/activation timing, or cleanup exception handling.
+
 ## Deliberately Unsupported
 
-X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer combat/priority and ambiguous multiplayer trigger ordering are not certified. Special actions, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, unusual attack/block permissions, banding, planeswalker/battle attack targets, automatic spell continuation through combat windows, complete turn progression, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
+X, hybrid, Phyrexian, alternate-cost, and unrestricted cost-reduction calculations remain unsupported. Multiplayer combat/priority and ambiguous multiplayer trigger ordering are not certified. Special actions, arbitrary replacement/prevention scopes, arbitrary text changes, copy exceptions, face-down/copy interactions, merges, complete dependency inference, unusual attack/block permissions, banding, planeswalker/battle attack targets, automatic spell continuation through combat windows, turn-based untap/draw/cleanup actions, cleanup priority exceptions, Commander modifications, unrestricted search criteria, and variable or modal token instructions also remain uncertified. These return `UNVERIFIED`, or `DEPENDS` when a supported primitive only lacks required state or a required choice.
 
-The next phase should add complete turn progression, cleanup/reset semantics, and broader phase/step orchestration around the existing stack, continuous-effect, and combat owners.
+The next phase should implement one later Phase 8 slice without broadening 8A: either turn-based actions or certified priority/timing permissions.

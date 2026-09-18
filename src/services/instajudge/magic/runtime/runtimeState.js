@@ -11,6 +11,7 @@ import {
   registerStaticContinuousEffects,
   removeSourceStaticEffects
 } from './continuousEffects.js';
+import { createCanonicalTurnState } from './turnStructure.js';
 
 let nextObjectId = 1;
 let nextEventId = 1;
@@ -141,14 +142,14 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
     players: { player: createPlayer('player'), opponent: createPlayer('opponent') },
     objects: new Map(),
     zones: { battlefield: [], hand: [], graveyard: [], exile: [], library: [], stack: [], command: [] },
-    game: {
-      turn: 1,
+    game: createCanonicalTurnState({
+      turn: scenario?.game?.turn || 1,
       activePlayer: scenario?.game?.activePlayer || (/opponent.?s turn|opponent turn/i.test(message) ? 'opponent' : 'player'),
       phase: scenario?.game?.phase || (/combat/i.test(message) ? 'combat' : /end step/i.test(message) ? 'ending' : 'main'),
       step: scenario?.game?.step || (/cleanup/i.test(message) ? 'cleanup' : null),
-      priorityHolder: scenario?.game?.priorityHolder || 'player',
+      priorityHolder: scenario?.game?.priorityHolder || null,
       consecutivePasses: 0
-    },
+    }),
     battlefield: [], stack: [], pendingTriggers: [], pendingChoices: [],
     events: [], eventQueue: [],
     replacementEffects: [], preventionEffects: [], continuousEffects: [],

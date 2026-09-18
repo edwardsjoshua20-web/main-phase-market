@@ -663,6 +663,13 @@ function evaluateTimingPermissionQuestion({ message, cards, genericObjects, scen
   const state = createMagicRuntimeState({ cards, genericObjects, scenario, message });
   if (scenario.game.stackEmpty === false) state.stack.push({ id: 'stack-context', kind: 'UnknownStackObject' });
   if (!scenario.game.factsProvided.priority) state.game.priorityHolder = action.actor;
+  if (state.game.step === 'cleanup') {
+    return unsupported('Cleanup-step priority exceptions are outside the Phase 8A turn skeleton.', {
+      cards,
+      primitives: ['timing', 'turn-structure'],
+      trace: [{ type: 'UnsupportedTimingWindow', step: state.game.step, reason: 'cleanup priority exceptions are deferred' }]
+    });
+  }
   const timing = checkTimingPermission({
     state,
     card,

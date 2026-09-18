@@ -1,7 +1,8 @@
 import { isInstant, isSorcery, normalizeMagicCard } from '../magicCards.js';
 import { COST_TYPES, PAYMENT_STATUS, createTriggeredPaymentCost, normalizeCost, payCost } from './costSystem.js';
-import { deriveCharacteristics, expireContinuousEffects } from './continuousEffects.js';
+import { deriveCharacteristics } from './continuousEffects.js';
 import { createGameObject, emitEvent, moveObject, registerGameObject, runStateBasedActionsRuntime } from './runtimeState.js';
+import { advanceTurnStep } from './turnRuntime.js';
 
 export const STACK_OBJECT_TYPES = Object.freeze({
   SPELL: 'Spell',
@@ -77,22 +78,9 @@ export function takePriorityAction(state, playerId, action = null) {
   return { allowed: true };
 }
 
-const STEP_ORDER = Object.freeze(['beginning', 'precombat-main', 'combat', 'postcombat-main', 'ending']);
-
 export function advanceGameStep(state) {
-  const current = state.game.step || (state.game.phase === 'main' ? 'precombat-main' : state.game.phase || 'beginning');
-  const index = Math.max(0, STEP_ORDER.indexOf(current));
-  const next = STEP_ORDER[index + 1] || 'beginning';
-  if (next === 'beginning') {
-    expireContinuousEffects(state, { step: 'cleanup' });
-    state.game.turn += 1;
-    state.game.activePlayer = opponentOf(state.game.activePlayer);
-  }
-  state.game.step = next;
-  state.game.phase = next.includes('main') ? 'main' : next;
-  emitEvent(state, 'StepAdvanced', { player: state.game.activePlayer, metadata: { from: current, to: next, turn: state.game.turn } });
-  grantPriority(state, state.game.activePlayer);
-  return next;
+  const result = advanceTurnStep(state);
+  return result.status === 'advanced' ? result.to : null;
 }
 
 export function passPriority(state, playerId, { resolve = resolveTopOfStack } = {}) {
