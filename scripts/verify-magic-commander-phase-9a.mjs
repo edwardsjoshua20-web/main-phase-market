@@ -164,7 +164,7 @@ const taxState = commanderState();
 const taxCommander = castAndResolveCommander(taxState);
 moveObjectWithResult(taxState, taxCommander, 'graveyard', 'destroyed', {}, { commanderReturnChoice: 'command' });
 const secondCast = castSpell(taxState, { sourceObject: taxCommander, controller: 'player', skipTiming: true });
-verify(secondCast.cast === false && secondCast.commanderPermission?.deferred === 'commander-tax', 'A tax-dependent repeat cast must fail closed as deferred.');
+verify(secondCast.cast === true && secondCast.commanderCost?.commanderTaxGenericMana === 2, 'A repeat command-zone cast must now use the Phase 9B commander-tax cost path.');
 
 const compiled = compileMagicScenario({ message: `${card.name} is my commander and starts in the command zone.`, cards: [card] });
 verify(compiled.format.id === 'commander' && compiled.format.commanderDesignations.length === 1, 'The scenario compiler must represent Commander format and designation.');
@@ -178,7 +178,7 @@ const publicCases = [
   [`In Commander, can I cast my commander ${card.name} from the command zone?`, 'yes'],
   [`In Commander, ${card.name} is my commander. Is another copy of ${card.name} also my commander?`, 'no'],
   [`In Commander, ${card.name} is a noncommander creature and dies. Can it move to the command zone?`, 'no'],
-  [`In Commander, how much commander tax do I pay to cast ${card.name} again from the command zone?`, 'unverified']
+  [`In Commander, I cast my commander ${card.name} once. How much commander tax do I pay to cast it again from the command zone?`, 'yes']
 ];
 const publicResults = publicCases.map(([message, expected]) => {
   const result = evaluateMagicRulesRuntime({ message, cards: [card] });

@@ -1,5 +1,5 @@
 import { isInstant, isPermanentType, isSorcery, normalizeMagicCard, normalizeMagicText } from '../magicCards.js';
-import { COST_TYPES, PAYMENT_STATUS, createTriggeredPaymentCost, normalizeCost, payCost } from './costSystem.js';
+import { COST_TYPES, PAYMENT_STATUS, checkManaAvailability, createAdditionalCost, createManaCost, createTriggeredPaymentCost, normalizeCost, payCost, summarizeManaCosts } from './costSystem.js';
 import { deriveCharacteristics } from './continuousEffects.js';
 import { parseOracleSemantics } from './oracleSemantics.js';
 import { commanderCastPermission, recordCommanderCastFromCommandZone } from './commanderRuntime.js';
@@ -383,13 +383,45 @@ export function putPendingStackTriggers(state) {
   return ordered;
 }
 
-export function castSpell(state, { card = null, sourceObject: suppliedSourceObject = null, controller, targets = [], modes = [], costs = [], chosenValues = {}, paymentChoices = [], skipTiming = false, factsProvided = null, validateTarget = null } = {}) {
+export function castSpell(state, { card = null, sourceObject: suppliedSourceObject = null, controller, targets = [], modes = [], costs = [], chosenValues = {}, paymentChoices = [], availableMana = null, skipTiming = false, factsProvided = null, validateTarget = null } = {}) {
   const castCard = card || suppliedSourceObject?.card;
   const sourceZone = suppliedSourceObject?.zone || 'hand';
   let commanderPermission = null;
+  let commanderCost = null;
+  let castingCosts = costs;
   if (suppliedSourceObject?.zone === 'command') {
     commanderPermission = commanderCastPermission(state, suppliedSourceObject, controller);
     if (commanderPermission.allowed !== true) return { cast: false, status: commanderPermission.status || 'unsupported', commanderPermission };
+    if (chosenValues.alternativeCost || chosenValues.dynamicCostModifier || chosenValues.genericCostReduction) {
+      return {
+        cast: false,
+        status: 'unsupported',
+        commanderPermission,
+        commanderCost: { status: 'unsupported', reason: 'Alternative costs and dynamic cost modifiers are not certified by the current cost owner.' }
+      };
+    }
+    const startingManaRequirement = createManaCost(castCard?.manaCost || '');
+    const taxManaCost = createManaCost(commanderPermission.tax.genericMana ? `{${commanderPermission.tax.genericMana}}` : '');
+    const commanderTaxCost = createAdditionalCost([taxManaCost]);
+    commanderTaxCost.reason = 'commander-tax';
+    commanderTaxCost.commanderDesignationId = commanderPermission.designation.id;
+    castingCosts = [startingManaRequirement, ...costs, ...(commanderPermission.tax.genericMana > 0 ? [commanderTaxCost] : [])];
+    const finalManaRequirement = summarizeManaCosts(castingCosts);
+    const availability = checkManaAvailability(finalManaRequirement, availableMana);
+    commanderCost = {
+      status: startingManaRequirement.supported && finalManaRequirement.supported && availability.supported ? 'verified' : 'unsupported',
+      commanderDesignationId: commanderPermission.designation.id,
+      previousCommandZoneCasts: commanderPermission.tax.previousCommandZoneCasts,
+      commanderTaxGenericMana: commanderPermission.tax.genericMana,
+      startingManaRequirement,
+      otherAdditionalCosts: costs.map(normalizeCost).filter(Boolean),
+      finalManaRequirement,
+      availability
+    };
+    if (commanderCost.status !== 'verified') return { cast: false, status: 'unsupported', commanderPermission, commanderCost };
+    if (availability.known && !availability.payable) {
+      return { cast: false, status: PAYMENT_STATUS.CANNOT_PAY, commanderPermission, commanderCost, paymentFailure: { supported: true, status: PAYMENT_STATUS.CANNOT_PAY, paid: false } };
+    }
   }
   const timing = skipTiming ? { allowed: true, status: 'allowed' } : checkTimingPermission({ state, card: castCard, actionType: 'Cast', playerId: controller, factsProvided });
   if (timing.allowed !== true) return { cast: false, timing };
@@ -407,7 +439,7 @@ export function castSpell(state, { card = null, sourceObject: suppliedSourceObje
     controller,
     targets,
     modes,
-    costs,
+    costs: castingCosts,
     chosenValues,
     effectIR: sourceObject.semantics?.spellAbilities?.[0]?.effects || [],
     ruleReferences: ['CR-601', 'CR-405']
@@ -415,7 +447,7 @@ export function castSpell(state, { card = null, sourceObject: suppliedSourceObje
   const targetChecks = targets.map((target, index) => validateTarget ? validateTarget({ sourceObject, target, effect: stackObject.effectIR[index] || stackObject.effectIR[0] }) : { legal: Boolean(target) });
   if (targetChecks.some((check) => !check.legal)) {
     moveObject(state, sourceObject, sourceZone, 'casting rolled back: illegal target', {}, { skipCommanderReturnChoice: true });
-    return { cast: false, timing, targetChecks };
+    return { cast: false, timing, targetChecks, commanderCost };
   }
   const costPayments = stackObject.costs.map((cost, index) => payCost({
     state,
@@ -427,7 +459,7 @@ export function castSpell(state, { card = null, sourceObject: suppliedSourceObje
   const failedPayment = costPayments.find((payment) => !payment.paid);
   if (failedPayment) {
     moveObject(state, sourceObject, sourceZone, 'casting rolled back: cost not paid', {}, { skipCommanderReturnChoice: true });
-    return { cast: false, timing, targetChecks, costPayments, paymentFailure: failedPayment };
+    return { cast: false, timing, targetChecks, costPayments, paymentFailure: failedPayment, commanderCost };
   }
   costPayments.forEach((payment) => emitEvent(state, 'CostPaid', { source: sourceObject, player: controller, metadata: { costType: payment.cost.type } }));
   pushStackObject(state, stackObject);
@@ -443,7 +475,7 @@ export function castSpell(state, { card = null, sourceObject: suppliedSourceObje
   putPendingStackTriggers(state);
   grantPriority(state, controller);
   if (commanderPermission?.designation) recordCommanderCastFromCommandZone(state, sourceObject);
-  return { cast: true, stackObject, sourceObject, targetChecks, targetEvents, costPayments, commanderPermission };
+  return { cast: true, stackObject, sourceObject, targetChecks, targetEvents, costPayments, commanderPermission, commanderCost };
 }
 
 export function activateAbility(state, { sourceObject, ability = null, controller, targets = [], costs = [], effectIR = [], factsProvided = null } = {}) {

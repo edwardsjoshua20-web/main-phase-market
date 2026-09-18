@@ -13,7 +13,7 @@ import {
   derivedHasQuality
 } from './continuousEffects.js';
 import { castSpell, checkTimingPermission, passPriority, resolveTopOfStack } from './stackRuntime.js';
-import { commanderDesignationFor, isDesignatedCommander } from './commanderRuntime.js';
+import { commanderDesignationFor, commanderTaxForCast, isDesignatedCommander } from './commanderRuntime.js';
 import {
   SPECIAL_ACTION_TYPES,
   checkSpecialAction,
@@ -997,7 +997,7 @@ function typedExecutionSummary(card, effect, target, targetPlayer, result) {
   return `${card.name}'s ${effect.type} resolves.`;
 }
 
-function commanderScenarioState(card, { zone = 'battlefield', controller = 'player', includeCopy = false, designated = true } = {}) {
+function commanderScenarioState(card, { zone = 'battlefield', controller = 'player', includeCopy = false, designated = true, castsFromCommandZone = 0 } = {}) {
   const commanderId = 'commander-object-1';
   const designationId = `commander-designation:player:${commanderId}`;
   const objects = [{
@@ -1024,7 +1024,7 @@ function commanderScenarioState(card, { zone = 'battlefield', controller = 'play
     version: 1,
     format: {
       id: 'commander',
-      commanderDesignations: designated ? [{ id: designationId, objectId: commanderId, ownerId: 'player', startingZone: zone }] : []
+      commanderDesignations: designated ? [{ id: designationId, objectId: commanderId, ownerId: 'player', startingZone: zone, castsFromCommandZone }] : []
     },
     objects,
     continuousEffects: [],
@@ -1048,7 +1048,104 @@ function explicitCommanderDecision(text, destination) {
   return null;
 }
 
-function evaluateCommanderScenario({ message, cards }) {
+function manaRequirementLabel(requirement) {
+  if (!requirement) return 'an unknown mana amount';
+  const colored = [
+    ['W', requirement.white], ['U', requirement.blue], ['B', requirement.black],
+    ['R', requirement.red], ['G', requirement.green], ['C', requirement.colorless]
+  ].flatMap(([symbol, count]) => Array.from({ length: count || 0 }, () => `{${symbol}}`));
+  return `${requirement.generic ? `{${requirement.generic}}` : ''}${colored.join('')}` || '{0}';
+}
+
+function evaluateCommanderTaxScenario({ message, cards, scenario, card, commanderLabel }) {
+  const text = normalizeMagicText(message);
+  const history = scenario.format?.commanderCastHistory || { known: false, castsFromCommandZone: null, source: 'not-stated' };
+  if (/\b(?:unknown|unspecified|not sure (?:which|what)) (?:source )?zone\b|\bfrom somewhere\b/.test(text)) {
+    return dependent('Commander tax applies only to a cast from the command zone, so the source zone must be known.', {
+      cards,
+      primitives: ['commander'],
+      clarificationNeeded: 'Which zone is the commander being cast from?'
+    });
+  }
+  const counteredFirstCast = /\bcountered\b/.test(text) && /\b(?:first|once|first time)\b/.test(text);
+  const resetQuestion = /\breset\b/.test(text);
+  const sourceZone = /\bfrom (?:my |the )?hand\b|\bhand\b.{0,60}\bfrom there\b/.test(text) ? 'hand'
+    : /\bfrom (?:my |the )?graveyard\b|\bgraveyard\b.{0,60}\bfrom there\b/.test(text) ? 'graveyard'
+      : /\bfrom (?:my |the )?exile\b/.test(text) ? 'exile'
+        : 'command';
+  const priorCasts = history.known ? history.castsFromCommandZone : counteredFirstCast || resetQuestion ? 1 : null;
+  if (sourceZone === 'command' && priorCasts == null) {
+    return dependent('Commander tax depends on how many previous times this specific commander was cast from the command zone this game.', {
+      cards,
+      primitives: ['commander', 'timing'],
+      clarificationNeeded: 'How many previous times was this designated commander cast from the command zone?'
+    });
+  }
+  const explicitBase = text.match(/\bcosts? (\d+) mana normally\b|\bbase (?:mana )?cost (?:is |of )?(\d+)\b/);
+  const baseAmount = explicitBase ? Number(explicitBase[1] || explicitBase[2]) : null;
+  const runtimeCard = baseAmount == null ? card : normalizeMagicCard({ ...card, manaCost: `{${baseAmount}}`, mana_cost: `{${baseAmount}}` });
+  const state = commanderScenarioState(runtimeCard, { zone: sourceZone, castsFromCommandZone: priorCasts ?? 0 });
+  const commander = state.objects.get('commander-object-1');
+  const tax = commanderTaxForCast(state, commander, 'player', { sourceZone });
+
+  if (sourceZone !== 'command') {
+    return evaluated('no', `Commander tax does not apply when ${commanderLabel} is cast from ${sourceZone}; only casts from the command zone use or increase its tax history.`, {
+      cards,
+      primitives: ['commander'],
+      state,
+      runtime: { commanderTax: tax, castHistory: commanderDesignationFor(state, commander) }
+    });
+  }
+  if (resetQuestion) {
+    return evaluated('no', `No. Zone changes do not reset ${commanderLabel}'s command-zone cast history; its next command-zone cast still has ${manaRequirementLabel({ generic: tax.genericMana })} of commander tax.`, {
+      cards,
+      primitives: ['commander', 'zone-changes'],
+      state,
+      runtime: { commanderTax: tax, castHistory: commanderDesignationFor(state, commander) }
+    });
+  }
+
+  const availableMatch = text.match(/\b(?:have|with) (?:exactly )?(\d+) mana\b/);
+  const availableMana = availableMatch ? Number(availableMatch[1]) : null;
+  const cast = castSpell(state, {
+    sourceObject: commander,
+    controller: 'player',
+    availableMana,
+    factsProvided: state.scenario.game.factsProvided
+  });
+  if (cast.status === 'unsupported') {
+    return unsupported(cast.commanderCost?.reason || 'The complete casting cost is not supported.', {
+      cards,
+      primitives: ['commander', 'timing'],
+      trace: state.trace
+    });
+  }
+  if (availableMana != null && !cast.cast) {
+    return evaluated('no', `${availableMana} mana is not enough for the supported final requirement ${manaRequirementLabel(cast.commanderCost?.finalManaRequirement)}. The failed cast does not increase commander tax.`, {
+      cards,
+      primitives: ['commander', 'timing'],
+      trace: state.trace,
+      state,
+      runtime: { cast, commanderTax: tax, cost: cast.commanderCost }
+    });
+  }
+  if (!cast.cast) return unsupported(cast.timing?.reason || 'The command-zone cast could not be proven.', { cards, primitives: ['commander', 'timing'], trace: state.trace });
+  const asksTotal = /\bhow much does it cost|\bcosts? now|\btotal cost\b/.test(text);
+  const summary = counteredFirstCast
+    ? `Yes. The first cast still counts even though the spell was countered, so the next command-zone cast has {2} of commander tax.`
+    : asksTotal
+      ? `${commanderLabel}'s supported final mana requirement is ${manaRequirementLabel(cast.commanderCost.finalManaRequirement)}: ${manaRequirementLabel(cast.commanderCost.startingManaRequirement)} plus ${manaRequirementLabel({ generic: tax.genericMana })} of commander tax.`
+      : `${commanderLabel}'s commander tax is ${manaRequirementLabel({ generic: tax.genericMana })}, based on ${priorCasts} previous command-zone cast${priorCasts === 1 ? '' : 's'}.`;
+  return evaluated('yes', summary, {
+    cards,
+    primitives: ['commander', 'timing', 'stack'],
+    trace: state.trace,
+    state,
+    runtime: { cast, commanderTax: tax, cost: cast.commanderCost, castHistory: commanderDesignationFor(state, commander) }
+  });
+}
+
+function evaluateCommanderScenario({ message, cards, scenario }) {
   const text = normalizeMagicText(message);
   if (!/\bcommander\b|\bcommand zone\b/.test(text)) return null;
   if (/\bcommander damage\b|\b21 damage\b/.test(text)) {
@@ -1056,13 +1153,6 @@ function evaluateCommanderScenario({ message, cards }) {
   }
   if (/\bpartner\b|\bbackground\b|\bdoctor'?s companion\b|\bmultiplayer\b|\bfour.player\b/.test(text)) {
     return unsupported('This multi-commander or multiplayer Commander mechanic is deferred beyond Phase 9A.', { cards, primitives: ['commander'] });
-  }
-  if (/\bcommander tax\b|\badditional (?:mana|cost)\b|\bcosts? (?:more|now)\b|\bagain from (?:my |the )?command zone\b|\bsecond time from (?:my |the )?command zone\b/.test(text)) {
-    return unsupported('Commander tax is deferred until Phase 9B, so this casting-cost question cannot be verified yet.', {
-      cards,
-      primitives: ['commander', 'timing'],
-      clarificationNeeded: 'Phase 9A proves command-zone casting structure but does not calculate commander tax.'
-    });
   }
   if (/\bcolor identity\b|\bsingleton\b|\bdeck (?:legal|legality|construction)\b/.test(text)) return null;
   if (!/\bcommander\b/.test(text)) {
@@ -1081,6 +1171,8 @@ function evaluateCommanderScenario({ message, cards }) {
     toughness: 1
   });
   const commanderLabel = cards.length ? card.name : 'the designated commander';
+  const taxQuestion = /\btax\b|\badditional (?:mana|cost)\b|\bcosts? (?:more|now|\d+ mana normally)\b|\bagain from (?:my |the )?command zone\b|\b(?:first|second|third) time\b|\bcountered\b|\breset\b|\bcast\b.{0,50}\bfrom (?:my |the )?(?:hand|graveyard)\b/.test(text);
+  if (taxQuestion) return evaluateCommanderTaxScenario({ message, cards, scenario, card, commanderLabel });
 
   if (/\bnon.?commander\b/.test(text)) {
     const state = commanderScenarioState(card, { designated: false });
@@ -1181,7 +1273,7 @@ export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
   const normalizedCards = cards.map(normalizeMagicCard).filter((card) => card.name);
   const text = normalizeMagicText(message);
   const scenario = compileMagicScenario({ message, cards: normalizedCards });
-  const commander = evaluateCommanderScenario({ message, cards: normalizedCards });
+  const commander = evaluateCommanderScenario({ message, cards: normalizedCards, scenario });
   if (commander) return commander;
   if (/\b(humility|opalescence|layer|dependency|timestamp)\b/.test(text)) {
     return unsupported('This is a complex continuous-effect layer/dependency interaction outside the current runtime coverage.', {

@@ -41,7 +41,7 @@ export function isDesignatedCommander(state, objectOrId) {
   return Boolean(commanderDesignationFor(state, objectOrId));
 }
 
-export function designateCommander(state, object, { ownerId = object?.owner, designationId = null } = {}) {
+export function designateCommander(state, object, { ownerId = object?.owner, designationId = null, castsFromCommandZone = 0 } = {}) {
   if (!isCommanderFormat(state) || !object || !ownerId || !state.players?.[ownerId]) return null;
   const existing = commanderDesignationFor(state, object);
   if (existing) return existing;
@@ -58,7 +58,7 @@ export function designateCommander(state, object, { ownerId = object?.owner, des
     objectIds: [object.id],
     currentZone: object.zone,
     inCommandZone: object.zone === 'command',
-    castsFromCommandZone: 0,
+    castsFromCommandZone: Number.isInteger(castsFromCommandZone) && castsFromCommandZone >= 0 ? castsFromCommandZone : 0,
     movementHistory: []
   };
   object.commander = true;
@@ -75,7 +75,8 @@ export function initializeCommanderDesignations(state, descriptors = []) {
     if (!object) continue;
     const designation = designateCommander(state, object, {
       ownerId: descriptor.ownerId || object.owner,
-      designationId: descriptor.id || null
+      designationId: descriptor.id || null,
+      castsFromCommandZone: descriptor.castsFromCommandZone
     });
     if (designation) designations.push(designation);
   }
@@ -169,15 +170,29 @@ export function commanderCastPermission(state, object, playerId) {
   if (!designation) return { allowed: false, reason: 'This command-zone object is not a designated commander.' };
   if (object.zone !== 'command') return { allowed: false, reason: 'The designated commander is not in the command zone.' };
   if (designation.ownerId !== playerId) return { allowed: false, reason: 'Only the commander owner has the Commander-format permission to cast it from the command zone.' };
-  if (designation.castsFromCommandZone > 0) {
-    return {
-      allowed: null,
-      status: 'unsupported',
-      deferred: 'commander-tax',
-      reason: 'This casting cost depends on commander tax, which is deferred until Phase 9B.'
-    };
+  return { allowed: true, designation, tax: commanderTaxForCast(state, object, playerId) };
+}
+
+export function commanderTaxForCast(state, object, playerId, { sourceZone = object?.zone } = {}) {
+  const designation = commanderDesignationFor(state, object);
+  if (!designation) {
+    return { supported: false, status: 'depends', applies: false, reason: 'Commander designation is unknown.' };
   }
-  return { allowed: true, designation };
+  const previousCommandZoneCasts = designation.castsFromCommandZone;
+  if (!Number.isInteger(previousCommandZoneCasts) || previousCommandZoneCasts < 0) {
+    return { supported: false, status: 'depends', applies: sourceZone === 'command', designationId: designation.id, reason: 'Previous command-zone cast history is unknown.' };
+  }
+  const applies = sourceZone === 'command' && designation.ownerId === playerId;
+  return {
+    supported: true,
+    status: 'verified',
+    applies,
+    designationId: designation.id,
+    ownerId: designation.ownerId,
+    sourceZone,
+    previousCommandZoneCasts,
+    genericMana: applies ? previousCommandZoneCasts * 2 : 0
+  };
 }
 
 export function recordCommanderCastFromCommandZone(state, object) {

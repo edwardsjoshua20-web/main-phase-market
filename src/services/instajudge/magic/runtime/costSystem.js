@@ -63,6 +63,59 @@ export function createAdditionalCost(costs = []) {
   return { type: COST_TYPES.ADDITIONAL, costs: costs.map(normalizeCost) };
 }
 
+export function summarizeManaCosts(costs = []) {
+  const total = createManaCost('');
+  const visit = (rawCost) => {
+    const cost = normalizeCost(rawCost);
+    if (!cost) return;
+    if (cost.type === COST_TYPES.ADDITIONAL) {
+      cost.costs.forEach(visit);
+      return;
+    }
+    if (cost.type !== COST_TYPES.MANA) return;
+    total.supported = total.supported && cost.supported;
+    total.symbols.push(...cost.symbols);
+    total.generic += cost.generic;
+    total.white += cost.white;
+    total.blue += cost.blue;
+    total.black += cost.black;
+    total.red += cost.red;
+    total.green += cost.green;
+    total.colorless += cost.colorless;
+  };
+  costs.forEach(visit);
+  total.converted = total.generic + total.white + total.blue + total.black + total.red + total.green + total.colorless;
+  return total;
+}
+
+export function checkManaAvailability(requirement, availableMana) {
+  if (availableMana == null) return { supported: true, known: false, payable: null };
+  if (!requirement?.supported) return { supported: false, known: true, payable: false, reason: 'The mana requirement contains an unsupported symbol.' };
+  if (Number.isFinite(availableMana)) {
+    const colored = requirement.white + requirement.blue + requirement.black + requirement.red + requirement.green + requirement.colorless;
+    if (colored > 0) return { supported: false, known: true, payable: false, reason: 'An undifferentiated mana total cannot prove colored or colorless payment.' };
+    return { supported: true, known: true, payable: availableMana >= requirement.generic, available: availableMana, required: requirement.generic };
+  }
+  const pool = {
+    generic: Number(availableMana.generic) || 0,
+    white: Number(availableMana.white) || 0,
+    blue: Number(availableMana.blue) || 0,
+    black: Number(availableMana.black) || 0,
+    red: Number(availableMana.red) || 0,
+    green: Number(availableMana.green) || 0,
+    colorless: Number(availableMana.colorless) || 0
+  };
+  const coloredPayable = Object.values(COLOR_FIELDS).every((field) => pool[field] >= requirement[field]);
+  const availableTotal = Object.values(pool).reduce((sum, amount) => sum + amount, 0);
+  return {
+    supported: true,
+    known: true,
+    payable: coloredPayable && availableTotal >= requirement.converted,
+    available: pool,
+    required: requirement
+  };
+}
+
 export function createTriggeredPaymentCost(cost, context = {}) {
   return { type: COST_TYPES.TRIGGERED_PAYMENT, cost: normalizeCost(cost), ...context };
 }

@@ -351,11 +351,23 @@ function compileChoices(message, objects, actions, makeId, format) {
 function compileCommanderFormat(message, cards, objects, makeId) {
   const text = normalizeMagicText(message);
   if (!/\bcommander\b/.test(text)) return { id: 'ordinary', commanderDesignations: [] };
+  const ordinal = text.match(/\b(?:this is|for) (?:the )?(first|second|third|fourth|fifth|sixth) time\b/);
+  const ordinalCounts = { first: 0, second: 1, third: 2, fourth: 3, fifth: 4, sixth: 5 };
+  const prior = text.match(/\b(?:cast|played) (?:(?:my |the )?commander(?:.{0,80}?)?|it) (once|twice|one|two|three|four|five|six|\d+)\b|\bcommander (?:has been|was) cast (once|twice|one|two|three|four|five|six|\d+)\b/);
+  const countToken = prior?.[1] || prior?.[2] || null;
+  const countWords = { once: 1, twice: 2, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+  const vagueHistory = /\b(?:a bunch|several|many|some number of times)\b/.test(text);
+  const inferredCount = ordinal ? ordinalCounts[ordinal[1]] : countToken ? (countWords[countToken] ?? Number(countToken)) : null;
+  const commanderCastHistory = {
+    known: Number.isInteger(inferredCount) && !vagueHistory,
+    castsFromCommandZone: Number.isInteger(inferredCount) && !vagueHistory ? inferredCount : null,
+    source: ordinal ? 'ordinal-cast-number' : countToken ? 'explicit-prior-count' : vagueHistory ? 'ambiguous-history' : 'not-stated'
+  };
   const namedCandidates = cards
     .filter((card) => isPermanentType(card) && text.includes(card.normalizedName))
     .flatMap((card) => objects.filter((object) => normalizeMagicText(object.name) === card.normalizedName));
   const commanderObject = namedCandidates[0] || objects.find((object) => object.commander) || null;
-  if (!commanderObject) return { id: 'commander', commanderDesignations: [] };
+  if (!commanderObject) return { id: 'commander', commanderDesignations: [], commanderCastHistory };
   commanderObject.commander = true;
   if (/\b(?:cast|casting).{0,50}\bcommander\b.{0,50}\bcommand zone\b|\bcommander\b.{0,50}\b(?:from|starts? in|begins? in) (?:my |the )?command zone\b/.test(text)) {
     commanderObject.zone = 'command';
@@ -378,8 +390,11 @@ function compileCommanderFormat(message, cards, objects, makeId) {
       id: designationId,
       objectId: commanderObject.id,
       ownerId: commanderObject.owner,
-      startingZone: commanderObject.zone
-    }]
+      startingZone: commanderObject.zone,
+      castsFromCommandZone: commanderCastHistory.known ? commanderCastHistory.castsFromCommandZone : 0,
+      castHistoryKnown: commanderCastHistory.known
+    }],
+    commanderCastHistory
   };
 }
 
