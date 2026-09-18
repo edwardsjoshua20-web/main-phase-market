@@ -119,6 +119,8 @@ assert(!/^YES|^NO/i.test(unsupported.answer), 'Missing coverage must not produce
 
 const extracted = extractPossibleCardNames('Can "Black Lotus" be used in Commander with "Sol Ring"?');
 assert(extracted.includes('Black Lotus') && extracted.includes('Sol Ring'), 'Card-name extraction must preserve quoted card names.');
+const responseCards = extractPossibleCardNames('I have priority. Can I cast Divination in response to Lightning Bolt?');
+assert(responseCards.includes('Divination') && responseCards.includes('Lightning Bolt'), 'Card-name extraction must separate both cards in an in-response-to timing question.');
 assert(isLegalityQuestion('Is Black Lotus legal in Commander?'), 'Legality classifier must detect Commander legality questions.');
 assert(detectLegalityFormat('Is Pot of Greed limited in Advanced?') === 'advanced_tcg', 'Legality classifier must detect Yu-Gi-Oh! Advanced format.');
 

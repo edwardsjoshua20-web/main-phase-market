@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
+import { extractPossibleCardNames } from '../src/services/instajudge/instajudgeCore.js';
 import { beginCombat, combatNeedsFirstStrikeStep, declareAttackers, declareBlockers, executeCombatDamageStep } from '../src/services/instajudge/magic/runtime/combatRuntime.js';
 import { CONTINUOUS_LAYERS, PT_SUBLAYERS, createContinuousEffect } from '../src/services/instajudge/magic/runtime/continuousEffects.js';
 import { PAYMENT_STATUS, createManaCost } from '../src/services/instajudge/magic/runtime/costSystem.js';
@@ -387,6 +388,8 @@ const oracle = parseOracleSemantics({ name: 'Certification Device', typeLine: 'A
 verify(oracle.activatedAbilitiesIR[0]?.restrictions?.[0]?.mode === 'sorcery', 'Oracle semantics must preserve explicit sorcery-speed activation restrictions.');
 const compiled = compileMagicScenario({ message: "It is my turn, I have priority during my postcombat main phase, the stack is empty, and I haven't played a land. Can I play Certification Plains from my hand?", cards: [{ name: 'Certification Plains', typeLine: 'Basic Land - Plains', oracleText: '' }] });
 verify(compiled.actions[0]?.type === 'Play' && compiled.actions[0]?.zoneTo === 'battlefield' && compiled.game.factsProvided.landAllowance, 'Scenario compiler must represent land play as a special action with canonical state facts.');
+const responseCardNames = extractPossibleCardNames('I have priority. Can I cast Certification Divination in response to Certification Bolt?');
+verify(responseCardNames.includes('Certification Divination') && responseCardNames.includes('Certification Bolt'), 'Public card resolution must preserve both cards in an in-response-to timing question.');
 
 metrics.durationMs = Math.round(performance.now() - started);
 assert.equal(metrics.incorrectConfident, 0, 'Phase 8 certification cannot pass with an incorrect confident ruling.');

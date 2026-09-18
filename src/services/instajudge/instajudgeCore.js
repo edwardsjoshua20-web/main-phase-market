@@ -92,7 +92,7 @@ export function isLegalityQuestion(message = '') {
 
 function pushCandidate(candidates, value) {
   const clean = String(value || '')
-    .replace(/\b(can|does|if|when|then|with|from|target|targets|respond|cast|play|use|is|are|the|a|an)\b/gi, ' ')
+    .replace(/\b(can|does|if|when|then|with|from|in|target|targets|respond|cast|play|use|is|are|the|a|an)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   if (clean.length >= 3 && !STOP_WORDS.has(clean.toLowerCase())) candidates.add(clean);
