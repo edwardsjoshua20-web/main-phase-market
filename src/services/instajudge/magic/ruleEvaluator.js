@@ -35,7 +35,7 @@ export function evaluateMagicScenario({ message = '', cards = [], rules = [], le
   const mechanics = detectMagicMechanics({ message, cards: normalizedCards });
   const selectedRules = selectRelevantRules(mechanics, rules);
   const structuralCommanderQuestion = /\bcommander\b/i.test(message)
-    && /\b(?:command zone|dies?|died|graveyard|exil(?:e|ed)|hand|library|second copy|another copy|tax|countered|costs?|cast)\b/i.test(message);
+    && /\b(?:command zone|dies?|died|graveyard|exil(?:e|ed)|hand|library|second copy|another copy|tax|countered|costs?|cast|damage|combat|hits?|trample|stole|lightning bolts?|lose|kill)\b/i.test(message);
   if (normalizedCards.length === 0 && !structuralCommanderQuestion) {
     return unsupported({ cards: [], rules: selectedRules, mechanics, latencyMs, trace: [], reason: 'I cannot verify a Magic ruling until at least one exact card identity is resolved from the catalog.' });
   }

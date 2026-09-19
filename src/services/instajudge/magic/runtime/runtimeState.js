@@ -14,11 +14,13 @@ import {
 import { createCanonicalTurnState } from './turnStructure.js';
 import {
   commanderDesignationFor,
+  commanderDamageLossFor,
   commanderReplacementEffects,
   commanderReturnDecision,
   createCommanderReturnChoice,
   createFormatState,
   initializeCommanderDesignations,
+  recordCommanderCombatDamage,
   recordCommanderMovement
 } from './commanderRuntime.js';
 
@@ -555,6 +557,7 @@ function applyDamageWithResult(state, { object = null, playerId = null, amount, 
   if (pipeline.status !== 'ready') return pipeline;
   let remaining = pipeline.event.amount;
   const preventedBy = [];
+  let commanderDamage = null;
   for (const prevention of preventionEffectsFor(state, pipeline.event)) {
     const prevented = prevention.remaining == null ? remaining : Math.min(remaining, prevention.remaining);
     if (prevented <= 0) continue;
@@ -565,16 +568,30 @@ function applyDamageWithResult(state, { object = null, playerId = null, amount, 
     if (remaining === 0) break;
   }
   if (remaining > 0) {
+    let damageEvent = null;
     if (object) {
       object.damageMarked += remaining;
       if (metadata.deathtouch) object.damagedByDeathtouch = true;
     } else if (state.players[playerId]) {
       state.players[playerId].life -= remaining;
     }
-    emitEvent(state, 'DamageDealt', {
+    damageEvent = emitEvent(state, 'DamageDealt', {
       source, affected: object, object, player: playerId, amount: remaining,
       final: object ? { damageMarked: object.damageMarked } : { life: state.players[playerId]?.life },
       metadata: { ...metadata, replacements: pipeline.applied }
+    });
+    commanderDamage = !object ? recordCommanderCombatDamage(state, {
+      recipientId: playerId,
+      source,
+      amount: remaining,
+      combat: pipeline.event.metadata?.combat === true,
+      damageEventId: damageEvent.id
+    }) : null;
+    if (commanderDamage) emitEvent(state, 'CommanderCombatDamageRecorded', {
+      source,
+      player: playerId,
+      amount: remaining,
+      metadata: commanderDamage
     });
     if (metadata.lifelink && source) {
       const controller = source.runtimeState ? deriveCharacteristics(state, source).controller : source.controller;
@@ -584,7 +601,7 @@ function applyDamageWithResult(state, { object = null, playerId = null, amount, 
       }
     }
   }
-  return { status: 'committed', proposed: amount, replacedAmount: pipeline.event.amount, dealt: remaining, prevented: pipeline.event.amount - remaining, preventedBy, replacements: pipeline.applied };
+  return { status: 'committed', proposed: amount, replacedAmount: pipeline.event.amount, dealt: remaining, prevented: pipeline.event.amount - remaining, preventedBy, replacements: pipeline.applied, commanderDamage };
 }
 
 export function markDamageWithResult(state, object, amount, source, metadata = {}, options = {}) {
@@ -647,10 +664,11 @@ export function runStateBasedActionsRuntime(state) {
       changed = true;
     }
     for (const [playerId, player] of Object.entries(state.players)) {
-      if (!player.lost && (player.life <= 0 || player.poison >= 10 || player.failedDraw)) {
+      const commanderDamageLoss = commanderDamageLossFor(state, playerId);
+      if (!player.lost && (player.life <= 0 || player.poison >= 10 || player.failedDraw || commanderDamageLoss)) {
         player.lost = true;
-        const reason = player.life <= 0 ? 'life total' : player.poison >= 10 ? 'poison counters' : 'drawing from an empty library';
-        emitEvent(state, 'PlayerLost', { player: playerId, metadata: { reason } });
+        const reason = player.life <= 0 ? 'life total' : player.poison >= 10 ? 'poison counters' : player.failedDraw ? 'drawing from an empty library' : 'commander combat damage';
+        emitEvent(state, 'PlayerLost', { player: playerId, metadata: { reason, ...(commanderDamageLoss || {}) } });
         applied.push(`${playerId} loses the game because of ${reason}.`);
         changed = true;
       }

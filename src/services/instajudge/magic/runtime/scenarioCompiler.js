@@ -363,11 +363,12 @@ function compileCommanderFormat(message, cards, objects, makeId) {
     castsFromCommandZone: Number.isInteger(inferredCount) && !vagueHistory ? inferredCount : null,
     source: ordinal ? 'ordinal-cast-number' : countToken ? 'explicit-prior-count' : vagueHistory ? 'ambiguous-history' : 'not-stated'
   };
+  const commanderDamage = compileCommanderDamageScenario(text);
   const namedCandidates = cards
     .filter((card) => isPermanentType(card) && text.includes(card.normalizedName))
     .flatMap((card) => objects.filter((object) => normalizeMagicText(object.name) === card.normalizedName));
   const commanderObject = namedCandidates[0] || objects.find((object) => object.commander) || null;
-  if (!commanderObject) return { id: 'commander', commanderDesignations: [], commanderCastHistory };
+  if (!commanderObject) return { id: 'commander', commanderDesignations: [], commanderCastHistory, commanderDamage };
   commanderObject.commander = true;
   if (/\b(?:cast|casting).{0,50}\bcommander\b.{0,50}\bcommand zone\b|\bcommander\b.{0,50}\b(?:from|starts? in|begins? in) (?:my |the )?command zone\b/.test(text)) {
     commanderObject.zone = 'command';
@@ -394,7 +395,72 @@ function compileCommanderFormat(message, cards, objects, makeId) {
       castsFromCommandZone: commanderCastHistory.known ? commanderCastHistory.castsFromCommandZone : 0,
       castHistoryKnown: commanderCastHistory.known
     }],
-    commanderCastHistory
+    commanderCastHistory,
+    commanderDamage
+  };
+}
+
+function compileCommanderDamageScenario(text) {
+  const relevant = /\bcommander(?: combat)? damage\b/.test(text)
+    || (/\bcommander\b/.test(text) && /\b(?:combat damage|hits?|trample|lightning bolts?|stole|deals? damage|lose|kill)\b/.test(text));
+  if (!relevant) return null;
+  const recipientId = /\b(?:hit|hits|damag(?:e|ed)) me\b|\bhit me with it\b/.test(text) ? 'player' : 'opponent';
+  const differentCommanders = /\b(?:my |the )?other commander\b|\bdifferent commanders?\b/.test(text);
+  const vagueHistory = /\b(?:unknown|unsure|not sure|some|several|an unknown amount)\b.{0,35}\bcommander damage\b/.test(text);
+  const ambiguousIdentity = /\b(?:not sure|unknown|unsure) (?:which|what) commander\b|\bwhich commander dealt\b/.test(text);
+  const unsupportedReplacement = /\b(?:unsupported|unidentified|unknown) replacement\b|\breplaced in an unknown way\b/.test(text);
+  const unsupportedIdentity = /\b(?:face.?down|becomes? a copy|copy of (?:a|the) commander)\b/.test(text);
+  const preventionMatch = text.match(/\b(?:but )?(\d+) (?:of (?:that|it) )?(?:damage )?is prevented\b|\bprevent(?:ed|s)? (\d+)\b/);
+  const prevented = Number(preventionMatch?.[1] || preventionMatch?.[2] || 0);
+  const pair = text.match(/\b(?:my |the |this )?commander\b.{0,45}?\b(?:dealt|has dealt|did) (\d+)\b.{0,90}?\b(?:other commander|then|later|and)\b.{0,55}?\b(?:dealt|deals?|hits?|for)\s*(\d+)\b/);
+  const priorMatch = text.match(/\b(?:my |the |this )?commander\b.{0,50}?\b(?:has |had )?(?:already )?(?:dealt|hit)\s+(\d+)\b/)
+    || text.match(/\b(?:my |the |this )?commander\b.{0,40}?\bhas hit (?:me|him|them) for\s+(\d+)\b/)
+    || text.match(/\b(?:taken|received)\s+(\d+)\s+(?:points? of )?commander damage\b/);
+  const incomingMatch = text.match(/\b(?:would |will )?(?:deal|deals|hit|hits)\s+(?:for\s+)?(\d+)\b/)
+    || text.match(/\b(\d+)\s+(?:points? of )?(?:trample|combat|commander) damage\b/);
+  const lightningBolt = /\blightning bolts?\b/.test(text);
+  const explicitlyNoncombat = lightningBolt || /\bnoncombat damage\b|\bactivated ability\b|\btriggered damage\b|\bfight damage\b/.test(text);
+  const lifeGainMatch = text.match(/\bgain(?:ed|s)?\s+(\d+)\s+life\b/);
+
+  let priorPrimary = priorMatch ? Number(priorMatch[1]) : 0;
+  let priorSecondary = 0;
+  let incomingAmount = incomingMatch ? Number(incomingMatch[1]) : null;
+  if (/\bhas hit (?:me|him|them) for\s+\d+\b/.test(text)) incomingAmount = null;
+  if (pair) {
+    priorPrimary = Number(pair[1]);
+    if (differentCommanders) {
+      priorSecondary = Number(pair[2]);
+      incomingAmount = null;
+    } else {
+      incomingAmount = Number(pair[2]);
+    }
+  }
+  if (/\bone more (?:point of )?(?:commander )?damage\b/.test(text)) incomingAmount = 1;
+  if (lightningBolt) incomingAmount = 3;
+  if (incomingAmount == null && priorPrimary === 0 && /\b(?:does|would) (?:that|it|this) count\b|\bdoes trample damage\b|\bstole my commander and hit me\b/.test(text)) incomingAmount = 1;
+  const asksLoss = /\b(?:lose|loses|kill|kills|lethal|dead)\b|\bis that 21\b/.test(text);
+  const missingLossHistory = asksLoss && priorMatch == null && pair == null && incomingAmount == null;
+
+  return {
+    known: !vagueHistory && !ambiguousIdentity && !missingLossHistory,
+    ambiguity: ambiguousIdentity ? 'commander-designation' : vagueHistory || missingLossHistory ? 'prior-damage-total' : null,
+    unsupported: unsupportedReplacement ? 'damage-replacement' : unsupportedIdentity ? 'commander-copy-or-face-down-identity' : null,
+    recipientId,
+    controllerId: /\b(?:opponent|they) stole my commander\b|\bopponent controls? (?:my |the )?commander\b/.test(text) ? 'opponent' : 'player',
+    prior: [
+      { designation: 'primary', amount: priorPrimary },
+      ...(differentCommanders ? [{ designation: 'secondary', amount: priorSecondary }] : [])
+    ],
+    incoming: incomingAmount == null ? null : {
+      designation: 'primary',
+      amount: incomingAmount,
+      combat: !explicitlyNoncombat,
+      prevented
+    },
+    lifeGain: Number(lifeGainMatch?.[1] || 0),
+    asksLoss,
+    asksCount: /\b(?:count|how much)\b/.test(text),
+    source: differentCommanders ? 'distinct-designations' : 'single-designation'
   };
 }
 

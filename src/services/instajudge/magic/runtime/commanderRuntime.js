@@ -1,4 +1,5 @@
 export const COMMANDER_FORMAT_ID = 'commander';
+export const COMMANDER_DAMAGE_THRESHOLD = 21;
 
 export const COMMANDER_CHOICE_TIMING = Object.freeze({
   REPLACEMENT: 'replacement',
@@ -200,4 +201,66 @@ export function recordCommanderCastFromCommandZone(state, object) {
   if (!designation) return null;
   designation.castsFromCommandZone += 1;
   return designation;
+}
+
+export function commanderDamageTotal(state, recipientId, designationOrObject) {
+  const designation = typeof designationOrObject === 'string'
+    ? state?.format?.commander?.designations?.find((entry) => entry.id === designationOrObject) || commanderDesignationFor(state, designationOrObject)
+    : commanderDesignationFor(state, designationOrObject);
+  if (!designation || !state?.players?.[recipientId]) return null;
+  const total = state.players[recipientId].commanderDamage?.[designation.id] ?? 0;
+  return Number.isFinite(total) && total >= 0 ? total : null;
+}
+
+export function setCommanderDamageTotal(state, recipientId, designationOrObject, amount) {
+  const designation = typeof designationOrObject === 'string'
+    ? state?.format?.commander?.designations?.find((entry) => entry.id === designationOrObject) || commanderDesignationFor(state, designationOrObject)
+    : commanderDesignationFor(state, designationOrObject);
+  if (!designation || !state?.players?.[recipientId] || !Number.isFinite(amount) || amount < 0) return null;
+  state.players[recipientId].commanderDamage[designation.id] = amount;
+  return {
+    designationId: designation.id,
+    commanderName: state.objects?.get(designation.currentObjectId)?.name || null,
+    recipientId,
+    total: amount,
+    threshold: COMMANDER_DAMAGE_THRESHOLD
+  };
+}
+
+export function recordCommanderCombatDamage(state, { recipientId, source, amount, damageEventId = null, combat = false } = {}) {
+  if (!isCommanderFormat(state) || combat !== true || !state?.players?.[recipientId] || !Number.isFinite(amount) || amount <= 0) return null;
+  const designation = commanderDesignationFor(state, source);
+  if (!designation) return null;
+  const priorTotal = commanderDamageTotal(state, recipientId, designation.id);
+  if (priorTotal == null) return null;
+  const newTotal = priorTotal + amount;
+  state.players[recipientId].commanderDamage[designation.id] = newTotal;
+  return {
+    designationId: designation.id,
+    commanderName: source?.name || state.objects?.get(designation.currentObjectId)?.name || null,
+    recipientId,
+    priorTotal,
+    damageDealt: amount,
+    newTotal,
+    threshold: COMMANDER_DAMAGE_THRESHOLD,
+    thresholdReached: newTotal >= COMMANDER_DAMAGE_THRESHOLD,
+    damageEventId
+  };
+}
+
+export function commanderDamageLossFor(state, recipientId) {
+  if (!isCommanderFormat(state) || !state?.players?.[recipientId]) return null;
+  for (const designation of state.format.commander.designations) {
+    const total = commanderDamageTotal(state, recipientId, designation.id);
+    if (total != null && total >= COMMANDER_DAMAGE_THRESHOLD) {
+      return {
+        recipientId,
+        designationId: designation.id,
+        commanderName: state.objects?.get(designation.currentObjectId)?.name || null,
+        total,
+        threshold: COMMANDER_DAMAGE_THRESHOLD
+      };
+    }
+  }
+  return null;
 }

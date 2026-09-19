@@ -13,7 +13,14 @@ import {
   derivedHasQuality
 } from './continuousEffects.js';
 import { castSpell, checkTimingPermission, passPriority, resolveTopOfStack } from './stackRuntime.js';
-import { commanderDesignationFor, commanderTaxForCast, isDesignatedCommander } from './commanderRuntime.js';
+import {
+  COMMANDER_DAMAGE_THRESHOLD,
+  commanderDamageTotal,
+  commanderDesignationFor,
+  commanderTaxForCast,
+  isDesignatedCommander,
+  setCommanderDamageTotal
+} from './commanderRuntime.js';
 import {
   SPECIAL_ACTION_TYPES,
   checkSpecialAction,
@@ -34,6 +41,7 @@ import {
   createGameObject,
   createMagicRuntimeState,
   currentToughness,
+  dealDamageToPlayerWithResult,
   markDamage,
   moveObject,
   moveObjectWithResult,
@@ -997,7 +1005,7 @@ function typedExecutionSummary(card, effect, target, targetPlayer, result) {
   return `${card.name}'s ${effect.type} resolves.`;
 }
 
-function commanderScenarioState(card, { zone = 'battlefield', controller = 'player', includeCopy = false, designated = true, castsFromCommandZone = 0 } = {}) {
+function commanderScenarioState(card, { zone = 'battlefield', controller = 'player', includeCopy = false, secondCommander = false, designated = true, castsFromCommandZone = 0 } = {}) {
   const commanderId = 'commander-object-1';
   const designationId = `commander-designation:player:${commanderId}`;
   const objects = [{
@@ -1019,12 +1027,22 @@ function commanderScenarioState(card, { zone = 'battlefield', controller = 'play
     commander: false,
     commanderDesignationId: null
   });
+  if (secondCommander) objects.push({
+    ...objects[0],
+    id: 'commander-object-2',
+    name: 'Other Designated Commander',
+    card: normalizeMagicCard({ ...card, id: 'other-designated-commander', name: 'Other Designated Commander' }),
+    commanderDesignationId: 'commander-designation:player:commander-object-2'
+  });
   const scenario = {
     type: 'MagicScenario',
     version: 1,
     format: {
       id: 'commander',
-      commanderDesignations: designated ? [{ id: designationId, objectId: commanderId, ownerId: 'player', startingZone: zone, castsFromCommandZone }] : []
+      commanderDesignations: designated ? [
+        { id: designationId, objectId: commanderId, ownerId: 'player', startingZone: zone, castsFromCommandZone },
+        ...(secondCommander ? [{ id: 'commander-designation:player:commander-object-2', objectId: 'commander-object-2', ownerId: 'player', startingZone: zone, castsFromCommandZone: 0 }] : [])
+      ] : []
     },
     objects,
     continuousEffects: [],
@@ -1037,7 +1055,107 @@ function commanderScenarioState(card, { zone = 'battlefield', controller = 'play
       factsProvided: { turn: true, phase: true, stack: true, priority: true }
     }
   };
-  return createMagicRuntimeState({ cards: [card], scenario, message: card.name });
+  const state = createMagicRuntimeState({ cards: [card, ...(secondCommander ? [objects[1].card] : [])], scenario, message: objects.map((object) => object.name).join(' ') });
+  state.players.player.life = 40;
+  state.players.opponent.life = 40;
+  return state;
+}
+
+function evaluateCommanderDamageScenario({ cards, scenario, card, commanderLabel }) {
+  const compiled = scenario.format?.commanderDamage;
+  if (!compiled) return null;
+  if (compiled.unsupported) {
+    return unsupported(`This ${compiled.unsupported.replaceAll('-', ' ')} edge cannot be represented safely by the current Commander runtime.`, {
+      cards,
+      primitives: ['commander', 'combat', 'damage', 'state-based-actions']
+    });
+  }
+  if (!compiled.known) {
+    const missing = compiled.ambiguity === 'commander-designation' ? 'which commander designation dealt the prior damage' : 'the prior damage total for one specific commander';
+    return dependent(`Commander-damage loss depends on ${missing}.`, {
+      cards,
+      primitives: ['commander', 'combat', 'damage', 'state-based-actions'],
+      clarificationNeeded: `Specify ${missing}.`
+    });
+  }
+
+  const state = commanderScenarioState(card, {
+    controller: compiled.controllerId,
+    secondCommander: compiled.prior.some((entry) => entry.designation === 'secondary')
+  });
+  const primary = state.objects.get('commander-object-1');
+  const secondary = state.objects.get('commander-object-2');
+  const recipient = compiled.recipientId;
+  state.players[recipient].life += compiled.lifeGain;
+  for (const entry of compiled.prior) {
+    const source = entry.designation === 'secondary' ? secondary : primary;
+    if (source && setCommanderDamageTotal(state, recipient, source, entry.amount) == null) {
+      return dependent('The prior Commander damage could not be tied to a stable commander designation.', {
+        cards,
+        primitives: ['commander', 'damage'],
+        state,
+        clarificationNeeded: 'Identify which designated commander dealt the prior combat damage.'
+      });
+    }
+  }
+
+  const designation = commanderDesignationFor(state, primary);
+  const priorTotal = commanderDamageTotal(state, recipient, designation.id);
+  let damageResult = null;
+  if (compiled.incoming) {
+    if (compiled.incoming.prevented > 0) state.preventionEffects.push({
+      id: 'public-commander-damage-prevention',
+      remaining: compiled.incoming.prevented,
+      applies: (event) => event.type === 'Damage' && event.player === recipient && event.source?.id === primary.id
+    });
+    damageResult = dealDamageToPlayerWithResult(
+      state,
+      recipient,
+      compiled.incoming.amount,
+      primary,
+      { combat: compiled.incoming.combat, publicCommanderScenario: true }
+    );
+    if (damageResult.status !== 'committed') {
+      return unsupported(damageResult.reason || 'The Commander damage event could not be committed safely.', {
+        cards,
+        primitives: ['commander', 'combat', 'damage'],
+        trace: state.trace
+      });
+    }
+  }
+  const stateBasedActions = runStateBasedActionsRuntime(state);
+  const newTotal = commanderDamageTotal(state, recipient, designation.id);
+  const lossEvent = state.events.findLast((event) => event.type === 'PlayerLost' && event.player === recipient && event.metadata?.reason === 'commander combat damage') || null;
+  const actualDamage = damageResult?.commanderDamage?.damageDealt || 0;
+  const structured = {
+    commanderDesignationId: designation.id,
+    commanderIdentity: commanderLabel,
+    damageRecipient: recipient,
+    priorCommanderDamage: priorTotal,
+    combatDamageDealt: actualDamage,
+    newCommanderDamageTotal: newTotal,
+    threshold: COMMANDER_DAMAGE_THRESHOLD,
+    stateBasedActionLoss: Boolean(lossEvent),
+    supportStatus: 'verified'
+  };
+  const asksLoss = compiled.asksLoss;
+  const countedDamage = actualDamage || (compiled.asksCount ? newTotal : 0);
+  const verdict = asksLoss ? (lossEvent ? 'yes' : 'no') : countedDamage > 0 ? 'yes' : 'no';
+  const summary = asksLoss
+    ? lossEvent
+      ? `Yes. ${commanderLabel} has dealt ${newTotal} combat damage to ${recipient}; reaching ${COMMANDER_DAMAGE_THRESHOLD} or more causes that player to lose as a state-based action.`
+      : `No. No single commander designation has dealt ${COMMANDER_DAMAGE_THRESHOLD} combat damage to ${recipient}. ${commanderLabel}'s tracked total is ${newTotal}.`
+    : countedDamage > 0
+      ? `Yes. ${actualDamage || newTotal} combat damage actually dealt to ${recipient} counts, bringing ${commanderLabel}'s tracked total to ${newTotal}.`
+      : `No. This event adds 0 Commander damage because only combat damage actually dealt to a player counts.`;
+  return evaluated(verdict, summary, {
+    cards,
+    primitives: ['commander', 'combat', 'damage', 'state-based-actions'],
+    trace: state.trace,
+    sequence: state.trace.filter((entry) => ['DamageDealt', 'CommanderCombatDamageRecorded', 'PlayerLost'].includes(entry.type)).map((entry) => entry.type),
+    state,
+    runtime: { commanderDamage: structured, damageResult, stateBasedActions }
+  });
 }
 
 function explicitCommanderDecision(text, destination) {
@@ -1148,9 +1266,6 @@ function evaluateCommanderTaxScenario({ message, cards, scenario, card, commande
 function evaluateCommanderScenario({ message, cards, scenario }) {
   const text = normalizeMagicText(message);
   if (!/\bcommander\b|\bcommand zone\b/.test(text)) return null;
-  if (/\bcommander damage\b|\b21 damage\b/.test(text)) {
-    return unsupported('Commander damage is deferred beyond Phase 9A.', { cards, primitives: ['commander', 'damage'] });
-  }
   if (/\bpartner\b|\bbackground\b|\bdoctor'?s companion\b|\bmultiplayer\b|\bfour.player\b/.test(text)) {
     return unsupported('This multi-commander or multiplayer Commander mechanic is deferred beyond Phase 9A.', { cards, primitives: ['commander'] });
   }
@@ -1171,6 +1286,8 @@ function evaluateCommanderScenario({ message, cards, scenario }) {
     toughness: 1
   });
   const commanderLabel = cards.length ? card.name : 'the designated commander';
+  const commanderDamage = evaluateCommanderDamageScenario({ cards, scenario, card, commanderLabel });
+  if (commanderDamage) return commanderDamage;
   const taxQuestion = /\btax\b|\badditional (?:mana|cost)\b|\bcosts? (?:more|now|\d+ mana normally)\b|\bagain from (?:my |the )?command zone\b|\b(?:first|second|third) time\b|\bcountered\b|\breset\b|\bcast\b.{0,50}\bfrom (?:my |the )?(?:hand|graveyard)\b/.test(text);
   if (taxQuestion) return evaluateCommanderTaxScenario({ message, cards, scenario, card, commanderLabel });
 
