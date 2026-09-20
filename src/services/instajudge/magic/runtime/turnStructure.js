@@ -85,19 +85,28 @@ export function createLandPlayState({ turnId, allowed = 1, used = 0, source = 'd
   };
 }
 
-export function createCanonicalTurnState({ turn = 1, activePlayer = 'player', phase = MAGIC_PHASES.MAIN, step = null, priorityHolder = null, consecutivePasses = 0, landPlaysAllowed = 1, landPlaysUsed = 0 } = {}) {
+export function createCanonicalTurnState({ turn = 1, activePlayer = 'player', turnOrder = ['player', 'opponent'], phase = MAGIC_PHASES.MAIN, step = null, priorityHolder = null, consecutivePasses = 0, landPlaysAllowed = 1, landPlaysUsed = 0 } = {}) {
   const currentStep = inferredStep(phase, step);
   const metadata = TURN_STEP_METADATA[currentStep];
   const currentTurn = Math.max(1, Number(turn) || 1);
   const actionKey = `${currentTurn}:${activePlayer}:${currentStep}${currentStep === TURN_STEPS.CLEANUP ? ':1' : ''}`;
   const turnId = `turn-${currentTurn}:${activePlayer}`;
+  const orderedPlayers = [...new Set([activePlayer, ...turnOrder].filter(Boolean))];
+  const activeIndex = orderedPlayers.indexOf(activePlayer);
+  const nonactivePlayers = orderedPlayers.slice(activeIndex + 1).concat(orderedPlayers.slice(0, activeIndex));
   return {
     type: 'MagicTurnState',
-    version: 2,
+    version: 3,
     turn: currentTurn,
     turnId,
     activePlayer,
-    nonactivePlayer: opponentOf(activePlayer),
+    turnOrder: orderedPlayers,
+    playersInGame: [...orderedPlayers],
+    nonactivePlayers,
+    nonactivePlayer: nonactivePlayers[0] || null,
+    nextPlayer: nonactivePlayers[0] || null,
+    turnOrderAnchor: activePlayer,
+    result: { status: 'active', winnerId: null },
     phase: metadata.phase,
     step: currentStep,
     insideCombat: metadata.phase === MAGIC_PHASES.COMBAT,

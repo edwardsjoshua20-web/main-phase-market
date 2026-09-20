@@ -555,6 +555,67 @@ function compileCombat(message, objects, cards) {
   };
 }
 
+function playerIdForName(name) {
+  if (/^(?:i|me|my|you|player|a)$/i.test(name)) return 'player';
+  return String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function compileMultiplayer(message) {
+  const countWords = { three: 3, four: 4, five: 5 };
+  const countMatch = message.match(/\b(three|four|five|3|4|5)[ -]player\b/i);
+  const playerCount = countMatch ? (countWords[countMatch[1].toLowerCase()] || Number(countMatch[1])) : null;
+  const names = new Map([['player', { id: 'player', name: 'You', role: 'user' }]]);
+  const addName = (name) => {
+    const cleaned = String(name || '').replace(/[.,]/g, '').trim();
+    if (!cleaned || /^(?:commander|magic|ward|instant|spell|creature|player|game|what|whose|whose|then)$/i.test(cleaned)) return;
+    const id = playerIdForName(cleaned);
+    if (id && id !== 'player') names.set(id, { id, name: cleaned, role: 'opponent' });
+  };
+  for (const match of message.matchAll(/\b([A-Z][a-z]+|[A-D])(?:'s)?\s+(?:passes|responds|casts|loses|dies|controls|has priority|is active|turn)\b/g)) addName(match[1]);
+  for (const match of message.matchAll(/\b(?:attack(?:s|ing)?|target(?:s|ing)?|hits?|to)\s+([A-Z][a-z]+|[B-D])\b/g)) addName(match[1]);
+  const tableList = message.match(/\b(?:player Commander game|Commander game|multiplayer game|game) with\s+([^.;?]+)/i);
+  if (tableList) {
+    for (const token of tableList[1].split(/\s*(?:,|and)\s*/i)) addName(token);
+  }
+  const orderMatch = message.match(/(?:turn order is|seated clockwise(?: in(?: the)? order)?|clockwise order is)\s*([^.;?]+)/i);
+  let explicitOrder = null;
+  if (orderMatch) {
+    const tokens = orderMatch[1].split(/\s*(?:,|->|→|then|and)\s*/i).map((token) => token.trim()).filter(Boolean);
+    explicitOrder = tokens.map((token) => {
+      addName(token);
+      return playerIdForName(token);
+    });
+  }
+  const unsupportedVariant = /two-headed giant|2hg|emperor|grand melee|archenemy|limited range of influence|team(?:ed)? multiplayer|shared team/i.test(message);
+  if (!playerCount && !/\bmultiplayer\b|\bfree-for-all\b/i.test(message) && !unsupportedVariant) return null;
+  const targetCount = playerCount || Math.max(3, names.size);
+  for (let index = names.size; index < targetCount; index += 1) {
+    const id = `opponent-${index}`;
+    names.set(id, { id, name: `Opponent ${index}`, role: 'opponent' });
+  }
+  const players = [...names.values()].slice(0, Math.min(5, targetCount));
+  const knownIds = new Set(players.map((player) => player.id));
+  const turnOrder = explicitOrder?.filter((id) => knownIds.has(id)) || players.map((player) => player.id);
+  const activeMatch = message.match(/\b([A-Z][a-z]+|[A-D])(?:'s turn| is (?:the )?active player| is active)\b/i);
+  const priorityMatch = message.match(/\b([A-Z][a-z]+|[A-D])\s+(?:has|gets|receives) priority\b/i);
+  const activeCandidate = activeMatch ? playerIdForName(activeMatch[1]) : 'player';
+  const priorityCandidate = priorityMatch ? playerIdForName(priorityMatch[1]) : null;
+  const activePlayer = players.some((player) => player.id === activeCandidate) ? activeCandidate : 'player';
+  const priorityHolder = players.some((player) => player.id === priorityCandidate) ? priorityCandidate : null;
+  const lostPlayers = players.filter((player) => new RegExp(`\\b${player.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b\\s+(?:loses|lost|dies|died|leaves|left the game)\\b`, 'i').test(message)).map((player) => player.id);
+  return {
+    format: 'free-for-all',
+    playerCount: players.length,
+    players,
+    turnOrder,
+    turnOrderKnown: Boolean(explicitOrder),
+    activePlayer,
+    priorityHolder,
+    lostPlayers,
+    unsupportedVariant
+  };
+}
+
 export function compileMagicScenario({ message = '', cards = [] } = {}) {
   const makeId = makeIdFactory();
   const normalizedCards = cards.map(normalizeMagicCard).filter((card) => card.name);
@@ -593,6 +654,7 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
   const choices = compileChoices(message, objects, actions, makeId, format);
   const continuousEffects = compileContinuousEffects(message, objects);
   const combat = compileCombat(message, objects, normalizedCards);
+  const multiplayer = compileMultiplayer(message);
   const text = normalizeMagicText(message);
   const step = inferredTurnStep(text);
   const phase = phaseForStep(step);
@@ -604,7 +666,7 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
     version: 1,
     sourceText: message,
     format,
-    players: [
+    players: multiplayer?.players || [
       { id: 'player', role: 'user', active: !opponentTurn },
       { id: 'opponent', role: 'opponent', active: opponentTurn }
     ],
@@ -616,10 +678,13 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
     choices,
     sequence: [...actions].sort((left, right) => left.index - right.index).map((action) => action.id),
     game: {
-      activePlayer: opponentTurn ? 'opponent' : 'player',
+      activePlayer: multiplayer?.activePlayer || (opponentTurn ? 'opponent' : 'player'),
+      turnOrder: multiplayer?.turnOrder || ['player', 'opponent'],
+      turnOrderKnown: multiplayer ? multiplayer.turnOrderKnown : true,
+      multiplayer,
       phase,
       step,
-      priorityHolder: /\bopponent has priority\b/i.test(message) ? 'opponent' : /\b(?:i|player|you) (?:have|has) priority\b/i.test(message) ? 'player' : null,
+      priorityHolder: multiplayer?.priorityHolder || (/\bopponent has priority\b/i.test(message) ? 'opponent' : /\b(?:i|player|you) (?:have|has) priority\b/i.test(message) ? 'player' : null),
       stackEmpty: /\bstack is empty\b/i.test(message) ? true : stackNonempty ? false : null,
       landPlaysAllowed: landPlayState.allowed,
       landPlaysUsed: landPlayState.used,

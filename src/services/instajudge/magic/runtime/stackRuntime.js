@@ -6,6 +6,7 @@ import { commanderCastPermission, recordCommanderCastFromCommandZone } from './c
 import { clearPendingRuntimeChoice, createGameObject, emitEvent, getPendingRuntimeChoice, moveObject, moveObjectWithResult, registerGameObject, runStateBasedActionsRuntime, setPendingRuntimeChoice } from './runtimeState.js';
 import { advanceTurnStep } from './turnRuntime.js';
 import { TURN_STEPS } from './turnStructure.js';
+import { nextPlayerInTurnOrder, playersStillInGame, priorityStartPlayer } from './multiplayerRuntime.js';
 
 export const STACK_OBJECT_TYPES = Object.freeze({
   SPELL: 'Spell',
@@ -91,10 +92,11 @@ export function counterStackObject(state, stackObject, source = null) {
 }
 
 export function grantPriority(state, playerId = state.game.activePlayer) {
-  state.game.priorityHolder = playerId;
+  const holder = playerId && state.players[playerId]?.inGame !== false ? playerId : priorityStartPlayer(state);
+  state.game.priorityHolder = holder;
   state.game.consecutivePasses = 0;
-  emitEvent(state, 'PriorityGranted', { player: playerId });
-  return playerId;
+  emitEvent(state, 'PriorityGranted', { player: holder });
+  return holder;
 }
 
 export function takePriorityAction(state, playerId, action = null) {
@@ -116,8 +118,9 @@ export function passPriority(state, playerId, { resolve = resolveTopOfStack } = 
   if (state.game.priorityHolder !== playerId) return { allowed: false, reason: `${playerId} does not have priority.` };
   state.game.consecutivePasses += 1;
   emitEvent(state, 'PriorityPassed', { player: playerId, metadata: { consecutivePasses: state.game.consecutivePasses } });
-  if (state.game.consecutivePasses < 2) {
-    state.game.priorityHolder = opponentOf(playerId);
+  const requiredPasses = playersStillInGame(state).length;
+  if (state.game.consecutivePasses < requiredPasses) {
+    state.game.priorityHolder = nextPlayerInTurnOrder(state, playerId);
     return { allowed: true, resolved: false };
   }
   state.game.consecutivePasses = 0;
@@ -130,7 +133,7 @@ export function passPriority(state, playerId, { resolve = resolveTopOfStack } = 
     state.game.priorityHolder = null;
     return { allowed: true, resolved: false, status: 'depends', result, pendingChoice: getPendingRuntimeChoice(state) };
   }
-  grantPriority(state, state.game.activePlayer);
+  grantPriority(state, priorityStartPlayer(state));
   return { allowed: true, resolved: true, result };
 }
 
@@ -559,8 +562,4 @@ export function resolveTopOfStack(state, { paymentChoices = [], resolveEffect = 
   runStateBasedActionsRuntime(state);
   emitEvent(state, 'StackObjectResolved', { source: stackObject.sourceObject, controller: stackObject.controller, metadata: { stackObjectId: stackObject.id, stackObjectType: stackObject.kind } });
   return { resolved: true, stackObject, effectResults };
-}
-
-function opponentOf(playerId) {
-  return playerId === 'player' ? 'opponent' : 'player';
 }

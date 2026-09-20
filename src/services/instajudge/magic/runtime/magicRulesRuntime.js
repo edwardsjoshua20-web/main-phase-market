@@ -12,12 +12,13 @@ import {
   derivedHasAbility,
   derivedHasQuality
 } from './continuousEffects.js';
-import { castSpell, checkTimingPermission, passPriority, resolveTopOfStack } from './stackRuntime.js';
+import { STACK_OBJECT_TYPES, castSpell, checkTimingPermission, createStackObject, passPriority, pushStackObject, resolveTopOfStack } from './stackRuntime.js';
 import {
   COMMANDER_DAMAGE_THRESHOLD,
   commanderDamageTotal,
   commanderDesignationFor,
   commanderTaxForCast,
+  designateCommander,
   isDesignatedCommander,
   setCommanderDamageTotal
 } from './commanderRuntime.js';
@@ -42,12 +43,15 @@ import {
   createMagicRuntimeState,
   currentToughness,
   dealDamageToPlayerWithResult,
+  leavePlayersRuntime,
   markDamage,
   moveObject,
   moveObjectWithResult,
+  putPendingTriggersOnStack,
   resolveTrigger,
   runStateBasedActionsRuntime
 } from './runtimeState.js';
+import { apnapOrder, nextPlayerInTurnOrder, opponentsOf, playersStillInGame } from './multiplayerRuntime.js';
 
 function primitiveRules(primitives) {
   return rulesForPrimitives([...new Set(primitives)]);
@@ -79,6 +83,180 @@ function evaluated(verdict, summary, { cards = [], primitives = [], trace = [], 
     state,
     runtime
   };
+}
+
+function multiplayerPlayerId(scenario, name) {
+  const normalized = normalizeMagicText(name);
+  return scenario.players.find((player) => normalizeMagicText(player.name || player.id) === normalized)?.id || null;
+}
+
+function multiplayerState(scenario, message, cards = []) {
+  return createMagicRuntimeState({ cards, message, scenario });
+}
+
+function evaluateMultiplayerCommanderScenario({ message, cards, scenario }) {
+  const multiplayer = scenario.game.multiplayer;
+  if (!multiplayer) return null;
+  const text = normalizeMagicText(message);
+  if (multiplayer.unsupportedVariant) {
+    return unsupported('This multiplayer option or team variant is outside the supported free-for-all runtime.', { cards, primitives: ['commander', 'turn-structure'] });
+  }
+  if (multiplayer.playerCount < 3 || multiplayer.playerCount > 5) {
+    return unsupported('The certified free-for-all runtime supports three through five players.', { cards, primitives: ['commander', 'turn-structure'] });
+  }
+
+  if (/\btarget opponent\b/.test(text)) {
+    const state = multiplayerState(scenario, message, cards);
+    const result = executeTypedEffect({ state, effect: { type: 'LifeChange', direction: 'lose', amount: { kind: 'fixed', value: 1 }, subject: 'target opponent' }, controller: 'player' });
+    if (result.status === 'depends') return dependent('There are multiple legal opponents, so the target must be identified.', {
+      cards, primitives: ['targeting'], state, clarificationNeeded: result.clarificationNeeded
+    });
+  }
+
+  if (/\b(?:each opponent|all (?:my )?opponents)\b/.test(text)) {
+    const state = multiplayerState(scenario, message, cards);
+    const before = Object.fromEntries(Object.entries(state.players).map(([id, player]) => [id, player.life]));
+    const result = executeTypedEffect({ state, effect: { type: 'LifeChange', direction: 'lose', amount: { kind: 'fixed', value: 1 }, subject: 'each opponent' }, controller: 'player' });
+    const affected = opponentsOf(state, 'player').filter((id) => state.players[id].life === before[id] - 1);
+    return evaluated(result.status === 'executed' && affected.length === multiplayer.playerCount - 1 && state.players.player.life === before.player ? 'yes' : 'no',
+      `Each opponent means every other player still in the game: ${affected.join(', ')} each lose 1 life, and the controller does not.`, {
+        cards, primitives: ['effects', 'multiplayer'], trace: state.trace, state, runtime: { affected, result }
+      });
+  }
+
+  if (/\beach player\b/.test(text)) {
+    const state = multiplayerState(scenario, message, cards);
+    const result = executeTypedEffect({ state, effect: { type: 'LifeChange', direction: 'lose', amount: { kind: 'fixed', value: 1 }, subject: 'each player' }, controller: 'player' });
+    const affected = playersStillInGame(state).filter((id) => state.players[id].life === 19);
+    return evaluated(result.status === 'executed' && affected.length === multiplayer.playerCount ? 'yes' : 'no',
+      `Each player includes all ${affected.length} players still in the game.`, {
+        cards, primitives: ['effects', 'multiplayer'], trace: state.trace, state, runtime: { affected, result }
+      });
+  }
+
+  if (/\battack\b/.test(text) && /\b(?:one creature|creature 1)\b/.test(text) && /\b(?:another|creature 2)\b/.test(text)) {
+    const named = scenario.players.filter((player) => player.id !== 'player' && text.includes(normalizeMagicText(player.name || player.id)));
+    if (named.length < 2) return dependent('Each attacking creature needs an identified defending opponent.', { cards, primitives: ['combat'], clarificationNeeded: 'Which player does each creature attack?' });
+    const state = multiplayerState(scenario, message, cards);
+    const attackers = [1, 2].map((index) => addPermanent(state, createGameObject({ id: `multiplayer-attacker-${index}`, name: `Creature ${index}`, owner: 'player', controller: 'player', power: 2, toughness: 2 })));
+    beginCombat(state);
+    const result = declareAttackers(state, attackers.map((object, index) => ({ object, attackTarget: named[index].id })));
+    return evaluated(result.status === 'declared' ? 'yes' : 'no', `Yes. Different creatures may attack ${named[0].name || named[0].id} and ${named[1].name || named[1].id} in the same free-for-all combat.`, {
+      cards, primitives: ['combat', 'multiplayer'], trace: state.trace, state, runtime: { result }
+    });
+  }
+
+  if (/\bcommander\b/.test(text) && /\bdealt \d+ to\b/.test(text) && /\bhits?\b/.test(text)) {
+    const history = text.match(/\bdealt (\d+) to ([a-z0-9-]+) and (\d+) to ([a-z0-9-]+)/);
+    const incoming = text.match(/\bhits? ([a-z0-9-]+) for (\d+)/);
+    if (!history || !incoming) return dependent('Commander damage needs an identified recipient and prior total for each relevant player.', {
+      cards, primitives: ['commander', 'combat', 'damage'], clarificationNeeded: 'Which commander dealt how much combat damage to each player?'
+    });
+    const state = multiplayerState(scenario, message, cards);
+    const commander = addPermanent(state, createGameObject({ id: 'public-multiplayer-commander', name: 'Your Commander', owner: 'player', controller: 'player', power: Number(incoming[2]), toughness: 10, commander: true }));
+    const designation = designateCommander(state, commander, { ownerId: 'player', designationId: 'public-multiplayer-designation' });
+    const firstRecipient = multiplayerPlayerId(scenario, history[2]);
+    const secondRecipient = multiplayerPlayerId(scenario, history[4]);
+    const hitRecipient = multiplayerPlayerId(scenario, incoming[1]);
+    if (!designation || !firstRecipient || !secondRecipient || !hitRecipient) return dependent('A named Commander-damage recipient could not be matched to the multiplayer state.', {
+      cards, primitives: ['commander', 'combat', 'damage'], clarificationNeeded: 'Identify every player by their table name.'
+    });
+    setCommanderDamageTotal(state, firstRecipient, designation.id, Number(history[1]));
+    setCommanderDamageTotal(state, secondRecipient, designation.id, Number(history[3]));
+    dealDamageToPlayerWithResult(state, hitRecipient, Number(incoming[2]), commander, { combat: true });
+    runStateBasedActionsRuntime(state);
+    const lost = scenario.players.filter((player) => !state.players[player.id]?.inGame).map((player) => player.name || player.id);
+    return evaluated(lost.length ? 'yes' : 'no', lost.length
+      ? `${lost.join(', ')} loses after reaching 21 Commander combat damage from that designation; the other players remain in the game.`
+      : 'No player reaches 21 Commander combat damage from a single designation.', {
+        cards, primitives: ['commander', 'combat', 'damage', 'state-based-actions'], trace: state.trace, state,
+        runtime: { designationId: designation.id, lost, remaining: playersStillInGame(state) }
+      });
+  }
+
+  const namedController = scenario.players.find((player) => player.id !== 'player'
+    && new RegExp(`\\b${normalizeMagicText(player.name || player.id)}\\b controls? my commander`).test(text));
+  const namedLoss = scenario.players.find((player) => player.id !== 'player'
+    && new RegExp(`\\b${normalizeMagicText(player.name || player.id)}\\b.{0,30}\\b(?:dies|loses|leaves)\\b`).test(text))
+    || (namedController && /\b(?:he|she|they) loses\b|\bwhen (?:he|she|they) (?:loses|leaves)\b/.test(text) ? namedController : null);
+  if (namedLoss && /\bgame end|\bgame over|\bend the game\b/.test(text)) {
+    const state = multiplayerState(scenario, message, cards);
+    const leave = leavePlayersRuntime(state, [namedLoss.id], { reason: 'public multiplayer scenario' });
+    return evaluated(leave.result.status === 'active' ? 'no' : 'yes', leave.result.status === 'active'
+      ? `No. ${namedLoss.name || namedLoss.id} leaves, but ${playersStillInGame(state).length} players remain and the game continues.`
+      : `Yes. The game ends because only ${leave.result.winnerId || 'one player'} remains.`, {
+        cards, primitives: ['multiplayer', 'state-based-actions'], trace: state.trace, state, runtime: { leave }
+      });
+  }
+
+  if (namedLoss && /\b(?:still|get|take|receive).{0,20}\bturn\b|\bbefore (?:their|his|her) turn\b/.test(text)) {
+    if (!scenario.game.turnOrderKnown) return dependent('Whether a later player is next depends on the established seating order.', { cards, primitives: ['turn-structure'], clarificationNeeded: 'What is the clockwise turn order?' });
+    const state = multiplayerState(scenario, message, cards);
+    leavePlayersRuntime(state, [namedLoss.id], { reason: 'public multiplayer scenario' });
+    return evaluated('no', `No. ${namedLoss.name || namedLoss.id} is removed from turn order and will not receive a future turn.`, {
+      cards, primitives: ['turn-structure', 'multiplayer'], trace: state.trace, state, runtime: { nextPlayer: nextPlayerInTurnOrder(state, state.game.activePlayer || state.game.turnOrderAnchor) }
+    });
+  }
+
+  if (/\bcontrols? my commander\b/.test(text) && namedLoss) {
+    const state = multiplayerState(scenario, message, cards);
+    const commander = addPermanent(state, createGameObject({ id: 'multiplayer-controlled-commander', name: 'Your Commander', owner: 'player', controller: namedLoss.id, baseController: 'player', commander: true, power: 4, toughness: 4 }));
+    const leave = leavePlayersRuntime(state, [namedLoss.id], { reason: 'public multiplayer scenario' });
+    const controller = deriveCharacteristics(state, commander).controller;
+    return evaluated(leave.status === 'committed' && commander.zone === 'battlefield' && controller === 'player' ? 'no' : 'yes',
+      `${namedLoss.name || namedLoss.id} does not own the commander, so it remains in the game and control reverts to its supported base controller.`, {
+        cards, primitives: ['commander', 'continuous', 'multiplayer'], trace: state.trace, state, runtime: { leave, controller }
+      });
+  }
+
+  if (/\btriggers?\b/.test(text) && /\b(?:same time|simultaneous|whose|stack first)\b/.test(text)) {
+    if (!scenario.game.turnOrderKnown) return dependent('APNAP trigger placement depends on the active player and established turn order.', { cards, primitives: ['stack', 'triggers'], clarificationNeeded: 'What is the clockwise turn order and who is active?' });
+    const state = multiplayerState(scenario, message, cards);
+    state.pendingTriggers = apnapOrder(state).map((controller, index) => ({ id: `public-trigger-${index + 1}`, source: { id: `source-${index + 1}`, name: `${controller} trigger`, owner: controller }, controller }));
+    const ordered = putPendingTriggersOnStack(state);
+    return evaluated('yes', `Triggers are put on the stack in APNAP order: ${ordered.map((trigger) => trigger.controller).join(' then ')}. Later nonactive-player triggers are above earlier ones.`, {
+      cards, primitives: ['stack', 'triggers', 'multiplayer'], trace: state.trace, state, runtime: { ordered: ordered.map((trigger) => trigger.controller) }
+    });
+  }
+
+  if (/\b(?:responds?|in response)\b/.test(text) && /\bwhat resolves first|\bresolve first\b/.test(text)) {
+    const state = multiplayerState(scenario, message, cards);
+    const responders = [...message.matchAll(/\b([A-Z][a-z]+|[A-D])\s+responds?\b/g)].map((match) => multiplayerPlayerId(scenario, match[1])).filter(Boolean);
+    const controllers = ['player', ...responders];
+    controllers.forEach((controller, index) => pushStackObject(state, createStackObject({ kind: STACK_OBJECT_TYPES.SPELL, sourceObject: { id: `public-spell-${index + 1}`, name: `Spell ${index + 1}`, owner: controller, controller, zone: 'stack' }, controller })));
+    const top = state.stack.at(-1);
+    return evaluated('yes', `${top.sourceObject.name}, controlled by ${top.controller}, resolves first because it was added last.`, {
+      cards, primitives: ['stack', 'priority', 'multiplayer'], trace: state.trace, state, runtime: { stack: state.stack.map((entry) => entry.controller), resolvesFirst: top.controller }
+    });
+  }
+
+  if (/\bward\b/.test(text) && /\bpriority\b|\brespond\b|\bopportunity\b/.test(text)) {
+    if (!scenario.game.turnOrderKnown) return dependent('Multiplayer Ward priority order depends on seating order.', { cards, primitives: ['ward', 'priority'], clarificationNeeded: 'What is the clockwise turn order?' });
+    const state = multiplayerState(scenario, message, cards);
+    pushStackObject(state, createStackObject({ kind: STACK_OBJECT_TYPES.TRIGGERED_ABILITY, sourceObject: { id: 'public-ward', name: 'Ward', owner: state.game.nonactivePlayer }, controller: state.game.nonactivePlayer }));
+    state.game.priorityHolder = state.game.activePlayer;
+    const seen = [];
+    for (let index = 0; index < playersStillInGame(state).length - 1; index += 1) {
+      const holder = state.game.priorityHolder;
+      seen.push(holder);
+      passPriority(state, holder);
+    }
+    seen.push(state.game.priorityHolder);
+    return evaluated('yes', `Ward remains on the stack while priority passes through ${seen.join(', ')} before it can resolve.`, {
+      cards, primitives: ['ward', 'stack', 'priority'], trace: state.trace, state, runtime: { priorityOrder: seen }
+    });
+  }
+
+  if (/\bpriority\b/.test(text) || /\bturn order\b|\bnext turn\b|\bclockwise\b/.test(text)) {
+    if (!scenario.game.turnOrderKnown) return dependent('The result depends on the established clockwise seating order.', { cards, primitives: ['turn-structure', 'priority'], clarificationNeeded: 'What is the clockwise turn order?' });
+    if (/\bpriority\b/.test(text) && !scenario.game.priorityHolder) return dependent('The result depends on which player currently has priority.', { cards, primitives: ['priority'], clarificationNeeded: 'Who currently has priority?' });
+    const state = multiplayerState(scenario, message, cards);
+    return evaluated('yes', `The canonical in-game order is ${state.game.turnOrder.join(' -> ')}; active player ${state.game.activePlayer} is followed by ${state.game.nonactivePlayers.join(', ')}.`, {
+      cards, primitives: ['turn-structure', 'priority', 'multiplayer'], state, runtime: { turnOrder: state.game.turnOrder, nonactivePlayers: state.game.nonactivePlayers }
+    });
+  }
+
+  return unsupported('This multiplayer Commander interaction is outside the certified Phase 9D free-for-all subset.', { cards, primitives: ['commander', 'multiplayer'] });
 }
 
 function dependent(summary, { cards = [], primitives = [], trace = [], sequence = [], state = null, clarificationNeeded = null, runtime = {} } = {}) {
@@ -208,7 +386,7 @@ function targetedEffectsForSpell({ message, spell }) {
 function compileScenarioTrace({ state, cards, targetBindings = [], responses = [] }) {
   state.trace.push({
     type: 'ScenarioCompiler',
-    players: ['player', 'opponent'],
+    players: state.game.turnOrder,
     objects: state.battlefield.map((object) => ({
       name: deriveCharacteristics(state, object).name,
       controller: deriveCharacteristics(state, object).controller,
@@ -805,7 +983,10 @@ function evaluateTypedSpellEffects({ message, cards, genericObjects, scenario })
     const effect = effects[index];
     const targetId = action.targets[index]?.objectId || action.targets[0]?.objectId;
     const target = targetId ? state.objects.get(targetId) : null;
-    const targetPlayer = effect.subject?.includes('opponent') || effect.target?.kind === 'player' ? opponentOf(action.actor) : null;
+    const legalOpponents = opponentsOf(state, action.actor);
+    const targetPlayer = effect.subject?.includes('opponent') || effect.target?.kind === 'player'
+      ? legalOpponents.length === 1 ? legalOpponents[0] : null
+      : null;
     const result = executeTypedEffect({
       state,
       effect,
@@ -1266,8 +1447,8 @@ function evaluateCommanderTaxScenario({ message, cards, scenario, card, commande
 function evaluateCommanderScenario({ message, cards, scenario }) {
   const text = normalizeMagicText(message);
   if (!/\bcommander\b|\bcommand zone\b/.test(text)) return null;
-  if (/\bpartner\b|\bbackground\b|\bdoctor'?s companion\b|\bmultiplayer\b|\bfour.player\b/.test(text)) {
-    return unsupported('This multi-commander or multiplayer Commander mechanic is deferred beyond Phase 9A.', { cards, primitives: ['commander'] });
+  if (/\bpartner\b|\bbackground\b|\bdoctor'?s companion\b/.test(text)) {
+    return unsupported('This multi-commander mechanic is outside the certified Commander subset.', { cards, primitives: ['commander'] });
   }
   if (/\bcolor identity\b|\bsingleton\b|\bdeck (?:legal|legality|construction)\b/.test(text)) return null;
   if (!/\bcommander\b/.test(text)) {
@@ -1390,6 +1571,8 @@ export function evaluateMagicRulesRuntime({ message = '', cards = [] } = {}) {
   const normalizedCards = cards.map(normalizeMagicCard).filter((card) => card.name);
   const text = normalizeMagicText(message);
   const scenario = compileMagicScenario({ message, cards: normalizedCards });
+  const multiplayer = evaluateMultiplayerCommanderScenario({ message, cards: normalizedCards, scenario });
+  if (multiplayer) return multiplayer;
   const commander = evaluateCommanderScenario({ message, cards: normalizedCards, scenario });
   if (commander) return commander;
   if (/\b(humility|opalescence|layer|dependency|timestamp)\b/.test(text)) {

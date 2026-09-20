@@ -11,6 +11,7 @@ import {
   setPendingRuntimeChoice
 } from './runtimeState.js';
 import { COMBAT_STEPS } from './turnStructure.js';
+import { opponentsOf } from './multiplayerRuntime.js';
 
 export { COMBAT_STEPS } from './turnStructure.js';
 
@@ -51,12 +52,13 @@ function finishTurnBasedAction(state, eventIndex, step) {
   return { stateBasedActions, triggers, stackedTriggers };
 }
 
-export function createCombatState({ attackingPlayer = 'player', defendingPlayer = opponentOf(attackingPlayer) } = {}) {
+export function createCombatState({ attackingPlayer = 'player', defendingPlayer = opponentOf(attackingPlayer), defendingPlayers = defendingPlayer ? [defendingPlayer] : [] } = {}) {
   return {
     status: 'active',
     step: COMBAT_STEPS.BEGINNING,
     attackingPlayer,
     defendingPlayer,
+    defendingPlayers,
     attackers: [],
     blockerAssignments: [],
     damageAssignments: [],
@@ -71,15 +73,16 @@ export function createCombatState({ attackingPlayer = 'player', defendingPlayer 
 
 export function beginCombat(state, options = {}) {
   const attackingPlayer = options.attackingPlayer || state.game.activePlayer;
-  const defendingPlayer = options.defendingPlayer || opponentOf(attackingPlayer);
-  if (!state.players[attackingPlayer] || !state.players[defendingPlayer] || attackingPlayer === defendingPlayer) {
-    return { status: 'unsupported', reason: 'Combat requires one supported attacking player and one distinct defending player.' };
+  const legalDefenders = opponentsOf(state, attackingPlayer);
+  const defendingPlayer = options.defendingPlayer || legalDefenders[0] || null;
+  if (!state.players[attackingPlayer] || legalDefenders.length === 0) {
+    return { status: 'unsupported', reason: 'Combat requires an in-game attacking player and at least one distinct in-game opponent.' };
   }
-  state.combat = createCombatState({ attackingPlayer, defendingPlayer });
+  state.combat = createCombatState({ attackingPlayer, defendingPlayer, defendingPlayers: legalDefenders });
   state.combat.startedAtTurn = state.game.turn;
   state.game.phase = 'combat';
   state.game.step = COMBAT_STEPS.BEGINNING;
-  emitEvent(state, 'CombatBegan', { player: attackingPlayer, metadata: { defendingPlayer } });
+  emitEvent(state, 'CombatBegan', { player: attackingPlayer, metadata: { defendingPlayer, defendingPlayers: legalDefenders } });
   openPriorityWindow(state, COMBAT_STEPS.BEGINNING);
   return { status: 'ready', combat: state.combat };
 }
@@ -106,9 +109,14 @@ export function declareAttackers(state, declarations = []) {
   if (state.combat.step !== COMBAT_STEPS.BEGINNING && state.combat.step !== COMBAT_STEPS.DECLARE_ATTACKERS) {
     return { status: 'illegal', reason: 'Attackers can be declared only during the declare attackers step.' };
   }
+  const multiplayer = state.combat.defendingPlayers.length > 1;
   const normalized = declarations.map((entry) => typeof entry === 'string' || entry?.id
-    ? { object: objectFrom(state, entry), attackTarget: state.combat.defendingPlayer }
-    : { object: objectFrom(state, entry.objectId || entry.object), attackTarget: entry.attackTarget || state.combat.defendingPlayer });
+    ? { object: objectFrom(state, entry), attackTarget: multiplayer ? null : state.combat.defendingPlayer }
+    : { object: objectFrom(state, entry.objectId || entry.object), attackTarget: entry.attackTarget || (multiplayer ? null : state.combat.defendingPlayer) });
+  const invalidTarget = normalized.find((entry) => !entry.attackTarget
+    || !state.combat.defendingPlayers.includes(entry.attackTarget)
+    || state.players[entry.attackTarget]?.inGame === false);
+  if (invalidTarget) return { status: 'depends', reason: 'Each attacker needs an explicit in-game defending opponent in multiplayer combat.' };
   const checks = normalized.map((entry) => validateAttacker(state, entry.object));
   const unsupported = checks.find((check) => check.status === 'unsupported');
   if (unsupported) return unsupported;
@@ -152,7 +160,7 @@ export function validateBlocker(state, attackerReference, blockerReference) {
   if (!blocker || blocker.zone !== 'battlefield') return { legal: false, reason: 'The proposed blocker is not on the battlefield.' };
   const blockerCharacteristics = deriveCharacteristics(state, blocker);
   if (!blockerCharacteristics.types.includes('creature')) return { legal: false, reason: `${blocker.name} is not a creature.` };
-  if (blockerCharacteristics.controller !== state.combat.defendingPlayer) return { legal: false, reason: `${blocker.name} is not controlled by the defending player.` };
+  if (blockerCharacteristics.controller !== attackerEntry.attackTarget) return { legal: false, reason: `${blocker.name} is not controlled by the player this creature is attacking.` };
   if (blocker.tapped) return { legal: false, reason: `${blocker.name} is tapped and cannot block.` };
   if (blockerCharacteristics.abilities.some((ability) => /can't block|cannot block/.test(ability))) return { legal: false, reason: `${blocker.name} cannot block.` };
   if (blocker.blockRestrictions?.length) return { legal: null, status: 'unsupported', reason: `${blocker.name} has an unsupported blocking restriction.` };
@@ -203,7 +211,7 @@ export function declareBlockers(state, declarations = []) {
     attackerEntry.wasBlocked = attackerEntry.wasBlocked || attackerEntry.blocked;
     if (attackerEntry.blocked) emitEvent(state, 'AttackerBecameBlocked', { source: state.objects.get(attackerEntry.objectId), metadata: { blockerIds: attackerEntry.blockerIds } });
     for (const assignment of assignments) {
-      emitEvent(state, 'BlockDeclared', { source: assignment.blocker, affected: assignment.attacker, object: assignment.blocker, controller: state.combat.defendingPlayer, metadata: { attackerId: assignment.attacker.id } });
+      emitEvent(state, 'BlockDeclared', { source: assignment.blocker, affected: assignment.attacker, object: assignment.blocker, controller: attackerEntry.attackTarget, metadata: { attackerId: assignment.attacker.id, defendingPlayer: attackerEntry.attackTarget } });
     }
   }
   const followUp = finishTurnBasedAction(state, eventIndex, COMBAT_STEPS.DECLARE_BLOCKERS);
@@ -358,7 +366,7 @@ export function endCombat(state) {
   state.combat.step = COMBAT_STEPS.END;
   state.combat.status = 'complete';
   state.game.step = COMBAT_STEPS.END;
-  emitEvent(state, 'EndOfCombat', { player: state.combat.attackingPlayer, metadata: { defendingPlayer: state.combat.defendingPlayer } });
+  emitEvent(state, 'EndOfCombat', { player: state.combat.attackingPlayer, metadata: { defendingPlayer: state.combat.defendingPlayer, defendingPlayers: state.combat.defendingPlayers } });
   const followUp = finishTurnBasedAction(state, eventIndex, COMBAT_STEPS.END);
   return { status: 'complete', combat: state.combat, ...followUp };
 }

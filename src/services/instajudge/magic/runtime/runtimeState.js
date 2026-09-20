@@ -12,6 +12,7 @@ import {
   removeSourceStaticEffects
 } from './continuousEffects.js';
 import { createCanonicalTurnState } from './turnStructure.js';
+import { apnapOrder, nextPlayerInTurnOrder, opponentsOf, playersStillInGame, priorityStartPlayer, syncMultiplayerGameState } from './multiplayerRuntime.js';
 import {
   commanderDesignationFor,
   commanderDamageLossFor,
@@ -43,11 +44,13 @@ export function createPlayer(id, overrides = {}) {
     hand: [], library: [], graveyard: [], exile: [], battlefield: [], commandZone: [],
     commanderDamage: {},
     failedDraw: false,
-    lost: false
+    lost: overrides.lost ?? false,
+    inGame: overrides.inGame ?? !overrides.lost,
+    leftGame: overrides.leftGame ?? false
   };
 }
 
-export function createGameObject({ id = null, card, controller = 'player', owner = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false, commanderDesignationId = null, counters = {}, timestamp = null, abilities = [], summoningSick = false, enteredTurn = null, attackRestrictions = [], blockRestrictions = [] } = {}) {
+export function createGameObject({ id = null, card, controller = 'player', owner = controller, baseController = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false, commanderDesignationId = null, counters = {}, timestamp = null, abilities = [], summoningSick = false, enteredTurn = null, attackRestrictions = [], blockRestrictions = [] } = {}) {
   const normalizedCard = card ? normalizeMagicCard(card) : normalizeMagicCard({ name: name || 'Generic Object', typeLine: 'Creature', oracleText: '', power, toughness });
   const objectId = id ? reserveId(id) : makeId(token ? 'token' : 'object');
   const object = {
@@ -55,7 +58,7 @@ export function createGameObject({ id = null, card, controller = 'player', owner
     card: normalizedCard,
     oracleId: normalizedCard.oracle_id || normalizedCard.id || null,
     name: name || normalizedCard.name,
-    owner, controller, zone,
+    owner, controller, baseController, zone,
     timestamp: timestamp ?? nextObjectId,
     tapped,
     summoningSick,
@@ -166,15 +169,21 @@ export function clearPendingRuntimeChoice(state, choiceId) {
 export function createMagicRuntimeState({ cards = [], genericObjects = [], scenario = null, message = '' } = {}) {
   nextObjectId = 1;
   nextEventId = 1;
+  const playerDescriptors = scenario?.players?.length
+    ? scenario.players
+    : [{ id: 'player', role: 'user' }, { id: 'opponent', role: 'opponent' }];
+  const players = Object.fromEntries(playerDescriptors.map((descriptor) => [descriptor.id, createPlayer(descriptor.id, descriptor)]));
+  const turnOrder = scenario?.game?.turnOrder?.length ? scenario.game.turnOrder : playerDescriptors.map((descriptor) => descriptor.id);
   const state = {
     type: 'MagicGameState', version: 2,
     format: createFormatState(scenario?.format || null),
-    players: { player: createPlayer('player'), opponent: createPlayer('opponent') },
+    players,
     objects: new Map(),
     zones: { battlefield: [], hand: [], graveyard: [], exile: [], library: [], stack: [], command: [] },
     game: createCanonicalTurnState({
       turn: scenario?.game?.turn || 1,
       activePlayer: scenario?.game?.activePlayer || (/opponent.?s turn|opponent turn/i.test(message) ? 'opponent' : 'player'),
+      turnOrder,
       phase: scenario?.game?.phase || (/combat/i.test(message) ? 'combat' : /end step/i.test(message) ? 'ending' : 'main'),
       step: scenario?.game?.step || (/cleanup/i.test(message) ? 'cleanup' : null),
       priorityHolder: scenario?.game?.priorityHolder || null,
@@ -190,6 +199,7 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
     trace: [], scenario
   };
   state.combat = null;
+  syncMultiplayerGameState(state);
 
   for (const card of cards) {
     const normalized = normalizeMagicCard(card);
@@ -629,6 +639,126 @@ function cancelOpposingCounters(state, object) {
   return true;
 }
 
+function removeObjectFromGame(state, object, playerId) {
+  if (object.zone === 'battlefield') removeSourceStaticEffects(state, object.id);
+  removeFromZone(state, object.zone, object.id);
+  state.battlefield = state.battlefield.filter((candidate) => candidate.id !== object.id);
+  object.lastKnown = snapshotObject(object);
+  object.zone = 'outside-game';
+  object.leftGame = true;
+  object.attachments = [];
+  object.attachedTo = null;
+  emitEvent(state, 'ObjectLeftGame', { object, affected: object, player: playerId, previous: object.lastKnown });
+  return object;
+}
+
+function updateMultiplayerResult(state) {
+  const remaining = playersStillInGame(state);
+  if (remaining.length === 1 && Object.keys(state.players).length > 1) {
+    state.game.result = { status: 'complete', winnerId: remaining[0], reason: 'last-player-standing' };
+    emitEvent(state, 'GameEnded', { player: remaining[0], metadata: { result: 'win', reason: 'last-player-standing' } });
+  } else if (remaining.length === 0) {
+    state.game.result = { status: 'unverified', winnerId: null, reason: 'no-players-remaining' };
+    emitEvent(state, 'GameResultUnverified', { metadata: { reason: 'no-players-remaining' } });
+  } else {
+    state.game.result = { status: 'active', winnerId: null };
+  }
+  return state.game.result;
+}
+
+export function leavePlayersRuntime(state, playerIds, { reason = 'left the game' } = {}) {
+  const leaving = [...new Set(playerIds)].filter((playerId) => state.players[playerId]?.inGame !== false);
+  if (leaving.length === 0) return { status: 'unchanged', players: [], result: state.game.result };
+  const leavingSet = new Set(leaving);
+  const activeWasLeaving = leavingSet.has(state.game.activePlayer);
+  const activeAnchor = state.game.activePlayer || state.game.turnOrderAnchor;
+  const controlledForeignObjects = [...state.objects.values()].filter((object) => !leavingSet.has(object.owner)
+    && leavingSet.has(deriveCharacteristics(state, object).controller));
+
+  for (const playerId of leaving) {
+    state.players[playerId].inGame = false;
+    state.players[playerId].leftGame = true;
+  }
+
+  const ownedObjects = [...state.objects.values()].filter((object) => leavingSet.has(object.owner) && object.zone !== 'outside-game');
+  for (const object of ownedObjects) removeObjectFromGame(state, object, object.owner);
+
+  const removedStackObjects = state.stack.filter((entry) => leavingSet.has(entry.controller)
+    || leavingSet.has(entry.sourceObject?.owner)
+    || leavingSet.has(entry.source?.owner));
+  state.stack = state.stack.filter((entry) => !removedStackObjects.includes(entry));
+  for (const entry of removedStackObjects) {
+    entry.status = 'ceased-on-player-leave';
+    emitEvent(state, 'StackObjectCeased', { source: entry.sourceObject || entry.source, controller: entry.controller, metadata: { stackObjectId: entry.id, reason: 'player-left-game' } });
+  }
+
+  state.continuousEffects = state.continuousEffects.filter((effect) => !leavingSet.has(effect.controller)
+    && !leavingSet.has(effect.modification?.controller)
+    && !leavingSet.has(effect.source?.owner));
+  const unsupportedControl = [];
+  for (const object of controlledForeignObjects) {
+    const controller = object.baseController || object.owner;
+    if (!controller || !state.players[controller] || leavingSet.has(controller)) {
+      unsupportedControl.push(object.id);
+      continue;
+    }
+    object.controller = controller;
+    object.baseController = controller;
+    for (const player of Object.values(state.players)) player.battlefield = player.battlefield.filter((id) => id !== object.id);
+    if (object.zone === 'battlefield' && !state.players[controller].battlefield.includes(object.id)) state.players[controller].battlefield.push(object.id);
+    emitEvent(state, 'ControlReverted', { object, affected: object, controller, metadata: { previousControllerLeft: true } });
+  }
+  invalidateCharacteristics(state);
+
+  state.pendingTriggers = state.pendingTriggers.filter((trigger) => !leavingSet.has(trigger.controller));
+  state.pendingChoices = state.pendingChoices.filter((choice) => !leavingSet.has(choice.playerId || choice.player || choice.chooser || choice.ownerId));
+  for (const playerId of leaving) emitEvent(state, 'PlayerLeftGame', { player: playerId, metadata: { reason } });
+
+  if (activeWasLeaving) {
+    state.game.turnOrderAnchor = activeAnchor;
+    state.game.activePlayer = null;
+  }
+  if (leavingSet.has(state.game.priorityHolder)) state.game.priorityHolder = nextPlayerInTurnOrder(state, state.game.priorityHolder);
+  state.game.consecutivePasses = 0;
+  syncMultiplayerGameState(state);
+  if (!state.game.priorityHolder && playersStillInGame(state).length > 1) state.game.priorityHolder = priorityStartPlayer(state);
+  const result = updateMultiplayerResult(state);
+  return {
+    status: unsupportedControl.length ? 'unverified' : 'committed',
+    players: leaving,
+    ownedObjects: ownedObjects.map((object) => object.id),
+    removedStackObjects: removedStackObjects.map((entry) => entry.id),
+    revertedObjects: controlledForeignObjects.filter((object) => !unsupportedControl.includes(object.id)).map((object) => object.id),
+    unsupportedControl,
+    result
+  };
+}
+
+export function gatherSimultaneousPlayerChoices(state, { id, requiredPlayers = playersStillInGame(state), selections = {}, choiceForPlayer = null, applyChoices = null } = {}) {
+  const order = apnapOrder(state).filter((playerId) => requiredPlayers.includes(playerId));
+  const existing = state.pendingChoices.find((choice) => choice.id === id);
+  const gathered = { ...(existing?.selections || {}), ...selections };
+  const nextChooser = order.find((playerId) => gathered[playerId] === undefined);
+  if (nextChooser) {
+    const pending = setPendingRuntimeChoice(state, {
+      id,
+      type: 'SimultaneousPlayerChoice',
+      playerId: nextChooser,
+      chooser: nextChooser,
+      affectedPlayers: [...order],
+      activePlayer: state.game.activePlayer,
+      turnOrder: [...state.game.turnOrder],
+      selections: gathered,
+      choices: typeof choiceForPlayer === 'function' ? choiceForPlayer(nextChooser, state) : []
+    });
+    return { status: 'depends', order, nextChooser, selections: gathered, pendingChoice: pending };
+  }
+  clearPendingRuntimeChoice(state, id);
+  const result = typeof applyChoices === 'function' ? applyChoices(gathered, state) : gathered;
+  emitEvent(state, 'SimultaneousChoicesCommitted', { metadata: { choiceId: id, order, selections: gathered } });
+  return { status: 'committed', order, selections: gathered, result };
+}
+
 export function runStateBasedActionsRuntime(state) {
   const applied = [];
   let changed = true;
@@ -663,15 +793,20 @@ export function runStateBasedActionsRuntime(state) {
       applied.push(`${object.name} is put into its owner's graveyard (${reason.replace('state-based action: ', '')}).`);
       changed = true;
     }
+    const losingPlayers = [];
     for (const [playerId, player] of Object.entries(state.players)) {
       const commanderDamageLoss = commanderDamageLossFor(state, playerId);
-      if (!player.lost && (player.life <= 0 || player.poison >= 10 || player.failedDraw || commanderDamageLoss)) {
+      if (player.inGame !== false && !player.lost && (player.life <= 0 || player.poison >= 10 || player.failedDraw || commanderDamageLoss)) {
         player.lost = true;
         const reason = player.life <= 0 ? 'life total' : player.poison >= 10 ? 'poison counters' : player.failedDraw ? 'drawing from an empty library' : 'commander combat damage';
         emitEvent(state, 'PlayerLost', { player: playerId, metadata: { reason, ...(commanderDamageLoss || {}) } });
         applied.push(`${playerId} loses the game because of ${reason}.`);
-        changed = true;
+        losingPlayers.push(playerId);
       }
+    }
+    if (losingPlayers.length) {
+      leavePlayersRuntime(state, losingPlayers, { reason: 'state-based action loss' });
+      changed = true;
     }
     for (const object of state.objects.values()) {
       if (object.token && object.zone !== 'battlefield' && object.zone !== 'stack' && !object.ceasedToExist) {
@@ -734,9 +869,29 @@ export function collectTriggeredAbilities(state, events = state.events) {
   return triggerInstances;
 }
 
-export function putPendingTriggersOnStack(state) {
-  const active = state.game.activePlayer;
-  const ordered = [...state.pendingTriggers].sort((left, right) => Number(left.controller === active) - Number(right.controller === active));
+export function putPendingTriggersOnStack(state, { triggerOrders = {}, orderMattersByPlayer = [] } = {}) {
+  const order = apnapOrder(state);
+  for (const playerId of orderMattersByPlayer) {
+    const controlled = state.pendingTriggers.filter((trigger) => trigger.controller === playerId);
+    if (controlled.length > 1 && !triggerOrders[playerId]) {
+      setPendingRuntimeChoice(state, {
+        id: `trigger-order:${state.game.turnId}:${playerId}`,
+        type: 'TriggerOrderChoice',
+        playerId,
+        chooser: playerId,
+        activePlayer: state.game.activePlayer,
+        turnOrder: [...state.game.turnOrder],
+        choices: controlled.map((trigger) => ({ id: trigger.id, source: trigger.source?.name || null }))
+      });
+      return [];
+    }
+  }
+  const ordered = order.flatMap((playerId) => {
+    const controlled = state.pendingTriggers.filter((trigger) => trigger.controller === playerId);
+    const supplied = triggerOrders[playerId];
+    if (!supplied) return controlled;
+    return supplied.map((id) => controlled.find((trigger) => trigger.id === id)).filter(Boolean);
+  });
   for (const trigger of ordered) {
     if (!state.stack.includes(trigger)) state.stack.push(trigger);
     emitEvent(state, 'TriggerPutOnStack', { source: trigger.source, controller: trigger.controller, metadata: { triggerId: trigger.id } });
@@ -747,7 +902,11 @@ export function putPendingTriggersOnStack(state) {
 
 export function resolveTrigger(state, trigger, targetPlayer = 'opponent') {
   if (trigger.effect.type !== 'life-drain') return { supported: false, summary: `${trigger.source.name}'s trigger is unsupported.` };
-  const target = state.players[targetPlayer] ? targetPlayer : 'opponent';
+  const legalOpponents = opponentsOf(state, trigger.controller);
+  if ((!targetPlayer || targetPlayer === 'opponent') && legalOpponents.length > 1) {
+    return { supported: false, status: 'depends', clarificationNeeded: 'Which opponent is targeted by the triggered ability?', choices: legalOpponents };
+  }
+  const target = state.players[targetPlayer] ? targetPlayer : legalOpponents[0];
   const loss = trigger.effect.opponentLifeLoss;
   const gain = trigger.effect.controllerLifeGain;
   state.players[target].life -= loss;

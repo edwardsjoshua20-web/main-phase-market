@@ -24,9 +24,9 @@ import {
   TURN_STEPS,
   TURN_STEP_METADATA,
   createLandPlayState,
-  getTurnStepMetadata,
-  opponentOf
+  getTurnStepMetadata
 } from './turnStructure.js';
+import { nextPlayerInTurnOrder, priorityStartPlayer, syncMultiplayerGameState } from './multiplayerRuntime.js';
 
 function actionKey(state) {
   const cleanupIteration = state.game.step === TURN_STEPS.CLEANUP
@@ -237,6 +237,11 @@ function performCleanupTurnBasedAction(state, options) {
 
 export function executeCurrentTurnBasedAction(state, options = {}) {
   const actionState = initializeTurnBasedActionState(state);
+  if (!state.game.activePlayer) {
+    const result = { status: 'executed', skipped: true, reason: 'The active player left the game.' };
+    completeTurnBasedAction(state, result);
+    return result;
+  }
   if (actionState.status === 'complete') {
     return { status: 'executed', alreadyCompleted: true, result: actionState.result || null };
   }
@@ -252,7 +257,7 @@ export function executeCurrentTurnBasedAction(state, options = {}) {
   if (result.status === 'executed') {
     completeTurnBasedAction(state, result);
     if (state.game.priorityPolicy === PRIORITY_POLICIES.NORMAL && !state.game.priorityHolder) {
-      state.game.priorityHolder = state.game.activePlayer;
+      state.game.priorityHolder = priorityStartPlayer(state);
       state.game.consecutivePasses = 0;
       emitEvent(state, 'PriorityGranted', {
         player: state.game.priorityHolder,
@@ -303,8 +308,10 @@ function applyCanonicalStep(state, to, { nextTurn = false, actionOptions = {} } 
   const from = state.game.step;
   if (nextTurn) {
     state.game.turn += 1;
-    state.game.activePlayer = opponentOf(state.game.activePlayer);
-    state.game.nonactivePlayer = opponentOf(state.game.activePlayer);
+    const anchor = state.game.activePlayer || state.game.turnOrderAnchor;
+    state.game.activePlayer = nextPlayerInTurnOrder(state, anchor);
+    state.game.turnOrderAnchor = state.game.activePlayer;
+    syncMultiplayerGameState(state);
     state.game.turnId = `turn-${state.game.turn}:${state.game.activePlayer}`;
     state.game.landPlays = createLandPlayState({ turnId: state.game.turnId });
     state.combat = null;
@@ -333,7 +340,7 @@ function applyCanonicalStep(state, to, { nextTurn = false, actionOptions = {} } 
   const transition = transitionResult(state, from, to, null, null, actionResult);
   if (actionResult.status !== 'executed') return { ...transition, ...actionResult, from, to };
   if (metadata.priority === PRIORITY_POLICIES.NORMAL && !state.game.priorityHolder) {
-    state.game.priorityHolder = state.game.activePlayer;
+    state.game.priorityHolder = priorityStartPlayer(state);
     emitEvent(state, 'PriorityGranted', { player: state.game.priorityHolder, metadata: { turnStep: to } });
   }
   return transition;
@@ -454,6 +461,8 @@ export function describeTurnStep(state) {
     turnId: state.game.turnId,
     activePlayer: state.game.activePlayer,
     nonactivePlayer: state.game.nonactivePlayer,
+    nonactivePlayers: [...(state.game.nonactivePlayers || [])],
+    nextPlayer: state.game.nextPlayer || null,
     phase: metadata.phase,
     step: state.game.step,
     insideCombat: state.game.insideCombat,

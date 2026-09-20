@@ -21,6 +21,7 @@ import {
   registerPreventionEffect,
   runStateBasedActionsRuntime
 } from './runtimeState.js';
+import { opponentsOf, playersStillInGame } from './multiplayerRuntime.js';
 
 function fixedAmount(value) {
   if (Number.isFinite(value)) return value;
@@ -28,11 +29,22 @@ function fixedAmount(value) {
   return null;
 }
 
-function playerForSubject(subject, controller, targetPlayer) {
+function playerForSubject(state, subject, controller, targetPlayer) {
   if (targetPlayer) return targetPlayer;
   if (subject === 'you') return controller;
-  if (subject === 'each opponent' || subject === 'target opponent') return opponentOf(controller);
+  if (subject === 'target opponent') {
+    const opponents = opponentsOf(state, controller);
+    return opponents.length === 1 ? opponents[0] : null;
+  }
   return controller;
+}
+
+function ambiguousOpponentTarget(state, effect, controller, targetPlayer) {
+  if (effect.subject !== 'target opponent' || targetPlayer) return null;
+  const choices = opponentsOf(state, controller);
+  return choices.length > 1
+    ? { status: 'depends', clarificationNeeded: 'Which opponent is the target?', choices }
+    : null;
 }
 
 function zoneObjects(state, playerId, zone) {
@@ -56,7 +68,7 @@ export function createGenericZoneCard(state, { playerId = 'player', zone = 'libr
   }), playerId, zone);
 }
 
-export function changeLife(state, { playerId, amount, direction = 'gain', source = null, replacementChoices = [] } = {}) {
+export function changeLife(state, { playerId, amount, direction = 'gain', source = null, replacementChoices = [], runStateBasedActions = true } = {}) {
   const numeric = fixedAmount(amount);
   if (!Number.isFinite(numeric)) return unsupported('Life change amount is not fixed.');
   const pipeline = proposeRuntimeEvent(state, 'LifeChange', { source, player: playerId, amount: numeric, metadata: { direction } }, { replacementChoices });
@@ -65,7 +77,7 @@ export function changeLife(state, { playerId, amount, direction = 'gain', source
   const finalDirection = pipeline.event.metadata?.direction || direction;
   state.players[playerId].life += finalDirection === 'gain' ? finalAmount : -finalAmount;
   emitEvent(state, finalDirection === 'gain' ? 'LifeGained' : 'LifeLost', { source, player: playerId, amount: finalAmount, metadata: { replacements: pipeline.applied } });
-  runStateBasedActionsRuntime(state);
+  if (runStateBasedActions) runStateBasedActionsRuntime(state);
   return { status: 'executed', playerId, amount: finalAmount, direction: finalDirection, life: state.players[playerId].life, replacements: pipeline.applied };
 }
 
@@ -221,20 +233,34 @@ export function searchLibrary(state, { playerId, criteria, destination = 'hand',
 
 export function executeTypedEffect({ state, effect, sourceObject = null, controller = sourceObject?.controller || 'player', target = null, targetPlayer = null, choices = {}, allowPlaceholders = false } = {}) {
   if (!effect?.type) return unsupported('No typed effect was supplied.');
+  const targetAmbiguity = ambiguousOpponentTarget(state, effect, controller, targetPlayer);
+  if (targetAmbiguity) return targetAmbiguity;
   const amount = fixedAmount(effect.amount);
   switch (effect.type) {
     case ORACLE_NODE_TYPES.LIFE_CHANGE: {
-      const players = effect.subject === 'each opponent' ? [opponentOf(controller)] : [playerForSubject(effect.subject, controller, targetPlayer)];
-      return combine(players.map((playerId) => changeLife(state, { playerId, amount, direction: effect.direction, source: sourceObject, replacementChoices: choices.replacementChoices })));
+      const players = effect.subject === 'each opponent' ? opponentsOf(state, controller)
+        : effect.subject === 'each player' ? playersStillInGame(state)
+          : [playerForSubject(state, effect.subject, controller, targetPlayer)];
+      const simultaneous = players.length > 1;
+      const result = combine(players.map((playerId) => changeLife(state, {
+        playerId,
+        amount,
+        direction: effect.direction,
+        source: sourceObject,
+        replacementChoices: choices.replacementChoices,
+        runStateBasedActions: !simultaneous
+      })));
+      if (result.status === 'executed' && simultaneous) result.stateBasedActions = runStateBasedActionsRuntime(state);
+      return result;
     }
     case ORACLE_NODE_TYPES.DRAW:
-      return drawCards(state, { playerId: playerForSubject(effect.subject, controller, targetPlayer), amount, source: sourceObject, allowPlaceholders });
+      return drawCards(state, { playerId: playerForSubject(state, effect.subject, controller, targetPlayer), amount, source: sourceObject, allowPlaceholders });
     case ORACLE_NODE_TYPES.DISCARD: {
-      const players = effect.subject === 'each player' ? Object.keys(state.players) : [playerForSubject(effect.subject, controller, targetPlayer)];
+      const players = effect.subject === 'each player' ? playersStillInGame(state) : [playerForSubject(state, effect.subject, controller, targetPlayer)];
       return combine(players.map((playerId) => discardCards(state, { playerId, amount, cardIds: choices.cardIds?.[playerId] || choices.cardIds || [], source: sourceObject })));
     }
     case ORACLE_NODE_TYPES.MILL:
-      return millCards(state, { playerId: playerForSubject(effect.subject, controller, targetPlayer), amount, source: sourceObject, allowPlaceholders });
+      return millCards(state, { playerId: playerForSubject(state, effect.subject, controller, targetPlayer), amount, source: sourceObject, allowPlaceholders });
     case ORACLE_NODE_TYPES.SACRIFICE:
       return sacrificePermanent(state, { playerId: targetPlayer || controller, requirement: /creature/.test(effect.subject || '') ? 'creature' : 'permanent', objectId: target?.id || choices.objectId, source: sourceObject, replacementChoices: choices.replacementChoices });
     case ORACLE_NODE_TYPES.TOKEN_CREATION:
@@ -327,8 +353,4 @@ function combine(results) {
 
 function unsupported(reason) {
   return { status: 'unsupported', reason };
-}
-
-function opponentOf(playerId) {
-  return playerId === 'player' ? 'opponent' : 'player';
 }
