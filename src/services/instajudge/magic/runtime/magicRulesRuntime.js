@@ -210,7 +210,7 @@ function evaluateMultiplayerCommanderScenario({ message, cards, scenario }) {
       });
   }
 
-  if (/\btriggers?\b/.test(text) && /\b(?:same time|simultaneous|whose|stack first)\b/.test(text)) {
+  if (/\btriggers?\b/.test(text) && /\b(?:same time|simultaneous|whose|stack first|at once)\b|\border\b.{0,30}\bstack\b|\bstack order\b/.test(text)) {
     if (!scenario.game.turnOrderKnown) return dependent('APNAP trigger placement depends on the active player and established turn order.', { cards, primitives: ['stack', 'triggers'], clarificationNeeded: 'What is the clockwise turn order and who is active?' });
     const state = multiplayerState(scenario, message, cards);
     state.pendingTriggers = apnapOrder(state).map((controller, index) => ({ id: `public-trigger-${index + 1}`, source: { id: `source-${index + 1}`, name: `${controller} trigger`, owner: controller }, controller }));

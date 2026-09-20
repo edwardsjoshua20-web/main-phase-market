@@ -310,6 +310,9 @@ const publicCases = [
 for (const [message, verdict] of publicCases) {
   const result = evaluateMagicScenario({ message, cards: [] });
   verify(result.verdict === verdict, `Public case expected ${verdict}, received ${result.verdict}: ${message}`);
+  if (/\btriggers?\b/i.test(message) && verdict === 'yes') {
+    verify(/APNAP order/i.test(result.summary), 'Public simultaneous-trigger case must return the canonical APNAP explanation.');
+  }
   if (verdict === 'depends') metrics.depends += 1;
   else if (verdict === 'unverified') metrics.unverified += 1;
   else metrics.supported += 1;
