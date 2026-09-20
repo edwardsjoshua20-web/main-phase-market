@@ -414,9 +414,11 @@ function compileCommanderDamageScenario(text) {
   const prevented = Number(preventionMatch?.[1] || preventionMatch?.[2] || 0);
   const pair = text.match(/\b(?:my |the |this )?commander\b.{0,45}?\b(?:dealt|has dealt|did) (\d+)\b.{0,90}?\b(?:other commander|then|later|and)\b.{0,55}?\b(?:dealt|deals?|hits?|for)\s*(\d+)\b/);
   const priorMatch = text.match(/\b(?:my |the |this )?commander\b.{0,50}?\b(?:has |had )?(?:already )?(?:dealt|hit)\s+(\d+)\b/)
+    || text.match(/\b(?:my |the |this )?commander\b.{0,50}?\b(?:has |had )?(?:already )?(?:dealt|hit)\s+[a-z0-9-]+\s+(\d+)\b/)
     || text.match(/\b(?:my |the |this )?commander\b.{0,40}?\bhas hit (?:me|him|them) for\s+(\d+)\b/)
     || text.match(/\b(?:taken|received)\s+(\d+)\s+(?:points? of )?commander damage\b/);
-  const incomingMatch = text.match(/\b(?:would |will )?(?:deal|deals|hit|hits)\s+(?:for\s+)?(\d+)\b/)
+  const incomingMatch = text.match(/\b(?:would |will )?(?:deal|deals|hit|hits)\s+(?:me|him|her|them)\s+for\s+(\d+)\b/)
+    || text.match(/\b(?:would |will )?(?:deal|deals|hit|hits)\s+(?:for\s+)?(\d+)\b/)
     || text.match(/\b(\d+)\s+(?:points? of )?(?:trample|combat|commander) damage\b/);
   const lightningBolt = /\blightning bolts?\b/.test(text);
   const explicitlyNoncombat = lightningBolt || /\bnoncombat damage\b|\bactivated ability\b|\btriggered damage\b|\bfight damage\b/.test(text);
@@ -573,6 +575,7 @@ function compileMultiplayer(message) {
   };
   for (const match of message.matchAll(/\b([A-Z][a-z]+|[A-D])(?:'s)?\s+(?:passes|responds|casts|loses|dies|controls|has priority|is active|turn)\b/g)) addName(match[1]);
   for (const match of message.matchAll(/\b(?:attack(?:s|ing)?|target(?:s|ing)?|hits?|to)\s+([A-Z][a-z]+|[B-D])\b/g)) addName(match[1]);
+  for (const match of message.matchAll(/\band\s+([A-Z][a-z]+|[B-D])\s+with\s+(?:another|one|a)\b/g)) addName(match[1]);
   const tableList = message.match(/\b(?:player Commander game|Commander game|multiplayer game|game) with\s+([^.;?]+)/i);
   if (tableList) {
     for (const token of tableList[1].split(/\s*(?:,|and)\s*/i)) addName(token);

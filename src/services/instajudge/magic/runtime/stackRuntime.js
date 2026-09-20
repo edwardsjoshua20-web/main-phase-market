@@ -100,6 +100,15 @@ export function grantPriority(state, playerId = state.game.activePlayer) {
 }
 
 export function takePriorityAction(state, playerId, action = null) {
+  const pendingChoice = getPendingRuntimeChoice(state);
+  if (pendingChoice) {
+    return {
+      allowed: false,
+      status: 'depends',
+      reason: 'A pending runtime choice must be resolved before another priority action can be taken.',
+      pendingChoice
+    };
+  }
   if (state.game.priorityHolder !== playerId) return { allowed: false, reason: `${playerId} does not have priority.` };
   state.game.consecutivePasses = 0;
   state.game.priorityHolder = playerId;
@@ -387,6 +396,23 @@ export function putPendingStackTriggers(state) {
 }
 
 export function castSpell(state, { card = null, sourceObject: suppliedSourceObject = null, controller, targets = [], modes = [], costs = [], chosenValues = {}, paymentChoices = [], availableMana = null, skipTiming = false, factsProvided = null, validateTarget = null } = {}) {
+  const pendingChoice = getPendingRuntimeChoice(state);
+  if (pendingChoice) {
+    const timing = {
+      allowed: null,
+      status: 'depends',
+      code: TIMING_REASON_CODES.PENDING_CHOICE,
+      reason: 'A pending runtime choice must be resolved before another spell can be cast.',
+      missing: [`resolve pending ${pendingChoice.type}`]
+    };
+    return {
+      cast: false,
+      status: 'depends',
+      reason: timing.reason,
+      timing,
+      pendingChoice
+    };
+  }
   const castCard = card || suppliedSourceObject?.card;
   const sourceZone = suppliedSourceObject?.zone || 'hand';
   let commanderPermission = null;

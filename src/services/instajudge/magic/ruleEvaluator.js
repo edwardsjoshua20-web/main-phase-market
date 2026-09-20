@@ -35,7 +35,7 @@ export function evaluateMagicScenario({ message = '', cards = [], rules = [], le
   const mechanics = detectMagicMechanics({ message, cards: normalizedCards });
   const selectedRules = selectRelevantRules(mechanics, rules);
   const structuralCommanderQuestion = /\bcommander\b/i.test(message)
-    && /\b(?:command zone|dies?|died|graveyard|exil(?:e|ed)|hand|library|second copy|another copy|tax|countered|costs?|cast|damage|combat|hits?|trample|stole|lightning bolts?|lose|kill)\b/i.test(message);
+    && /\b(?:command zone|dies?|died|graveyard|exil(?:e|ed)|hand|library|second copy|another copy|tax|countered|costs?|cast|damage|combat|dealt|hits?|trample|stole|lightning bolts?|lose|kill)\b|\bis that 21\b/i.test(message);
   const structuralMultiplayerQuestion = /\b(?:three|four|five|3|4|5)[ -]player\b|\bfree-for-all\b|\bmultiplayer\b/i.test(message)
     && /\b(?:turn|priority|pass|respond|stack|attack|block|loses?|dies?|leaves?|controls?|game end|each opponent|each player|target opponent|ward|trigger|commander damage)\b/i.test(message);
   const unsupportedMultiplayerVariant = /\b(?:two-headed giant|2hg|emperor|grand melee|archenemy|limited range of influence|shared team)\b/i.test(message);

@@ -12,7 +12,7 @@ import {
   derivedHasAbility,
   derivedHasQuality
 } from './continuousEffects.js';
-import { STACK_OBJECT_TYPES, castSpell, checkTimingPermission, createStackObject, passPriority, pushStackObject, resolveTopOfStack } from './stackRuntime.js';
+import { STACK_OBJECT_TYPES, castSpell, checkTimingPermission, counterStackObject, createStackObject, passPriority, pushStackObject, resolveTopOfStack } from './stackRuntime.js';
 import {
   COMMANDER_DAMAGE_THRESHOLD,
   commanderDamageTotal,
@@ -48,6 +48,7 @@ import {
   moveObject,
   moveObjectWithResult,
   putPendingTriggersOnStack,
+  registerGameObject,
   resolveTrigger,
   runStateBasedActionsRuntime
 } from './runtimeState.js';
@@ -244,6 +245,29 @@ function evaluateMultiplayerCommanderScenario({ message, cards, scenario }) {
     seen.push(state.game.priorityHolder);
     return evaluated('yes', `Ward remains on the stack while priority passes through ${seen.join(', ')} before it can resolve.`, {
       cards, primitives: ['ward', 'stack', 'priority'], trace: state.trace, state, runtime: { priorityOrder: seen }
+    });
+  }
+
+  if (/\bpriority\b/.test(text) && /\bafter (?:i|we|the active player) cast\b.{0,50}\bcommander\b/.test(text)) {
+    const state = multiplayerState(scenario, message, cards);
+    state.game.phase = 'main';
+    state.game.step = 'precombat-main';
+    state.game.priorityHolder = 'player';
+    const commanderCard = cards[0] || normalizeMagicCard({
+      id: 'public-priority-commander-card', name: 'Designated Commander', typeLine: 'Legendary Creature', manaCost: '{2}', oracleText: ''
+    });
+    const commander = registerGameObject(state, createGameObject({
+      id: 'public-priority-commander', card: commanderCard, owner: 'player', controller: 'player', zone: 'command', commander: true
+    }));
+    state.players.player.commandZone.push(commander.id);
+    designateCommander(state, commander, { ownerId: 'player', designationId: 'public-priority-designation' });
+    const cast = castSpell(state, { sourceObject: commander, controller: 'player', skipTiming: true });
+    if (!cast.cast) return unsupported('The command-zone cast could not be represented safely.', {
+      cards, primitives: ['commander', 'stack', 'priority'], trace: state.trace
+    });
+    return evaluated('yes', `The player who cast the commander retains priority after the successful cast. After that player passes, priority proceeds through ${state.game.nonactivePlayers.join(', ')} in turn order.`, {
+      cards, primitives: ['commander', 'stack', 'priority', 'multiplayer'], trace: state.trace, state,
+      runtime: { priorityHolder: state.game.priorityHolder, priorityOrder: [state.game.priorityHolder, ...state.game.nonactivePlayers], cast }
     });
   }
 
@@ -1242,7 +1266,42 @@ function commanderScenarioState(card, { zone = 'battlefield', controller = 'play
   return state;
 }
 
-function evaluateCommanderDamageScenario({ cards, scenario, card, commanderLabel }) {
+function evaluateCommanderDamageScenario({ message, cards, scenario, card, commanderLabel }) {
+  const text = normalizeMagicText(message);
+  const splitRecipients = text.match(/\b(?:my |the |this )?commander\b.{0,35}\b(?:dealt|has dealt) ([a-z0-9-]+) (\d+) and ([a-z0-9-]+) (\d+)/);
+  if (splitRecipients && splitRecipients[1] !== splitRecipients[3] && /\bis that 21\b|\bdoes (?:that|it) (?:equal|count as) 21\b/.test(text)) {
+    const [, firstName, firstAmount, secondName, secondAmount] = splitRecipients;
+    const state = createMagicRuntimeState({
+      scenario: {
+        players: [{ id: 'player', name: 'Player' }, { id: firstName, name: firstName }, { id: secondName, name: secondName }],
+        objects: [], continuousEffects: [], format: { id: 'commander', commanderDesignations: [] },
+        game: { activePlayer: 'player', turnOrder: ['player', firstName, secondName], phase: 'main', step: 'precombat-main', priorityHolder: 'player' }
+      }
+    });
+    const commander = addPermanent(state, createGameObject({
+      id: 'split-recipient-commander', card, name: commanderLabel, owner: 'player', controller: 'player', commander: true
+    }));
+    const designation = designateCommander(state, commander, { ownerId: 'player', designationId: 'split-recipient-designation' });
+    setCommanderDamageTotal(state, firstName, designation.id, Number(firstAmount));
+    setCommanderDamageTotal(state, secondName, designation.id, Number(secondAmount));
+    const stateBasedActions = runStateBasedActionsRuntime(state);
+    return evaluated('no', `No. Commander damage is tracked separately for each recipient: ${firstName} has ${firstAmount} and ${secondName} has ${secondAmount}; those totals do not combine.`, {
+      cards,
+      primitives: ['commander', 'combat', 'damage', 'state-based-actions'],
+      trace: state.trace,
+      state,
+      runtime: {
+        commanderDamage: {
+          designationId: designation.id,
+          recipients: {
+            [firstName]: commanderDamageTotal(state, firstName, designation.id),
+            [secondName]: commanderDamageTotal(state, secondName, designation.id)
+          }
+        },
+        stateBasedActions
+      }
+    });
+  }
   const compiled = scenario.format?.commanderDamage;
   if (!compiled) return null;
   if (compiled.unsupported) {
@@ -1367,12 +1426,38 @@ function evaluateCommanderTaxScenario({ message, cards, scenario, card, commande
     });
   }
   const counteredFirstCast = /\bcountered\b/.test(text) && /\b(?:first|once|first time)\b/.test(text);
+  const asksWhetherCounteredCastCounts = /\bcountered\b/.test(text)
+    && /\b(?:tax increase|increase (?:the )?tax|still count|does (?:it|that) count)\b/.test(text);
   const resetQuestion = /\breset\b/.test(text);
   const sourceZone = /\bfrom (?:my |the )?hand\b|\bhand\b.{0,60}\bfrom there\b/.test(text) ? 'hand'
     : /\bfrom (?:my |the )?graveyard\b|\bgraveyard\b.{0,60}\bfrom there\b/.test(text) ? 'graveyard'
       : /\bfrom (?:my |the )?exile\b/.test(text) ? 'exile'
         : 'command';
   const priorCasts = history.known ? history.castsFromCommandZone : counteredFirstCast || resetQuestion ? 1 : null;
+  if (asksWhetherCounteredCastCounts && priorCasts == null) {
+    const state = commanderScenarioState(card, { zone: 'command', castsFromCommandZone: 0 });
+    const commander = state.objects.get('commander-object-1');
+    const cast = castSpell(state, {
+      sourceObject: commander,
+      controller: 'player',
+      factsProvided: state.scenario.game.factsProvided
+    });
+    if (!cast.cast || !counterStackObject(state, cast.stackObject).countered) {
+      return unsupported('The command-zone cast and counter transaction could not be proven safely.', {
+        cards,
+        primitives: ['commander', 'timing', 'stack'],
+        trace: state.trace
+      });
+    }
+    const castHistory = commanderDesignationFor(state, commander);
+    return evaluated('yes', `Yes. A successful command-zone cast counts before resolution, so countering ${commanderLabel} does not undo that cast or its future tax increase.`, {
+      cards,
+      primitives: ['commander', 'timing', 'stack'],
+      trace: state.trace,
+      state,
+      runtime: { cast, castHistory }
+    });
+  }
   if (sourceZone === 'command' && priorCasts == null) {
     return dependent('Commander tax depends on how many previous times this specific commander was cast from the command zone this game.', {
       cards,
@@ -1467,7 +1552,7 @@ function evaluateCommanderScenario({ message, cards, scenario }) {
     toughness: 1
   });
   const commanderLabel = cards.length ? card.name : 'the designated commander';
-  const commanderDamage = evaluateCommanderDamageScenario({ cards, scenario, card, commanderLabel });
+  const commanderDamage = evaluateCommanderDamageScenario({ message, cards, scenario, card, commanderLabel });
   if (commanderDamage) return commanderDamage;
   const taxQuestion = /\btax\b|\badditional (?:mana|cost)\b|\bcosts? (?:more|now|\d+ mana normally)\b|\bagain from (?:my |the )?command zone\b|\b(?:first|second|third) time\b|\bcountered\b|\breset\b|\bcast\b.{0,50}\bfrom (?:my |the )?(?:hand|graveyard)\b/.test(text);
   if (taxQuestion) return evaluateCommanderTaxScenario({ message, cards, scenario, card, commanderLabel });
@@ -1531,7 +1616,8 @@ function evaluateCommanderScenario({ message, cards, scenario }) {
   const state = commanderScenarioState(card, { controller });
   const commander = state.objects.get('commander-object-1');
   const designation = commanderDesignationFor(state, commander);
-  const decision = explicitCommanderDecision(text, destination);
+  const asksMustReturn = /\b(?:do i have to|must i|am i required to)\b.{0,100}\bcommand zone\b/.test(text);
+  const decision = asksMustReturn ? 'remain' : explicitCommanderDecision(text, destination);
   let movement;
   if (['hand', 'library'].includes(destination)) {
     const replacementId = `commander-zone:${designation.id}:battlefield:${destination}`;
@@ -1555,9 +1641,11 @@ function evaluateCommanderScenario({ message, cards, scenario }) {
   }
   const finalZone = commander.zone;
   const summary = decision === 'remain'
-    ? `Yes. The commander owner may leave ${commanderLabel} in ${destination}; its commander designation persists there.`
+    ? asksMustReturn
+      ? `No. The commander owner may leave ${commanderLabel} in ${destination}; moving it to the command zone is optional.`
+      : `Yes. The commander owner may leave ${commanderLabel} in ${destination}; its commander designation persists there.`
     : `Yes. The commander owner may move ${commanderLabel} to the command zone${['hand', 'library'].includes(destination) ? ' instead' : ' after it reaches the destination zone'}.`;
-  return evaluated('yes', summary, {
+  return evaluated(asksMustReturn ? 'no' : 'yes', summary, {
     cards,
     primitives: ['commander', 'zone-changes', ...(['graveyard', 'exile'].includes(destination) ? ['state-based-actions'] : ['replacement'])],
     trace: state.trace,
