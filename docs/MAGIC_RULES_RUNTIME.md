@@ -268,7 +268,19 @@ The residual two-player audit found valid compatibility aliases (`nonactivePlaye
 
 Expected `DEPENDS` boundaries include unidentified target opponents, missing material within-controller trigger order, unresolved simultaneous choices, Commander return/replacement decisions, Ward payment, and combat damage assignment. Expected `UNVERIFIED` boundaries include team multiplayer variants and foreign-object control reversion without provable provenance. Multiple applicable unsupported replacements, unusual-zone casting permission, broad cost reduction/alternative-cost mechanics, and unmodeled active-player-leaving stack or trigger edges also remain fail-closed.
 
-Certification repairs were limited to canonical runtime/compiler/evaluator owners and this dedicated verifier. Phase 8 reports 1,741 supported, 17 `DEPENDS`, 3 `UNVERIFIED`, 1,648 compositions, and 0 incorrect confident. Phase 9A, 9B, 9C, and 9D retain their accepted results with 0 incorrect confident. Phase 10 was not started.
+Certification repairs were limited to canonical runtime/compiler/evaluator owners and this dedicated verifier. Phase 8 reports 1,741 supported, 17 `DEPENDS`, 3 `UNVERIFIED`, 1,648 compositions, and 0 incorrect confident. Phase 9A, 9B, 9C, and 9D retain their accepted results with 0 incorrect confident.
+
+## Phase 10 Certification: Final Supported-Scope Audit
+
+Phase 10 certifies the combined Phase 1 through Phase 9 runtime for the documented supported scope. It does not add a new rules phase or broaden unsupported mechanics. The deterministic harness uses seed `0x10c34a`, 542 unseen or recomposed real-card ruling scenarios, and 4,120 timing and cross-system compositions. The real-card corpus is stratified across creatures, instants, sorceries, artifacts, enchantments, planeswalkers, battles, lands, and legal commanders from the local canonical Magic catalog.
+
+The final result is 4,670 supported checks, 13 expected `DEPENDS`, 12 expected `UNVERIFIED`, 0 crashes, 0 incorrectly parsed simple Oracle effects, and 0 incorrect confident rulings. Of 520 sampled Oracle records, 478 are fully represented by the current semantic subset and 42 are explicitly unsupported; semantic coverage is reported separately from ruling correctness. Median measured operation latency is 0.060 ms, p95 is 0.358 ms, the largest focused composition is 0.257 ms, and the one-time catalog load is the 380.709 ms worst sample.
+
+Certification exercises real-card timing and land permissions; ambiguous missing-state questions; unsupported mechanics; typed draw, life, mill, destroy, and damage semantics; thirteen turn steps; player/priority/stack permutations; a five-object LIFO stack; centralized pending-choice gates; first strike, deathtouch, lifelink, trample, prevention, and SBAs in one combat; layer ordering and counters; replacement and prevention commit boundaries; five-player Commander designation, damage, loss, APNAP, and player departure; multiple exact card names; pronouns; reordered response clauses; and natural-language timing paraphrases.
+
+Three narrow resolver defects were found and fixed in canonical owners. Exact card names containing rules words no longer manufacture combat intent (`Fire Nation Attacks`); equivalent player-priority phrases such as `Priority is mine` and `I hold priority` populate the same canonical fact; and a nearby opponent turn reference no longer makes the opponent the actor of a passive player permission question. Explicit opponent action clauses remain opponent-owned. Dedicated Phase 10 regressions cover every repair.
+
+The final Phase 8, Phase 9A through 9D, integrated Phase 9, turn, turn-action, timing, special-action, stack, combat, effect, layer, public runtime, and 100-case rules-engine verifiers all pass unchanged with 0 incorrect confident rulings. Expected `DEPENDS` remains reserved for missing canonical state or a required supported choice. Expected `UNVERIFIED` remains reserved for mechanics or interactions outside the executable subset. The limitations below are unchanged and fail closed.
 
 ## Deliberately Unsupported
 

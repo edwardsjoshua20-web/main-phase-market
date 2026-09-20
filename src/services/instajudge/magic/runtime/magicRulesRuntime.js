@@ -889,8 +889,11 @@ function typedEffectSummary(sourceObject, effect, target, result) {
 
 function evaluateTimingPermissionQuestion({ message, cards, genericObjects, scenario }) {
   const text = normalizeMagicText(message);
-  if (!/\bcan (?:i|player|you) (?:cast|activate)\b/.test(text)
-    || !/\b(?:right now|now|during|after|before|between|in response)\b/.test(text)) return null;
+  const asksPermission = /\b(?:can|may) (?:i|player|you) (?:cast|activate)\b/.test(text)
+    || /\bis (?:casting|activating)\b.*\blegal\b/.test(text);
+  const hasTimingContext = /\b(?:right now|now|during|after|before|between|in response)\b/.test(text)
+    || scenario.game.factsProvided.phase;
+  if (!asksPermission || !hasTimingContext) return null;
   const action = scenario.actions[0];
   const card = cards.find((candidate) => normalizeMagicText(candidate.name) === normalizeMagicText(action?.source?.name));
   if (!action || !card) return null;

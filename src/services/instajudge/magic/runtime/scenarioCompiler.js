@@ -201,8 +201,8 @@ function actorBefore(message, cardName) {
   const index = text.indexOf(normalizeMagicText(cardName));
   const before = text.slice(Math.max(0, index - 90), index);
   if (/\b(?:i|player|you)\s+(?:cast|casts|activate|activates|play|plays)\s*$/.test(before)) return 'player';
-  if (/\bopponent\s+(?:cast|casts|activate|activates|play|plays)\s*$/.test(before)) return 'opponent';
-  return /\bopponent\b/.test(before) ? 'opponent' : 'player';
+  if (/\b(?:my opponent|opponent|they)\s+(?:cast|casts|activate|activates|play|plays)\s*$/.test(before)) return 'opponent';
+  return 'player';
 }
 
 function permanentController(message, cardName) {
@@ -505,7 +505,10 @@ function objectWithPowerToughness(objects, power, toughness, excluded = new Set(
 
 function compileCombat(message, objects, cards) {
   const text = normalizeMagicText(message);
-  if (!/\battack(?:s|ed|ing)?\b|\bblock(?:s|ed|ing)?\b/.test(text)) return null;
+  const intentText = [...cards]
+    .sort((left, right) => right.normalizedName.length - left.normalizedName.length)
+    .reduce((value, card) => value.replaceAll(card.normalizedName, ' referenced card '), text);
+  if (!/\battack(?:s|ed|ing)?\b|\bblock(?:s|ed|ing)?\b/.test(intentText)) return null;
   const attackingPlayer = /\b(?:my opponent|opponent|they) attack/.test(text) ? 'opponent' : 'player';
   const defendingPlayer = attackingPlayer === 'player' ? 'opponent' : 'player';
   const used = new Set();
@@ -664,6 +667,8 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
   const opponentTurn = /\bopponent'?s turn\b|\btheir turn\b/.test(text);
   const stackNonempty = /\bstack is not empty\b|\bspell (?:is |already )?on the stack\b|\bin response to\b/.test(text);
   const landPlayState = inferredLandPlayState(text);
+  const playerHasPriority = /\b(?:(?:i|player|you) (?:have|has|hold) priority|priority is mine)\b/.test(text);
+  const opponentHasPriority = /\b(?:opponent (?:has|holds) priority|priority is (?:the )?opponent'?s)\b/.test(text);
   return {
     type: 'MagicScenario',
     version: 1,
@@ -687,7 +692,7 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
       multiplayer,
       phase,
       step,
-      priorityHolder: multiplayer?.priorityHolder || (/\bopponent has priority\b/i.test(message) ? 'opponent' : /\b(?:i|player|you) (?:have|has) priority\b/i.test(message) ? 'player' : null),
+      priorityHolder: multiplayer?.priorityHolder || (opponentHasPriority ? 'opponent' : playerHasPriority ? 'player' : null),
       stackEmpty: /\bstack is empty\b/i.test(message) ? true : stackNonempty ? false : null,
       landPlaysAllowed: landPlayState.allowed,
       landPlaysUsed: landPlayState.used,
@@ -696,7 +701,7 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
         turn: /\b(?:my|your|player'?s|opponent'?s|their) turn\b/i.test(message),
         phase: step != null,
         stack: /\bstack is (?:not )?empty\b/i.test(message) || stackNonempty,
-        priority: /\b(?:i|player|you|opponent) (?:have|has) priority\b/i.test(message),
+        priority: playerHasPriority || opponentHasPriority,
         landAllowance: landPlayState.known
       }
     },
