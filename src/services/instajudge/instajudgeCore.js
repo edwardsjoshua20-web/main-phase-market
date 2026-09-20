@@ -94,7 +94,8 @@ function pushCandidate(candidates, value) {
   const clean = String(value || '')
     .replace(/\b(can|does|if|when|then|with|from|in|target|targets|respond|cast|play|use|is|are|the|a|an)\b/gi, ' ')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .replace(/\s+(?:and|or)$/i, '');
   if (clean.length >= 3 && !STOP_WORDS.has(clean.toLowerCase())) candidates.add(clean);
 }
 

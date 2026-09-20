@@ -56,8 +56,8 @@ const metrics = {
   expectedUnverified: 0,
   incorrectConfident: 0,
   crashes: 0,
-  defectsDiscovered: 3,
-  defectsFixed: 3
+  defectsDiscovered: 4,
+  defectsFixed: 4
 };
 
 function verify(condition, message) {
@@ -462,6 +462,8 @@ const ordinaryPhraseNames = extractPossibleCardNames('Can I draw a card after co
 verify(!ordinaryPhraseNames.includes('Draw A Card') && !ordinaryPhraseNames.includes('After Combat'), 'Ordinary English must not become fake exact card identity.');
 const multipleNames = extractPossibleCardNames('Can Lightning Bolt target Serra Angel while Counterspell is on the stack?');
 verify(['Lightning Bolt', 'Serra Angel', 'Counterspell'].every((name) => multipleNames.includes(name)), 'Multiple exact-looking card names must remain extractable.');
+const combatNames = extractPossibleCardNames('I attack with Grizzly Bears and my opponent blocks with Black Knight. Does my creature die?');
+verify(combatNames.includes('Grizzly Bears') && combatNames.includes('Black Knight'), 'A trailing conjunction must not become part of an exact card-name candidate.');
 const compiledPronoun = compileMagicScenario({ message: "Alice casts Lightning Bolt targeting Bob. In response, he casts Counterspell targeting it.", cards: [bolt, { name: 'Counterspell', typeLine: 'Instant', oracleText: 'Counter target spell.' }] });
 verify(compiledPronoun.resolvedCards.length === 2 && compiledPronoun.actions.length >= 1, 'Pronoun/reordered response scenario must preserve both exact cards without crashing.');
 const passiveActor = compileMagicScenario({ message: 'It is the opponent upkeep and I hold priority. Is casting Lightning Bolt legal?', cards: [bolt] });
