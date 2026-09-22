@@ -887,14 +887,21 @@ function typedEffectSummary(sourceObject, effect, target, result) {
   return null;
 }
 
+function permissionActionForMessage(text, actions = []) {
+  const permissionIndex = text.search(/\b(?:can|may) (?:i|player|you) (?:respond (?:by|with) )?(?:cast(?:ing)?|activate|activating)\b|\bis (?:casting|activating)\b.*\blegal\b/);
+  if (permissionIndex < 0) return actions[0] || null;
+  return actions.find((action) => action.index >= permissionIndex) || actions.at(-1) || null;
+}
+
 function evaluateTimingPermissionQuestion({ message, cards, genericObjects, scenario }) {
   const text = normalizeMagicText(message);
-  const asksPermission = /\b(?:can|may) (?:i|player|you) (?:cast|activate)\b/.test(text)
+  const asksPermission = /\b(?:can|may) (?:i|player|you) (?:respond (?:by|with) )?(?:cast(?:ing)?|activate|activating)\b/.test(text)
     || /\bis (?:casting|activating)\b.*\blegal\b/.test(text);
   const hasTimingContext = /\b(?:right now|now|during|after|before|between|in response)\b/.test(text)
-    || scenario.game.factsProvided.phase;
+    || scenario.game.factsProvided.phase
+    || scenario.game.factsProvided.stack;
   if (!asksPermission || !hasTimingContext) return null;
-  const action = scenario.actions[0];
+  const action = permissionActionForMessage(text, scenario.actions);
   const card = cards.find((candidate) => normalizeMagicText(candidate.name) === normalizeMagicText(action?.source?.name));
   if (!action || !card) return null;
   const state = createMagicRuntimeState({ cards, genericObjects, scenario, message });
@@ -1080,7 +1087,7 @@ function evaluateContinuousScenario({ message, cards, genericObjects, scenario }
 
 function combatAssignments(state, scenario) {
   const text = normalizeMagicText(scenario.sourceText);
-  if (!/\b(?:remaining|excess|rest of the) damage\b.{0,50}\b(?:player|opponent)\b|\btrample(?:s)? over\b/.test(text)) return {};
+  if (!/\b(?:remaining|excess|rest of the) (?:trample |combat )?damage\b.{0,50}\b(?:player|opponent)\b|\btrample(?:s)? over\b/.test(text)) return {};
   const assignments = {};
   for (const attackerEntry of state.combat.attackers) {
     const attacker = state.objects.get(attackerEntry.objectId);
@@ -1099,11 +1106,19 @@ function evaluateCombatPriorityQuestion({ message, cards, scenario }) {
   const timingWindow = /\bbeginning of combat\b/.test(text) ? 'beginning-of-combat'
     : /\bafter attackers(?: are declared)?\b/.test(text) ? 'after-attackers'
       : /\bafter blockers(?: are declared)?\b/.test(text) ? 'after-blockers'
-        : /\bbetween first strike (?:damage )?and (?:normal|regular) (?:combat )?damage\b|\bafter first strike (?:combat )?damage\b/.test(text) ? 'first-strike-gap'
+        : /\bbetween first[- ]strike (?:damage )?and (?:normal|regular) (?:combat )?damage\b|\bafter first[- ]strike (?:combat )?damage\b|\bfirst[- ]strike (?:combat )?damage (?:has been|was) dealt\b|\bhas dealt first[- ]strike (?:combat )?damage\b/.test(text) ? 'first-strike-gap'
           : null;
   if (!/\bcan (?:i|player|you) cast\b/.test(text) || !timingWindow) return null;
   const card = cards.find((candidate) => text.includes(candidate.normalizedName));
   if (!card) return null;
+  if (timingWindow === 'first-strike-gap' && !scenario.game.factsProvided.priority) {
+    return {
+      status: 'depends', verdict: 'depends', summary: `${card.name}'s timing depends on who has priority in the ${timingWindow} window.`,
+      cards, rules: primitiveRules(['combat', 'timing', 'casting', 'stack']), mechanics: ['combat', 'timing', 'casting', 'stack'],
+      trace: [{ type: 'CombatPriorityStateIncomplete', window: timingWindow, missing: ['who has priority'] }], sequence: [],
+      clarificationNeeded: 'Please specify who has priority after state-based actions and triggered abilities are finished.'
+    };
+  }
   const state = createMagicRuntimeState({ cards: [], genericObjects: [], scenario: null, message });
   beginCombat(state, { attackingPlayer: 'player', defendingPlayer: 'opponent' });
   if (['after-attackers', 'after-blockers', 'first-strike-gap'].includes(timingWindow)) {
@@ -1135,6 +1150,71 @@ function evaluateCombatPriorityQuestion({ message, cards, scenario }) {
   });
 }
 
+function combatInterventionAction(scenario) {
+  const actions = scenario.actions.filter((action) => ['Cast', 'Activate'].includes(action.type));
+  return actions.length === 1 ? actions[0] : null;
+}
+
+function combatInterventionTarget({ action, effects, state, scenario, text }) {
+  const explicitTargetId = action.targets.find((target) => target.objectId)?.objectId;
+  if (explicitTargetId) return state.objects.get(explicitTargetId) || null;
+  const blockerIds = scenario.combat.blocks.flatMap((block) => block.blockerIds || []);
+  if (blockerIds.length === 1 && /\b(?:the |that )?blocker\b/.test(text)) return state.objects.get(blockerIds[0]) || null;
+  const attackerIds = scenario.combat.attackers.map((attacker) => attacker.objectId);
+  const namedAttacker = attackerIds.map((id) => state.objects.get(id)).find((object) => object && text.includes(`targeting ${normalizeMagicText(object.name)}`));
+  if (namedAttacker) return namedAttacker;
+  const requiresTarget = effects.some((effect) => effect.target?.minimum > 0);
+  return requiresTarget ? null : undefined;
+}
+
+function executeCombatIntervention({ message, cards, scenario, state }) {
+  const text = normalizeMagicText(message);
+  const action = combatInterventionAction(scenario);
+  if (!action || action.type !== 'Cast') {
+    return { status: 'unsupported', reason: 'The combat intervention must identify exactly one supported spell cast.' };
+  }
+  const card = cards.find((candidate) => normalizeMagicText(candidate.name) === normalizeMagicText(action.source.name));
+  if (!card) return { status: 'unsupported', reason: 'The combat intervention card identity was not resolved.' };
+  const effects = parseOracleSemantics(card).spellAbilities?.[0]?.effects || [];
+  if (effects.length === 0) return { status: 'unsupported', reason: `${card.name} has no executable spell effect in the canonical Oracle IR.` };
+  const target = combatInterventionTarget({ action, effects, state, scenario, text });
+  if (target === null) return { status: 'depends', reason: `${card.name} needs an identified combat target.`, clarificationNeeded: 'Which attacking or blocking creature is targeted?' };
+  const targets = target ? [target] : [];
+  const cast = castSpell(state, {
+    card,
+    controller: action.actor,
+    targets,
+    modes: action.modes,
+    costs: action.costs,
+    factsProvided: { turn: true, phase: true, stack: true, priority: true },
+    validateTarget
+  });
+  if (!cast.cast) return { status: cast.timing?.status || cast.status || 'unsupported', reason: cast.timing?.reason || cast.reason || `${card.name} could not be cast in this combat window.`, cast };
+  if (state.stack.length !== 1) return { status: 'unsupported', reason: 'The combat intervention created additional stack objects that require an explicit choice.', cast };
+
+  const effectResults = [];
+  const resolve = () => resolveTopOfStack(state, {
+    resolveEffect: ({ state: resolutionState, stackObject, effect, target: effectTarget }) => {
+      const targetCheck = effectTarget ? validateTarget({ sourceObject: stackObject.sourceObject, target: effectTarget, effect }) : { legal: true, failures: [] };
+      resolutionState.trace.push({ type: 'TargetCheckOnResolution', source: stackObject.sourceObject.name, target: effectTarget?.name || null, legal: targetCheck.legal, failures: targetCheck.failures });
+      if (!targetCheck.legal) return { targetCheck };
+      const result = executeTypedEffect({ state: resolutionState, sourceObject: stackObject.sourceObject, controller: stackObject.controller, effect, target: effectTarget });
+      effectResults.push({ effect, target: effectTarget, result });
+      return { targetCheck, result };
+    }
+  });
+  passPriority(state, state.game.priorityHolder, { resolve });
+  const resolvingPass = passPriority(state, state.game.priorityHolder, { resolve });
+  const blockedResult = effectResults.find(({ result }) => ['depends', 'unsupported'].includes(result?.status));
+  if (blockedResult) return { status: blockedResult.result.status, reason: blockedResult.result.reason, clarificationNeeded: blockedResult.result.clarificationNeeded, cast, resolvingPass, effectResults };
+  if (state.stack.length > 0) return { status: 'unsupported', reason: 'The combat intervention stack did not fully resolve.', cast, resolvingPass, effectResults };
+
+  if (target?.zone !== 'battlefield' && scenario.combat.blocks.some((block) => block.blockerIds?.includes(target.id))) {
+    removeBlockerFromCombat(state, target);
+  }
+  return { status: 'resolved', card, target, cast, resolvingPass, effectResults };
+}
+
 function evaluateCombatScenario({ message, cards, genericObjects, scenario }) {
   if (!scenario.combat) return null;
   if (scenario.combat.status === 'unsupported') return unsupported(scenario.combat.reason, {
@@ -1148,9 +1228,6 @@ function evaluateCombatScenario({ message, cards, genericObjects, scenario }) {
       clarificationNeeded: 'What creature is blocking, and how is combat damage assigned?'
     };
   }
-  if (scenario.actions.length > 0 && scenario.combat.interventionWindow) return unsupported('Casting a compiled spell inside a combat priority window is not yet connected to automatic combat continuation.', {
-    cards, primitives: ['combat', 'timing', 'stack'], trace: [{ type: 'CombatInterventionUnsupported', window: scenario.combat.interventionWindow }]
-  });
   const state = createMagicRuntimeState({ cards, genericObjects, scenario, message });
   const begun = beginCombat(state, scenario.combat);
   if (begun.status !== 'ready') return unsupported(begun.reason, { cards, primitives: ['combat'], trace: state.trace });
@@ -1160,6 +1237,20 @@ function evaluateCombatScenario({ message, cards, genericObjects, scenario }) {
   const blockers = declareBlockers(state, scenario.combat.blocks);
   if (blockers.status === 'unsupported') return unsupported(blockers.reason, { cards, primitives: ['combat', 'blockers'], trace: state.trace });
   if (blockers.status === 'illegal') return evaluated('no', blockers.reason, { cards, primitives: ['combat', 'blockers'], trace: state.trace, state });
+  let intervention = null;
+  if (scenario.combat.interventionWindow) {
+    intervention = executeCombatIntervention({ message, cards, scenario, state });
+    if (intervention.status === 'depends') {
+      return {
+        status: 'depends', verdict: 'depends', summary: intervention.reason,
+        cards, rules: primitiveRules(['combat', 'timing', 'stack']), mechanics: ['combat', 'timing', 'stack'],
+        trace: state.trace, sequence: [], clarificationNeeded: intervention.clarificationNeeded || 'Please identify the combat intervention target.'
+      };
+    }
+    if (intervention.status !== 'resolved') return unsupported(intervention.reason, {
+      cards, primitives: ['combat', 'timing', 'stack', 'resolving'], trace: state.trace
+    });
+  }
   for (const blockerId of scenario.combat.removedBeforeDamage || []) {
     const blocker = state.objects.get(blockerId);
     if (!blocker) continue;
@@ -1187,16 +1278,17 @@ function evaluateCombatScenario({ message, cards, genericObjects, scenario }) {
   const diesQuestion = asksAttackerDies || asksBlockerDies;
   const died = subject?.zone === 'graveyard';
   const playerDamage = state.combat.damageAssignments.filter((entry) => entry.targetId === scenario.combat.defendingPlayer).reduce((sum, entry) => sum + entry.amount, 0);
+  const asksPlayerDamage = /\b(?:does|will)\b.{0,80}\bdeal (?:trample )?damage to (?:my )?opponent\b|\bdoes (?:the )?defending player take\b/.test(text);
   const summary = diesQuestion
     ? `${subject?.name || 'The creature'} ${died ? 'dies' : 'survives'} after combat damage and state-based actions.`
     : `Combat resolves with ${playerDamage} damage assigned to ${scenario.combat.defendingPlayer}.`;
-  return evaluated(diesQuestion ? (died ? 'yes' : 'no') : 'yes', summary, {
+  return evaluated(diesQuestion ? (died ? 'yes' : 'no') : asksPlayerDamage ? (playerDamage > 0 ? 'yes' : 'no') : 'yes', summary, {
     cards,
     primitives: ['combat', 'attackers', 'blockers', 'damage', 'state-based-actions', 'triggers', 'timing'],
     trace: state.trace,
     sequence: state.trace.filter((entry) => ['AttackDeclared', 'BlockDeclared', 'DamageDealt', 'CreatureDied'].includes(entry.type)).map((entry) => entry.type),
     state,
-    runtime: { combat: state.combat, playerDamage, attackerZone: attacker?.zone, blockerZone: blocker?.zone }
+    runtime: { combat: state.combat, intervention, playerDamage, attackerZone: attacker?.zone, blockerZone: blocker?.zone }
   });
 }
 

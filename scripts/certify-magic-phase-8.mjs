@@ -367,7 +367,7 @@ const publicCases = [
   ["I have priority during my opponent's upkeep. Can I cast Certification Bolt now?", [cards.instant], 'yes'],
   ['It is my turn, I have priority during my postcombat main phase, and the stack is empty. Can I cast Certification Bear now?', [cards.creature], 'yes'],
   ['I have priority. Can I cast Certification Divination in response to Certification Bolt?', [cards.sorcery, cards.instant], 'no'],
-  ['Can I cast Certification Bolt between first strike damage and regular combat damage?', [cards.instant], 'yes'],
+  ['First-strike combat damage has been dealt, state-based actions and triggers are finished, and I have priority. Can I cast Certification Bolt before regular combat damage?', [cards.instant], 'yes'],
   ["It is my turn, I have priority during my postcombat main phase, the stack is empty, and I haven't played a land. Can I play Certification Plains from my hand?", [{ name: 'Certification Plains', typeLine: 'Basic Land - Plains', oracleText: '' }], 'yes'],
   ["It is my turn, I have priority during my main phase, the stack is empty, and I already played a land. Can I play Certification Plains from my hand?", [{ name: 'Certification Plains', typeLine: 'Basic Land - Plains', oracleText: '' }], 'no'],
   ["It is my turn, I have priority during my main phase, a spell is on the stack, and I haven't played a land. Can I play Certification Plains from my hand?", [{ name: 'Certification Plains', typeLine: 'Basic Land - Plains', oracleText: '' }], 'no'],

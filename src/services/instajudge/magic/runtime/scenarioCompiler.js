@@ -141,7 +141,7 @@ function compileGenericObjects(message, makeId) {
     }
   }
 
-  const descriptorPattern = /\b(?:(my opponent's|opponent's|their|my own|my|your|i control|opponent controls|player controls)\s+)?(?:(one|two|three|four|five|six|\d+|a|an)\s+)?(?:(\d+)\/(\d+)\s+)?((?:tapped\s+)?(?:legendary\s+)?(?:artifact\s+)?(?:commander|creature)(?:\s+tokens?)?(?:\s+(?:that has|has|with)\s+(?:double strike|first strike|deathtouch|indestructible|vigilance|hexproof|shroud|flying|reach|trample|lifelink|menace|haste|defender|flash|ward(?:\s+\d+)?|protection from (?:white|blue|black|red|green|colorless|artifacts?|creatures?))(?:\s+and\s+(?:[a-z ]+))?)?)(?=\s+(?:attacks?|blocks?|for|and|gains?|gets?|is|are|from|target|targeting|can|in response|i cast|\. |\?|$)|$)/g;
+  const descriptorPattern = /\b(?:(my opponent's|opponent's|their|my own|my|your|i control|opponent controls|player controls)\s+)?(?:(one|two|three|four|five|six|\d+|a|an)\s+)?(?:(\d+)\/(\d+)\s+)?((?:tapped\s+)?(?:legendary\s+)?(?:artifact\s+)?(?:commander|creature)(?:\s+tokens?)?(?:\s+(?:that has|has|with)\s+(?:double strike|first strike|deathtouch|indestructible|vigilance|hexproof|shroud|flying|reach|trample|lifelink|menace|haste|defender|flash|ward(?:\s+\d+)?|protection from (?:white|blue|black|red|green|colorless|artifacts?|creatures?))(?:\s+and\s+(?:[a-z ]+))?)?)(?=\s+(?:attacks?|blocks?|for|and|after|before|gains?|gets?|is|are|from|target|targeting|can|in response|i cast|\. |\?|$)|$)/g;
   for (const match of normalized.matchAll(descriptorPattern)) {
     if (/\bcreate\s+$/.test(normalized.slice(Math.max(0, match.index - 16), match.index))) continue;
     if (objects.some((entry) => entry.sourceKey.startsWith(`${match.index}:`))) continue;
@@ -270,7 +270,7 @@ function inferredTurnStep(text) {
   if (/\bbeginning of combat\b/.test(text)) return 'beginning-of-combat';
   if (/\bafter attackers(?: are| were)? declared\b/.test(text)) return 'declare-attackers';
   if (/\bafter blockers(?: are| were)? declared\b/.test(text)) return 'declare-blockers';
-  if (/\bbetween first strike (?:damage )?and (?:normal|regular) (?:combat )?damage\b|\bafter first strike (?:combat )?damage\b/.test(text)) return 'first-strike-combat-damage';
+  if (/\bbetween first[- ]strike (?:damage )?and (?:normal|regular) (?:combat )?damage\b|\bafter first[- ]strike (?:combat )?damage\b|\bfirst[- ]strike (?:combat )?damage (?:has been|was) dealt\b|\bhas dealt first[- ]strike (?:combat )?damage\b/.test(text)) return 'first-strike-combat-damage';
   if (/\bafter (?:regular )?combat damage\b/.test(text)) return 'combat-damage';
   if (/\bend of combat\b/.test(text)) return 'end-of-combat';
   if (/\bend step\b/.test(text)) return 'end-step';
@@ -664,8 +664,10 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
   const text = normalizeMagicText(message);
   const step = inferredTurnStep(text);
   const phase = phaseForStep(step);
-  const opponentTurn = /\bopponent'?s turn\b|\btheir turn\b/.test(text);
-  const stackNonempty = /\bstack is not empty\b|\bspell (?:is |already )?on the stack\b|\bin response to\b/.test(text);
+  const playerOwnedTurnWindow = /\b(?:my|your) (?:precombat |postcombat |first |second )?main(?: phase)?\b|\b(?:my|your) (?:upkeep|draw step|combat|end step)\b/.test(text);
+  const opponentOwnedTurnWindow = /\b(?:my )?opponent'?s (?:precombat |postcombat |first |second )?main(?: phase)?\b|\b(?:my )?opponent'?s (?:upkeep|draw step|combat|end step)\b/.test(text);
+  const opponentTurn = /\bopponent'?s turn\b|\btheir turn\b/.test(text) || opponentOwnedTurnWindow;
+  const stackNonempty = /\bstack is not empty\b|\bspell (?:is |already |is still )?on the stack\b|\b(?:is|remains?) (?:still )?on the stack\b|\bin response to\b|\brespond(?:ing)? (?:by|with)\b/.test(text);
   const landPlayState = inferredLandPlayState(text);
   const playerHasPriority = /\b(?:(?:i|player|you) (?:have|has|hold) priority|priority is mine)\b/.test(text);
   const opponentHasPriority = /\b(?:opponent (?:has|holds) priority|priority is (?:the )?opponent'?s)\b/.test(text);
@@ -698,7 +700,7 @@ export function compileMagicScenario({ message = '', cards = [] } = {}) {
       landPlaysUsed: landPlayState.used,
       landSourceZone: inferredLandSourceZone(text),
       factsProvided: {
-        turn: /\b(?:my|your|player'?s|opponent'?s|their) turn\b/i.test(message),
+        turn: /\b(?:my|your|player'?s|opponent'?s|their) turn\b/i.test(message) || playerOwnedTurnWindow || opponentOwnedTurnWindow,
         phase: step != null,
         stack: /\bstack is (?:not )?empty\b/i.test(message) || stackNonempty,
         priority: playerHasPriority || opponentHasPriority,

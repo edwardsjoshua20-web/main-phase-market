@@ -147,11 +147,10 @@ function legalityMetadata(game) {
 }
 
 function updatedSession(session = {}, result = {}) {
-  const priorCards = Array.isArray(session.resolvedCards) ? session.resolvedCards : [];
   return {
     ...session,
     game: result.game || session.game,
-    resolvedCards: dedupeCards([...(result.cards || []), ...priorCards]).slice(0, 8),
+    resolvedCards: dedupeCards(result.cards || []).slice(0, 8),
     lastRuling: result
   };
 }

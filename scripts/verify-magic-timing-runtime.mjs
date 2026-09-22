@@ -152,8 +152,10 @@ const publicPermanent = evaluateMagicRulesRuntime({ message: 'It is my turn, I h
 expect(publicPermanent.verdict === 'yes', 'The public runtime must route noninstant permanent timing through the canonical authority.');
 const publicResponse = evaluateMagicRulesRuntime({ message: 'I have priority. Can I cast Timing Divination in response to Timing Bolt?', cards: [card.sorcery, card.instant] });
 expect(publicResponse.verdict === 'no', 'The public runtime must reject a sorcery response to a spell.');
-const publicFirstStrike = evaluateMagicRulesRuntime({ message: 'Can I cast Timing Bolt between first strike damage and regular combat damage?', cards: [card.instant] });
+const publicFirstStrike = evaluateMagicRulesRuntime({ message: 'First-strike combat damage has been dealt, state-based actions and triggers are finished, and I have priority. Can I cast Timing Bolt before regular combat damage?', cards: [card.instant] });
 expect(publicFirstStrike.verdict === 'yes' && publicFirstStrike.runtime.timingWindow === 'first-strike-gap', 'The public runtime must use the real combat engine for the first-strike priority gap.');
+const ambiguousFirstStrike = evaluateMagicRulesRuntime({ message: 'First-strike combat damage has been dealt. Can I cast Timing Bolt before regular combat damage?', cards: [card.instant] });
+expect(ambiguousFirstStrike.verdict === 'depends', 'The public runtime must not invent priority in an ambiguous first-strike gap.');
 
 console.log('Magic canonical timing permission verifier passed.');
 console.log('- Instant and sorcery timing: priority, active player, phase, and stack enforced');
