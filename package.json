@@ -43,6 +43,7 @@
     "commander:ingest:worker": "node scripts/commander-ingest-worker.mjs",
     "commander:ingest:daemon": "node scripts/commander-ingest-daemon.mjs",
     "commander:ingest:status": "node scripts/commander-ingest-status.mjs",
+    "verify:deck-chemistry-pipeline": "node scripts/verify-deck-chemistry-pipeline.mjs --hosted",
     "commander:discover:candidates": "node scripts/commander-discover-candidates.mjs",
     "commander:archidekt:bot": "node scripts/commander-archidekt-bot.mjs",
     "commander:clipboard:bot": "node scripts/commander-clipboard-bot.mjs",

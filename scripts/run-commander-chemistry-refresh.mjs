@@ -18,6 +18,11 @@ const childEnv = {
   MPM_DISABLE_COMMANDER_PREWARM: '1'
 };
 
+function positiveInteger(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
 function runNode(script, args = []) {
   const result = spawnSync(process.execPath, [script, ...args], {
     cwd: projectRoot,
@@ -103,12 +108,12 @@ const previousDatasetVersion = fs.existsSync(manifestPath)
 
 runNode('scripts/commander-archidekt-bot.mjs', [
   '--once',
-  '--pages', '1',
-  '--start-page', '1',
-  '--max-page', '1',
-  '--batch-size', '5',
-  '--order-by', '-viewCount',
-  '--request-delay-ms', '1500',
+  '--pages', String(positiveInteger('MPM_COMMANDER_REFRESH_PAGES', 20)),
+  '--max-page', String(positiveInteger('MPM_COMMANDER_REFRESH_MAX_PAGE', 200)),
+  '--max-queue', String(positiveInteger('MPM_COMMANDER_REFRESH_MAX_QUEUE', 5000)),
+  '--batch-size', String(positiveInteger('MPM_COMMANDER_REFRESH_BATCH_SIZE', 1000)),
+  '--order-by', process.env.MPM_COMMANDER_REFRESH_ORDER_BY || '-updatedAt',
+  '--request-delay-ms', String(positiveInteger('MPM_COMMANDER_REFRESH_DELAY_MS', 1000)),
   '--max-retries', '2'
 ]);
 runNode('scripts/certify-commander-ingestion.mjs');
@@ -124,6 +129,11 @@ manifest.last_publication_time = publicationTime;
 fs.writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
 runNode('scripts/publish-mtg-commander-public-data.mjs');
 setFreshness({ last_publication_time: publicationTime });
+runNode('scripts/verify-deck-chemistry-pipeline.mjs', [
+  '--state', statePath,
+  '--manifest', manifestPath,
+  '--minimum-attempted', '0'
+]);
 const stateUpload = await uploadFilteredCommanderState();
 const after = readCorpusCounts();
 

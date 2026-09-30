@@ -1574,6 +1574,7 @@ export function getCommanderCorpusStatus() {
       imported_decks: source.imported_decks,
       last_error: source.last_error,
       updated_at: source.updated_at,
+      last_started_at: source.last_started_at,
       last_finished_at: source.last_finished_at
     }))
   };

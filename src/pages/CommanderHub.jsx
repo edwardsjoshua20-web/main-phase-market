@@ -233,7 +233,7 @@ export default function CommanderHub() {
   const featuredPageCount = Math.max(1, Math.ceil(rankedFeatured.length / featuredPageSize));
   const visibleFeatured = rankedFeatured.slice(featuredPage * featuredPageSize, (featuredPage + 1) * featuredPageSize);
   const profileCount = manifest?.positive_commander_count || browseTotal || browseResults.length;
-  const updatedAt = manifest?.last_publication_time || manifest?.generated_at;
+  const updatedAt = manifest?.dataset_freshness_time || manifest?.generated_at;
   const trendingArchetypes = manifest?.trending_archetypes || [];
   const archetypeOptions = [
     { value: 'all', label: 'All archetypes' },

@@ -1186,6 +1186,11 @@ export function getMtgCommanderPublicSnapshot() {
       WHERE ${VALID_CORPUS_DECK_SQL}
       ORDER BY deck_key ASC
     `).all();
+    const datasetFreshnessTime = db.prepare(`
+      SELECT MAX(imported_at) value
+      FROM mtg_commander_corpus_decks
+      WHERE ${VALID_CORPUS_DECK_SQL}
+    `).get()?.value || null;
     const indexRows = db.prepare(`
       SELECT oracle_id, deck_count, unique_configuration_count
       FROM mtg_commander_index
@@ -1246,6 +1251,7 @@ export function getMtgCommanderPublicSnapshot() {
       analyticsVersion: COMMANDER_ANALYTICS_VERSION,
       sampleThresholds: COMMANDER_SAMPLE_THRESHOLDS,
       generatedAt: new Date().toISOString(),
+      datasetFreshnessTime,
       activeDeckCount: activeDecks.length,
       uniqueConfigurationCount: Number(corpusStatus.unique_configuration_count || 0),
       duplicateObservationCount: Number(corpusStatus.duplicate_observation_count || 0),

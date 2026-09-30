@@ -3,6 +3,7 @@ import path from 'node:path';
 import {
   cleanupCommanderCorpusSourceQueue,
   ensureCommanderCorpusTables,
+  getCommanderPipelineFreshness,
   getCommanderCorpusStatus,
   loadCommanderSourceManifest,
   processCommanderCorpusSource,
@@ -23,6 +24,7 @@ function parseArgs(argv) {
     orderBy: '-updatedAt',
     backoffMs: 300000,
     startPage: 1,
+    startPageExplicit: false,
     maxPage: 200,
     maxQueue: 1500,
     discoverMode: 'html',
@@ -38,7 +40,10 @@ function parseArgs(argv) {
     if (token === '--pages') args.pages = Math.max(1, Number(argv[i + 1]) || args.pages);
     if (token === '--order-by') args.orderBy = String(argv[i + 1] || args.orderBy);
     if (token === '--backoff-ms') args.backoffMs = Math.max(30000, Number(argv[i + 1]) || args.backoffMs);
-    if (token === '--start-page') args.startPage = Math.max(1, Number(argv[i + 1]) || args.startPage);
+    if (token === '--start-page') {
+      args.startPage = Math.max(1, Number(argv[i + 1]) || args.startPage);
+      args.startPageExplicit = true;
+    }
     if (token === '--max-page') args.maxPage = Math.max(1, Number(argv[i + 1]) || args.maxPage);
     if (token === '--max-queue') args.maxQueue = Math.max(1, Number(argv[i + 1]) || args.maxQueue);
     if (token === '--discover-mode') args.discoverMode = String(argv[i + 1] || args.discoverMode);
@@ -222,7 +227,11 @@ async function discoverEntries(args, corpusStatus) {
 
   if (queuedArchidekt >= args.maxQueue) {
     const status = readStatus();
-    const pausedStartPage = Math.max(1, Number(status?.next_start_page) || args.startPage);
+    const freshness = getCommanderPipelineFreshness();
+    const pausedStartPage = Math.max(
+      1,
+      Number(freshness.archidekt_next_start_page) || Number(status?.next_start_page) || args.startPage
+    );
     return {
       deckUrls: [],
       pageResults: [],
@@ -236,9 +245,13 @@ async function discoverEntries(args, corpusStatus) {
   }
 
   const status = readStatus();
-  const startPage = args.once
+  const freshness = getCommanderPipelineFreshness();
+  const startPage = args.startPageExplicit
     ? args.startPage
-    : Math.max(1, Number(status?.next_start_page) || args.startPage);
+    : Math.max(
+      1,
+      Number(freshness.archidekt_next_start_page) || Number(status?.next_start_page) || args.startPage
+    );
   const urls = buildSearchUrls(args, startPage);
   const discovered = new Set();
   const pageResults = [];
@@ -286,14 +299,24 @@ async function discoverEntries(args, corpusStatus) {
 
 async function processQueuedSources(args, corpusStatus, preferredLocations = []) {
   const priority = new Map(preferredLocations.map((location, index) => [location, index]));
+  const retryCutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const staleRunningCutoff = Date.now() - 6 * 60 * 60 * 1000;
   const queued = corpusStatus.sources
     .filter((source) => (
       source.source_name === 'archidekt'
       && source.source_type === 'archidekt_deck'
       && source.source_id
-      && source.status === 'queued'
+      && (
+        source.status === 'queued'
+        || (source.status === 'error' && Date.parse(source.last_finished_at || 0) <= retryCutoff)
+        || (source.status === 'running' && Date.parse(source.last_started_at || 0) <= staleRunningCutoff)
+      )
     ))
-    .sort((a, b) => (priority.get(a.location) ?? Number.MAX_SAFE_INTEGER) - (priority.get(b.location) ?? Number.MAX_SAFE_INTEGER))
+    .sort((a, b) => (
+      (priority.get(a.location) ?? Number.MAX_SAFE_INTEGER) - (priority.get(b.location) ?? Number.MAX_SAFE_INTEGER)
+      || (a.status === 'queued' ? 0 : 1) - (b.status === 'queued' ? 0 : 1)
+      || String(a.last_finished_at || '').localeCompare(String(b.last_finished_at || ''))
+    ))
     .slice(0, args.batchSize);
 
   const processed = [];
@@ -316,6 +339,8 @@ async function processQueuedSources(args, corpusStatus, preferredLocations = [])
 }
 
 export async function tick(args) {
+  const startedAt = new Date().toISOString();
+  setCommanderPipelineFreshness('last_ingestion_start_time', startedAt);
   cleanupCommanderCorpusSourceQueue();
   const corpusBefore = getCommanderCorpusStatus();
   const existing = mergeEntries(
@@ -343,14 +368,33 @@ export async function tick(args) {
   }, {});
   const discoveryErrors = discovery.pageResults.filter((result) => result.error);
   const processingErrors = processed.filter((result) => result.status === 'error');
+  const fetchedDecks = processed.reduce((total, result) => total + Number(result.total_decks || 0), 0);
+  const acceptedDecks = processed.reduce((total, result) => total + Number(result.imported_decks || 0), 0);
   const completedAt = new Date().toISOString();
   if (!discovery.discoveryPaused && discoveryErrors.length === 0) {
     setCommanderPipelineFreshness('last_successful_discovery_time', completedAt);
+    setCommanderPipelineFreshness('archidekt_next_start_page', String(discovery.nextStartPage));
   }
   if (processingErrors.length === 0) {
     setCommanderPipelineFreshness('last_successful_ingestion_time', completedAt);
   }
+  setCommanderPipelineFreshness('last_ingestion_attempted_count', String(processed.length));
+  setCommanderPipelineFreshness('last_ingestion_fetched_count', String(fetchedDecks));
+  setCommanderPipelineFreshness('last_ingestion_accepted_count', String(acceptedDecks));
+  setCommanderPipelineFreshness('last_ingestion_rejected_count', String(Math.max(0, fetchedDecks - acceptedDecks)));
+  setCommanderPipelineFreshness('last_ingestion_error_count', String(discoveryErrors.length + processingErrors.length));
+  if (discoveryErrors.length > 0 || processingErrors.length > 0) {
+    setCommanderPipelineFreshness(
+      'last_ingestion_error',
+      [...discoveryErrors, ...processingErrors].map((entry) => entry.error).filter(Boolean).join(' | ')
+    );
+    setCommanderPipelineFreshness('last_ingestion_error_time', completedAt);
+  }
   const finalCorpus = getCommanderCorpusStatus();
+  setCommanderPipelineFreshness(
+    'last_ingestion_deduplicated_count',
+    String(Math.max(0, finalCorpus.duplicate_observation_count - corpusBefore.duplicate_observation_count))
+  );
 
   writeStatus({
     generated_at: new Date().toISOString(),
@@ -382,6 +426,7 @@ export async function tick(args) {
     processedSummary,
     discoveryErrors: discoveryErrors.length,
     processingErrors: processingErrors.length,
+    fatalProcessingFailure: processed.length > 0 && processingErrors.length === processed.length,
     discoveryPaused: discovery.discoveryPaused,
     queuedArchidekt: discovery.queuedArchidekt
   };
@@ -399,7 +444,7 @@ async function main() {
   if (args.once) {
     const result = await tick(args);
     console.log(JSON.stringify(result, null, 2));
-    if (result.rateLimited || result.discoveryErrors > 0 || result.processingErrors > 0) {
+    if (result.rateLimited || result.discoveryErrors > 0 || result.fatalProcessingFailure) {
       process.exitCode = 1;
     }
     return;

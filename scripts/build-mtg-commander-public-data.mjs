@@ -306,6 +306,7 @@ async function main() {
     analytics_version: COMMANDER_ANALYTICS_VERSION,
     sample_thresholds: COMMANDER_SAMPLE_THRESHOLDS,
     generated_at: snapshot.generatedAt,
+    dataset_freshness_time: snapshot.datasetFreshnessTime,
     active_deck_count: snapshot.activeDeckCount,
     unique_content_configuration_count: snapshot.uniqueConfigurationCount,
     duplicate_observation_count: snapshot.duplicateObservationCount,
