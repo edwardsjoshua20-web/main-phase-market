@@ -15,10 +15,11 @@ import {
 } from './mtgCommanderAnalyticsPolicy.mjs';
 import { isCommanderGameChanger } from './mtgCommanderGameChangers.mjs';
 
-const mtgSearchDirs = [
-  path.join(process.cwd(), 'public', 'data', 'mtg', 'search'),
-  path.join(process.cwd(), 'public', 'data', 'mtg', 'search-lite')
-];
+const fullSearchDir = path.join(process.cwd(), 'public', 'data', 'mtg', 'search');
+const searchLiteDir = path.join(process.cwd(), 'public', 'data', 'mtg', 'search-lite');
+const mtgSearchDirs = process.env.MPM_COMMANDER_CATALOG_SOURCE === 'search-lite'
+  ? [searchLiteDir]
+  : [fullSearchDir, searchLiteDir];
 const INDEX_VERSION = 7;
 const COMMANDER_CATEGORY_ORDER = [
   'creatures',

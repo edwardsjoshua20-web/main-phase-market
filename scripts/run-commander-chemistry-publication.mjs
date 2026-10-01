@@ -15,7 +15,8 @@ const manifestPath = path.join(projectRoot, 'public', 'data', 'mtg', 'commander-
 const childEnv = {
   ...process.env,
   MPM_DB_PATH: statePath,
-  MPM_DISABLE_COMMANDER_PREWARM: '1'
+  MPM_DISABLE_COMMANDER_PREWARM: '1',
+  MPM_COMMANDER_CATALOG_SOURCE: 'search-lite'
 };
 
 function runNode(script, args = []) {

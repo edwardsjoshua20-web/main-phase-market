@@ -203,13 +203,16 @@ function buildCertifiedThemeSlices(commanderOracleId, themeOptions = [], options
 }
 
 async function main() {
-  const files = collectJsonFiles(SEARCH_DIR);
   const searchShardFiles = collectJsonFiles(SEARCH_SHARDS_DIR);
-  const sourceFiles = files.length > 0
-    ? files
-    : searchShardFiles.length > 0
-      ? searchShardFiles
-      : collectJsonFiles(SEARCH_LITE_DIR);
+  const fullSearchFiles = collectJsonFiles(SEARCH_DIR);
+  const searchLiteFiles = collectJsonFiles(SEARCH_LITE_DIR);
+  const sourceFiles = process.env.MPM_COMMANDER_CATALOG_SOURCE === 'search-lite'
+    ? searchLiteFiles
+    : fullSearchFiles.length > 0
+      ? fullSearchFiles
+      : searchShardFiles.length > 0
+        ? searchShardFiles
+        : searchLiteFiles;
 
   if (sourceFiles.length === 0) {
     throw new Error('No MTG search files found to build commander data.');
