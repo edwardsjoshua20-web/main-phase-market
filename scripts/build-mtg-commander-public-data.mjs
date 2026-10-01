@@ -303,6 +303,8 @@ async function main() {
 
   fs.writeFileSync(MANIFEST_PATH, `${JSON.stringify({
     dataset_version: snapshot.datasetVersion,
+    index_path: `commander-datasets/${snapshot.datasetVersion}/commanders.json`,
+    detail_prefix: `commander-datasets/${snapshot.datasetVersion}/commander-details`,
     analytics_version: COMMANDER_ANALYTICS_VERSION,
     sample_thresholds: COMMANDER_SAMPLE_THRESHOLDS,
     generated_at: snapshot.generatedAt,

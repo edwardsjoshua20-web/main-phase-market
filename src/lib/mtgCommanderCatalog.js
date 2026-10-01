@@ -2,10 +2,16 @@ import { getCatalogAssetUrl } from '@/config/publicAssetUrls';
 
 const API_BASE = '/api/local/mtg/commanders';
 const HOSTED_COMMANDERS_URL = getCatalogAssetUrl('mtg', 'commanders.json');
+const HOSTED_COMMANDER_MANIFEST_URL = getCatalogAssetUrl('mtg', 'commander-manifest.json');
 const HOSTED_COMMANDER_DETAIL_SCHEMA = 'commander-views-v3';
 
 const hostedCommanderCache = {
   key: '',
+  promise: null,
+  value: null
+};
+
+const hostedManifestCache = {
   promise: null,
   value: null
 };
@@ -96,8 +102,48 @@ function withCertifiedThemeOptions(payload) {
   };
 }
 
-async function loadHostedCommanders(datasetVersion = '') {
-  const cacheKey = String(datasetVersion || 'current');
+function normalizeCommanderAssetPath(value, fallback) {
+  const normalized = String(value || fallback || '')
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/^data\/mtg\//, '');
+  return normalized || fallback;
+}
+
+async function loadHostedManifest(providedManifest) {
+  if (providedManifest?.dataset_version) {
+    hostedManifestCache.value = providedManifest;
+    return providedManifest;
+  }
+  if (hostedManifestCache.value) return hostedManifestCache.value;
+  if (!hostedManifestCache.promise) {
+    hostedManifestCache.promise = fetch(HOSTED_COMMANDER_MANIFEST_URL, { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Failed to load hosted Commander manifest: ${response.status}`);
+        const manifest = await response.json();
+        hostedManifestCache.value = manifest;
+        return manifest;
+      });
+  }
+  return hostedManifestCache.promise;
+}
+
+async function getHostedDataset(options = {}) {
+  const manifest = await loadHostedManifest(options.manifest);
+  return {
+    manifest,
+    datasetVersion: String(options.datasetVersion || manifest?.dataset_version || 'current'),
+    indexUrl: getCatalogAssetUrl(
+      'mtg',
+      normalizeCommanderAssetPath(manifest?.index_path, 'commanders.json')
+    ),
+    detailPrefix: normalizeCommanderAssetPath(manifest?.detail_prefix, 'commander-details')
+  };
+}
+
+async function loadHostedCommanders(options = {}) {
+  const dataset = await getHostedDataset(options);
+  const cacheKey = `${dataset.datasetVersion}:${dataset.indexUrl}`;
   if (hostedCommanderCache.key === cacheKey && hostedCommanderCache.value) {
     return hostedCommanderCache.value;
   }
@@ -109,7 +155,7 @@ async function loadHostedCommanders(datasetVersion = '') {
   }
 
   if (!hostedCommanderCache.promise) {
-    const url = `${HOSTED_COMMANDERS_URL}?dataset=${encodeURIComponent(cacheKey)}`;
+    const url = `${dataset.indexUrl || HOSTED_COMMANDERS_URL}?dataset=${encodeURIComponent(dataset.datasetVersion)}`;
     hostedCommanderCache.promise = fetch(url, { cache: 'no-store' }).then(async (response) => {
       if (!response.ok) {
         throw new Error(`Failed to load hosted commander data: ${response.status}`);
@@ -136,7 +182,7 @@ export async function searchMtgCommanders(query, options = {}) {
     const limit = Math.max(1, Math.min(Number(options.limit) || 120, 4000));
     const minDeckCount = Math.max(0, Number(options.minDeckCount) || 0);
     const colors = Array.isArray(options.colors) ? options.colors : [];
-    const commanders = await loadHostedCommanders(options.datasetVersion);
+    const commanders = await loadHostedCommanders(options);
     const rankedCommanders = commanders
       .map((commander) => ({ commander, score: scoreHostedCommander(commander, normalizedQuery) }))
       .filter(({ commander, score }) => score > 0 && Number(commander.deck_count || 0) >= minDeckCount && matchesHostedColors(commander, colors))
@@ -173,7 +219,8 @@ export async function searchMtgCommanders(query, options = {}) {
 
 export async function getMtgCommanderPage(oracleId, options = {}) {
   if (isHostedWithoutLocalApi()) {
-    const detailsUrl = `${getCatalogAssetUrl('mtg', `commander-details/${encodeURIComponent(oracleId)}.json`)}?schema=${HOSTED_COMMANDER_DETAIL_SCHEMA}`;
+    const dataset = await getHostedDataset(options);
+    const detailsUrl = `${getCatalogAssetUrl('mtg', `${dataset.detailPrefix}/${encodeURIComponent(oracleId)}.json`)}?schema=${HOSTED_COMMANDER_DETAIL_SCHEMA}&dataset=${encodeURIComponent(dataset.datasetVersion)}`;
     try {
       const response = await fetch(detailsUrl, { cache: 'no-store' });
       if (response.ok) {
@@ -190,7 +237,7 @@ export async function getMtgCommanderPage(oracleId, options = {}) {
       }
     } catch {}
 
-    const commanders = await loadHostedCommanders(options.datasetVersion);
+    const commanders = await loadHostedCommanders({ ...options, manifest: dataset.manifest });
     const commander = commanders.find((item) => item.oracle_id === oracleId) || null;
     const relatedCommanders = commander
       ? commanders

@@ -22,7 +22,8 @@ export function useCommanderHubData() {
         const payload = await searchMtgCommanders('', {
           limit: 10,
           minDeckCount: 1,
-          datasetVersion: nextManifest?.dataset_version
+          datasetVersion: nextManifest?.dataset_version,
+          manifest: nextManifest
         });
         if (!mounted) return;
         const featured = (payload.results || []).slice(0, 10);
@@ -48,7 +49,8 @@ export function useCommanderHubData() {
         const payload = await searchMtgCommanders(search, {
           limit: 4000,
           minDeckCount: 1,
-          datasetVersion: manifest?.dataset_version
+          datasetVersion: manifest?.dataset_version,
+          manifest
         });
         if (!mounted) return;
         setBrowseResults(payload.results || []);

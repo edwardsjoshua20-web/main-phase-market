@@ -186,25 +186,108 @@ export function collectPublicFilesByRelativePaths(relativePaths = [], options = 
   return [...collected.values()].sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 }
 
-export async function uploadFile({ file, storageBaseUrl, serviceRoleKey }) {
-  const fileBuffer = fs.readFileSync(file.fullPath);
-  const targetUrl = `${storageBaseUrl}/${toObjectKey(file.relativePath)}`;
+const TRANSIENT_UPLOAD_STATUSES = new Set([429, 500, 502, 503, 504, 520]);
+const TRANSIENT_NETWORK_CODES = new Set([
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'EPIPE',
+  'ETIMEDOUT',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_SOCKET'
+]);
 
-  const response = await fetch(targetUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${serviceRoleKey}`,
-      apikey: serviceRoleKey,
-      'x-upsert': 'true',
-      'Content-Type': contentTypeFor(file.fullPath)
-    },
-    body: fileBuffer
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Upload failed for ${file.relativePath}: ${response.status} ${errorText}`);
+export class PublicDataUploadError extends Error {
+  constructor(message, options = {}) {
+    super(message, options.cause ? { cause: options.cause } : undefined);
+    this.name = 'PublicDataUploadError';
+    this.objectPath = options.objectPath || null;
+    this.status = Number.isFinite(Number(options.status)) ? Number(options.status) : null;
+    this.attempt = Number(options.attempt || 0);
+    this.transient = Boolean(options.transient);
   }
+}
+
+export function isTransientUploadFailure(error) {
+  if (error instanceof PublicDataUploadError) return error.transient;
+  const code = String(error?.code || error?.cause?.code || '').toUpperCase();
+  if (TRANSIENT_NETWORK_CODES.has(code)) return true;
+  const message = String(error?.message || error || '');
+  return /fetch failed|network|socket|connection reset|timed?\s*out|timeout/i.test(message);
+}
+
+function uploadAttemptCount(options = {}) {
+  const value = Number(options.maxAttempts || process.env.MPM_PUBLIC_UPLOAD_MAX_ATTEMPTS || 4);
+  return Number.isInteger(value) && value > 0 ? value : 4;
+}
+
+function retryDelayMs(attempt, options = {}) {
+  const base = Math.max(0, Number(options.retryBaseDelayMs ?? process.env.MPM_PUBLIC_UPLOAD_RETRY_BASE_MS ?? 500));
+  const ceiling = Math.max(base, Number(options.retryMaxDelayMs ?? process.env.MPM_PUBLIC_UPLOAD_RETRY_MAX_MS ?? 8_000));
+  return Math.min(ceiling, base * (2 ** Math.max(0, attempt - 1)));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function uploadFile({ file, storageBaseUrl, serviceRoleKey, ...options }) {
+  const fileBuffer = fs.readFileSync(file.fullPath);
+  const objectPath = file.objectPath || file.relativePath;
+  const targetUrl = `${storageBaseUrl}/${toObjectKey(objectPath)}`;
+  const maxAttempts = uploadAttemptCount(options);
+  const fetchImpl = options.fetchImpl || fetch;
+  const sleepImpl = options.sleepImpl || sleep;
+  const logger = options.logger || console;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetchImpl(targetUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+          'x-upsert': 'true',
+          'Content-Type': contentTypeFor(file.fullPath)
+        },
+        body: fileBuffer
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new PublicDataUploadError(
+          `Upload failed for ${objectPath}: ${response.status} ${errorText}`,
+          {
+            objectPath,
+            status: response.status,
+            attempt,
+            transient: TRANSIENT_UPLOAD_STATUSES.has(response.status)
+          }
+        );
+      }
+
+      if (attempt > 1) logger.log(`Upload recovered for ${objectPath} on attempt ${attempt}/${maxAttempts}.`);
+      return { objectPath, attempts: attempt, status: response.status };
+    } catch (cause) {
+      const error = cause instanceof PublicDataUploadError
+        ? cause
+        : new PublicDataUploadError(`Upload failed for ${objectPath}: ${cause?.message || cause}`, {
+            cause,
+            objectPath,
+            attempt,
+            transient: isTransientUploadFailure(cause)
+          });
+      const retry = error.transient && attempt < maxAttempts;
+      logger.warn(
+        `Upload ${retry ? 'retry' : 'failure'} for ${objectPath} `
+        + `(attempt ${attempt}/${maxAttempts}, status=${error.status || error.cause?.code || 'network'}).`
+      );
+      if (!retry) throw error;
+      await sleepImpl(retryDelayMs(attempt, options));
+    }
+  }
+
+  throw new PublicDataUploadError(`Upload failed for ${objectPath}.`, { objectPath });
 }
 
 export async function uploadCollectedFiles(files, options = {}) {
@@ -223,7 +306,17 @@ export async function uploadCollectedFiles(files, options = {}) {
     if (!quietProgress || uploaded === 1 || uploaded === files.length || uploaded % 50 === 0) {
       console.log(`[${uploaded}/${files.length}] ${file.relativePath}`);
     }
-    await uploadFile({ file, storageBaseUrl, serviceRoleKey: config.serviceRoleKey });
+    await uploadFile({
+      file,
+      storageBaseUrl,
+      serviceRoleKey: config.serviceRoleKey,
+      fetchImpl: options.fetchImpl,
+      sleepImpl: options.sleepImpl,
+      logger: options.logger,
+      maxAttempts: options.maxAttempts,
+      retryBaseDelayMs: options.retryBaseDelayMs,
+      retryMaxDelayMs: options.retryMaxDelayMs
+    });
   }
 
   console.log('Upload complete.');

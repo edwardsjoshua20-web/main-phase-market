@@ -121,14 +121,22 @@ runNode('scripts/build-mtg-commander-public-data.mjs');
 runNode('scripts/certify-commander-analytics.mjs');
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-setFreshness({ last_analytics_rebuild_time: manifest.generated_at });
+setFreshness({
+  last_analytics_rebuild_time: manifest.generated_at,
+  last_successful_aggregation_time: manifest.generated_at,
+  latest_built_dataset_id: manifest.dataset_version,
+  publication_status: 'pending'
+});
 await uploadFilteredCommanderState();
 
-const publicationTime = new Date().toISOString();
-manifest.last_publication_time = publicationTime;
-fs.writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
-runNode('scripts/publish-mtg-commander-public-data.mjs');
-setFreshness({ last_publication_time: publicationTime });
+try {
+  runNode('scripts/publish-mtg-commander-public-data.mjs');
+} catch (error) {
+  // Publication telemetry is written by the publisher; persist it even when the public pointer stays old.
+  await uploadFilteredCommanderState();
+  throw error;
+}
+const publishedManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 runNode('scripts/verify-deck-chemistry-pipeline.mjs', [
   '--state', statePath,
   '--manifest', manifestPath,
@@ -137,16 +145,16 @@ runNode('scripts/verify-deck-chemistry-pipeline.mjs', [
 const stateUpload = await uploadFilteredCommanderState();
 const after = readCorpusCounts();
 
-if (manifest.dataset_version === previousDatasetVersion && after.active_decks !== before.active_decks) {
+if (publishedManifest.dataset_version === previousDatasetVersion && after.active_decks !== before.active_decks) {
   throw new Error('Commander corpus changed but the analytics dataset version did not advance.');
 }
 
 console.log(JSON.stringify({
   status: 'PASS',
   previous_dataset_version: previousDatasetVersion,
-  dataset_version: manifest.dataset_version,
-  analytics_version: manifest.analytics_version,
-  publication_time: publicationTime,
+  dataset_version: publishedManifest.dataset_version,
+  analytics_version: publishedManifest.analytics_version,
+  publication_time: publishedManifest.last_publication_time,
   before,
   after,
   state: stateUpload
