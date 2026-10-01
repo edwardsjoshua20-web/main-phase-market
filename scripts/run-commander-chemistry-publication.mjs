@@ -52,6 +52,8 @@ async function uploadState() {
 }
 
 await downloadCommanderCorpusState(statePath);
+// Match the scheduled runner's catalog inputs without invoking discovery or ingestion.
+runNode('scripts/hydrate-supabase-public-data.mjs');
 runNode('scripts/build-mtg-commander-public-data.mjs');
 runNode('scripts/certify-commander-analytics.mjs');
 
