@@ -117,7 +117,7 @@ async function loadHostedManifest(providedManifest) {
   }
   if (hostedManifestCache.value) return hostedManifestCache.value;
   if (!hostedManifestCache.promise) {
-    hostedManifestCache.promise = fetch(HOSTED_COMMANDER_MANIFEST_URL, { cache: 'no-store' })
+    hostedManifestCache.promise = fetch(`${HOSTED_COMMANDER_MANIFEST_URL}?v=${Date.now()}`, { cache: 'no-store' })
       .then(async (response) => {
         if (!response.ok) throw new Error(`Failed to load hosted Commander manifest: ${response.status}`);
         const manifest = await response.json();

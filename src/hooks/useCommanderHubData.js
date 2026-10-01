@@ -17,7 +17,8 @@ export function useCommanderHubData() {
 
     async function loadFeatured() {
       try {
-        const manifestResponse = await fetch(getCatalogAssetUrl('mtg', 'commander-manifest.json'), { cache: 'no-store' }).catch(() => null);
+        const manifestUrl = `${getCatalogAssetUrl('mtg', 'commander-manifest.json')}?v=${Date.now()}`;
+        const manifestResponse = await fetch(manifestUrl, { cache: 'no-store' }).catch(() => null);
         const nextManifest = manifestResponse?.ok ? await manifestResponse.json() : null;
         const payload = await searchMtgCommanders('', {
           limit: 10,

@@ -93,7 +93,7 @@ if (args.hosted) {
   const state = await downloadCommanderCorpusState(args.statePath);
   publicConfig = readSupabaseUploadConfig();
   publicBaseUrl = `${String(state.config.supabaseUrl).replace(/\/+$/, '')}/storage/v1/object/public/${encodeURIComponent(publicConfig.bucketName)}/data/mtg`;
-  const manifestUrl = `${publicBaseUrl}/commander-manifest.json`;
+  const manifestUrl = `${publicBaseUrl}/commander-manifest.json?v=${Date.now()}`;
   const response = await fetch(manifestUrl, { headers: { 'Cache-Control': 'no-cache' } });
   if (!response.ok) throw new Error(`Hosted Commander manifest download failed: ${response.status}`);
   fs.writeFileSync(args.manifestPath, await response.text());

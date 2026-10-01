@@ -119,6 +119,7 @@ function localPublicationFiles(projectRoot, manifest) {
       fullPath: manifestFile,
       relativePath: MANIFEST_PATH,
       objectPath: MANIFEST_PATH,
+      cacheControl: 'no-cache, max-age=0',
       size: fs.statSync(manifestFile).size
     },
     details: names.map((name) => {

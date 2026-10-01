@@ -18,6 +18,7 @@ const childEnv = {
   MPM_DISABLE_COMMANDER_PREWARM: '1',
   MPM_COMMANDER_CATALOG_SOURCE: 'search-lite'
 };
+const reuseBuild = process.argv.includes('--reuse-build');
 
 function runNode(script, args = []) {
   const result = spawnSync(process.execPath, [script, ...args], {
@@ -53,9 +54,13 @@ async function uploadState() {
 }
 
 await downloadCommanderCorpusState(statePath);
-// Match the scheduled runner's catalog inputs without invoking discovery or ingestion.
-runNode('scripts/hydrate-supabase-public-data.mjs');
-runNode('scripts/build-mtg-commander-public-data.mjs');
+if (!reuseBuild) {
+  // Match the scheduled runner's catalog inputs without invoking discovery or ingestion.
+  runNode('scripts/hydrate-supabase-public-data.mjs');
+  runNode('scripts/build-mtg-commander-public-data.mjs');
+} else if (!fs.existsSync(manifestPath)) {
+  throw new Error('Cannot reuse Commander publication build because the local manifest is missing.');
+}
 runNode('scripts/certify-commander-analytics.mjs');
 
 const builtManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
@@ -84,6 +89,7 @@ console.log(JSON.stringify({
   status: 'PASS',
   mode: 'publication-only',
   ingestion_run: false,
+  reused_certified_build: reuseBuild,
   dataset_version: publishedManifest.dataset_version,
   publication_time: publishedManifest.last_publication_time,
   commander_profiles: publishedManifest.detail_count,

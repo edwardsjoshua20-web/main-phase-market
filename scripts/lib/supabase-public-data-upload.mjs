@@ -248,7 +248,8 @@ export async function uploadFile({ file, storageBaseUrl, serviceRoleKey, ...opti
           Authorization: `Bearer ${serviceRoleKey}`,
           apikey: serviceRoleKey,
           'x-upsert': 'true',
-          'Content-Type': contentTypeFor(file.fullPath)
+          'Content-Type': contentTypeFor(file.fullPath),
+          ...(file.cacheControl ? { 'cache-control': file.cacheControl } : {})
         },
         body: fileBuffer
       });
