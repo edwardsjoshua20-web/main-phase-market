@@ -71,6 +71,22 @@ async function callSupabaseFunction(functionName, body, extraHeaders = {}) {
   return payload;
 }
 
+function getStoredAccessToken() {
+  if (typeof window === 'undefined') return '';
+  try {
+    const session = JSON.parse(window.localStorage.getItem('mpm.supabase.session') || 'null');
+    return String(session?.access_token || session?.session?.access_token || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+export async function invokeNamedSupabaseFunction(functionName, body = {}, { authenticated = false } = {}) {
+  const token = authenticated ? getStoredAccessToken() : '';
+  if (authenticated && !token) throw new Error('Please sign in as an administrator.');
+  return callSupabaseFunction(functionName, body, token ? { Authorization: `Bearer ${token}` } : {});
+}
+
 export async function invokeSupabaseAction(actionName, payload = {}) {
   const functionName = actionFunctionMap[String(actionName || '').trim()];
   if (!functionName) {

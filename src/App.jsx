@@ -27,6 +27,7 @@ import InstaJudge from './pages/InstaJudge';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminInventory from './pages/AdminInventory';
 import AdminOperations from './pages/AdminOperations';
+import AdminInstaJudgeReports from './pages/AdminInstaJudgeReports';
 import AdminShippingFulfillment from './pages/AdminShippingFulfillment';
 import AdvancedDeckBuilderBackup from './pages/AdvancedDeckBuilderBackup';
 import SetDetail from './pages/SetDetail';
@@ -114,6 +115,7 @@ const AuthenticatedApp = () => {
         <Route path="/InstaJudge" element={<LayoutWrapper currentPageName="InstaJudge"><InstaJudge /></LayoutWrapper>} />
         <Route path="/AdminInventory" element={<AdminInventory />} />
         <Route path="/AdminShippingFulfillment" element={<AdminShippingFulfillment />} />
+        <Route path="/AdminInstaJudgeReports" element={<AdminInstaJudgeReports />} />
         <Route path="/set/:game/:setSlug" element={<SetDetail />} />
         <Route path="/DeckChemistry" element={<LayoutWrapper currentPageName="DeckChemistry"><DeckChemistry /></LayoutWrapper>} />
         <Route path="/DeckChemistry/magic" element={<LayoutWrapper currentPageName="CommanderHub"><CommanderHub /></LayoutWrapper>} />
@@ -157,6 +159,7 @@ const AuthenticatedApp = () => {
       <Route path="/AdvancedDeckBuilderBackup" element={<LayoutWrapper currentPageName="AdvancedDeckBuilderBackup"><AdvancedDeckBuilderBackup /></LayoutWrapper>} />
       <Route path="/AdminDashboard" element={<AdminDashboard />} />
       <Route path="/AdminOperations" element={<AdminOperations />} />
+      <Route path="/AdminInstaJudgeReports" element={<AdminInstaJudgeReports />} />
       <Route path="/Forum" element={<LayoutWrapper currentPageName="Forum"><Forum /></LayoutWrapper>} />
       <Route path="/ForumThread" element={<LayoutWrapper currentPageName="ForumThread"><ForumThread /></LayoutWrapper>} />
       <Route path="/RulesReference" element={<LayoutWrapper currentPageName="RulesReference"><RulesReference /></LayoutWrapper>} />

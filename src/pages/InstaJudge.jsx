@@ -1,9 +1,24 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ArrowRight, RotateCcw, Send } from 'lucide-react';
+import { ArrowRight, Flag, LoaderCircle, RotateCcw, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { instaJudgeOwner } from '@/services/instajudge/instajudgeOwner';
+import {
+  buildRulingReportDraft,
+  captureRulingContext,
+  isReportableRulingMessage,
+  isRulingReportIntent
+} from '@/services/instajudge/rulingReportCore';
+import { rulingReportService } from '@/services/instajudge/rulingReportService';
 
 const assistantIntro = "Hi, I’m MPM InstaJudge. What TCG do you need help with?";
+const REPORT_JUDGE = Object.freeze({ id: 'instajudge', displayName: 'MPM InstaJudge' });
+
+function createClientSession(initial = {}) {
+  const id = globalThis.crypto?.randomUUID?.() || `ij-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return { ...instaJudgeOwner.createSession(initial), id };
+}
 
 function verdictClass(verdict) {
   if (verdict === 'yes') return 'border-emerald-400/40 bg-emerald-400/10 text-emerald-100';
@@ -12,7 +27,7 @@ function verdictClass(verdict) {
   return 'border-slate-600 bg-slate-900/80 text-slate-200';
 }
 
-function ChatBubble({ message }) {
+function ChatBubble({ message, onReport }) {
   const isUser = message.role === 'user';
   return (
     <div className={`flex min-w-0 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -56,6 +71,11 @@ function ChatBubble({ message }) {
             {message.result.clarificationNeeded}
           </p>
         ) : null}
+        {isReportableRulingMessage(message) ? (
+          <button type="button" onClick={() => onReport(message)} className="mt-3 inline-flex items-center gap-2 border-t border-slate-800 pt-3 text-xs font-semibold text-slate-400 hover:text-cyan-100">
+            <Flag className="h-3.5 w-3.5" aria-hidden="true" /> Wrong Answer? Report Error
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -63,12 +83,17 @@ function ChatBubble({ message }) {
 
 export default function InstaJudge() {
   const games = useMemo(() => instaJudgeOwner.listGames(), []);
-  const [session, setSession] = useState(() => instaJudgeOwner.createSession());
+  const [session, setSession] = useState(() => createClientSession());
   const [selectedGame, setSelectedGame] = useState(null);
   const [messages, setMessages] = useState([{ id: 'intro', role: 'assistant', text: assistantIntro }]);
   const [draft, setDraft] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportNote, setReportNote] = useState('');
+  const [reportError, setReportError] = useState('');
+  const [isReporting, setIsReporting] = useState(false);
   const inputRef = useRef(null);
+  const latestReportable = useMemo(() => [...messages].reverse().find(isReportableRulingMessage) || null, [messages]);
 
   const handleSelectGame = (gameId) => {
     const selected = instaJudgeOwner.selectGame(session, gameId);
@@ -87,7 +112,7 @@ export default function InstaJudge() {
   };
 
   const clearConversation = () => {
-    const nextSession = instaJudgeOwner.createSession(selectedGame ? { game: selectedGame.id } : {});
+    const nextSession = createClientSession(selectedGame ? { game: selectedGame.id } : {});
     setSession(nextSession);
     setMessages([
       { id: 'intro', role: 'assistant', text: assistantIntro },
@@ -98,13 +123,25 @@ export default function InstaJudge() {
       }] : [])
     ]);
     setDraft('');
+    setReportTarget(null);
+    setReportNote('');
+    setReportError('');
   };
 
   const changeGame = () => {
     setSelectedGame(null);
-    setSession(instaJudgeOwner.createSession());
+    setSession(createClientSession());
     setMessages([{ id: 'intro', role: 'assistant', text: assistantIntro }]);
     setDraft('');
+    setReportTarget(null);
+    setReportNote('');
+    setReportError('');
+  };
+
+  const openReport = (message) => {
+    setReportTarget(message);
+    setReportNote('');
+    setReportError('');
   };
 
   const submitMessage = async (event) => {
@@ -113,6 +150,12 @@ export default function InstaJudge() {
     if (!text || !selectedGame || isThinking) return;
 
     setDraft('');
+    if (isRulingReportIntent(text) && latestReportable) {
+      setMessages((current) => [...current, { id: `user-${Date.now()}`, role: 'user', text }]);
+      openReport(latestReportable);
+      return;
+    }
+
     setIsThinking(true);
     setMessages((current) => [...current, { id: `user-${Date.now()}`, role: 'user', text }]);
 
@@ -120,16 +163,57 @@ export default function InstaJudge() {
     setSession(response.session);
     setMessages((current) => [
       ...current,
-      {
+      (() => {
+        const result = {
+          ...response.result,
+          reportContext: captureRulingContext({
+            session: response.session,
+            userMessage: text,
+            result: response.result,
+            judge: REPORT_JUDGE,
+            inputSource: 'typed'
+          })
+        };
+        return {
         id: `judge-${Date.now()}`,
         role: 'assistant',
         text: response.result.answer,
         verdict: response.result.verdict,
-        result: response.result
-      }
+        result
+        };
+      })()
     ]);
     setIsThinking(false);
     window.setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const submitReport = async () => {
+    if (!reportTarget || isReporting) return;
+    setIsReporting(true);
+    setReportError('');
+    try {
+      const report = buildRulingReportDraft({
+        message: reportTarget,
+        transcript: messages,
+        session,
+        judge: REPORT_JUDGE,
+        note: reportNote,
+        route: `${window.location.pathname}${window.location.search}`,
+        appVersion: import.meta.env.VITE_COMMIT_SHA || import.meta.env.VITE_APP_VERSION || 'production'
+      });
+      await rulingReportService.create(report);
+      setMessages((current) => [...current, {
+        id: `report-confirmation-${Date.now()}`,
+        role: 'assistant',
+        text: 'Thanks. I saved this ruling for review. Your current ruling session is unchanged.'
+      }]);
+      setReportTarget(null);
+      setReportNote('');
+    } catch (error) {
+      setReportError(error instanceof Error ? error.message : 'Unable to submit this report.');
+    } finally {
+      setIsReporting(false);
+    }
   };
 
   return (
@@ -141,7 +225,7 @@ export default function InstaJudge() {
 
         <div className="mt-5 flex flex-1 flex-col gap-4">
           <div className="min-w-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden border-y border-slate-800 py-4">
-            {messages.map((message) => <ChatBubble key={message.id} message={message} />)}
+            {messages.map((message) => <ChatBubble key={message.id} message={message} onReport={openReport} />)}
 
             {!selectedGame ? (
               <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -200,6 +284,31 @@ export default function InstaJudge() {
           </form>
         </div>
       </section>
+
+      <Dialog open={Boolean(reportTarget)} onOpenChange={(open) => { if (!open && !isReporting) setReportTarget(null); }}>
+        <DialogContent className="max-w-lg rounded-sm border-slate-700 bg-[#0b1220] text-slate-100">
+          <DialogHeader>
+            <DialogTitle>Report this ruling</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm leading-6 text-slate-300">The ruling, recent conversation, and available diagnostic state will be sent to Main Phase Market for review.</p>
+          <label className="mt-2 block text-sm font-semibold text-slate-200" htmlFor="ruling-report-note">Optional note</label>
+          <Textarea
+            id="ruling-report-note"
+            value={reportNote}
+            onChange={(event) => setReportNote(event.target.value.slice(0, 2000))}
+            placeholder="What seems wrong?"
+            className="min-h-28 rounded-sm border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500"
+          />
+          {reportError ? <p className="text-sm text-rose-300" role="alert">{reportError}</p> : null}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" disabled={isReporting} onClick={() => setReportTarget(null)} className="rounded-sm border-slate-700 bg-transparent text-slate-200 hover:bg-slate-800">Cancel</Button>
+            <Button type="button" disabled={isReporting} onClick={submitReport} className="rounded-sm bg-cyan-200 text-slate-950 hover:bg-cyan-100">
+              {isReporting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : <Flag className="mr-2 h-4 w-4" aria-hidden="true" />}
+              Submit report
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

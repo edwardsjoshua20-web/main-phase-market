@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Package, ClipboardList, ArrowRight, Home, Activity } from 'lucide-react';
+import { Package, ClipboardList, ArrowRight, Home, Activity, ShieldAlert } from 'lucide-react';
 
 const tools = [
   {
@@ -22,6 +22,13 @@ const tools = [
     icon: Activity,
     href: '/AdminOperations',
     color: 'bg-purple-500'
+  },
+  {
+    title: 'InstaJudge Reports',
+    description: 'Review reported rulings, diagnostic state, and resolution status.',
+    icon: ShieldAlert,
+    href: '/AdminInstaJudgeReports',
+    color: 'bg-cyan-600'
   }
 ];
 
