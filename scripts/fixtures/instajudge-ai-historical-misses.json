@@ -1,0 +1,3043 @@
+{
+  "sourceReport": ".tmp-instajudge-ai-live-improved-1.json",
+  "sourceRunSemanticPassesAfterExpectationRepair": 73,
+  "sourceRunSemanticMissesAfterExpectationRepair": 35,
+  "repairedExpectationIds": [
+    "AI042",
+    "AI066",
+    "AI082",
+    "AI088",
+    "AI103",
+    "AI104",
+    "AI106"
+  ],
+  "cases": [
+    {
+      "id": "AI004",
+      "category": "turn",
+      "message": "I am the active player.",
+      "expected": {
+        "facts": {
+          "turn": "user"
+        },
+        "absentFacts": [
+          "phase",
+          "step",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": "user",
+          "phase": null,
+          "step": null,
+          "priorityHolder": "user",
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "priorityHolder",
+          "actual": "user"
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unsupported_temporal_fact",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI009",
+      "category": "phase_step",
+      "message": "We're in upkeep.",
+      "expected": {
+        "facts": {
+          "phase": "beginning",
+          "step": "upkeep"
+        },
+        "absentFacts": [
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": "beginning",
+          "step": "upkeep",
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unsupported_temporal_fact",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI011",
+      "category": "phase_step",
+      "message": "We are in the draw step.",
+      "expected": {
+        "facts": {
+          "phase": "beginning",
+          "step": "draw"
+        },
+        "absentFacts": [
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": "precombat-main",
+          "step": "draw",
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "other_failure",
+          "field": "phase",
+          "expected": "beginning",
+          "actual": "precombat-main"
+        },
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "combat_step_normalization",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI015",
+      "category": "phase_step",
+      "message": "Beginning of combat.",
+      "expected": {
+        "facts": {
+          "phase": "combat",
+          "step": "beginning-of-combat"
+        },
+        "absentFacts": [
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": "combat",
+          "step": "beginning-of-combat",
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unsupported_temporal_fact",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI016",
+      "category": "phase_step",
+      "message": "After attackers are declared.",
+      "expected": {
+        "facts": {
+          "phase": "combat",
+          "step": "declare-attackers"
+        },
+        "absentFacts": [
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": "declare-attackers",
+          "priorityHolder": null,
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "missing_fact",
+          "field": "phase",
+          "expected": "combat",
+          "actual": null
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "combat_step_normalization",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI018",
+      "category": "phase_step",
+      "message": "After blocks.",
+      "expected": {
+        "facts": {
+          "phase": "combat",
+          "step": "declare-blockers"
+        },
+        "absentFacts": [
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": "end-of-combat",
+          "priorityHolder": null,
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "missing_fact",
+          "field": "phase",
+          "expected": "combat",
+          "actual": null
+        },
+        {
+          "type": "other_failure",
+          "field": "step",
+          "expected": "declare-blockers",
+          "actual": "end-of-combat"
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "combat_step_normalization",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI019",
+      "category": "phase_step",
+      "message": "First strike combat damage.",
+      "expected": {
+        "facts": {
+          "phase": "combat",
+          "step": "first-strike-combat-damage"
+        },
+        "absentFacts": [
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": "combat",
+          "step": "first-strike-combat-damage",
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unsupported_temporal_fact",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI020",
+      "category": "phase_step",
+      "message": "Regular combat damage.",
+      "expected": {
+        "facts": {
+          "phase": "combat",
+          "step": "combat-damage"
+        },
+        "absentFacts": [
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": "combat",
+          "step": "combat-damage",
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unsupported_temporal_fact",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI021",
+      "category": "phase_step",
+      "message": "End of combat.",
+      "expected": {
+        "facts": {
+          "phase": "combat",
+          "step": "end-of-combat"
+        },
+        "absentFacts": [
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": "postcombat-main",
+          "step": "end-of-combat",
+          "priorityHolder": null,
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "other_failure",
+          "field": "phase",
+          "expected": "combat",
+          "actual": "postcombat-main"
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "combat_step_normalization",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI025",
+      "category": "phase_step",
+      "message": "We're between first strike damage and regular damage.",
+      "expected": {
+        "facts": {
+          "phase": "combat"
+        },
+        "absentFacts": [
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": true
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": "combat",
+          "step": "combat-damage",
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        },
+        {
+          "type": "missing_fact",
+          "field": "ambiguity",
+          "expected": true,
+          "actual": false
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "combat_step_normalization",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI026",
+      "category": "phase_step",
+      "message": "Before blockers are declared.",
+      "expected": {
+        "facts": {
+          "phase": "combat",
+          "step": "declare-attackers"
+        },
+        "absentFacts": [
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": "combat",
+          "step": "declare-blockers",
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "other_failure",
+          "field": "step",
+          "expected": "declare-attackers",
+          "actual": "declare-blockers"
+        },
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "combat_step_normalization",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI035",
+      "category": "priority",
+      "message": "Neither player has said who has priority.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "phase",
+          "step",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": true
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "missing_fact",
+          "field": "ambiguity",
+          "expected": true,
+          "actual": false
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "required_ambiguity_missing",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI036",
+      "category": "priority",
+      "message": "I am waiting for priority.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "phase",
+          "step",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": "user",
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "priorityHolder",
+          "actual": "user"
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unsupported_temporal_fact",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI050",
+      "category": "multi_stack",
+      "message": "Divination is on the stack. Opponent responds with Negate. I respond with Cancel.",
+      "expected": {
+        "facts": {
+          "stackEmpty": false
+        },
+        "absentFacts": [
+          "turn",
+          "phase",
+          "step",
+          "priorityHolder"
+        ],
+        "cards": [
+          "Cancel",
+          "Negate",
+          "Divination"
+        ],
+        "stack": [
+          "Cancel",
+          "Negate",
+          "Divination"
+        ],
+        "targets": [
+          {
+            "source": "Cancel",
+            "target": "Negate"
+          },
+          {
+            "source": "Negate",
+            "target": "Divination"
+          }
+        ],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": false
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": "user",
+            "actionType": "cast",
+            "sourceText": "Divination'}, {",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          },
+          {
+            "sequence": 2,
+            "actor": "opponent",
+            "actionType": "cast",
+            "sourceText": "Negate",
+            "targetText": "Divination",
+            "responseToSequence": 1,
+            "timingText": null
+          },
+          {
+            "sequence": 3,
+            "actor": "user",
+            "actionType": "cast",
+            "sourceText": "Cancel",
+            "targetText": "Negate",
+            "responseToSequence": 2,
+            "timingText": null
+          }
+        ],
+        "stack": [
+          {
+            "position": 3,
+            "sourceText": "Cancel",
+            "controller": "user",
+            "targetText": "Negate",
+            "responseToPosition": 2
+          },
+          {
+            "position": 2,
+            "sourceText": "Negate",
+            "controller": "opponent",
+            "targetText": "Divination",
+            "responseToPosition": 1
+          },
+          {
+            "position": 1,
+            "sourceText": "Divination",
+            "controller": "user",
+            "targetText": null,
+            "responseToPosition": null
+          }
+        ],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "wrong_relationship",
+          "field": "stack_order",
+          "expected": [
+            "Cancel",
+            "Negate",
+            "Divination"
+          ],
+          "actual": [
+            "Divination",
+            "Negate",
+            "Cancel"
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "stack_order_reversal",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI056",
+      "category": "multi_stack",
+      "message": "Cancel responds to Negate, which responds to Divination.",
+      "expected": {
+        "facts": {
+          "stackEmpty": false
+        },
+        "absentFacts": [
+          "turn",
+          "phase",
+          "step",
+          "priorityHolder"
+        ],
+        "cards": [
+          "Cancel",
+          "Negate",
+          "Divination"
+        ],
+        "stack": [
+          "Cancel",
+          "Negate",
+          "Divination"
+        ],
+        "targets": [
+          {
+            "source": "Cancel",
+            "target": "Negate"
+          },
+          {
+            "source": "Negate",
+            "target": "Divination"
+          }
+        ],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": false
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": null,
+            "actionType": "cast",
+            "sourceText": "Cancel",
+            "targetText": "Negate'}, {",
+            "responseToSequence": 2,
+            "timingText": "Negate"
+          },
+          {
+            "sequence": 2,
+            "actor": null,
+            "actionType": "cast",
+            "sourceText": "Negate",
+            "targetText": "Divination'}, {",
+            "responseToSequence": 3,
+            "timingText": "Divination"
+          }
+        ],
+        "stack": [
+          {
+            "position": 1,
+            "sourceText": "Cancel",
+            "controller": null,
+            "targetText": "Negate",
+            "responseToPosition": 2
+          },
+          {
+            "position": 2,
+            "sourceText": "Negate",
+            "controller": null,
+            "targetText": "Divination",
+            "responseToPosition": 3
+          },
+          {
+            "position": 3,
+            "sourceText": "Divination",
+            "controller": null,
+            "targetText": null,
+            "responseToPosition": null
+          }
+        ],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [
+          {
+            "field": "actor",
+            "reason": "not stated",
+            "candidateTexts": [
+              "user",
+              "opponent"
+            ]
+          }
+        ],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "excessive_ambiguity",
+          "actual": [
+            {
+              "field": "actor",
+              "reason": "not stated",
+              "candidateTexts": [
+                "user",
+                "opponent"
+              ]
+            }
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unnecessary_ambiguity",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI057",
+      "category": "combat",
+      "message": "I attack with Colossal Dreadmaw.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [
+          "Colossal Dreadmaw"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [
+          "Colossal Dreadmaw"
+        ],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": "user",
+            "actionType": "attack",
+            "sourceText": "Colossal Dreadmaw",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          }
+        ],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Colossal Dreadmaw",
+              "defender": null
+            }
+          ],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [
+          {
+            "field": "relationship",
+            "reason": "unstated",
+            "candidateTexts": [
+              "turn",
+              "phase",
+              "step",
+              "priorityHolder",
+              "stack"
+            ]
+          }
+        ],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "excessive_ambiguity",
+          "actual": [
+            {
+              "field": "relationship",
+              "reason": "unstated",
+              "candidateTexts": [
+                "turn",
+                "phase",
+                "step",
+                "priorityHolder",
+                "stack"
+              ]
+            }
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unnecessary_ambiguity",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI058",
+      "category": "combat",
+      "message": "He attacks me with Grizzly Bears.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [
+          "Grizzly Bears"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [
+          "Grizzly Bears"
+        ],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": "opponent",
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": "opponent",
+            "actionType": "attack",
+            "sourceText": "Grizzly Bears",
+            "targetText": "user",
+            "responseToSequence": null,
+            "timingText": null
+          }
+        ],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Grizzly Bears",
+              "defender": "user"
+            }
+          ],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [
+          {
+            "field": "phase",
+            "reason": "attack declared",
+            "candidateTexts": [
+              "beginning",
+              "precombat-main",
+              "combat",
+              "postcombat-main",
+              "ending"
+            ]
+          },
+          {
+            "field": "step",
+            "reason": "attack declared",
+            "candidateTexts": [
+              "upkeep",
+              "draw",
+              "beginning-of-combat",
+              "declare-attackers",
+              "declare-blockers",
+              "first-strike-combat-damage', 'combat-damage', 'end-of-combat', 'end-step"
+            ]
+          },
+          {
+            "field": "priorityHolder",
+            "reason": "attack declared",
+            "candidateTexts": [
+              "user",
+              "opponent"
+            ]
+          }
+        ],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "turn",
+          "actual": "opponent"
+        },
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        },
+        {
+          "type": "excessive_ambiguity",
+          "actual": [
+            {
+              "field": "phase",
+              "reason": "attack declared",
+              "candidateTexts": [
+                "beginning",
+                "precombat-main",
+                "combat",
+                "postcombat-main",
+                "ending"
+              ]
+            },
+            {
+              "field": "step",
+              "reason": "attack declared",
+              "candidateTexts": [
+                "upkeep",
+                "draw",
+                "beginning-of-combat",
+                "declare-attackers",
+                "declare-blockers",
+                "first-strike-combat-damage', 'combat-damage', 'end-of-combat', 'end-step"
+              ]
+            },
+            {
+              "field": "priorityHolder",
+              "reason": "attack declared",
+              "candidateTexts": [
+                "user",
+                "opponent"
+              ]
+            }
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unnecessary_ambiguity",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI060",
+      "category": "combat",
+      "message": "Dreadmaw attacks Bob and Bears blocks it.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [
+          "Dreadmaw",
+          "Bears"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [
+          "Dreadmaw"
+        ],
+        "blockers": [
+          {
+            "blocker": "Bears",
+            "attacker": "Dreadmaw"
+          }
+        ],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": null,
+            "actionType": "attack",
+            "sourceText": "Dreadmaw",
+            "targetText": "Bob'}, {",
+            "responseToSequence": null,
+            "timingText": "Bears blocks it"
+          },
+          {
+            "sequence": 2,
+            "actor": null,
+            "actionType": "block",
+            "sourceText": "Bears",
+            "targetText": "Dreadmaw",
+            "responseToSequence": 1,
+            "timingText": "blocks it"
+          }
+        ],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Dreadmaw",
+              "defender": "Bob"
+            }
+          ],
+          "blockers": [
+            {
+              "blockerText": "Bears",
+              "blockedAttackerText": "Dreadmaw"
+            }
+          ]
+        },
+        "correction": null,
+        "ambiguities": [
+          {
+            "field": "controller",
+            "reason": "not stated",
+            "candidateTexts": [
+              "Dreadmaw",
+              "Bears"
+            ]
+          }
+        ],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "excessive_ambiguity",
+          "actual": [
+            {
+              "field": "controller",
+              "reason": "not stated",
+              "candidateTexts": [
+                "Dreadmaw",
+                "Bears"
+              ]
+            }
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unnecessary_ambiguity",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI061",
+      "category": "combat",
+      "message": "I attack with Dreadmaw and Llanowar Elves; Bears blocks the Elves.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [
+          "Dreadmaw",
+          "Llanowar Elves",
+          "Bears"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [
+          "Dreadmaw",
+          "Llanowar Elves"
+        ],
+        "blockers": [
+          {
+            "blocker": "Bears",
+            "attacker": "Llanowar Elves"
+          }
+        ],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": "user",
+          "phase": "combat",
+          "step": "declare-blockers",
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": "user",
+            "actionType": "attack",
+            "sourceText": "Dreadmaw",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          },
+          {
+            "sequence": 2,
+            "actor": "user",
+            "actionType": "attack",
+            "sourceText": "Llanowar Elves",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          },
+          {
+            "sequence": 3,
+            "actor": "opponent",
+            "actionType": "block",
+            "sourceText": "Bears",
+            "targetText": "Llanowar Elves",
+            "responseToSequence": 2,
+            "timingText": null
+          }
+        ],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Dreadmaw",
+              "defender": null
+            },
+            {
+              "attackerText": "Llanowar Elves",
+              "defender": "Bears"
+            }
+          ],
+          "blockers": [
+            {
+              "blockerText": "Bears",
+              "blockedAttackerText": "Llanowar Elves"
+            }
+          ]
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "turn",
+          "actual": "user"
+        },
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unsupported_temporal_fact",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI062",
+      "category": "combat",
+      "message": "My Grizzly Bears attacks and their Grizzly Bears blocks it.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [
+          "Grizzly Bears",
+          "Grizzly Bears"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [
+          "Grizzly Bears"
+        ],
+        "blockers": [
+          {
+            "blocker": "Grizzly Bears",
+            "attacker": "Grizzly Bears"
+          }
+        ],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": "user",
+            "actionType": "attack",
+            "sourceText": "Grizzly Bears",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          },
+          {
+            "sequence": 2,
+            "actor": "opponent",
+            "actionType": "block",
+            "sourceText": "Grizzly Bears",
+            "targetText": "Grizzly Bears",
+            "responseToSequence": 1,
+            "timingText": null
+          }
+        ],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Grizzly Bears",
+              "defender": "opponent"
+            }
+          ],
+          "blockers": [
+            {
+              "blockerText": "Grizzly Bears",
+              "blockedAttackerText": "Grizzly Bears"
+            }
+          ]
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unsupported_temporal_fact",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI063",
+      "category": "combat",
+      "message": "Colossal Dreadmaw and Grizzly Bears are attacking.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [
+          "Colossal Dreadmaw",
+          "Grizzly Bears"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [
+          "Colossal Dreadmaw",
+          "Grizzly Bears"
+        ],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": null,
+            "actionType": "attack",
+            "sourceText": "Colossal Dreadmaw",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          },
+          {
+            "sequence": 2,
+            "actor": null,
+            "actionType": "attack",
+            "sourceText": "Grizzly Bears",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          }
+        ],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Colossal Dreadmaw",
+              "defender": null
+            },
+            {
+              "attackerText": "Grizzly Bears",
+              "defender": null
+            }
+          ],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [
+          {
+            "field": "actor",
+            "reason": "identity of attacker controller not stated",
+            "candidateTexts": [
+              "user",
+              "opponent"
+            ]
+          }
+        ],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "excessive_ambiguity",
+          "actual": [
+            {
+              "field": "actor",
+              "reason": "identity of attacker controller not stated",
+              "candidateTexts": [
+                "user",
+                "opponent"
+              ]
+            }
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unnecessary_ambiguity",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI064",
+      "category": "combat",
+      "message": "Opponent attacks with Dreadmaw; I block with Bears.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [
+          "Dreadmaw",
+          "Bears"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [
+          "Dreadmaw"
+        ],
+        "blockers": [
+          {
+            "blocker": "Bears",
+            "attacker": "Dreadmaw"
+          }
+        ],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": "opponent",
+          "phase": "combat",
+          "step": "declare-blockers",
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": "opponent",
+            "actionType": "attack",
+            "sourceText": "Dreadmaw'}, {",
+            "targetText": "Bears",
+            "responseToSequence": null,
+            "timingText": "block with Bears"
+          },
+          {
+            "sequence": 2,
+            "actor": "user",
+            "actionType": "block",
+            "sourceText": "Bears",
+            "targetText": "Dreadmaw",
+            "responseToSequence": 1,
+            "timingText": "in response to attack"
+          }
+        ],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Dreadmaw",
+              "defender": "user"
+            }
+          ],
+          "blockers": [
+            {
+              "blockerText": "Bears",
+              "blockedAttackerText": "Dreadmaw"
+            }
+          ]
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "turn",
+          "actual": "opponent"
+        },
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unsupported_temporal_fact",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI065",
+      "category": "combat",
+      "message": "Dreadmaw is attacking me with no blockers declared yet.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [
+          "Dreadmaw"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [
+          "Dreadmaw"
+        ],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": "opponent",
+          "phase": "combat",
+          "step": "declare-blockers",
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Dreadmaw",
+              "defender": "user"
+            }
+          ],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "turn",
+          "actual": "opponent"
+        },
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unsupported_temporal_fact",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI068",
+      "category": "combat",
+      "message": "I swing with Dreadmaw at Bob.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [
+          "Dreadmaw"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [
+          "Dreadmaw"
+        ],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": "user",
+            "actionType": "attack",
+            "sourceText": "Dreadmaw",
+            "targetText": "Bob",
+            "responseToSequence": null,
+            "timingText": null
+          }
+        ],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Dreadmaw",
+              "defender": "Bob"
+            }
+          ],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unsupported_temporal_fact",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI069",
+      "category": "combat",
+      "message": "My opponent swings with two Grizzly Bears.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "priorityHolder",
+          "stackEmpty"
+        ],
+        "cards": [
+          "Grizzly Bears",
+          "Grizzly Bears"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [
+          "Grizzly Bears",
+          "Grizzly Bears"
+        ],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": "opponent",
+          "phase": "combat",
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": "opponent",
+            "actionType": "attack",
+            "sourceText": "Grizzly Bears",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          },
+          {
+            "sequence": 2,
+            "actor": "opponent",
+            "actionType": "attack",
+            "sourceText": "Grizzly Bears",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          }
+        ],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Grizzly Bears",
+              "defender": null
+            }
+          ],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [
+          {
+            "field": "step",
+            "reason": "step not stated",
+            "candidateTexts": [
+              "beginning-of-combat",
+              "declare-attackers"
+            ]
+          }
+        ],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "invented_fact",
+          "field": "turn",
+          "actual": "opponent"
+        },
+        {
+          "type": "invented_fact",
+          "field": "stackEmpty",
+          "actual": true
+        },
+        {
+          "type": "excessive_ambiguity",
+          "actual": [
+            {
+              "field": "step",
+              "reason": "step not stated",
+              "candidateTexts": [
+                "beginning-of-combat",
+                "declare-attackers"
+              ]
+            }
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unnecessary_ambiguity",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI074",
+      "category": "correction",
+      "message": "I meant declare blockers.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": true,
+        "ambiguity": false,
+        "correctionField": "step",
+        "correctionValue": "declare blockers"
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "correction",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": "declare-blockers",
+          "priorityHolder": null,
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [
+          {
+            "position": 1,
+            "sourceText": "Divination",
+            "controller": null,
+            "targetText": "",
+            "responseToPosition": null
+          }
+        ],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": {
+          "field": "pendingQuestion",
+          "previousValueText": "What spell or ability is currently on the stack?",
+          "proposedValueText": "declare blockers"
+        },
+        "ambiguities": [],
+        "unrecognized": [
+          "I meant declare blockers"
+        ]
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "wrong_correction_classification",
+          "field": "correction.field",
+          "expected": "step",
+          "actual": "pendingQuestion"
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "correction_field_selection",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI077",
+      "category": "correction",
+      "message": "Scratch that, Murder isn't on the stack.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [],
+        "cards": [
+          "Murder"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": true,
+        "ambiguity": false,
+        "correctionField": "stack",
+        "correctionValue": "empty"
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "correction",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": true
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": {
+          "field": "stack",
+          "previousValueText": "nonempty",
+          "proposedValueText": "empty"
+        },
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "missing_fact",
+          "field": "card",
+          "expected": "Murder",
+          "actual": []
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "correction_field_selection",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI079",
+      "category": "correction",
+      "message": "No, priority is mine.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": true,
+        "ambiguity": false,
+        "correctionField": "priority",
+        "correctionValue": "user"
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": "user",
+          "stackEmpty": false
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [
+          {
+            "position": 1,
+            "sourceText": "Divination",
+            "controller": null,
+            "targetText": "",
+            "responseToPosition": null
+          }
+        ],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "wrong_correction_classification",
+          "expected": "priority",
+          "actual": "state_update"
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "correction_field_selection",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI084",
+      "category": "card_preservation",
+      "message": "Grizly Bears is attacking.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "phase",
+          "step",
+          "priorityHolder"
+        ],
+        "cards": [
+          "Grizly Bears"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false,
+        "preserveRaw": [
+          "Grizly Bears"
+        ]
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": null,
+            "actionType": "attack",
+            "sourceText": "Grizly Bears",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          }
+        ],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Grizly Bears",
+              "defender": null
+            }
+          ],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [
+          {
+            "field": "actor",
+            "reason": "identity of actor",
+            "candidateTexts": [
+              "user",
+              "opponent"
+            ]
+          }
+        ],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "excessive_ambiguity",
+          "actual": [
+            {
+              "field": "actor",
+              "reason": "identity of actor",
+              "candidateTexts": [
+                "user",
+                "opponent"
+              ]
+            }
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unnecessary_ambiguity",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI085",
+      "category": "card_preservation",
+      "message": "Colosal Dreadmaw attacks.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "phase",
+          "step",
+          "priorityHolder"
+        ],
+        "cards": [
+          "Colosal Dreadmaw"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false,
+        "preserveRaw": [
+          "Colosal Dreadmaw"
+        ]
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": null
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": "user",
+            "actionType": "attack",
+            "sourceText": "Colosal Dreadmaw",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          }
+        ],
+        "stack": [],
+        "combat": {
+          "attackers": [
+            {
+              "attackerText": "Colosal Dreadmaw",
+              "defender": null
+            }
+          ],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [
+          {
+            "field": "relationship",
+            "reason": "not stated",
+            "candidateTexts": [
+              "turn",
+              "phase",
+              "step",
+              "priorityHolder",
+              "stack"
+            ]
+          }
+        ],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "excessive_ambiguity",
+          "actual": [
+            {
+              "field": "relationship",
+              "reason": "not stated",
+              "candidateTexts": [
+                "turn",
+                "phase",
+                "step",
+                "priorityHolder",
+                "stack"
+              ]
+            }
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unnecessary_ambiguity",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI086",
+      "category": "card_preservation",
+      "message": "I cast Divin.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "phase",
+          "step",
+          "priorityHolder"
+        ],
+        "cards": [
+          "Divin"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false,
+        "preserveRaw": [
+          "Divin"
+        ]
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": false
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": "user",
+            "actionType": "cast",
+            "sourceText": "Divin.",
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": null
+          }
+        ],
+        "stack": [
+          {
+            "position": 1,
+            "sourceText": "Divin.",
+            "controller": "user",
+            "targetText": null,
+            "responseToPosition": null
+          }
+        ],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [
+          {
+            "field": "sourceText",
+            "reason": "incomplete card name",
+            "candidateTexts": [
+              "Divination",
+              "Divine"
+            ]
+          }
+        ],
+        "unrecognized": [
+          "Divin."
+        ]
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "card_name_mutation",
+          "expected": "Divin",
+          "actual": [
+            "Divin.",
+            "Divin."
+          ]
+        },
+        {
+          "type": "excessive_ambiguity",
+          "actual": [
+            {
+              "field": "sourceText",
+              "reason": "incomplete card name",
+              "candidateTexts": [
+                "Divination",
+                "Divine"
+              ]
+            }
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "card_abbreviation_punctuation",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI089",
+      "category": "card_preservation",
+      "message": "Counterspel targets Bolt.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "phase",
+          "step",
+          "priorityHolder"
+        ],
+        "cards": [
+          "Counterspel"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false,
+        "preserveRaw": [
+          "Counterspel"
+        ]
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": false
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": null,
+            "actionType": "cast",
+            "sourceText": "Counterspel",
+            "targetText": "Bolt",
+            "responseToSequence": null,
+            "timingText": null
+          }
+        ],
+        "stack": [
+          {
+            "position": 1,
+            "sourceText": "Counterspel",
+            "controller": null,
+            "targetText": "Bolt",
+            "responseToPosition": null
+          },
+          {
+            "position": 2,
+            "sourceText": "Bolt",
+            "controller": null,
+            "targetText": null,
+            "responseToPosition": null
+          }
+        ],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [
+          {
+            "field": "actor",
+            "reason": "missing information",
+            "candidateTexts": [
+              "user",
+              "opponent"
+            ]
+          }
+        ],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "excessive_ambiguity",
+          "actual": [
+            {
+              "field": "actor",
+              "reason": "missing information",
+              "candidateTexts": [
+                "user",
+                "opponent"
+              ]
+            }
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unnecessary_ambiguity",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI090",
+      "category": "card_preservation",
+      "message": "Gient Growth targets Bears.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "phase",
+          "step",
+          "priorityHolder"
+        ],
+        "cards": [
+          "Gient Growth"
+        ],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": false,
+        "preserveRaw": [
+          "Gient Growth"
+        ]
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": false
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": null,
+            "actionType": "cast",
+            "sourceText": "Gient Growth",
+            "targetText": "Bears",
+            "responseToSequence": null,
+            "timingText": null
+          }
+        ],
+        "stack": [
+          {
+            "position": 1,
+            "sourceText": "Gient Growth",
+            "controller": null,
+            "targetText": "Bears",
+            "responseToPosition": null
+          }
+        ],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [
+          {
+            "field": "actor",
+            "reason": "controller not stated",
+            "candidateTexts": [
+              "user",
+              "opponent"
+            ]
+          }
+        ],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "excessive_ambiguity",
+          "actual": [
+            {
+              "field": "actor",
+              "reason": "controller not stated",
+              "candidateTexts": [
+                "user",
+                "opponent"
+              ]
+            }
+          ]
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "unnecessary_ambiguity",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI093",
+      "category": "ambiguity",
+      "message": "I respond.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "phase",
+          "step",
+          "priorityHolder"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": true
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "low",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": false
+        },
+        "objects": [],
+        "actions": [
+          {
+            "sequence": 1,
+            "actor": "user",
+            "actionType": "other",
+            "sourceText": null,
+            "targetText": null,
+            "responseToSequence": null,
+            "timingText": "in response"
+          }
+        ],
+        "stack": [
+          {
+            "position": 1,
+            "sourceText": "response",
+            "controller": "user",
+            "targetText": null,
+            "responseToPosition": null
+          }
+        ],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": [
+          "respond"
+        ]
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "missing_fact",
+          "field": "ambiguity",
+          "expected": true,
+          "actual": false
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "required_ambiguity_missing",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    },
+    {
+      "id": "AI098",
+      "category": "ambiguity",
+      "message": "There is an ability on the stack.",
+      "expected": {
+        "facts": {},
+        "absentFacts": [
+          "turn",
+          "phase",
+          "step",
+          "priorityHolder"
+        ],
+        "cards": [],
+        "stack": null,
+        "targets": [],
+        "attackers": [],
+        "blockers": [],
+        "correction": false,
+        "ambiguity": true
+      },
+      "priorModelOutput": {
+        "schemaVersion": 1,
+        "interpretationType": "state_update",
+        "confidence": "high",
+        "facts": {
+          "turn": null,
+          "phase": null,
+          "step": null,
+          "priorityHolder": null,
+          "stackEmpty": false
+        },
+        "objects": [],
+        "actions": [],
+        "stack": [
+          {
+            "position": 1,
+            "sourceText": "",
+            "controller": null,
+            "targetText": "",
+            "responseToPosition": null
+          }
+        ],
+        "combat": {
+          "attackers": [],
+          "blockers": []
+        },
+        "correction": null,
+        "ambiguities": [],
+        "unrecognized": []
+      },
+      "priorNormalizedOutput": null,
+      "priorFailures": [
+        {
+          "type": "missing_fact",
+          "field": "ambiguity",
+          "expected": true,
+          "actual": false
+        }
+      ],
+      "priorValidatorResult": null,
+      "priorFallbackRequired": null,
+      "rootCause": "required_ambiguity_missing",
+      "historicalAvailability": {
+        "modelOutput": "available",
+        "normalizedOutput": "unavailable",
+        "validatorResult": "unavailable",
+        "fallbackDecision": "unavailable"
+      }
+    }
+  ]
+}

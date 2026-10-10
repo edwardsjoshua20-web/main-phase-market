@@ -1,3 +1,5 @@
+import { handleInstaJudgeInterpretation } from './instajudge-ai-interpreter.mjs';
+
 const SUPABASE_FUNCTION_ORIGIN = 'https://wwvvyrhlybwijqlhubdv.supabase.co/functions/v1/cardstache-public-api';
 const MAINPHASE_STATIC_ORIGIN = 'https://wwvvyrhlybwijqlhubdv.supabase.co/storage/v1/object/public/main-phase-market-public/data';
 const LEGALITY_BATCH_MAX = 1000;
@@ -441,8 +443,10 @@ async function augmentServiceStatus(request, upstreamResponse) {
 }
 
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
+    const interpretationResponse = await handleInstaJudgeInterpretation(request, env || {});
+    if (interpretationResponse) return interpretationResponse;
     if (!url.pathname.startsWith('/api/public/v1/')) return new Response('Not found', { status: 404 });
     const legalityResponse = await handleLegality(request, url);
     if (legalityResponse) return legalityResponse;

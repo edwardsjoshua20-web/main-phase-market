@@ -92,7 +92,8 @@ export function isLegalityQuestion(message = '') {
 
 function pushCandidate(candidates, value) {
   const clean = String(value || '')
-    .replace(/\b(can|does|if|when|then|with|from|in|target|targets|respond|cast|play|use|is|are|the|a|an)\b/gi, ' ')
+    .replace(/^(?:can|does|if|when|then|with|from|target|targets|respond|cast|play|use|is|are|the|a|an)\b\s*/i, '')
+    .replace(/\s+\b(?:can|does|if|when|then|with|from|in|to|and|target|targets|respond|cast|play|use|is|are|the|a|an)$/i, '')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/\s+(?:and|or)$/i, '');
@@ -204,11 +205,11 @@ export function buildLegalityRuling({ game, card, legality, rules = [], latencyM
   };
 }
 
-export function buildRulesRuling({ game, message, cards = [], rules = [], latencyMs = 0 }) {
+export function buildRulesRuling({ game, message, cards = [], rules = [], latencyMs = 0, scenario = null }) {
   const text = normalizeJudgeText(message);
 
   if (game.id === 'magic') {
-    return judgeMagicScenario({ message, cards, rules, latencyMs });
+    return judgeMagicScenario({ message, cards, rules, latencyMs, scenario });
   }
 
   if (game.id === 'pokemon' && /\basleep|special condition|attack|attacks\b/.test(text)) {

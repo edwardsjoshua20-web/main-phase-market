@@ -1,5 +1,6 @@
 import { isCreature, normalizeMagicCard, normalizeMagicText, sourceHasQuality } from '../magicCards.js';
 import { parseOracleSemantics } from './oracleSemantics.js';
+import { ATTACHMENT_TYPES, attachLegally, attachmentTypeFor, canAttach, detachForZoneChange } from './attachmentRuntime.js';
 import {
   deriveCharacteristics,
   detachObject,
@@ -22,7 +23,8 @@ import {
   createFormatState,
   initializeCommanderDesignations,
   recordCommanderCombatDamage,
-  recordCommanderMovement
+  recordCommanderMovement,
+  setCommanderDamageTotal
 } from './commanderRuntime.js';
 
 let nextObjectId = 1;
@@ -50,7 +52,7 @@ export function createPlayer(id, overrides = {}) {
   };
 }
 
-export function createGameObject({ id = null, card, controller = 'player', owner = controller, baseController = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false, commanderDesignationId = null, counters = {}, timestamp = null, abilities = [], summoningSick = false, enteredTurn = null, attackRestrictions = [], blockRestrictions = [] } = {}) {
+export function createGameObject({ id = null, card, controller = 'player', owner = controller, baseController = controller, zone = 'battlefield', token = false, power = null, toughness = null, name = null, tapped = false, commander = false, commanderDesignationId = null, counters = {}, timestamp = null, abilities = [], summoningSick = false, enteredTurn = null, attackRestrictions = [], blockRestrictions = [], attachedTo = null } = {}) {
   const normalizedCard = card ? normalizeMagicCard(card) : normalizeMagicCard({ name: name || 'Generic Object', typeLine: 'Creature', oracleText: '', power, toughness });
   const objectId = id ? reserveId(id) : makeId(token ? 'token' : 'object');
   const object = {
@@ -74,7 +76,7 @@ export function createGameObject({ id = null, card, controller = 'player', owner
     commander,
     commanderDesignationId,
     attachments: [],
-    attachedTo: null,
+    attachedTo,
     basePower: power ?? normalizedCard.power,
     baseToughness: toughness ?? normalizedCard.toughness,
     effects: [],
@@ -136,6 +138,12 @@ export function emitEvent(state, type, data = {}) {
   const event = eventRecord(type, data);
   state.events.push(event);
   state.eventQueue.push(event);
+  const resolution = event.metadata.resolutionId ? state.resolutions?.get(event.metadata.resolutionId) : null;
+  if (resolution) {
+    resolution.eventIds.push(event.id);
+    const operation = event.metadata.operationId ? resolution.operations.get(event.metadata.operationId) : null;
+    if (operation) operation.eventIds.push(event.id);
+  }
   state.trace.push({
     type,
     eventId: event.id,
@@ -192,7 +200,7 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
       landPlaysUsed: scenario?.game?.landPlaysUsed ?? 0
     }),
     battlefield: [], stack: [], pendingTriggers: [], pendingChoices: [],
-    events: [], eventQueue: [],
+    events: [], eventQueue: [], resolutions: new Map(), nextResolutionId: 1,
     replacementEffects: [], preventionEffects: [], continuousEffects: [],
     characteristicRevision: 0, characteristicCache: new Map(),
     nextContinuousEffectId: 1, nextContinuousTimestamp: 1,
@@ -203,9 +211,9 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
 
   for (const card of cards) {
     const normalized = normalizeMagicCard(card);
-    if (!normalizeMagicText(message).includes(normalized.normalizedName) || /instant|sorcery/i.test(normalized.typeLine)) continue;
     const descriptors = scenario?.objects?.filter((entry) => normalizeMagicText(entry.name) === normalized.normalizedName) || [];
-    const initializers = descriptors.length ? descriptors : [null];
+    if (descriptors.length === 0 && (!normalizeMagicText(message).includes(normalized.normalizedName) || /instant|sorcery/i.test(normalized.typeLine))) continue;
+    const initializers = scenario ? descriptors : [null];
     for (const descriptor of initializers) {
       addInitialObject(state, createGameObject({
         id: descriptor?.id || null,
@@ -213,10 +221,14 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
         controller: descriptor?.controller || inferController(message, normalized),
         owner: descriptor?.owner || inferController(message, normalized),
         zone: descriptor?.zone || 'battlefield',
+        power: descriptor?.power ?? normalized.power,
+        toughness: descriptor?.toughness ?? normalized.toughness,
+        counters: descriptor?.counters || {},
         commander: descriptor?.commander || false,
         commanderDesignationId: descriptor?.commanderDesignationId || null,
-        abilities: descriptor?.abilities || [],
-        summoningSick: descriptor?.summoningSick || false
+         abilities: descriptor?.abilities || [],
+         summoningSick: descriptor?.summoningSick || false,
+         attachedTo: descriptor?.attachedToObjectId || descriptor?.attachedTo || null
       }));
     }
   }
@@ -225,7 +237,18 @@ export function createMagicRuntimeState({ cards = [], genericObjects = [], scena
     || scenario?.objects?.filter((object) => object.commander).map((object) => ({ objectId: object.id, ownerId: object.owner, id: object.commanderDesignationId || null }))
     || [];
   initializeCommanderDesignations(state, commanderDescriptors);
+  for (const damage of scenario?.format?.priorDamage || []) {
+    setCommanderDamageTotal(state, damage.recipientId, damage.designationId, damage.amount);
+  }
   registerScenarioContinuousEffects(state, scenario?.continuousEffects || []);
+  for (const descriptor of scenario?.objects || []) {
+    const attachment = state.objects.get(descriptor.id);
+    const target = state.objects.get(descriptor.attachedToObjectId || descriptor.attachedTo);
+    if (attachment && target) {
+      attachment.attachedTo = null;
+      attachLegally(state, attachment, target);
+    }
+  }
   return state;
 }
 
@@ -289,9 +312,15 @@ function semanticReplacementEffects(state, event) {
           if (replacement.runtime.to && replacement.runtime.to !== candidate.to) return false;
           if (replacement.runtime.from && replacement.runtime.from !== candidate.from) return false;
           if (replacement.runtime.objectId === 'self' && source.id !== candidate.object?.id) return false;
+          if (replacement.runtime.counter && replacement.runtime.counter !== candidate.metadata?.counter) return false;
+          if (replacement.runtime.controller === 'self' && candidate.object?.controller !== source.controller) return false;
+          if (replacement.runtime.objectType === 'creature' && !isCreature(candidate.object?.card)) return false;
           return true;
         },
-        replace: () => ({ ...(replacement.runtime.replace || {}) }),
+        replace: (candidate) => ({
+          ...(replacement.runtime.replace || {}),
+          ...(Number.isFinite(replacement.runtime.amountDelta) ? { amount: candidate.amount + replacement.runtime.amountDelta } : {})
+        }),
         text: replacement.text
       });
     }
@@ -313,9 +342,24 @@ export function registerReplacementEffect(state, effect) {
 }
 
 export function registerPreventionEffect(state, effect) {
-  const normalized = { remaining: null, ...effect };
+  const sourceId = effect.sourceId || null;
+  const provenanceSourceId = effect.source?.id || sourceId;
+  const duration = typeof effect.duration === 'object'
+    ? { ...effect.duration, createdTurn: effect.duration.createdTurn ?? state.game.turn, sourceId: effect.duration.sourceId || provenanceSourceId }
+    : { type: effect.duration === 'this-turn' ? 'until-end-of-turn' : effect.duration || 'indefinite', createdTurn: state.game.turn, sourceId: provenanceSourceId };
+  const normalized = { remaining: null, ...effect, sourceId, duration };
   state.preventionEffects.push(normalized);
   return normalized;
+}
+
+export function expirePreventionEffects(state, transition = {}) {
+  const previous = state.preventionEffects.length;
+  state.preventionEffects = state.preventionEffects.filter((effect) => {
+    if (effect.remaining === 0) return false;
+    if (effect.duration?.type !== 'until-end-of-turn') return true;
+    return transition.step !== 'cleanup' && state.game.turn <= effect.duration.createdTurn;
+  });
+  return previous - state.preventionEffects.length;
 }
 
 export function applyReplacementPipeline(state, proposedEvent, { replacementChoices = [] } = {}) {
@@ -420,7 +464,10 @@ export function moveObjectWithResult(state, object, zone, reason, metadata = {},
   }
   clearPendingRuntimeChoice(state, pendingChoiceId);
   const finalZone = pipeline.event.to;
-  if (from === 'battlefield') removeSourceStaticEffects(state, object.id);
+  if (from === 'battlefield') {
+    detachForZoneChange(state, object);
+    removeSourceStaticEffects(state, object.id);
+  }
   removeFromZone(state, from, object.id);
   object.zone = finalZone;
   object.lastKnown = previous;
@@ -550,6 +597,8 @@ export function moveObject(state, object, zone, reason, metadata = {}, options =
 function preventionEffectsFor(state, event) {
   const registered = state.preventionEffects.filter((effect) => {
     if (effect.remaining === 0) return false;
+    if (effect.duration?.type === 'until-end-of-turn'
+      && (effect.expired || state.game.turn !== effect.duration.createdTurn)) return false;
     if (effect.sourceId && effect.sourceId !== event.source?.id) return false;
     if (effect.targetId && effect.targetId !== event.affected?.id) return false;
     return typeof effect.applies === 'function' ? effect.applies(event, state) : true;
@@ -680,6 +729,28 @@ export function leavePlayersRuntime(state, playerIds, { reason = 'left the game'
     state.players[playerId].leftGame = true;
   }
 
+  if (state.combat) {
+    const removedAttackers = state.combat.attackers.filter((entry) => leavingSet.has(entry.attackTarget));
+    const removedAttackerIds = new Set(removedAttackers.map((entry) => entry.objectId));
+    state.combat.attackers = state.combat.attackers.filter((entry) => !removedAttackerIds.has(entry.objectId));
+    state.combat.blockerAssignments = state.combat.blockerAssignments.filter((assignment) => {
+      const blocker = state.objects.get(assignment.blockerId);
+      return !removedAttackerIds.has(assignment.attackerId) && !leavingSet.has(blocker?.controller);
+    });
+    for (const attacker of removedAttackers) {
+      emitEvent(state, 'AttackerRemovedFromCombat', {
+        object: state.objects.get(attacker.objectId),
+        metadata: { attackTarget: attacker.attackTarget, reason: 'defending-player-left-game' }
+      });
+    }
+    for (const attacker of state.combat.attackers) {
+      attacker.blockerIds = attacker.blockerIds.filter((blockerId) => !leavingSet.has(state.objects.get(blockerId)?.controller));
+      attacker.damageOrder = attacker.damageOrder.filter((blockerId) => attacker.blockerIds.includes(blockerId));
+    }
+    state.combat.defendingPlayers = state.combat.defendingPlayers.filter((playerId) => !leavingSet.has(playerId));
+    if (leavingSet.has(state.combat.defendingPlayer)) state.combat.defendingPlayer = state.combat.defendingPlayers[0] || null;
+  }
+
   const ownedObjects = [...state.objects.values()].filter((object) => leavingSet.has(object.owner) && object.zone !== 'outside-game');
   for (const object of ownedObjects) removeObjectFromGame(state, object, object.owner);
 
@@ -767,16 +838,23 @@ export function runStateBasedActionsRuntime(state) {
     for (const object of state.battlefield.filter((candidate) => candidate.zone === 'battlefield')) {
       if (cancelOpposingCounters(state, object)) { applied.push(`${object.name}'s opposing +1/+1 and -1/-1 counters cancel.`); changed = true; }
     }
-    for (const attachment of state.battlefield.filter((candidate) => candidate.zone === 'battlefield' && candidate.attachedTo)) {
+    for (const attachment of state.battlefield.filter((candidate) => candidate.zone === 'battlefield' && attachmentTypeFor(candidate))) {
+      const attachmentType = attachmentTypeFor(attachment);
       const attached = state.objects.get(attachment.attachedTo);
-      if (attached?.zone === 'battlefield') continue;
-      const characteristics = deriveCharacteristics(state, attachment);
-      if (characteristics.subtypes.includes('aura')) {
+      const legality = attached ? canAttach(attachment, attached, state) : { legal: false, status: 'illegal', failures: ['The attachment is unattached.'] };
+      if (legality.legal) continue;
+      if (attached && legality.status === 'unsupported') {
+        state.trace.push({ type: 'AttachmentLegalityUnverified', attachmentId: attachment.id, targetId: attached.id, failures: legality.failures });
+        continue;
+      }
+      if (attachmentType === ATTACHMENT_TYPES.AURA) {
         moveObject(state, attachment, 'graveyard', 'state-based action: illegal Aura attachment');
         applied.push(`${attachment.name} is put into its owner's graveyard because it is not legally attached.`);
-      } else {
+      } else if (attachment.attachedTo) {
         detachObject(state, attachment);
         applied.push(`${attachment.name} becomes unattached.`);
+      } else {
+        continue;
       }
       changed = true;
     }

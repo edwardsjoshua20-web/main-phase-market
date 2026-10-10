@@ -336,7 +336,14 @@ export function executeCombatDamageStep(state, { step = COMBAT_STEPS.COMBAT_DAMA
       ? markDamageWithResult(state, assignment.object, assignment.amount, source, metadata)
       : dealDamageToPlayerWithResult(state, assignment.playerId, assignment.amount, source, metadata);
     results.push({ ...assignment, result });
-    state.combat.damageAssignments.push({ sourceId: source.id, targetId: assignment.object?.id || assignment.playerId, amount: assignment.amount, step });
+    state.combat.damageAssignments.push({
+      sourceId: source.id,
+      targetId: assignment.object?.id || assignment.playerId,
+      assignedAmount: assignment.amount,
+      amount: result.dealt,
+      preventedAmount: result.prevented,
+      step
+    });
   }
   emitEvent(state, 'CombatDamageStepCompleted', { player: state.combat.attackingPlayer, metadata: { combatStep: step, assignments: pending.length } });
   const followUp = finishTurnBasedAction(state, eventIndex, step);

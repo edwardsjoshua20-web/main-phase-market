@@ -18,8 +18,9 @@ function depends({ cards, rules, mechanics, latencyMs, trace, summary, clarifica
   return { ...result, answer: formatMagicRuling(result) };
 }
 
-function confident({ verdict, cards, rules, mechanics, latencyMs, trace, summary, sequence = [] }) {
+function confident({ verdict, cards, rules, mechanics, latencyMs, trace, summary, sequence = [], combatOutcome = null }) {
   const result = { game: 'magic', verdict, summary, sequence, cards, rules, mechanics: publicMechanicList(mechanics), diagnosticTrace: trace, latencyMs };
+  if (combatOutcome !== null && combatOutcome !== undefined) result.combatOutcome = combatOutcome;
   return { ...result, answer: formatMagicRuling(result) };
 }
 
@@ -30,7 +31,7 @@ function evaluateDelegatedLegality({ message, legalityResult, cards, rules, mech
   return null;
 }
 
-export function evaluateMagicScenario({ message = '', cards = [], rules = [], legalityResult = null, latencyMs = 0 } = {}) {
+export function evaluateMagicScenario({ message = '', cards = [], rules = [], legalityResult = null, latencyMs = 0, scenario = null } = {}) {
   const normalizedCards = cards.map(normalizeMagicCard).filter((card) => card.name);
   const mechanics = detectMagicMechanics({ message, cards: normalizedCards });
   const selectedRules = selectRelevantRules(mechanics, rules);
@@ -39,19 +40,19 @@ export function evaluateMagicScenario({ message = '', cards = [], rules = [], le
   const structuralMultiplayerQuestion = /\b(?:three|four|five|3|4|5)[ -]player\b|\bfree-for-all\b|\bmultiplayer\b/i.test(message)
     && /\b(?:turn|priority|pass|respond|stack|attack|block|loses?|dies?|leaves?|controls?|game end|each opponent|each player|target opponent|ward|trigger|commander damage)\b/i.test(message);
   const unsupportedMultiplayerVariant = /\b(?:two-headed giant|2hg|emperor|grand melee|archenemy|limited range of influence|shared team)\b/i.test(message);
-  if (normalizedCards.length === 0 && !structuralCommanderQuestion && !structuralMultiplayerQuestion && !unsupportedMultiplayerVariant) {
+  if (normalizedCards.length === 0 && !scenario?.questionedAction && !structuralCommanderQuestion && !structuralMultiplayerQuestion && !unsupportedMultiplayerVariant) {
     return unsupported({ cards: [], rules: selectedRules, mechanics, latencyMs, trace: [], reason: 'I cannot verify a Magic ruling until at least one exact card identity is resolved from the catalog.' });
   }
 
   const delegatedLegality = evaluateDelegatedLegality({ message, legalityResult, cards: normalizedCards, rules: selectedRules, mechanics, latencyMs });
   if (delegatedLegality) return delegatedLegality;
 
-  const runtime = evaluateMagicRulesRuntime({ message, cards: normalizedCards });
+  const runtime = evaluateMagicRulesRuntime({ message, cards: normalizedCards, scenario });
   if (runtime.status === 'depends') {
     return depends({ cards: normalizedCards, rules: runtime.rules, mechanics: runtime.mechanics, latencyMs, trace: runtime.trace, summary: runtime.summary, clarificationNeeded: runtime.clarificationNeeded, sequence: runtime.sequence });
   }
   if (runtime.status === 'unsupported') {
     return unsupported({ cards: normalizedCards, rules: runtime.rules, mechanics: runtime.mechanics, latencyMs, trace: runtime.trace, reason: runtime.summary, clarificationNeeded: runtime.clarificationNeeded });
   }
-  return confident({ verdict: runtime.verdict, cards: normalizedCards, rules: runtime.rules, mechanics: runtime.mechanics, latencyMs, trace: runtime.trace, summary: runtime.summary, sequence: runtime.sequence });
+  return confident({ verdict: runtime.verdict, cards: normalizedCards, rules: runtime.rules, mechanics: runtime.mechanics, latencyMs, trace: runtime.trace, summary: runtime.summary, sequence: runtime.sequence, combatOutcome: runtime.combatOutcome });
 }

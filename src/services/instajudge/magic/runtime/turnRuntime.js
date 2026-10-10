@@ -12,6 +12,7 @@ import {
   collectTriggeredAbilities,
   clearPendingRuntimeChoice,
   emitEvent,
+  expirePreventionEffects,
   getPendingRuntimeChoice,
   putPendingTriggersOnStack,
   runStateBasedActionsRuntime,
@@ -183,7 +184,9 @@ function performCleanupTurnBasedAction(state, options) {
   clearPendingRuntimeChoice(state, discardChoiceId);
 
   const clearedDamage = removeMarkedDamage(state);
-  const expiredEffects = expireContinuousEffects(state, { step: TURN_STEPS.CLEANUP });
+  const expiredContinuousEffects = expireContinuousEffects(state, { step: TURN_STEPS.CLEANUP });
+  const expiredPreventionEffects = expirePreventionEffects(state, { step: TURN_STEPS.CLEANUP });
+  const expiredEffects = expiredContinuousEffects + expiredPreventionEffects;
   if (expiredEffects > 0) {
     emitEvent(state, 'UntilEndOfTurnEffectsExpired', {
       player: state.game.activePlayer,

@@ -11,6 +11,7 @@ import {
 import {
   addPermanent,
   createGameObject,
+  clearPendingRuntimeChoice,
   currentPower,
   currentToughness,
   emitEvent,
@@ -19,9 +20,16 @@ import {
   proposeRuntimeEvent,
   registerGameObject,
   registerPreventionEffect,
+  setPendingRuntimeChoice,
   runStateBasedActionsRuntime
 } from './runtimeState.js';
-import { opponentsOf, playersStillInGame } from './multiplayerRuntime.js';
+import { apnapOrder, opponentsOf, playersStillInGame } from './multiplayerRuntime.js';
+import {
+  beginResolutionOperation,
+  createResolutionContext,
+  evaluateValueExpression,
+  resolvePlayerSet
+} from './valueExpressionRuntime.js';
 
 function fixedAmount(value) {
   if (Number.isFinite(value)) return value;
@@ -68,23 +76,23 @@ export function createGenericZoneCard(state, { playerId = 'player', zone = 'libr
   }), playerId, zone);
 }
 
-export function changeLife(state, { playerId, amount, direction = 'gain', source = null, replacementChoices = [], runStateBasedActions = true } = {}) {
+export function changeLife(state, { playerId, amount, direction = 'gain', source = null, replacementChoices = [], runStateBasedActions = true, provenance = {} } = {}) {
   const numeric = fixedAmount(amount);
   if (!Number.isFinite(numeric)) return unsupported('Life change amount is not fixed.');
-  const pipeline = proposeRuntimeEvent(state, 'LifeChange', { source, player: playerId, amount: numeric, metadata: { direction } }, { replacementChoices });
+  const pipeline = proposeRuntimeEvent(state, 'LifeChange', { source, player: playerId, amount: numeric, metadata: { direction, proposedAmount: numeric, ...provenance } }, { replacementChoices });
   if (pipeline.status !== 'ready') return pipeline;
   const finalAmount = pipeline.event.amount;
   const finalDirection = pipeline.event.metadata?.direction || direction;
   state.players[playerId].life += finalDirection === 'gain' ? finalAmount : -finalAmount;
-  emitEvent(state, finalDirection === 'gain' ? 'LifeGained' : 'LifeLost', { source, player: playerId, amount: finalAmount, metadata: { replacements: pipeline.applied } });
+  emitEvent(state, finalDirection === 'gain' ? 'LifeGained' : 'LifeLost', { source, player: playerId, amount: finalAmount, metadata: { replacements: pipeline.applied, proposedAmount: numeric, actualAmount: finalAmount, ...provenance } });
   if (runStateBasedActions) runStateBasedActionsRuntime(state);
   return { status: 'executed', playerId, amount: finalAmount, direction: finalDirection, life: state.players[playerId].life, replacements: pipeline.applied };
 }
 
-export function drawCards(state, { playerId, amount, source = null, allowPlaceholders = false, replacementChoices = [] } = {}) {
+export function drawCards(state, { playerId, amount, source = null, allowPlaceholders = false, replacementChoices = [], provenance = {} } = {}) {
   const numeric = fixedAmount(amount);
   if (!Number.isFinite(numeric)) return unsupported('Draw amount is not fixed.');
-  const pipeline = proposeRuntimeEvent(state, 'CardDraw', { source, player: playerId, amount: numeric }, { replacementChoices });
+  const pipeline = proposeRuntimeEvent(state, 'CardDraw', { source, player: playerId, amount: numeric, metadata: { proposedAmount: numeric, ...provenance } }, { replacementChoices });
   if (pipeline.status !== 'ready') return pipeline;
   if (pipeline.event.type !== 'CardDraw') return unsupported('The draw was replaced by an event this runtime cannot safely execute.');
   const finalAmount = fixedAmount(pipeline.event.amount);
@@ -99,40 +107,42 @@ export function drawCards(state, { playerId, amount, source = null, allowPlaceho
     const card = available.at(-(index + 1));
     if (!card) {
       state.players[playerId].failedDraw = true;
-      emitEvent(state, 'CardDrawFailed', { source, player: playerId, metadata: { reason: 'empty library' } });
+      emitEvent(state, 'CardDrawFailed', { source, player: playerId, metadata: { reason: 'empty library', ...provenance } });
       break;
     }
     const moved = moveObjectWithResult(state, card, 'hand', 'draw');
     if (moved.status !== 'committed') return moved;
     drawn.push(card);
-    emitEvent(state, 'CardDrawn', { source, object: card, player: playerId });
+    emitEvent(state, 'CardDrawn', { source, object: card, player: playerId, amount: 1, metadata: { proposedAmount: 1, actualAmount: 1, ...provenance } });
   }
   runStateBasedActionsRuntime(state);
   return { status: 'executed', drawn, failedDraw: state.players[playerId].failedDraw, replacements: pipeline.applied };
 }
 
-export function discardCards(state, { playerId, amount, cardIds = [], source = null } = {}) {
+export function discardCards(state, { playerId, amount, cardIds = [], source = null, provenance = {} } = {}) {
   const numeric = fixedAmount(amount);
   if (!Number.isFinite(numeric)) return unsupported('Discard amount is not fixed.');
   const hand = zoneObjects(state, playerId, 'hand');
   let selected = cardIds.map((id) => state.objects.get(id)).filter((card) => card?.zone === 'hand' && card.owner === playerId);
-  if (selected.length === 0 && hand.length === numeric) selected = hand;
-  if (selected.length < numeric) {
+  if (selected.length === 0 && hand.length <= numeric) selected = hand;
+  if (selected.length < Math.min(numeric, hand.length)) {
     return { status: 'depends', clarificationNeeded: `Which ${numeric} card${numeric === 1 ? '' : 's'} does ${playerId} discard?`, choices: hand.map((card) => ({ id: card.id, name: card.name })) };
   }
-  const pipeline = proposeRuntimeEvent(state, 'Discard', { source, player: playerId, amount: numeric, metadata: { cardIds: selected.slice(0, numeric).map((card) => card.id) } });
+  const actualAmount = Math.min(numeric, hand.length);
+  const pipeline = proposeRuntimeEvent(state, 'Discard', { source, player: playerId, amount: actualAmount, metadata: { cardIds: selected.slice(0, actualAmount).map((card) => card.id), proposedAmount: numeric, actualAmount, ...provenance } });
   if (pipeline.status !== 'ready') return pipeline;
   const discarded = [];
-  for (const card of selected.slice(0, numeric)) {
+  for (const card of selected.slice(0, actualAmount)) {
     const moved = moveObjectWithResult(state, card, 'graveyard', 'discard effect');
     if (moved.status !== 'committed') return moved;
+    if (moved.to !== 'graveyard') continue;
     discarded.push(card);
-    emitEvent(state, 'CardDiscarded', { source, object: card, player: playerId });
+    emitEvent(state, 'CardDiscarded', { source, object: card, player: playerId, amount: 1, metadata: { proposedAmount: numeric, actualAmount: 1, ...provenance } });
   }
   return { status: 'executed', discarded };
 }
 
-export function millCards(state, { playerId, amount, source = null, allowPlaceholders = false } = {}) {
+export function millCards(state, { playerId, amount, source = null, allowPlaceholders = false, provenance = {} } = {}) {
   const numeric = fixedAmount(amount);
   if (!Number.isFinite(numeric)) return unsupported('Mill amount is not fixed.');
   const library = zoneObjects(state, playerId, 'library');
@@ -140,13 +150,13 @@ export function millCards(state, { playerId, amount, source = null, allowPlaceho
     for (let index = library.length; index < numeric; index += 1) createGenericZoneCard(state, { playerId, zone: 'library', name: `Unknown Library Card ${index + 1}` });
   }
   const selected = zoneObjects(state, playerId, 'library').slice(-numeric);
-  const pipeline = proposeRuntimeEvent(state, 'Mill', { source, player: playerId, amount: selected.length });
+  const pipeline = proposeRuntimeEvent(state, 'Mill', { source, player: playerId, amount: selected.length, metadata: { proposedAmount: numeric, actualAmount: selected.length, ...provenance } });
   if (pipeline.status !== 'ready') return pipeline;
   for (const card of selected) {
     const moved = moveObjectWithResult(state, card, 'graveyard', 'mill');
     if (moved.status !== 'committed') return moved;
   }
-  emitEvent(state, 'CardsMilled', { source, player: playerId, amount: selected.length, metadata: { cardIds: selected.map((card) => card.id) } });
+  emitEvent(state, 'CardsMilled', { source, player: playerId, amount: selected.length, metadata: { cardIds: selected.map((card) => card.id), proposedAmount: numeric, actualAmount: selected.length, ...provenance } });
   return { status: 'executed', milled: selected };
 }
 
@@ -204,10 +214,11 @@ export function modifyCounters(state, { object, counter, amount, operation = 'ad
   if (!object || !counter || !Number.isFinite(numeric)) return unsupported('Counter modification requires an object, counter name, and fixed amount.');
   const pipeline = proposeRuntimeEvent(state, 'CounterChange', { source, object, affected: object, amount: numeric, metadata: { counter, operation } });
   if (pipeline.status !== 'ready') return pipeline;
+  const appliedAmount = pipeline.event.amount;
   const current = object.counters[counter] || 0;
-  object.counters[counter] = operation === 'remove' ? Math.max(0, current - numeric) : current + numeric;
+  object.counters[counter] = operation === 'remove' ? Math.max(0, current - appliedAmount) : current + appliedAmount;
   invalidateCharacteristics(state);
-  emitEvent(state, 'CountersChanged', { source, object, amount: numeric, metadata: { counter, operation, total: object.counters[counter] } });
+  emitEvent(state, 'CountersChanged', { source, object, amount: appliedAmount, metadata: { counter, operation, total: object.counters[counter], proposedAmount: numeric } });
   runStateBasedActionsRuntime(state);
   return { status: 'executed', object, counter, total: object.counters[counter], power: currentPower(object), toughness: currentToughness(object) };
 }
@@ -231,16 +242,21 @@ export function searchLibrary(state, { playerId, criteria, destination = 'hand',
   return { status: 'executed', found: selected, destination: moved.to, shuffled: shuffle };
 }
 
-export function executeTypedEffect({ state, effect, sourceObject = null, controller = sourceObject?.controller || 'player', target = null, targetPlayer = null, choices = {}, allowPlaceholders = false } = {}) {
+export function executeTypedEffect({ state, effect, sourceObject = null, controller = sourceObject?.controller || 'player', target = null, targetPlayer = null, choices = {}, allowPlaceholders = false, resolution = null, operationId = null } = {}) {
   if (!effect?.type) return unsupported('No typed effect was supplied.');
   const targetAmbiguity = ambiguousOpponentTarget(state, effect, controller, targetPlayer);
   if (targetAmbiguity) return targetAmbiguity;
-  const amount = fixedAmount(effect.amount);
+  const activeResolution = resolution || createResolutionContext(state, { source: sourceObject, controller, chosenValues: choices.chosenValues || {} });
+  const operation = beginResolutionOperation(activeResolution, effect, operationId);
+  const amountResult = evaluateValueExpression(effect.amount, { state, resolution: activeResolution, operationId: operation.id });
+  if (amountResult.status === 'depends') return { status: 'depends', clarificationNeeded: amountResult.reason, resolution: activeResolution };
+  if (amountResult.status !== 'resolved' && effect.amount != null && effect.type !== ORACLE_NODE_TYPES.PREVENTION) return unsupported(amountResult.reason);
+  const amount = amountResult.status === 'resolved' ? amountResult.value : null;
+  const provenance = { resolutionId: activeResolution.id, operationId: operation.id, cause: effect.type };
   switch (effect.type) {
     case ORACLE_NODE_TYPES.LIFE_CHANGE: {
-      const players = effect.subject === 'each opponent' ? opponentsOf(state, controller)
-        : effect.subject === 'each player' ? playersStillInGame(state)
-          : [playerForSubject(state, effect.subject, controller, targetPlayer)];
+      const players = resolvePlayerSet(state, effect.playerSet || effect.subject, controller)
+        || [playerForSubject(state, effect.subject, controller, targetPlayer)];
       const simultaneous = players.length > 1;
       const result = combine(players.map((playerId) => changeLife(state, {
         playerId,
@@ -248,19 +264,51 @@ export function executeTypedEffect({ state, effect, sourceObject = null, control
         direction: effect.direction,
         source: sourceObject,
         replacementChoices: choices.replacementChoices,
-        runStateBasedActions: !simultaneous
+        runStateBasedActions: !simultaneous,
+        provenance
       })));
       if (result.status === 'executed' && simultaneous) result.stateBasedActions = runStateBasedActionsRuntime(state);
       return result;
     }
     case ORACLE_NODE_TYPES.DRAW:
-      return drawCards(state, { playerId: playerForSubject(state, effect.subject, controller, targetPlayer), amount, source: sourceObject, allowPlaceholders });
+      return drawCards(state, { playerId: playerForSubject(state, effect.subject, controller, targetPlayer), amount, source: sourceObject, allowPlaceholders, provenance });
     case ORACLE_NODE_TYPES.DISCARD: {
-      const players = effect.subject === 'each player' ? playersStillInGame(state) : [playerForSubject(state, effect.subject, controller, targetPlayer)];
-      return combine(players.map((playerId) => discardCards(state, { playerId, amount, cardIds: choices.cardIds?.[playerId] || choices.cardIds || [], source: sourceObject })));
+      const players = resolvePlayerSet(state, effect.playerSet || effect.subject, controller)
+        || [playerForSubject(state, effect.subject, controller, targetPlayer)];
+      const orderedPlayers = apnapOrder(state).filter((playerId) => players.includes(playerId));
+      for (const playerId of orderedPlayers) {
+        const selected = Array.isArray(choices.cardIds?.[playerId]) ? choices.cardIds[playerId]
+          : Array.isArray(choices.cardIds) ? choices.cardIds : [];
+        if (selected.length >= Math.min(amount, zoneObjects(state, playerId, 'hand').length)) {
+          clearPendingRuntimeChoice(state, `discard:${activeResolution.id}:${operation.id}:${playerId}`);
+        }
+      }
+      const choicePlayer = orderedPlayers.find((playerId) => {
+        const hand = zoneObjects(state, playerId, 'hand');
+        const selected = Array.isArray(choices.cardIds?.[playerId]) ? choices.cardIds[playerId]
+          : Array.isArray(choices.cardIds) ? choices.cardIds : [];
+        return hand.length > amount && selected.length < amount;
+      });
+      if (choicePlayer) {
+        const clarificationNeeded = `Which ${amount} card${amount === 1 ? '' : 's'} does ${choicePlayer} discard?`;
+        const pendingChoice = setPendingRuntimeChoice(state, {
+          id: `discard:${activeResolution.id}:${operation.id}:${choicePlayer}`,
+          type: 'DiscardChoice', resolutionId: activeResolution.id, operationId: operation.id,
+          chooser: choicePlayer, amount,
+          choices: zoneObjects(state, choicePlayer, 'hand').map((card) => ({ id: card.id, name: card.name })),
+          clarificationNeeded
+        });
+        return { status: 'depends', clarificationNeeded, choices: pendingChoice.choices, chooser: choicePlayer, pendingChoice, resolution: activeResolution };
+      }
+      for (const playerId of orderedPlayers) clearPendingRuntimeChoice(state, `discard:${activeResolution.id}:${operation.id}:${playerId}`);
+      return combine(players.map((playerId) => discardCards(state, {
+        playerId, amount,
+        cardIds: Array.isArray(choices.cardIds?.[playerId]) ? choices.cardIds[playerId] : Array.isArray(choices.cardIds) ? choices.cardIds : [],
+        source: sourceObject, provenance
+      })));
     }
     case ORACLE_NODE_TYPES.MILL:
-      return millCards(state, { playerId: playerForSubject(state, effect.subject, controller, targetPlayer), amount, source: sourceObject, allowPlaceholders });
+      return millCards(state, { playerId: playerForSubject(state, effect.subject, controller, targetPlayer), amount, source: sourceObject, allowPlaceholders, provenance });
     case ORACLE_NODE_TYPES.SACRIFICE:
       return sacrificePermanent(state, { playerId: targetPlayer || controller, requirement: /creature/.test(effect.subject || '') ? 'creature' : 'permanent', objectId: target?.id || choices.objectId, source: sourceObject, replacementChoices: choices.replacementChoices });
     case ORACLE_NODE_TYPES.TOKEN_CREATION:
@@ -272,11 +320,17 @@ export function executeTypedEffect({ state, effect, sourceObject = null, control
     case ORACLE_NODE_TYPES.EXILE:
       return target ? moveObjectWithResult(state, target, 'exile', `${sourceObject?.name || 'effect'} exile`) : unsupported('No exile target was supplied.');
     case ORACLE_NODE_TYPES.DESTROY:
+      if (effect.affected?.kind === 'each') {
+        const affected = state.battlefield.filter((object) => object.zone === 'battlefield'
+          && (!effect.affected.filter?.type || normalizeMagicText(object.card.typeLine).includes(effect.affected.filter.type)));
+        const results = affected.map((object) => executeTypedEffect({ state, effect: { ...effect, affected: null }, sourceObject, controller, target: object, choices }));
+        return combine(results);
+      }
       if (!target) return unsupported('No destroy target was supplied.');
       if (target.card.abilities?.includes('indestructible')) return { status: 'executed', object: target, survived: true, reason: 'indestructible' };
       return moveObjectWithResult(state, target, 'graveyard', `${sourceObject?.name || 'effect'} destroy`, {}, { replacementChoices: choices.replacementChoices });
     case ORACLE_NODE_TYPES.DAMAGE:
-      return target && Number.isFinite(amount) ? markDamageWithResult(state, target, amount, sourceObject, choices.damageMetadata || {}) : unsupported('Damage needs a target and fixed amount.');
+      return target && Number.isFinite(amount) ? markDamageWithResult(state, target, amount, sourceObject, { ...(choices.damageMetadata || {}), ...provenance }) : unsupported('Damage needs a target and fixed amount.');
     case ORACLE_NODE_TYPES.PT_MODIFICATION:
       if (!target || !Number.isFinite(fixedAmount(effect.power)) || !Number.isFinite(fixedAmount(effect.toughness))) return unsupported('P/T modification needs a target and fixed values.');
       createContinuousEffect(state, {
@@ -335,6 +389,7 @@ export function executeTypedEffect({ state, effect, sourceObject = null, control
         sourceId: choices.sourceId || null,
         targetId: target?.id || choices.targetId || null,
         remaining: Number.isFinite(amount) ? amount : null,
+        duration: effect.duration || 'indefinite',
         applies: effect.combatOnly ? (event) => event.metadata?.combat === true : null
       });
       return { status: 'executed', shield };
@@ -344,6 +399,25 @@ export function executeTypedEffect({ state, effect, sourceObject = null, control
     default:
       return unsupported(`Typed effect ${effect.type} is parsed but not executable.`);
   }
+}
+
+export function executeEffectSequence({ state, effects = [], sourceObject = null, controller = sourceObject?.controller || 'player', choices = {}, allowPlaceholders = false, resolution = null } = {}) {
+  const activeResolution = resolution || createResolutionContext(state, { source: sourceObject, controller, chosenValues: choices.chosenValues || {} });
+  const results = activeResolution.results || [];
+  activeResolution.results = results;
+  let index = activeResolution.nextEffectIndex || 0;
+  for (; index < effects.length; index += 1) {
+    const result = executeTypedEffect({ state, effect: effects[index], sourceObject, controller, choices, allowPlaceholders, resolution: activeResolution });
+    if (result.status !== 'executed') {
+      activeResolution.nextEffectIndex = index;
+      activeResolution.status = result.status === 'depends' ? 'pending-choice' : 'unverified';
+      return { ...result, resolution: activeResolution, results };
+    }
+    results[index] = result;
+    activeResolution.nextEffectIndex = index + 1;
+  }
+  activeResolution.status = 'resolved';
+  return { status: 'executed', resolution: activeResolution, results };
 }
 
 function combine(results) {

@@ -66,13 +66,7 @@ export function captureRulingContext({ session, userMessage, result, judge, inpu
     sessionId: session?.id || null,
     game: result?.game || session?.game || null,
     userMessage: String(userMessage || '').trim(),
-    stateSnapshot: clone(session?.magicState || {
-      game: session?.game || result?.game || null,
-      resolvedCards: (session?.resolvedCards || []).map((card) => ({
-        id: card.id || card.oracle_id || null,
-        name: card.name || null
-      }))
-    }),
+    stateSnapshot: clone(session?.magicState || null),
     cards: cards.map((card) => ({
       id: card.id || card.oracle_id || null,
       oracleId: card.oracle_id || null,

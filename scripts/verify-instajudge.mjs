@@ -41,7 +41,7 @@ assert(hubChoicesSource.includes('Sets & Cards') && hubChoicesSource.includes('G
 assert(!hubChoicesSource.includes('Learn to Play'), 'Public Encyclopedia game hubs must not expose Learn to Play.');
 assert(app.includes('/Encyclopedia/:game/learn/:topicSlug'), 'Learn to Play routes must remain available directly.');
 assert(page.includes('Hi, I’m MPM InstaJudge. What TCG do you need help with?'), 'InstaJudge must render the required first assistant message.');
-assert(page.includes('Got it —') && page.includes('Describe what’s happening in the game'), 'InstaJudge must render the required game-selected prompt.');
+assert(page.includes('result: selected.result') && page.includes('stateSummary') && page.includes('StateReview'), 'InstaJudge must render owner-provided conversational state prompts.');
 assert(page.includes('In sanctioned events, the event judge has final authority.'), 'Event judge boundary note is missing.');
 
 for (const requiredOwner of ['searchOwner', 'gameKnowledgeOwner', 'legalityOwner']) {

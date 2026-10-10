@@ -3,6 +3,12 @@ main = "cloudflare/cardstache-public-api-worker.mjs"
 compatibility_date = "2026-09-10"
 workers_dev = true
 
+[ai]
+binding = "AI"
+
+[vars]
+INSTAJUDGE_AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+
 [[routes]]
 pattern = "api.mainphasemarket.net"
 custom_domain = true

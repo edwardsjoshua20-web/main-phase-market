@@ -18,6 +18,11 @@ export const PAYMENT_STATUS = Object.freeze({
   UNSPECIFIED: 'unspecified'
 });
 
+export const COST_MODIFIER_KINDS = Object.freeze({
+  INCREASE: 'increase',
+  REDUCTION: 'reduction'
+});
+
 const COLOR_FIELDS = Object.freeze({ W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green', C: 'colorless' });
 
 export function createManaCost(value = '') {
@@ -88,6 +93,133 @@ export function summarizeManaCosts(costs = []) {
   return total;
 }
 
+function manaComponents(cost) {
+  const normalized = normalizeCost(cost);
+  if (!normalized || normalized.type !== COST_TYPES.MANA) return null;
+  return {
+    generic: normalized.generic || 0,
+    white: normalized.white || 0,
+    blue: normalized.blue || 0,
+    black: normalized.black || 0,
+    red: normalized.red || 0,
+    green: normalized.green || 0,
+    colorless: normalized.colorless || 0
+  };
+}
+
+function manaFromComponents(components = {}) {
+  const symbols = [];
+  if (components.generic > 0) symbols.push(`{${components.generic}}`);
+  for (const [symbol, field] of Object.entries(COLOR_FIELDS)) {
+    for (let index = 0; index < (components[field] || 0); index += 1) symbols.push(`{${symbol}}`);
+  }
+  const cost = createManaCost(symbols);
+  cost.converted = cost.generic + cost.white + cost.blue + cost.black + cost.red + cost.green + cost.colorless;
+  return cost;
+}
+
+function flattenCosts(costs = []) {
+  return costs.map(normalizeCost).filter(Boolean).flatMap((cost) => cost.type === COST_TYPES.ADDITIONAL ? flattenCosts(cost.costs) : [cost]);
+}
+
+function spellTypes(card = {}) {
+  return String(card.typeLine || card.type_line || '').split(/\s+[—-]\s+/)[0].toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+function modifierApplies({ modifier, source, card, controller, actionType }) {
+  if (!modifier || modifier.actionType !== actionType) return false;
+  const relation = modifier.appliesTo?.casterRelation || 'any';
+  if (relation === 'source-controller' && source.controller !== controller) return false;
+  if (relation === 'opponent-of-source-controller' && source.controller === controller) return false;
+  const types = spellTypes(card);
+  const requiredTypes = modifier.appliesTo?.requiredTypes || [];
+  const excludedTypes = modifier.appliesTo?.excludedTypes || [];
+  return requiredTypes.every((type) => types.includes(type)) && excludedTypes.every((type) => !types.includes(type));
+}
+
+export function collectApplicableCostModifiers(state, { card, controller, actionType = 'Cast' } = {}) {
+  const modifiers = [];
+  for (const source of state?.battlefield || []) {
+    if (source.zone !== 'battlefield') continue;
+    for (const modifier of source.semantics?.costModifiers || []) {
+      if (!modifierApplies({ modifier, source, card, controller, actionType })) continue;
+      modifiers.push({ ...modifier, sourceObjectId: source.id, sourceName: source.name, sourceController: source.controller });
+    }
+  }
+  return modifiers;
+}
+
+export function createCostPlan({
+  state,
+  card,
+  controller,
+  actionType = 'Cast',
+  alternativeCost = null,
+  additionalCosts = [],
+  optionalAdditionalCosts = [],
+  commanderTax = null,
+  minimumConstraints = []
+} = {}) {
+  const printedManaCost = createManaCost(card?.manaCost || card?.mana_cost || '');
+  const selectedAlternativeCost = alternativeCost ? normalizeCost(alternativeCost) : null;
+  const baseManaCost = selectedAlternativeCost || printedManaCost;
+  const mandatory = flattenCosts(additionalCosts);
+  const optional = flattenCosts(optionalAdditionalCosts);
+  const commanderTaxCost = commanderTax?.genericMana > 0 ? createManaCost(`{${commanderTax.genericMana}}`) : createManaCost('');
+  const additionalManaCosts = [...mandatory, ...optional].filter((cost) => cost.type === COST_TYPES.MANA);
+  const nonmanaCosts = [...mandatory, ...optional].filter((cost) => cost.type !== COST_TYPES.MANA);
+  const startingManaCost = summarizeManaCosts([baseManaCost, ...additionalManaCosts, commanderTaxCost]);
+  const applicableModifiers = collectApplicableCostModifiers(state, { card, controller, actionType });
+  const unsupportedModifiers = applicableModifiers.filter((modifier) => modifier.executable === false
+    || !Object.values(COST_MODIFIER_KINDS).includes(modifier.kind)
+    || !modifier.amount?.supported
+    || modifier.amount?.generic == null
+    || Object.values(COLOR_FIELDS).some((field) => (modifier.amount?.[field] || 0) > 0));
+  const increases = applicableModifiers.filter((modifier) => modifier.kind === COST_MODIFIER_KINDS.INCREASE && !unsupportedModifiers.includes(modifier));
+  const reductions = applicableModifiers.filter((modifier) => modifier.kind === COST_MODIFIER_KINDS.REDUCTION && !unsupportedModifiers.includes(modifier));
+  const finalComponents = { ...manaComponents(startingManaCost) };
+  for (const modifier of increases) finalComponents.generic += modifier.amount.generic;
+  for (const modifier of reductions) finalComponents.generic = Math.max(0, finalComponents.generic - modifier.amount.generic);
+  for (const constraint of minimumConstraints) {
+    if (Number.isFinite(constraint?.genericMinimum)) finalComponents.generic = Math.max(finalComponents.generic, constraint.genericMinimum);
+  }
+  const finalManaCost = manaFromComponents(finalComponents);
+  const supported = printedManaCost.supported && baseManaCost?.type === COST_TYPES.MANA && baseManaCost.supported && startingManaCost.supported && unsupportedModifiers.length === 0;
+  return {
+    type: 'CostPlan',
+    version: 1,
+    status: supported ? 'verified' : 'unsupported',
+    frozen: true,
+    actionType,
+    controller,
+    cardId: card?.id || null,
+    cardName: card?.name || null,
+    printedManaCost,
+    alternativeCost: selectedAlternativeCost,
+    baseManaCost,
+    mandatoryAdditionalCosts: mandatory,
+    optionalAdditionalCosts: optional,
+    commanderTax: commanderTax ? { ...commanderTax, cost: commanderTaxCost } : null,
+    startingManaCost,
+    increases,
+    reductions,
+    minimumConstraints,
+    finalManaCost,
+    nonmanaCosts,
+    paymentCosts: [finalManaCost, ...nonmanaCosts],
+    unsupportedModifiers,
+    provenance: [
+      { stage: selectedAlternativeCost ? 'alternative' : 'printed', sourceName: card?.name || null, cost: baseManaCost },
+      ...mandatory.map((cost) => ({ stage: 'mandatory-additional', sourceName: card?.name || null, cost })),
+      ...optional.map((cost) => ({ stage: 'optional-additional', sourceName: card?.name || null, cost })),
+      ...(commanderTax?.genericMana > 0 ? [{ stage: 'commander-tax', sourceName: card?.name || null, cost: commanderTaxCost }] : []),
+      ...increases.map((modifier) => ({ stage: 'increase', sourceName: modifier.sourceName, sourceObjectId: modifier.sourceObjectId, cost: modifier.amount, text: modifier.text })),
+      ...reductions.map((modifier) => ({ stage: 'reduction', sourceName: modifier.sourceName, sourceObjectId: modifier.sourceObjectId, cost: modifier.amount, text: modifier.text })),
+      ...minimumConstraints.map((constraint) => ({ stage: 'minimum', ...constraint }))
+    ]
+  };
+}
+
 export function checkManaAvailability(requirement, availableMana) {
   if (availableMana == null) return { supported: true, known: false, payable: null };
   if (!requirement?.supported) return { supported: false, known: true, payable: false, reason: 'The mana requirement contains an unsupported symbol.' };
@@ -124,6 +256,10 @@ export function normalizeCost(cost) {
   if (!cost) return null;
   if (cost.type && Object.values(COST_TYPES).includes(cost.type)) return cost;
   if (cost.costType === 'mana' || cost.symbols) return createManaCost(cost.symbols || '');
+  if (cost.costType === 'tap') return createTapCost(cost.sourceObjectId || null);
+  if (cost.costType === 'life') return createLifeCost(cost.amount?.value ?? cost.amount);
+  if (cost.costType === 'sacrifice') return createSacrificeCost({ objectId: cost.objectId || null, count: cost.count || 1, filter: cost.filter || cost.subject || null });
+  if (cost.costType === 'discard') return createDiscardCost({ cardIds: cost.cardIds || [], count: cost.count || 1, filter: cost.filter || cost.subject || null });
   return cost;
 }
 

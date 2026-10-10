@@ -270,13 +270,13 @@ export function evaluateCommonMagicPattern({ message = '', cards = [] } = {}) {
     });
   }
 
-  if (hasAny(text, ['humility', 'opalescence', 'blood moon layer', 'dependency order', 'copy layer', 'copy effect and continuous effect'])) {
+  if (hasAny(text, ['layer dependency', 'dependency order', 'copy layer', 'copy effect and continuous effect'])) {
     return result('unverified', 'This is a complex layer/dependency interaction outside the current deterministic Magic engine coverage.', {
       mechanics: ['layers']
     });
   }
 
-  if (text.includes('unsupported corner case') || names.includes('panglacial wurm')) {
+  if (text.includes('unsupported corner case')) {
     return result('unverified', 'This is an unsupported corner case for the current deterministic Magic engine.', {
       mechanics: ['unverified']
     });

@@ -1,7 +1,9 @@
 import { isInstant, isPermanentType, isSorcery, normalizeMagicCard, normalizeMagicText } from '../magicCards.js';
-import { COST_TYPES, PAYMENT_STATUS, checkManaAvailability, createAdditionalCost, createManaCost, createTriggeredPaymentCost, normalizeCost, payCost, summarizeManaCosts } from './costSystem.js';
+import { COST_TYPES, PAYMENT_STATUS, checkManaAvailability, createCostPlan, createManaCost, createTriggeredPaymentCost, normalizeCost, payCost } from './costSystem.js';
 import { deriveCharacteristics } from './continuousEffects.js';
+import { ATTACHMENT_TYPES, attachLegally, canAttach } from './attachmentRuntime.js';
 import { parseOracleSemantics } from './oracleSemantics.js';
+import { validateTarget as validateCanonicalTarget } from './targetingRuntime.js';
 import { commanderCastPermission, recordCommanderCastFromCommandZone } from './commanderRuntime.js';
 import { clearPendingRuntimeChoice, createGameObject, emitEvent, getPendingRuntimeChoice, moveObject, moveObjectWithResult, registerGameObject, runStateBasedActionsRuntime, setPendingRuntimeChoice } from './runtimeState.js';
 import { advanceTurnStep } from './turnRuntime.js';
@@ -395,7 +397,12 @@ export function putPendingStackTriggers(state) {
   return ordered;
 }
 
-export function castSpell(state, { card = null, sourceObject: suppliedSourceObject = null, controller, targets = [], modes = [], costs = [], chosenValues = {}, paymentChoices = [], availableMana = null, skipTiming = false, factsProvided = null, validateTarget = null } = {}) {
+function sameManaCost(left, right) {
+  const fields = ['generic', 'white', 'blue', 'black', 'red', 'green', 'colorless'];
+  return left?.type === COST_TYPES.MANA && right?.type === COST_TYPES.MANA && fields.every((field) => (left[field] || 0) === (right[field] || 0));
+}
+
+export function castSpell(state, { card = null, sourceObject: suppliedSourceObject = null, controller, targets = [], modes = [], costs = [], costsIncludeBase = null, additionalCosts = [], chosenValues = {}, paymentChoices = [], availableMana = null, skipTiming = false, factsProvided = null, validateTarget = null } = {}) {
   const pendingChoice = getPendingRuntimeChoice(state);
   if (pendingChoice) {
     const timing = {
@@ -417,7 +424,6 @@ export function castSpell(state, { card = null, sourceObject: suppliedSourceObje
   const sourceZone = suppliedSourceObject?.zone || 'hand';
   let commanderPermission = null;
   let commanderCost = null;
-  let castingCosts = costs;
   if (suppliedSourceObject?.zone === 'command') {
     commanderPermission = commanderCastPermission(state, suppliedSourceObject, controller);
     if (commanderPermission.allowed !== true) return { cast: false, status: commanderPermission.status || 'unsupported', commanderPermission };
@@ -429,29 +435,41 @@ export function castSpell(state, { card = null, sourceObject: suppliedSourceObje
         commanderCost: { status: 'unsupported', reason: 'Alternative costs and dynamic cost modifiers are not certified by the current cost owner.' }
       };
     }
-    const startingManaRequirement = createManaCost(castCard?.manaCost || '');
-    const taxManaCost = createManaCost(commanderPermission.tax.genericMana ? `{${commanderPermission.tax.genericMana}}` : '');
-    const commanderTaxCost = createAdditionalCost([taxManaCost]);
-    commanderTaxCost.reason = 'commander-tax';
-    commanderTaxCost.commanderDesignationId = commanderPermission.designation.id;
-    castingCosts = [startingManaRequirement, ...costs, ...(commanderPermission.tax.genericMana > 0 ? [commanderTaxCost] : [])];
-    const finalManaRequirement = summarizeManaCosts(castingCosts);
-    const availability = checkManaAvailability(finalManaRequirement, availableMana);
+  }
+  if (!commanderPermission && (chosenValues.alternativeCost || chosenValues.dynamicCostModifier || chosenValues.genericCostReduction)) {
+    return { cast: false, status: 'unsupported', reason: 'Alternative costs and dynamic cost modifiers are not certified by the current cost owner.' };
+  }
+  const printedCost = createManaCost(castCard?.manaCost || castCard?.mana_cost || '');
+  const includesBase = costsIncludeBase ?? sameManaCost(normalizeCost(costs[0]), printedCost);
+  const normalizedAdditionalCosts = [...(includesBase ? costs.slice(1) : costs), ...additionalCosts];
+  const costPlan = createCostPlan({
+    state,
+    card: castCard,
+    controller,
+    alternativeCost: chosenValues.alternativeCost || null,
+    additionalCosts: normalizedAdditionalCosts,
+    commanderTax: commanderPermission?.tax || null
+  });
+  const castingCosts = costPlan.paymentCosts;
+  const availability = checkManaAvailability(costPlan.finalManaCost, availableMana);
+  if (commanderPermission) {
     commanderCost = {
-      status: startingManaRequirement.supported && finalManaRequirement.supported && availability.supported ? 'verified' : 'unsupported',
+      status: costPlan.status === 'verified' && availability.supported ? 'verified' : 'unsupported',
       commanderDesignationId: commanderPermission.designation.id,
       previousCommandZoneCasts: commanderPermission.tax.previousCommandZoneCasts,
       commanderTaxGenericMana: commanderPermission.tax.genericMana,
-      startingManaRequirement,
-      otherAdditionalCosts: costs.map(normalizeCost).filter(Boolean),
-      finalManaRequirement,
+      startingManaRequirement: costPlan.baseManaCost,
+      otherAdditionalCosts: normalizedAdditionalCosts.map(normalizeCost).filter(Boolean),
+      finalManaRequirement: costPlan.finalManaCost,
+      costPlan,
       availability
     };
     if (commanderCost.status !== 'verified') return { cast: false, status: 'unsupported', commanderPermission, commanderCost };
     if (availability.known && !availability.payable) {
       return { cast: false, status: PAYMENT_STATUS.CANNOT_PAY, commanderPermission, commanderCost, paymentFailure: { supported: true, status: PAYMENT_STATUS.CANNOT_PAY, paid: false } };
     }
-  }
+  } else if (costPlan.status !== 'verified') return { cast: false, status: 'unsupported', costPlan, reason: 'The complete casting cost contains an unsupported modifier.' };
+  if (!commanderPermission && availability.known && !availability.payable) return { cast: false, status: PAYMENT_STATUS.CANNOT_PAY, costPlan, paymentFailure: { supported: true, status: PAYMENT_STATUS.CANNOT_PAY, paid: false } };
   const timing = skipTiming ? { allowed: true, status: 'allowed' } : checkTimingPermission({ state, card: castCard, actionType: 'Cast', playerId: controller, factsProvided });
   if (timing.allowed !== true) return { cast: false, timing };
   let sourceObject = suppliedSourceObject;
@@ -473,10 +491,25 @@ export function castSpell(state, { card = null, sourceObject: suppliedSourceObje
     effectIR: sourceObject.semantics?.spellAbilities?.[0]?.effects || [],
     ruleReferences: ['CR-601', 'CR-405']
   });
-  const targetChecks = targets.map((target, index) => validateTarget ? validateTarget({ sourceObject, target, effect: stackObject.effectIR[index] || stackObject.effectIR[0] }) : { legal: Boolean(target) });
+  const targetValidator = validateTarget || validateCanonicalTarget;
+  const targetRequirement = stackObject.effectIR.flatMap((effect) => effect.target ? [effect.target] : [])[0]
+    || sourceObject.semantics?.spellAbilities?.flatMap((ability) => ability.targets || [])[0]
+    || null;
+  const attachmentTargetRequired = stackObject.effectIR.some((effect) => effect.type === 'AttachEffect');
+  if (attachmentTargetRequired && (targetRequirement?.minimum || 0) > targets.length) {
+    moveObject(state, sourceObject, sourceZone, 'casting rolled back: target missing', {}, { skipCommanderReturnChoice: true });
+    return { cast: false, timing, targetChecks: [], reason: `${sourceObject.name} requires a target.` };
+  }
+  const targetChecks = targets.map((target, index) => {
+    const effect = stackObject.effectIR[index] || stackObject.effectIR[0];
+    const targetCheck = targetValidator({ sourceObject, target, effect, state });
+    if (effect?.type !== 'AttachEffect') return targetCheck;
+    const attachmentCheck = canAttach(sourceObject, target, state, { asTarget: true, effect });
+    return { legal: targetCheck.legal && attachmentCheck.legal, failures: [...new Set([...(targetCheck.failures || []), ...(attachmentCheck.failures || [])])], attachmentCheck };
+  });
   if (targetChecks.some((check) => !check.legal)) {
     moveObject(state, sourceObject, sourceZone, 'casting rolled back: illegal target', {}, { skipCommanderReturnChoice: true });
-    return { cast: false, timing, targetChecks, commanderCost };
+    return { cast: false, timing, targetChecks, commanderCost, costPlan };
   }
   const costPayments = stackObject.costs.map((cost, index) => payCost({
     state,
@@ -488,7 +521,7 @@ export function castSpell(state, { card = null, sourceObject: suppliedSourceObje
   const failedPayment = costPayments.find((payment) => !payment.paid);
   if (failedPayment) {
     moveObject(state, sourceObject, sourceZone, 'casting rolled back: cost not paid', {}, { skipCommanderReturnChoice: true });
-    return { cast: false, timing, targetChecks, costPayments, paymentFailure: failedPayment, commanderCost };
+    return { cast: false, timing, targetChecks, costPayments, paymentFailure: failedPayment, commanderCost, costPlan };
   }
   costPayments.forEach((payment) => emitEvent(state, 'CostPaid', { source: sourceObject, player: controller, metadata: { costType: payment.cost.type } }));
   pushStackObject(state, stackObject);
@@ -504,17 +537,32 @@ export function castSpell(state, { card = null, sourceObject: suppliedSourceObje
   putPendingStackTriggers(state);
   grantPriority(state, controller);
   if (commanderPermission?.designation) recordCommanderCastFromCommandZone(state, sourceObject);
-  return { cast: true, stackObject, sourceObject, targetChecks, targetEvents, costPayments, commanderPermission, commanderCost };
+  return { cast: true, stackObject, sourceObject, targetChecks, targetEvents, costPayments, commanderPermission, commanderCost, costPlan };
 }
 
-export function activateAbility(state, { sourceObject, ability = null, controller, targets = [], costs = [], effectIR = [], factsProvided = null } = {}) {
+export function activateAbility(state, { sourceObject, ability = null, controller, targets = [], costs = [], effectIR = [], factsProvided = null, validateTarget = validateCanonicalTarget } = {}) {
   const timingAbility = ability || (sourceObject?.semantics?.activatedAbilitiesIR?.length === 1 ? sourceObject.semantics.activatedAbilitiesIR[0] : null);
+  if (!sourceObject || deriveCharacteristics(state, sourceObject).controller !== controller) {
+    return { activated: false, status: 'denied', reason: 'Only the current controller of the source may activate this ability.' };
+  }
   const timing = checkTimingPermission({ state, actionType: 'Activate', playerId: controller, sourceObject, ability: timingAbility, factsProvided });
   if (timing.allowed !== true) return { activated: false, timing };
-  const costPayments = costs.map((cost) => payCost({ state, playerId: controller, cost, choice: PAYMENT_STATUS.PAID, sourceObject }));
+  const resolvedEffects = effectIR.length ? effectIR : timingAbility?.effects || [];
+  const targetRequirement = timingAbility?.targets?.[0] || resolvedEffects.flatMap((effect) => effect.target ? [effect.target] : [])[0] || null;
+  if (resolvedEffects.some((effect) => effect.type === 'AttachEffect') && (targetRequirement?.minimum || 0) > targets.length) return { activated: false, timing, status: 'depends', reason: 'The activated ability requires an identified target.' };
+  const targetChecks = targets.map((target, index) => {
+    const effect = resolvedEffects[index] || resolvedEffects[0] || { target: targetRequirement };
+    const targetCheck = validateTarget({ sourceObject, target, effect, state });
+    if (effect?.type !== 'AttachEffect') return targetCheck;
+    const attachmentCheck = canAttach(sourceObject, target, state, { asTarget: true, effect });
+    return { legal: targetCheck.legal && attachmentCheck.legal, failures: [...new Set([...(targetCheck.failures || []), ...(attachmentCheck.failures || [])])], attachmentCheck };
+  });
+  if (targetChecks.some((check) => !check.legal)) return { activated: false, timing, status: 'denied', reason: targetChecks.flatMap((check) => check.failures || []).join(' '), targetChecks };
+  const resolvedCosts = costs.length ? costs : timingAbility?.costs || [];
+  const costPayments = resolvedCosts.map((cost) => payCost({ state, playerId: controller, cost, choice: PAYMENT_STATUS.PAID, sourceObject }));
   const failedPayment = costPayments.find((payment) => !payment.paid);
   if (failedPayment) return { activated: false, timing, costPayments, paymentFailure: failedPayment };
-  const stackObject = createStackObject({ kind: STACK_OBJECT_TYPES.ACTIVATED_ABILITY, sourceObject, controller, targets, costs, effectIR, ruleReferences: ['CR-602', 'CR-405'] });
+  const stackObject = createStackObject({ kind: STACK_OBJECT_TYPES.ACTIVATED_ABILITY, sourceObject, controller, targets, costs: resolvedCosts, effectIR: resolvedEffects, ruleReferences: ['CR-602', 'CR-405'] });
   pushStackObject(state, stackObject);
   emitEvent(state, 'AbilityActivated', { source: sourceObject, controller, metadata: { stackObjectId: stackObject.id } });
   const targetEvents = targets.map((target, index) => emitEvent(state, 'TargetChosen', {
@@ -527,7 +575,7 @@ export function activateAbility(state, { sourceObject, ability = null, controlle
   for (const event of targetEvents) createWardTriggers(state, event);
   putPendingStackTriggers(state);
   grantPriority(state, controller);
-  return { activated: true, stackObject, costPayments, targetEvents };
+  return { activated: true, stackObject, costPayments, targetChecks, targetEvents };
 }
 
 export function resolveTopOfStack(state, { paymentChoices = [], resolveEffect = null } = {}) {
@@ -568,15 +616,45 @@ export function resolveTopOfStack(state, { paymentChoices = [], resolveEffect = 
     });
     return { resolved: true, stackObject, payment: result, countered: !result.paid ? original || null : null };
   }
+  const targetedEffects = stackObject.effectIR.filter((effect) => effect.target);
+  const resolutionTargetChecks = targetedEffects.map((effect, index) => {
+    const target = stackObject.targets[index] || stackObject.targets[0];
+    const targetCheck = validateCanonicalTarget({ sourceObject: stackObject.sourceObject, target, effect, state });
+    const check = effect.type !== 'AttachEffect' ? targetCheck : (() => {
+      const attachmentCheck = canAttach(stackObject.sourceObject, target, state, { asTarget: true, effect });
+      return { legal: targetCheck.legal && attachmentCheck.legal, failures: [...new Set([...(targetCheck.failures || []), ...(attachmentCheck.failures || [])])], attachmentCheck };
+    })();
+    state.trace.push({ type: 'TargetCheckOnResolution', source: stackObject.sourceObject.name, target: target?.name || null, legal: check.legal, failures: check.failures || [] });
+    return check;
+  });
+  if (targetedEffects.length > 0 && resolutionTargetChecks.every((check) => !check.legal)) {
+    state.stack.pop();
+    stackObject.status = 'countered-by-rules';
+    if (stackObject.kind === STACK_OBJECT_TYPES.SPELL && stackObject.sourceObject.zone === 'stack') {
+      moveObject(state, stackObject.sourceObject, 'graveyard', 'all targets illegal on resolution');
+    }
+    emitEvent(state, 'StackObjectCounteredByRules', { source: stackObject.sourceObject, controller: stackObject.controller, metadata: { stackObjectId: stackObject.id, failures: resolutionTargetChecks.flatMap((check) => check.failures || []) } });
+    runStateBasedActionsRuntime(state);
+    return { resolved: true, counteredByRules: true, stackObject, targetChecks: resolutionTargetChecks, effectResults: [] };
+  }
   state.stack.pop();
   stackObject.status = 'resolving';
   const effectResults = [];
-  if (resolveEffect) {
-    for (let index = 0; index < stackObject.effectIR.length; index += 1) {
-      effectResults.push(resolveEffect({ state, stackObject, effect: stackObject.effectIR[index], target: stackObject.targets[index] || stackObject.targets[0] }));
+  let attachmentSpellMoved = false;
+  for (let index = 0; index < stackObject.effectIR.length; index += 1) {
+    const effect = stackObject.effectIR[index];
+    const target = stackObject.targets[index] || stackObject.targets[0];
+    if (effect.type === 'AttachEffect') {
+      if (effect.attachmentType === ATTACHMENT_TYPES.AURA && stackObject.sourceObject.zone === 'stack') {
+        moveObject(state, stackObject.sourceObject, 'battlefield', 'Aura spell resolved');
+        attachmentSpellMoved = true;
+      }
+      effectResults.push(attachLegally(state, stackObject.sourceObject, target));
+      continue;
     }
+    if (resolveEffect) effectResults.push(resolveEffect({ state, stackObject, effect, target }));
   }
-  if (stackObject.kind === STACK_OBJECT_TYPES.SPELL && stackObject.sourceObject.zone === 'stack') {
+  if (stackObject.kind === STACK_OBJECT_TYPES.SPELL && stackObject.sourceObject.zone === 'stack' && !attachmentSpellMoved) {
     moveObject(
       state,
       stackObject.sourceObject,
@@ -587,5 +665,5 @@ export function resolveTopOfStack(state, { paymentChoices = [], resolveEffect = 
   stackObject.status = 'resolved';
   runStateBasedActionsRuntime(state);
   emitEvent(state, 'StackObjectResolved', { source: stackObject.sourceObject, controller: stackObject.controller, metadata: { stackObjectId: stackObject.id, stackObjectType: stackObject.kind } });
-  return { resolved: true, stackObject, effectResults };
+  return { resolved: true, stackObject, targetChecks: resolutionTargetChecks, effectResults };
 }

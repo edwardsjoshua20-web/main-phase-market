@@ -127,6 +127,7 @@ export function createContinuousEffect(state, input = {}) {
     appliesTo: input.appliesTo || {},
     modification: input.modification || {},
     oracleText: input.oracleText || null,
+    provenance: input.provenance || null,
     static: Boolean(input.static),
     active: input.active !== false
   };
@@ -149,10 +150,12 @@ export function removeSourceStaticEffects(state, sourceId, { all = false } = {})
   if (state.continuousEffects.length !== previous) invalidateCharacteristics(state);
 }
 
-function staticEffectSpec(source, effect) {
+function staticEffectSpec(source, effect, sharedTimestamp) {
   const shared = {
     source,
     controller: source.controller,
+    timestamp: sharedTimestamp,
+    provenance: { kind: 'static-ability', sourceId: source.id, sourceName: source.name },
     duration: effect.duration || 'source-on-battlefield',
     appliesTo: effect.selector || { objectId: source.id },
     oracleText: effect.text,
@@ -195,8 +198,11 @@ export function registerStaticContinuousEffects(state, source) {
   removeSourceStaticEffects(state, source.id, { all: true });
   const effects = source.semantics?.continuousEffects || [];
   const created = [];
-  for (const effect of effects.filter((candidate) => candidate.static || candidate.type === 'CharacteristicDefiningAbility')) {
-    const spec = staticEffectSpec(source, effect);
+  const staticEffects = effects.filter((candidate) => candidate.static || candidate.type === 'CharacteristicDefiningAbility');
+  if (staticEffects.length === 0) return created;
+  const sharedTimestamp = state.nextContinuousTimestamp++;
+  for (const effect of staticEffects) {
+    const spec = staticEffectSpec(source, effect, sharedTimestamp);
     if (spec) created.push(createContinuousEffect(state, spec));
   }
   return created;
@@ -244,6 +250,11 @@ function descriptorMatches(descriptor, object, characteristics, state, effect) {
     const source = state.objects.get(effect.sourceId);
     const sourceController = source?.id === object.id ? characteristics.controller : source ? deriveCharacteristics(state, source).controller : effect.controller;
     if (characteristics.controller !== sourceController) return false;
+  }
+  if (descriptor.opponentOfSourceController) {
+    const source = state.objects.get(effect.sourceId);
+    const sourceController = source?.id === object.id ? characteristics.controller : source ? deriveCharacteristics(state, source).controller : effect.controller;
+    if (!sourceController || characteristics.controller === sourceController) return false;
   }
   if (descriptor.types?.length && !descriptor.types.every((type) => characteristics.types.includes(type.toLowerCase()))) return false;
   if (descriptor.attachedToSource && object.id !== state.objects.get(effect.sourceId)?.attachedTo) return false;
