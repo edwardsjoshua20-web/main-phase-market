@@ -44,6 +44,7 @@ export function useCommanderDetailPage({ oracleId, searchParams }) {
         averageDeckSections: pageState.averageDeckSections,
         categories: pageState.categories,
         gameChangers: pageState.gameChangers,
+        unifiedRecommendations: pageState.unifiedRecommendations,
         newCards: pageState.newCards,
         observedCards: pageState.observedCards,
         topCommanders: pageState.topCommanders,

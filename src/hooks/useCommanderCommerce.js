@@ -5,7 +5,7 @@ import { pricingOwner } from '@/services/pricing/pricingOwner';
 import { searchOwner } from '@/services/search/searchOwner';
 
 const PRINTING_LOOKUP_TIMEOUT_MS = 2500;
-const COMMERCE_QUERY_VERSION = 'v3';
+const COMMERCE_QUERY_VERSION = 'v4';
 
 function commerceCatalogCard(card = {}) {
   return {
@@ -44,7 +44,15 @@ export function useCommanderCommerce(cards = []) {
     queryFn: async () => {
       const fallbackCatalogCards = uniqueCards.map(commerceCatalogCard);
       const [availabilityByOracleId, printings] = await Promise.all([
-        inventoryOwner.getCatalogCardsAvailability(fallbackCatalogCards),
+        inventoryOwner.getCatalogCardsAvailability(fallbackCatalogCards).catch(() => (
+          Object.fromEntries(uniqueCards.map((card) => [card.oracle_id, {
+            inStock: false,
+            quantity: 0,
+            matchingListingCount: 0,
+            listing: null,
+            pricing: null
+          }]))
+        )),
         withTimeout(searchOwner.getMagicPreferredPrintingsByOracleIds(uniqueCards.map((card) => card.oracle_id)), [])
       ]);
       const printingByOracleId = new Map(printings.map((printing) => [printing.oracle_id, printing]));

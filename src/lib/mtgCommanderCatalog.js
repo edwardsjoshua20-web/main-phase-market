@@ -4,6 +4,7 @@ const API_BASE = '/api/local/mtg/commanders';
 const HOSTED_COMMANDERS_URL = getCatalogAssetUrl('mtg', 'commanders.json');
 const HOSTED_COMMANDER_MANIFEST_URL = getCatalogAssetUrl('mtg', 'commander-manifest.json');
 const HOSTED_COMMANDER_DETAIL_SCHEMA = 'commander-views-v3';
+const FORCE_HOSTED_COMMANDER_DATA = String(import.meta.env.VITE_FORCE_HOSTED_COMMANDER_DATA || '').trim() === '1';
 
 const hostedCommanderCache = {
   key: '',
@@ -40,6 +41,7 @@ async function parseJson(response, fallbackMessage) {
 
 function isHostedWithoutLocalApi() {
   if (typeof window === 'undefined') return false;
+  if (FORCE_HOSTED_COMMANDER_DATA) return true;
   return !['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
 }
 
@@ -259,6 +261,22 @@ export async function getMtgCommanderPage(oracleId, options = {}) {
   const suffix = params.toString() ? `?${params.toString()}` : '';
   const response = await fetch(`${API_BASE}/${encodeURIComponent(oracleId)}${suffix}`);
   return parseJson(response, 'Failed to load commander page');
+}
+
+export async function getMtgMechanicalChemistry(oracleId) {
+  if (!oracleId) return null;
+  const relativePath = `mechanical-chemistry/${encodeURIComponent(oracleId)}.json`;
+  const url = isHostedWithoutLocalApi()
+    ? getCatalogAssetUrl('mtg', relativePath)
+    : `/data/mtg/${relativePath}`;
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return payload?.schema_version && Array.isArray(payload?.recommendations) ? payload : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getMtgCommanderByOracleId(oracleId) {

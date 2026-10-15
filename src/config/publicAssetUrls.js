@@ -1,19 +1,20 @@
 const hostedPublicDataBaseUrl =
   'https://wwvvyrhlybwijqlhubdv.supabase.co/storage/v1/object/public/main-phase-market-public/data';
+const configuredPublicDataBaseUrl = String(import.meta.env.VITE_PUBLIC_DATA_BASE_URL || '').trim();
 
 function shouldUseHostedCatalogBase() {
   if (typeof window === 'undefined') {
     return false;
   }
 
-  return ['mainphasemarket.net', 'www.mainphasemarket.net'].includes(window.location.hostname)
+  return ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname)
+    || ['mainphasemarket.net', 'www.mainphasemarket.net'].includes(window.location.hostname)
     || window.location.hostname === 'main-phase-market.pages.dev'
     || window.location.hostname.endsWith('.main-phase-market.pages.dev');
 }
 
 const rawPublicDataBaseUrl = String(
-  (/** @type {{ env?: Record<string, string> }} */ (import.meta).env?.VITE_PUBLIC_DATA_BASE_URL) ||
-    (shouldUseHostedCatalogBase() ? hostedPublicDataBaseUrl : '')
+  configuredPublicDataBaseUrl || (shouldUseHostedCatalogBase() ? hostedPublicDataBaseUrl : '')
 )
   .trim()
   .replace(/\/+$/, '');

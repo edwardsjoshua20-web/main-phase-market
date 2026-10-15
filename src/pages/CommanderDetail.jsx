@@ -11,6 +11,7 @@ import { useCommanderDetailPage } from '@/hooks/useCommanderDetailPage';
 import { useCommanderCommerce } from '@/hooks/useCommanderCommerce';
 import { useAppAuth } from '@/lib/AppAuthContext';
 import { deckBuilderOwner } from '@/services/deckBuilderOwner';
+import { communityEvidenceText } from '@/services/commander/commanderRecommendationService';
 
 const TYPE_COLORS = {
   Land: '#d4a017',
@@ -23,6 +24,12 @@ const TYPE_COLORS = {
   Battle: '#64748b'
 };
 
+function wholeCardCount(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.round(numeric);
+}
+
 function percentText(value) {
   const pct = Number(value || 0) * 100;
   if (!Number.isFinite(pct)) return '0%';
@@ -30,7 +37,15 @@ function percentText(value) {
   return `${pct.toFixed(1)}%`;
 }
 
-function observedText(card) {
+function chemistryText(card) {
+  const affinity = card.statistical_affinity ?? card.synergy_score;
+  if (affinity !== null && affinity !== undefined && Number.isFinite(Number(affinity))) {
+    return `Chemistry ${percentText(affinity)}`;
+  }
+  const mechanicalScore = Number(card.mechanical_score ?? card.fit_score);
+  if (Number.isFinite(mechanicalScore)) {
+    return `Chemistry ${Math.max(0, Math.min(100, Math.round(mechanicalScore)))}%`;
+  }
   const count = Number(card?.deck_count || 0);
   const total = Number(card?.total_commander_decks || 0);
   if (count > 0 && total > 0) return `Observed ${count}/${total} decks`;
@@ -38,13 +53,17 @@ function observedText(card) {
   return 'Observed card';
 }
 
-function wholeCardCount(value) {
-  const numeric = Number(value || 0);
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.round(numeric);
+function customerFacingExplanation(card) {
+  return String(card?.mechanical_explanation || card?.why_it_works || card?.mechanical_reasons?.[0]?.explanation || '')
+    .replace(/identified in the commander graph/gi, "that support the commander's plan")
+    .replace(/semantic edges?/gi, 'mechanical connections')
+    .replace(/strategy lanes?/gi, 'strategies')
+    .replace(/confidence tiers?/gi, 'support levels')
+    .replace(/statistical affinity/gi, 'community trend')
+    .trim();
 }
 
-function stockStatus(availability, commerceLoading) {
+function stockStatus(availability) {
   if (availability?.inStock) {
     return {
       className: 'text-cyan-200/80',
@@ -111,12 +130,13 @@ function TypeBreakdown({ data }) {
   );
 }
 
-function CardTile({ card, commerce, commerceLoading, onAddToDeck }) {
-  const hasChemistryScore = card.synergy_score !== null && card.synergy_score !== undefined && Number.isFinite(Number(card.synergy_score));
-  const chemistryScore = hasChemistryScore ? percentText(card.synergy_score) : '';
+function CardTile({ card, commerce, onAddToDeck, onExplain }) {
+  const explanation = customerFacingExplanation(card);
+  const communityText = communityEvidenceText(card);
+  const canExplain = Boolean(explanation || communityText);
   const price = commerce?.pricing?.display_price;
   const availability = commerce?.availability;
-  const stock = stockStatus(availability, commerceLoading);
+  const stock = stockStatus(availability);
 
   return (
     <article className="group min-w-0 text-left">
@@ -131,10 +151,15 @@ function CardTile({ card, commerce, commerceLoading, onAddToDeck }) {
       <div className="mt-2 min-w-0">
         <p className="truncate text-xs font-semibold text-slate-100">{card.card_name}</p>
         <div className="mt-1 flex items-center justify-between gap-2 text-xs font-bold">
-          <span className={hasChemistryScore ? 'text-orange-300' : 'text-slate-400'}>
-            {hasChemistryScore ? `Chemistry ${card.synergy_score >= 0 ? '+' : ''}${chemistryScore}` : observedText(card)}
+          <span className="min-w-0 truncate text-orange-300">{chemistryText(card)}</span>
+          <span className="flex shrink-0 items-center gap-2">
+            {canExplain ? (
+              <button type="button" onClick={() => onExplain(card)} className="text-[11px] font-semibold text-slate-400 transition hover:text-slate-200" aria-label={`Why ${card.card_name} works`}>
+                Why?
+              </button>
+            ) : null}
+            {formatPrice(price) ? <span className={priceClassName(price)}>{formatPrice(price)}</span> : null}
           </span>
-          {formatPrice(price) ? <span className={priceClassName(price)}>{formatPrice(price)}</span> : null}
         </div>
         <div className="mt-1.5 flex min-h-5 items-center justify-between gap-2 text-[11px]">
           <span className={stock.className}>{stock.label}</span>
@@ -144,6 +169,24 @@ function CardTile({ card, commerce, commerceLoading, onAddToDeck }) {
         </div>
       </div>
     </article>
+  );
+}
+
+function RecommendationWhyDialog({ card, open, onOpenChange }) {
+  const explanation = customerFacingExplanation(card);
+  const communityText = card ? communityEvidenceText(card) : '';
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md border-white/10 bg-[#101722] text-white sm:rounded-[4px]">
+        <DialogHeader>
+          <DialogTitle>{card?.card_name || 'Why it works'}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm leading-6 text-slate-300">
+          {explanation ? <p><span className="font-bold text-white">Why it works:</span> {explanation}</p> : null}
+          {communityText ? <p className="border-t border-white/[0.08] pt-3 text-xs font-semibold text-slate-400">{communityText}</p> : null}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -293,6 +336,7 @@ export default function CommanderDetail() {
   const topRef = useRef(null);
   const resumedDeckActionRef = useRef('');
   const [deckActionCard, setDeckActionCard] = useState(null);
+  const [explanationCard, setExplanationCard] = useState(null);
   const [deckActionBusy, setDeckActionBusy] = useState(false);
   const [browseFloat, setBrowseFloat] = useState({
     mode: 'normal',
@@ -302,11 +346,12 @@ export default function CommanderDetail() {
   });
   const {
     commander,
+    unifiedRecommendations,
     topSynergy,
     observedCards,
     newCards,
     gameChangers,
-    categories,
+    visibleCategories,
     averageDeckSections,
     deckRows,
     topCommanders,
@@ -314,18 +359,17 @@ export default function CommanderDetail() {
     themeOptions,
     activeTheme,
     activeMode,
-    totalDecks,
     hasLocalData,
     sampleConfidence,
     analyticsSuppressed,
     navSections,
-    visibleCategories,
     loading
   } = useCommanderDetailPage({ oracleId, searchParams });
 
   const commerceCards = useMemo(() => {
     const cards = [
       commander ? { ...commander, card_name: commander.name } : null,
+      ...unifiedRecommendations,
       ...topSynergy,
       ...observedCards,
       ...newCards,
@@ -333,10 +377,10 @@ export default function CommanderDetail() {
       ...visibleCategories.flatMap((section) => section.cards || [])
     ].filter(Boolean);
     return [...new Map(cards.map((card) => [card.oracle_id, card])).values()];
-  }, [commander, gameChangers, newCards, observedCards, topSynergy, visibleCategories]);
+  }, [commander, gameChangers, newCards, observedCards, topSynergy, unifiedRecommendations, visibleCategories]);
   const { commerceByOracleId, loadingCommerce } = useCommanderCommerce(commerceCards);
   const commerceLoading = loadingCommerce;
-  const commanderStock = stockStatus(commerceByOracleId[commander?.oracle_id]?.availability, commerceLoading);
+  const commanderStock = stockStatus(commerceByOracleId[commander?.oracle_id]?.availability);
   const { data: compatibleDecks = [] } = useQuery({
     queryKey: ['cardlists', user?.email, 'magic', 'commander'],
     queryFn: () => deckBuilderOwner.listUserDecks(user.email, { game: 'magic', format: 'commander' }),
@@ -356,8 +400,6 @@ export default function CommanderDetail() {
     }));
 
     return {
-      totalDecks: averageDeckProfile?.total_decks || 0,
-      averageCards: averageDeckProfile?.average_cards || 0,
       typeDistribution,
       manaCurve
     };
@@ -727,12 +769,12 @@ export default function CommanderDetail() {
               </section>
             )}
 
-            {activeMode === 'commander' && topSynergy.length > 0 && (
+            {activeMode === 'commander' && unifiedRecommendations.length > 0 && (
               <section id="recommended" className="space-y-4">
                 <h2 className="text-2xl font-black tracking-tight text-white">Recommended Chemistry</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {topSynergy.map((card) => (
-                    <CardTile key={`recommended-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} />
+                  {unifiedRecommendations.slice(0, 20).map((card) => (
+                    <CardTile key={`recommended-${card.oracle_id}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} onExplain={setExplanationCard} />
                   ))}
                 </div>
               </section>
@@ -758,7 +800,7 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">Recommended Chemistry</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {topSynergy.map((card) => (
-                    <CardTile key={`card-mode-recommended-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} />
+                    <CardTile key={`card-mode-recommended-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} onExplain={setExplanationCard} />
                   ))}
                 </div>
               </section>
@@ -766,21 +808,13 @@ export default function CommanderDetail() {
 
             {activeMode === 'card' && gameChangers.length > 0 && (
               <section id="game-changers" className="space-y-4">
-                <h2 className="text-2xl font-black tracking-tight text-white">Game Changers</h2>
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight text-white">Game Changers</h2>
+                  <p className="mt-1 text-sm text-slate-400">Cards on the official Commander Brackets Game Changers list that appear in observed decks.</p>
+                </div>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {gameChangers.map((card) => (
-                    <CardTile key={`card-mode-changer-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeMode === 'commander' && observedCards.length > 0 && (
-              <section id="observed" className="space-y-4">
-                <h2 className="text-2xl font-black tracking-tight text-white">Observed Cards</h2>
-                <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {observedCards.map((card) => (
-                    <CardTile key={`observed-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} />
+                    <CardTile key={`card-mode-changer-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} onExplain={setExplanationCard} />
                   ))}
                 </div>
               </section>
@@ -791,8 +825,17 @@ export default function CommanderDetail() {
                 <h2 className="text-2xl font-black tracking-tight text-white">New Cards</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {newCards.map((card) => (
-                    <CardTile key={`card-mode-new-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} />
+                    <CardTile key={`card-mode-new-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} onExplain={setExplanationCard} />
                   ))}
+                </div>
+              </section>
+            )}
+
+            {activeMode === 'commander' && observedCards.length > 0 && (
+              <section id="observed" className="space-y-4">
+                <h2 className="text-2xl font-black tracking-tight text-white">Observed Cards</h2>
+                <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                  {observedCards.map((card) => <CardTile key={`observed-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} onExplain={setExplanationCard} />)}
                 </div>
               </section>
             )}
@@ -801,9 +844,7 @@ export default function CommanderDetail() {
               <section id="game-changers" className="space-y-4">
                 <h2 className="text-2xl font-black tracking-tight text-white">Game Changers</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {gameChangers.map((card) => (
-                    <CardTile key={`changer-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} />
-                  ))}
+                  {gameChangers.map((card) => <CardTile key={`changer-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} onExplain={setExplanationCard} />)}
                 </div>
               </section>
             )}
@@ -812,9 +853,7 @@ export default function CommanderDetail() {
               <section id="new-cards" className="space-y-4">
                 <h2 className="text-2xl font-black tracking-tight text-white">New Cards</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {newCards.map((card) => (
-                    <CardTile key={`new-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} />
-                  ))}
+                  {newCards.map((card) => <CardTile key={`new-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} onExplain={setExplanationCard} />)}
                 </div>
               </section>
             )}
@@ -823,9 +862,7 @@ export default function CommanderDetail() {
               <section key={section.category} id={`category-${section.category}`} className="space-y-4">
                 <h2 className="text-2xl font-black tracking-tight text-white">{section.label}</h2>
                 <div className="grid gap-x-3 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {section.cards.map((card) => (
-                    <CardTile key={`${section.category}-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} />
-                  ))}
+                  {section.cards.map((card) => <CardTile key={`${section.category}-${card.oracle_id}-${card.card_name}`} card={card} commerce={commerceByOracleId[card.oracle_id]} commerceLoading={commerceLoading} onAddToDeck={openDeckAction} onExplain={setExplanationCard} />)}
                 </div>
               </section>
             ))}
@@ -918,6 +955,11 @@ export default function CommanderDetail() {
         onAdd={addToExistingDeck}
         onCreate={(name) => createDeckAndAdd(name)}
         busy={deckActionBusy}
+      />
+      <RecommendationWhyDialog
+        card={explanationCard}
+        open={Boolean(explanationCard)}
+        onOpenChange={(open) => !open && setExplanationCard(null)}
       />
     </div>
   );

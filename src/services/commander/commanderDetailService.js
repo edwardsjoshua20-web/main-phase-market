@@ -1,4 +1,8 @@
-import { getMtgCommanderPage } from '@/lib/mtgCommanderCatalog';
+import { getMtgCommanderPage, getMtgMechanicalChemistry } from '@/lib/mtgCommanderCatalog';
+import {
+  buildCommanderStrategySummary,
+  buildUnifiedCommanderRecommendations
+} from '@/services/commander/commanderRecommendationService';
 
 const EMPTY_AVERAGE_DECK_PROFILE = {
   total_decks: 0,
@@ -23,6 +27,14 @@ const ALLOWED_CATEGORY_ORDER = [
 export function createEmptyCommanderPageState() {
   return {
     commander: null,
+    mechanicalChemistry: null,
+    mechanicalStrategies: [],
+    mechanicalRecommendations: [],
+    mechanicalCategories: [],
+    unifiedRecommendations: [],
+    unifiedStrategies: [],
+    unifiedRecommendationMetrics: null,
+    strategySummary: '',
     topSynergy: [],
     observedCards: [],
     newCards: [],
@@ -44,14 +56,35 @@ export function createEmptyCommanderPageState() {
   };
 }
 
-export function normalizeCommanderPagePayload(pagePayload) {
+export function normalizeCommanderPagePayload(pagePayload, mechanicalChemistry = null) {
+  const unified = buildUnifiedCommanderRecommendations({
+    mechanicalChemistry,
+    communityRecommendations: pagePayload?.top_synergy_cards || [],
+    gameChangers: pagePayload?.game_changers || []
+  });
+  const unifiedByOracleId = new Map(unified.recommendations.map((card) => [card.oracle_id, card]));
+  const withUnifiedEvidence = (cards = []) => cards.map((card) => ({
+    ...card,
+    ...(unifiedByOracleId.get(card.oracle_id) || {})
+  }));
   return {
     commander: pagePayload?.commander || null,
-    topSynergy: pagePayload?.top_synergy_cards || [],
-    observedCards: pagePayload?.observed_cards || [],
-    newCards: pagePayload?.new_cards || [],
-    gameChangers: pagePayload?.game_changers || [],
-    categories: pagePayload?.categories || [],
+    mechanicalChemistry,
+    mechanicalStrategies: mechanicalChemistry?.strategies || [],
+    mechanicalRecommendations: mechanicalChemistry?.recommendations || [],
+    mechanicalCategories: mechanicalChemistry?.categories || [],
+    unifiedRecommendations: unified.recommendations,
+    unifiedStrategies: unified.strategies,
+    unifiedRecommendationMetrics: unified.metrics,
+    strategySummary: buildCommanderStrategySummary(mechanicalChemistry?.commander_names, unified.strategies),
+    topSynergy: withUnifiedEvidence(pagePayload?.top_synergy_cards),
+    observedCards: withUnifiedEvidence(pagePayload?.observed_cards),
+    newCards: withUnifiedEvidence(pagePayload?.new_cards),
+    gameChangers: withUnifiedEvidence(pagePayload?.game_changers),
+    categories: (pagePayload?.categories || []).map((section) => ({
+      ...section,
+      cards: withUnifiedEvidence(section.cards)
+    })),
     averageDeckSections: pagePayload?.average_deck_sections || [],
     deckRows: pagePayload?.deck_rows || [],
     topCommanders: pagePayload?.top_commanders || [],
@@ -69,8 +102,11 @@ export function normalizeCommanderPagePayload(pagePayload) {
 }
 
 export async function loadCommanderDetailPage(oracleId, options = {}) {
-  const pagePayload = await getMtgCommanderPage(oracleId, options);
-  return normalizeCommanderPagePayload(pagePayload);
+  const [pagePayload, mechanicalChemistry] = await Promise.all([
+    getMtgCommanderPage(oracleId, options),
+    options.mode === 'card' ? Promise.resolve(null) : getMtgMechanicalChemistry(oracleId)
+  ]);
+  return normalizeCommanderPagePayload(pagePayload, mechanicalChemistry);
 }
 
 export function buildCommanderNavSections({
@@ -78,6 +114,7 @@ export function buildCommanderNavSections({
   averageDeckSections,
   categories,
   gameChangers,
+  unifiedRecommendations,
   newCards,
   observedCards,
   topCommanders,
@@ -104,15 +141,13 @@ export function buildCommanderNavSections({
   }
 
   const sections = [];
-  if (topSynergy.length > 0) sections.push({ id: 'recommended', label: 'Recommended Chemistry' });
+  if (unifiedRecommendations?.length > 0) sections.push({ id: 'recommended', label: 'Recommended Chemistry' });
   if (observedCards.length > 0) sections.push({ id: 'observed', label: 'Observed Cards' });
   if (gameChangers.length > 0) sections.push({ id: 'game-changers', label: 'Game Changers' });
   if (newCards.length > 0) sections.push({ id: 'new-cards', label: 'New Cards' });
   for (const label of ALLOWED_CATEGORY_ORDER) {
     const section = categories.find((entry) => entry.label === label);
-    if (section) {
-      sections.push({ id: `category-${section.category}`, label: section.label });
-    }
+    if (section) sections.push({ id: `category-${section.category}`, label: section.label });
   }
   return sections;
 }

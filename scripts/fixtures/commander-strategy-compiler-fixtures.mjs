@@ -1,0 +1,48 @@
+// Reviewed strategy-interpretation fixtures. These are verifier inputs only and are never read by production compilation.
+export const COMMANDER_STRATEGY_COMPILER_FIXTURES = Object.freeze([
+  { family: 'Mill', names: ['Bruvac the Grandiloquent'], strategies: ['mill'], conditions: ['opponent_mill'], actions: ['amplify_trigger'], forbidden: ['lifegain', 'lands'] },
+  { family: 'Aristocrats', names: ['Teysa Karlov'], strategies: ['aristocrats', 'sacrifice', 'tokens'], conditions: ['creature_died'], actions: ['amplify_trigger'], forbidden: ['mill', 'landfall'] },
+  { family: 'Spellslinger', names: ['Mizzix of the Izmagnus'], strategies: ['spellslinger'], conditions: ['spell_cast'], actions: ['reduce_cost'], forbidden: ['tribal', 'lifegain'] },
+  { family: 'Counters', names: ["Atraxa, Praetors' Voice"], strategies: ['counters', 'proliferate'], actions: ['modify_counters'], forbidden: ['mill', 'aura_voltron'] },
+  { family: 'Tokens', names: ['Rhys the Redeemed'], strategies: ['tokens'], actions: ['create_token'], forbidden: ['mill', 'reanimator'] },
+  { family: 'Artifacts', names: ['Urza, Lord High Artificer'], strategies: ['artifacts', 'tokens', 'etb'], actions: ['create_token', 'add_mana'], forbidden: ['lifegain', 'aura_voltron'] },
+  { family: 'Enchantress', names: ["Sythis, Harvest's Hand"], strategies: ['enchantress', 'lifegain'], conditions: ['spell_cast'], actions: ['draw', 'gain_life'], forbidden: ['mill', 'lands'] },
+  { family: 'Graveyard/Reanimator', names: ['Muldrotha, the Gravetide'], strategies: ['graveyard', 'recursion', 'reanimator', 'lands', 'landfall'], transitions: ['graveyard->battlefield'], forbidden: ['mill', 'tribal'] },
+  { family: 'Lands', names: ['The Gitrog Monster'], strategies: ['lands', 'graveyard', 'landfall', 'sacrifice'], actions: ['draw', 'extra_land_play'], transitions: ['battlefield->graveyard'], forbidden: ['aura_voltron', 'mill'] },
+  { family: 'Tribal/Aristocrats', names: ['Wilhelt, the Rotcleaver'], strategies: ['tribal', 'tokens', 'aristocrats', 'sacrifice'], conditions: ['creature_died'], actions: ['create_token', 'draw'], forbidden: ['landfall', 'enchantress'] },
+  { family: 'Aura/Voltron', names: ['Sram, Senior Edificer'], strategies: ['aura_voltron', 'artifacts', 'enchantress'], conditions: ['spell_cast'], actions: ['draw'], forbidden: ['mill', 'lands'] },
+  { family: 'Blink/ETB', names: ['Brago, King Eternal'], strategies: ['blink', 'etb', 'combat'], conditions: ['combat_damage'], actions: ['blink'], transitions: ['battlefield->exile', 'exile->battlefield'], forbidden: ['mill', 'lifegain'] },
+  { family: 'Mill/Tribal', names: ["Captain N'ghathrod"], strategies: ['mill', 'tribal', 'combat'], conditions: ['combat_damage'], actions: ['mill'], forbidden: ['landfall', 'lifegain'] },
+  { family: 'Lifegain', names: ['Karlov of the Ghost Council'], strategies: ['lifegain', 'counters'], conditions: ['life_gained'], actions: ['modify_counters'], forbidden: ['mill', 'lands'] },
+  { family: 'Combat', names: ['Aurelia, the Warleader'], strategies: ['combat', 'extra_combat'], conditions: ['attack_declared'], actions: ['extra_combat'], forbidden: ['mill', 'graveyard'] },
+  { family: 'Control', names: ['Grand Arbiter Augustin IV'], strategies: ['control'], actions: ['reduce_cost', 'tax_spells'], forbidden: ['mill', 'tokens'] },
+  { family: 'Group Slug', names: ['Mogis, God of Slaughter'], strategies: ['life_loss', 'group_slug', 'sacrifice'], actions: ['deal_damage', 'lose_life', 'sacrifice'], forbidden: ['landfall', 'aura_voltron'] },
+  { family: 'Treasure', names: ['Prosper, Tome-Bound'], strategies: ['treasure', 'tokens'], conditions: ['spell_cast'], actions: ['create_token'], forbidden: ['mill', 'lifegain'] },
+  { family: 'Sacrifice', names: ['Korvold, Fae-Cursed King'], strategies: ['sacrifice', 'counters', 'combat'], conditions: ['permanent_sacrificed'], actions: ['draw', 'modify_counters'], forbidden: ['mill', 'aura_voltron'] },
+  { family: 'Partner', names: ['Thrasios, Triton Hero', 'Tymna the Weaver'], strategies: ['card_draw'], conditions: ['combat_damage'], actions: ['draw'], forbidden: ['mill', 'tribal'] },
+  { family: 'Background', names: ['Karlach, Fury of Avernus', 'Agent of the Iron Throne'], strategies: ['combat', 'extra_combat', 'life_loss', 'group_slug'], conditions: ['attack_declared'], actions: ['extra_combat', 'lose_life'], forbidden: ['mill', 'landfall'] },
+  { family: 'Tribal/Tokens', names: ['Edgar Markov'], strategies: ['tribal', 'tokens', 'combat', 'counters'], conditions: ['attack_declared'], actions: ['create_token', 'modify_counters'], forbidden: ['mill', 'lands'] },
+  { family: 'Tribal/Counters', names: ['Giada, Font of Hope'], strategies: ['tribal', 'counters'], actions: ['add_mana', 'modify_counters'], forbidden: ['mill', 'graveyard'] },
+  { family: 'Tribal/Tokens', names: ['Krenko, Mob Boss'], strategies: ['tribal', 'tokens'], actions: ['create_token'], forbidden: ['mill', 'lifegain'] },
+  { family: 'Tribal/Combat', names: ["Yuriko, the Tiger's Shadow"], strategies: ['tribal', 'combat', 'life_loss', 'group_slug'], conditions: ['combat_damage'], actions: ['draw', 'lose_life'], forbidden: ['landfall', 'lifegain'] },
+  { family: 'Attack Triggers', names: ['Isshin, Two Heavens as One'], strategies: ['combat'], conditions: ['attack_declared'], actions: ['amplify_trigger'], forbidden: ['mill', 'graveyard'] },
+  { family: 'Activated Blink', names: ['Roon of the Hidden Realm'], strategies: ['blink', 'etb'], actions: ['blink'], transitions: ['battlefield->exile', 'exile->battlefield'], forbidden: ['mill', 'life_loss'] },
+  { family: 'Replacement/Tokens', names: ['Chatterfang, Squirrel General'], strategies: ['tokens', 'sacrifice'], actions: ['create_token', 'sacrifice'], forbidden: ['mill', 'enchantress'] },
+  { family: 'Graveyard/Sacrifice', names: ['Meren of Clan Nel Toth'], strategies: ['graveyard', 'reanimator', 'recursion', 'sacrifice'], conditions: ['creature_died'], transitions: ['graveyard->battlefield'], forbidden: ['mill', 'aura_voltron'] },
+  { family: 'Lands/Landfall', names: ['Aesi, Tyrant of Gyre Strait'], strategies: ['lands', 'landfall'], conditions: ['land_entered_battlefield'], actions: ['draw', 'extra_land_play'], forbidden: ['mill', 'tribal'] },
+  { family: 'Compound Graveyard/Lands/Tokens', names: ['Teval, the Balanced Scale'], strategies: ['self_mill', 'graveyard', 'lands', 'landfall', 'tokens', 'combat', 'recursion'], conditions: ['attack_declared', 'card_left_graveyard'], actions: ['mill', 'create_token'], transitions: ['graveyard->battlefield'], forbidden: ['lifegain', 'enchantress'] },
+  { family: 'Spells/Life Loss', names: ["Y'shtola, Night's Blessed"], strategies: ['spellslinger', 'life_loss', 'lifegain', 'group_slug'], conditions: ['life_lost', 'noncreature_spell_cast'], actions: ['draw', 'deal_damage', 'gain_life'], forbidden: ['mill', 'lands'] }
+]);
+
+export const ADVANCED_SEARCH_COMPILER_CASES = Object.freeze([
+  { commander: 'Bruvac the Grandiloquent', strategy: 'mill', expected: 'Maddening Cacophony', literal: 'mill' },
+  { commander: 'Teysa Karlov', strategy: 'aristocrats', expected: 'Pitiless Plunderer', literal: 'dies' },
+  { commander: 'Mizzix of the Izmagnus', strategy: 'spellslinger', expected: 'Frantic Search', literal: 'instant' },
+  { commander: 'The Gitrog Monster', strategy: 'lands', expected: 'Life from the Loam', literal: 'land' },
+  { commander: 'Brago, King Eternal', strategy: 'etb', expected: 'Panharmonicon', literal: 'enters' },
+  { commander: 'Sram, Senior Edificer', strategy: 'aura_voltron', expected: 'Flickering Ward', literal: 'aura' },
+  { commander: 'Prosper, Tome-Bound', strategy: 'treasure', expected: 'Xorn', literal: 'treasure' },
+  { commander: 'Aesi, Tyrant of Gyre Strait', strategy: 'landfall', expected: 'Exploration', literal: 'landfall' },
+  { commander: 'Teval, the Balanced Scale', strategy: 'landfall', expected: 'Scute Swarm', literal: 'landfall' },
+  { commander: "Y'shtola, Night's Blessed", strategy: 'spellslinger', expected: 'Baral, Chief of Compliance', literal: 'noncreature' }
+]);
