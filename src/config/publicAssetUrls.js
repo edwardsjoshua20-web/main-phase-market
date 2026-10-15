@@ -1,6 +1,15 @@
 const hostedPublicDataBaseUrl =
   'https://wwvvyrhlybwijqlhubdv.supabase.co/storage/v1/object/public/main-phase-market-public/data';
-const configuredPublicDataBaseUrl = String(import.meta.env.VITE_PUBLIC_DATA_BASE_URL || '').trim();
+
+function normalizeConfiguredPublicDataBaseUrl(value) {
+  const configured = String(value || '').trim().replace(/\/+$/, '');
+  if (!configured) return '';
+  return /\/storage\/v1\/object\/public\/[^/]+$/i.test(configured)
+    ? `${configured}/data`
+    : configured;
+}
+
+const configuredPublicDataBaseUrl = normalizeConfiguredPublicDataBaseUrl(import.meta.env.VITE_PUBLIC_DATA_BASE_URL);
 
 function shouldUseHostedCatalogBase() {
   if (typeof window === 'undefined') {
