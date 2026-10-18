@@ -992,7 +992,8 @@ export const localBackend = {
       if (!hostedSupabaseMode) {
         throw new Error('Hosted sign-up is not available in local backend mode.');
       }
-      const result = await supabaseRequest('/auth/v1/signup', {
+      const confirmationRedirect = getCanonicalHostedUrl('/MemberLogin?confirmed=1');
+      const result = await supabaseRequest(`/auth/v1/signup?redirect_to=${encodeURIComponent(confirmationRedirect)}`, {
         method: 'POST',
         auth: false,
         body: JSON.stringify({
