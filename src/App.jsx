@@ -39,6 +39,7 @@ import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-d
 import PageNotFound from './lib/PageNotFound';
 import { AppAuthProvider, useAppAuth } from '@/lib/AppAuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import KazakariPage from '@/features/kazakari/KazakariPage';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -120,6 +121,7 @@ const AuthenticatedApp = () => {
         <Route path="/DeckChemistry" element={<LayoutWrapper currentPageName="DeckChemistry"><DeckChemistry /></LayoutWrapper>} />
         <Route path="/DeckChemistry/magic" element={<LayoutWrapper currentPageName="CommanderHub"><CommanderHub /></LayoutWrapper>} />
         <Route path="/CommanderHub" element={<Navigate to="/DeckChemistry" replace />} />
+        <Route path="/private/kazakari" element={<KazakariPage />} />
         {/* Redirect all other paths to mobile home */}
         <Route path="*" element={<MobileHome />} />
       </Routes>
@@ -174,6 +176,7 @@ const AuthenticatedApp = () => {
       <Route path="/Encyclopedia/:game/rules/:topicSlug" element={<LayoutWrapper currentPageName="Encyclopedia"><Encyclopedia /></LayoutWrapper>} />
       <Route path="/InstaJudge" element={<LayoutWrapper currentPageName="InstaJudge"><InstaJudge /></LayoutWrapper>} />
       <Route path="/set/:game/:setSlug" element={<LayoutWrapper currentPageName="SetDetail"><SetDetail /></LayoutWrapper>} />
+      <Route path="/private/kazakari" element={<KazakariPage />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

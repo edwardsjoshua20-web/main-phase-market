@@ -61,6 +61,10 @@ async function apiRequest(path, options = {}) {
   return response.json();
 }
 
+export function requestPrivateLocalApi(path, options = {}) {
+  return apiRequest(path, options);
+}
+
 async function fetchStaticSystemHealth() {
   const payload = await fetchJsonWithEmbeddedFallback(
     getSiteAssetUrl('system-health.json'),

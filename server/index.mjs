@@ -62,6 +62,7 @@ import { ensureStarWarsSearchIndex, searchStarWarsAdvancedIndex, searchStarWarsI
 import { ensureYugiohSearchIndex, searchYugiohAdvancedIndex, searchYugiohIndex } from './yugiohSearchIndex.mjs';
 import { resolveRuntimeSiteDataRoot } from '../scripts/lib/runtime-site-data-paths.mjs';
 import { installCardstachePublicApi } from './cardstachePublicApi.mjs';
+import { createKazakariOwner, isKazakariAuthorized } from './kazakariOwner.mjs';
 
 const envFileValues = (() => {
   const parseEnvFile = (filePath) => {
@@ -1185,6 +1186,7 @@ const SITE_DATA_ROOT = resolveRuntimeSiteDataRoot(process.cwd());
 const AUTOMATION_CONTROL_LOG_PATH = path.join(SITE_DATA_ROOT, 'automation-control-log.json');
 const AUTOMATION_LOCK_ROOT = path.join(SITE_DATA_ROOT, 'automation-locks');
 const AUTOMATION_RUN_HISTORY_PATH = path.join(SITE_DATA_ROOT, 'automation-runs.json');
+const kazakariOwner = createKazakariOwner({ getEnvValue, runtimeDataRoot: SITE_DATA_ROOT });
 const AUTOMATION_LOCK_TTL_MS = 12 * 60 * 60 * 1000;
 const AUTOMATION_SCHEDULER_INTERVAL_MS = 60 * 1000;
 const automationJobMap = getAutomationControlJobMap();
@@ -1769,6 +1771,32 @@ async function requireAutomationAdmin(req, res, next) {
   }
 }
 
+async function requireKazakariAccess(req, res, next) {
+  res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  if (!allowRemoteConnections() && isLoopbackAddress(req.socket.remoteAddress)) {
+    req.kazakariActor = localAdminUser;
+    next();
+    return;
+  }
+
+  try {
+    const auth = await verifySupabaseAccessToken(extractBearerToken(req));
+    const actor = {
+      id: auth.profile?.id || auth.user?.id || null,
+      email: auth.profile?.email || auth.user?.email || '',
+      role: auth.role || auth.profile?.role || auth.user?.user_metadata?.role || 'member',
+    };
+    if (!actor.id || !isKazakariAuthorized(actor, getEnvValue('KAZAKARI_AUTHORIZED_EMAILS'))) {
+      res.status(403).json({ error: 'This account is not authorized for the Kazakari private preview.' });
+      return;
+    }
+    req.kazakariActor = actor;
+    next();
+  } catch (error) {
+    res.status(Number(error?.status || 401)).json({ error: error?.message || 'Kazakari authentication failed.' });
+  }
+}
+
 function startAutomationJob(jobId, actor = localAdminUser.email) {
   const runnerJob = automationJobMap[jobId];
   if (!runnerJob) {
@@ -1952,6 +1980,46 @@ app.get('/api/local/ops/bridge-readiness', (_req, res) => {
 
 app.get('/api/local/admin/automation/control-status', requireAutomationAdmin, (_req, res) => {
   res.json(buildAutomationControlStatus());
+});
+
+app.get('/api/local/kazakari/snapshot', requireKazakariAccess, async (_req, res) => {
+  try {
+    res.set('Cache-Control', 'private, no-store');
+    res.json(await kazakariOwner.getSnapshot());
+  } catch (error) {
+    res.status(Number(error?.status || 500)).json({ error: error?.message || 'Failed to load Kazakari data.' });
+  }
+});
+
+app.get('/api/local/kazakari/watches', requireKazakariAccess, async (req, res) => {
+  try {
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ watches: await kazakariOwner.listWatches(req.kazakariActor) });
+  } catch (error) {
+    res.status(Number(error?.status || 500)).json({ error: error?.message || 'Failed to load Kazakari watches.' });
+  }
+});
+
+app.post('/api/local/kazakari/watches', requireKazakariAccess, async (req, res) => {
+  try {
+    const watch = await kazakariOwner.createWatch(req.kazakariActor, req.body || {});
+    res.status(201).json({ watch });
+  } catch (error) {
+    res.status(Number(error?.status || 500)).json({ error: error?.message || 'Failed to create Kazakari watch.' });
+  }
+});
+
+app.delete('/api/local/kazakari/watches/:id', requireKazakariAccess, async (req, res) => {
+  try {
+    const removed = await kazakariOwner.deleteWatch(req.kazakariActor, req.params.id);
+    if (!removed) {
+      res.status(404).json({ error: 'Watch rule was not found.' });
+      return;
+    }
+    res.status(204).end();
+  } catch (error) {
+    res.status(Number(error?.status || 500)).json({ error: error?.message || 'Failed to delete Kazakari watch.' });
+  }
 });
 
 app.post('/api/local/admin/automation/:jobId/run', requireAutomationAdmin, (req, res) => {

@@ -32,6 +32,8 @@ services:
         sync: false
       - key: SUPABASE_PUBLIC_BUCKET
         sync: false
+      - key: KAZAKARI_AUTHORIZED_EMAILS
+        value: admin@mainphasemarket.net
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET

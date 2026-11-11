@@ -107,7 +107,10 @@
     "cardstache:api:verify": "node scripts/verify-cardstache-public-api.mjs",
     "listing:verify": "node scripts/verify-listing-owner.mjs",
     "deck:modular:verify": "node scripts/verify-deck-modular-workflow.mjs",
-    "deck:library:seed": "node scripts/seed-deck-library-examples.mjs"
+    "deck:library:seed": "node scripts/seed-deck-library-examples.mjs",
+    "kazakari:snapshot": "node scripts/build-kazakari-preview-snapshot.mjs",
+    "kazakari:sync": "node scripts/sync-kazakari-preview-supabase.mjs",
+    "kazakari:verify": "node scripts/verify-kazakari-preview.mjs"
   },
   "dependencies": {
     "@babel/core": "^7.25.0",
