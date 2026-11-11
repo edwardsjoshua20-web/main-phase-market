@@ -50,17 +50,25 @@ assert.equal((await owner.listWatches(actor)).length, 0);
 const appSource = fs.readFileSync(path.join(repoRoot, 'src', 'App.jsx'), 'utf8');
 const pageSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'KazakariPage.jsx'), 'utf8');
 const apiSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'kazakariApi.js'), 'utf8');
+const cssSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'kazakari.css'), 'utf8');
 const serverSource = fs.readFileSync(path.join(repoRoot, 'server', 'index.mjs'), 'utf8');
 const headers = fs.readFileSync(path.join(repoRoot, 'public', '_headers'), 'utf8');
 assert.match(appSource, /path="\/private\/kazakari"/);
 assert.match(pageSource, /minimumDiscount.*50/);
-assert.match(pageSource, /Hot Clearance/);
+assert.match(pageSource, /🔥 Hot Deals/);
 assert.match(pageSource, /Penny Finds/);
-assert.match(pageSource, /Original price unavailable/);
+assert.match(pageSource, /Scanner coming soon/);
+assert.match(pageSource, /Filter &amp; Sort/);
+assert.match(pageSource, /Math\.max\(50/);
+assert.match(pageSource, /regularPrice != null && <del>/);
+assert.match(pageSource, /source advertised this discount but did not provide an exact original price/i);
 assert.match(pageSource, /Home & Garden/);
 assert.match(pageSource, /loading="lazy"/);
 assert.match(pageSource, /push notifications are not active yet/i);
 assert.doesNotMatch(pageSource, /Find the price drop worth leaving home for|Real Markdown Intelligence|Verified Source Records/);
+assert.match(cssSource, /grid-template-columns:128px minmax\(0,1fr\)/);
+assert.match(cssSource, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+assert.match(cssSource, /\.kz-sheet-backdrop\{display:flex\}/);
 assert.match(apiSource, /\/rest\/v1\//);
 assert.match(apiSource, /kazakari_preview_snapshots\?select=payload/);
 assert.match(apiSource, /kazakari_watch_rules\?select=/);
@@ -77,6 +85,16 @@ assert.match(migration, /revoke all on table public\.kazakari_preview_snapshots 
 assert.match(migration, /revoke all on table public\.kazakari_watch_rules from anon, authenticated/i);
 assert.doesNotMatch(migration, /grant\s+(select|insert|update|delete|all).*\s+to\s+(anon|authenticated)/i);
 
+const enrichedSnapshotPath = path.join(repoRoot, 'server', 'data', 'kazakari-preview.json');
+if (fs.existsSync(enrichedSnapshotPath)) {
+  const enriched = JSON.parse(fs.readFileSync(enrichedSnapshotPath, 'utf8'));
+  assert.equal(enriched.summary.currentProducts, 298);
+  assert.equal(enriched.summary.verifiedProductImages, 298);
+  assert.equal(enriched.summary.exactReferencePrices, 79);
+  assert.equal(enriched.products.filter((product) => product.regularPrice != null).length, 79);
+  assert.equal(enriched.products.filter((product) => (product.discountPercent ?? -1) >= 50 || product.currentPrice === 0.01).length, 10);
+}
+
 const ownerBrowserMigration = fs.readFileSync(path.join(repoRoot, 'supabase', 'migrations', '20261111213000_allow_owner_kazakari_browser_access.sql'), 'utf8');
 assert.match(ownerBrowserMigration, /grant select on table public\.kazakari_preview_snapshots to authenticated/i);
 assert.match(ownerBrowserMigration, /grant select, insert, update, delete on table public\.kazakari_watch_rules to authenticated/i);
@@ -86,8 +104,8 @@ assert.match(ownerBrowserMigration, /user_id = auth\.uid\(\)/i);
 assert.doesNotMatch(ownerBrowserMigration, /\bto anon\b/i);
 
 console.log(JSON.stringify({
-  passed: 57,
+  passed: 68,
   source: snapshot.source,
   summary: snapshot.summary,
-  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'owner-only-allowlist', 'production-auth-required', 'watch-crud', 'route', 'noindex', 'shopping-layout', 'image-lazy-loading', 'broad-categories', 'hot-clearance', 'penny-finds', 'direct-supabase-data', 'migration-scope', 'rls'],
+  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'owner-only-allowlist', 'production-auth-required', 'watch-crud', 'route', 'noindex', 'mobile-product-rows', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls'],
 }, null, 2));
