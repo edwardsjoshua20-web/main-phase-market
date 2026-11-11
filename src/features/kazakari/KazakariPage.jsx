@@ -29,11 +29,17 @@ function ProductImage({ product, detail = false }) {
 
 function PriceBlock({ product, detail = false }) {
   const saved = savings(product);
-  return <div className={`kz-price ${detail ? 'is-detail' : ''}`}><div className="kz-price-main"><strong>{money(product.currentPrice)}</strong>{product.regularPrice != null && <del>{money(product.regularPrice)}</del>}</div><div className="kz-deal-line">{product.discountPercent != null && <b>{Math.round(product.discountPercent)}% off</b>}{saved != null && <span>Save {money(saved)}</span>}</div>{detail && product.regularPrice == null && product.discountPercent != null && <p className="kz-reference-note">The source advertised this discount but did not provide an exact original price.</p>}</div>;
+  return <div className={`kz-price ${detail ? 'is-detail' : ''}`}><div className="kz-price-main"><strong>{money(product.currentPrice)}</strong>{product.regularPrice != null && <del>{money(product.regularPrice)}</del>}</div>{detail && <div className="kz-deal-line">{product.discountPercent != null && <b>{Math.round(product.discountPercent)}% off</b>}{saved != null && <span>Save {money(saved)}</span>}</div>}{detail && product.regularPrice == null && product.discountPercent != null && <p className="kz-reference-note">The source advertised this discount but did not provide an exact original price.</p>}</div>;
+}
+
+function DiscountOverlay({ product }) {
+  const saved = savings(product);
+  if (product.discountPercent == null) return null;
+  return <div className={`kz-discount-overlay kazakari-discount-overlay ${product.discountPercent >= 90 ? 'is-extreme' : ''}`}><strong>{Math.round(product.discountPercent)}% OFF</strong>{saved != null && <span>Save {money(saved)}</span>}</div>;
 }
 
 function ProductItem({ product, onOpen, onWatch }) {
-  return <article className="kz-product"><button className="kz-product-open" onClick={() => onOpen(product)} aria-label={`View ${product.productName || product.productId}`}><div className="kz-image-wrap"><ProductImage product={product} />{product.discountPercent >= 75 && <span className={`kz-badge ${product.discountPercent >= 90 ? 'is-extreme' : ''}`}>{Math.round(product.discountPercent)}% off</span>}</div><div className="kz-product-copy"><h3>{product.productName || `Product ${product.productId}`}</h3><span className="kz-retailer">Home Depot · {scopeLabel(product)}</span><PriceBlock product={product} /><span className="kz-updated">Updated {age(product.observedAt)}</span></div></button><button className="kz-watch-icon" onClick={() => onWatch(product)} aria-label={`Watch ${product.productName || product.productId}`}><Bell /></button></article>;
+  return <article className="kz-product"><button className="kz-product-open" onClick={() => onOpen(product)} aria-label={`View ${product.productName || product.productId}`}><div className="kz-image-wrap kazakari-product-image"><ProductImage product={product} /><DiscountOverlay product={product} /></div><div className="kz-product-copy"><h3>{product.productName || `Product ${product.productId}`}</h3><span className="kz-retailer">Home Depot · {scopeLabel(product)}</span><PriceBlock product={product} /><span className="kz-updated">Updated {age(product.observedAt)}</span></div></button><button className="kz-watch-icon" onClick={() => onWatch(product)} aria-label={`Watch ${product.productName || product.productId}`}><Bell /></button></article>;
 }
 
 function FilterControls({ retailer, setRetailer, category, setCategory, minimumDiscount, setMinimumDiscount, maximumPrice, setMaximumPrice, sort, setSort }) {

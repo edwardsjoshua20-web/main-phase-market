@@ -48,12 +48,14 @@ assert.equal(await owner.deleteWatch(actor, created.id), true);
 assert.equal((await owner.listWatches(actor)).length, 0);
 
 const appSource = fs.readFileSync(path.join(repoRoot, 'src', 'App.jsx'), 'utf8');
+const indexSource = fs.readFileSync(path.join(repoRoot, 'index.html'), 'utf8');
 const pageSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'KazakariPage.jsx'), 'utf8');
 const apiSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'kazakariApi.js'), 'utf8');
 const cssSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'kazakari.css'), 'utf8');
 const serverSource = fs.readFileSync(path.join(repoRoot, 'server', 'index.mjs'), 'utf8');
 const headers = fs.readFileSync(path.join(repoRoot, 'public', '_headers'), 'utf8');
 assert.match(appSource, /path="\/private\/kazakari"/);
+assert.match(indexSource, /name="viewport" content="width=device-width, initial-scale=1\.0"/);
 assert.match(pageSource, /minimumDiscount.*50/);
 assert.match(pageSource, /🔥 Hot Deals/);
 assert.match(pageSource, /Penny Finds/);
@@ -64,11 +66,15 @@ assert.match(pageSource, /regularPrice != null && <del>/);
 assert.match(pageSource, /source advertised this discount but did not provide an exact original price/i);
 assert.match(pageSource, /Home & Garden/);
 assert.match(pageSource, /loading="lazy"/);
+assert.match(pageSource, /kazakari-product-image[^>]*><ProductImage product=\{product\} \/><DiscountOverlay product=\{product\} \/>/);
+assert.match(pageSource, /saved != null && <span>Save \{money\(saved\)\}<\/span>/);
 assert.match(pageSource, /push notifications are not active yet/i);
 assert.doesNotMatch(pageSource, /Find the price drop worth leaving home for|Real Markdown Intelligence|Verified Source Records/);
 assert.match(cssSource, /grid-template-columns:128px minmax\(0,1fr\)/);
 assert.match(cssSource, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
 assert.match(cssSource, /\.kz-sheet-backdrop\{display:flex\}/);
+assert.match(cssSource, /any-pointer:coarse[^}]*max-width:1180px/);
+assert.match(cssSource, /\.kz-discount-overlay\{position:absolute;top:6px;left:6px;z-index:2/);
 assert.match(apiSource, /\/rest\/v1\//);
 assert.match(apiSource, /kazakari_preview_snapshots\?select=payload/);
 assert.match(apiSource, /kazakari_watch_rules\?select=/);
@@ -104,8 +110,8 @@ assert.match(ownerBrowserMigration, /user_id = auth\.uid\(\)/i);
 assert.doesNotMatch(ownerBrowserMigration, /\bto anon\b/i);
 
 console.log(JSON.stringify({
-  passed: 68,
+  passed: 74,
   source: snapshot.source,
   summary: snapshot.summary,
-  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'owner-only-allowlist', 'production-auth-required', 'watch-crud', 'route', 'noindex', 'mobile-product-rows', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls'],
+  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'owner-only-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls'],
 }, null, 2));
