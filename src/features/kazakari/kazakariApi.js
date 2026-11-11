@@ -1,6 +1,9 @@
+import { requestPrivateLocalApi } from '@/services/providers/localBackend';
+
 const fallbackSupabaseUrl = 'https://wwvvyrhlybwijqlhubdv.supabase.co';
 const fallbackSupabaseAnonKey = 'sb_publishable_tWMznF-RAJFLR1XiQC7KEQ_VGoezQU9';
 const sessionKey = 'mpm.supabase.session';
+const runningOnLocalHost = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 const supabaseUrl = String(
   (/** @type {{ env?: Record<string, string> }} */ (import.meta).env?.VITE_SUPABASE_URL) || fallbackSupabaseUrl
@@ -85,6 +88,7 @@ function fromWatch(rule) {
 
 export const kazakariApi = {
   async snapshot() {
+    if (runningOnLocalHost) return requestPrivateLocalApi('/kazakari/snapshot');
     const rows = await request('kazakari_preview_snapshots?select=payload&id=eq.current&limit=1');
     if (!Array.isArray(rows) || !rows[0]?.payload) {
       const error = new Error('The Kazakari product snapshot is not available.');
@@ -94,10 +98,15 @@ export const kazakariApi = {
     return rows[0].payload;
   },
   async watches() {
+    if (runningOnLocalHost) return (await requestPrivateLocalApi('/kazakari/watches')).watches || [];
     const rows = await request('kazakari_watch_rules?select=*&order=created_at.asc');
     return Array.isArray(rows) ? rows.map(toWatch) : [];
   },
   async createWatch(rule) {
+    if (runningOnLocalHost) {
+      const result = await requestPrivateLocalApi('/kazakari/watches', { method: 'POST', body: JSON.stringify(rule) });
+      return result.watch;
+    }
     const rows = await request('kazakari_watch_rules?select=*', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
@@ -106,6 +115,7 @@ export const kazakariApi = {
     return toWatch(rows[0]);
   },
   deleteWatch(id) {
+    if (runningOnLocalHost) return requestPrivateLocalApi(`/kazakari/watches/${encodeURIComponent(id)}`, { method: 'DELETE' });
     return request(`kazakari_watch_rules?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
 };
