@@ -47,6 +47,7 @@ assert.equal((await owner.listWatches(actor)).length, 0);
 
 const appSource = fs.readFileSync(path.join(repoRoot, 'src', 'App.jsx'), 'utf8');
 const pageSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'KazakariPage.jsx'), 'utf8');
+const apiSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'kazakariApi.js'), 'utf8');
 const serverSource = fs.readFileSync(path.join(repoRoot, 'server', 'index.mjs'), 'utf8');
 const headers = fs.readFileSync(path.join(repoRoot, 'public', '_headers'), 'utf8');
 assert.match(appSource, /path="\/private\/kazakari"/);
@@ -54,6 +55,10 @@ assert.match(pageSource, /minimumDiscount.*50/);
 assert.match(pageSource, /Store-specific observation/);
 assert.match(pageSource, /Advertised promotion/);
 assert.match(pageSource, /Push notifications are not implemented/);
+assert.match(apiSource, /\/rest\/v1\//);
+assert.match(apiSource, /kazakari_preview_snapshots\?select=payload/);
+assert.match(apiSource, /kazakari_watch_rules\?select=/);
+assert.doesNotMatch(apiSource, /requestPrivateLocalApi|VITE_API_ORIGIN|\/api\/local/);
 assert.match(serverSource, /requireKazakariAccess[\s\S]*!allowRemoteConnections\(\) && isLoopbackAddress/);
 assert.match(headers, /X-Robots-Tag: noindex, nofollow/);
 
@@ -66,9 +71,17 @@ assert.match(migration, /revoke all on table public\.kazakari_preview_snapshots 
 assert.match(migration, /revoke all on table public\.kazakari_watch_rules from anon, authenticated/i);
 assert.doesNotMatch(migration, /grant\s+(select|insert|update|delete|all).*\s+to\s+(anon|authenticated)/i);
 
+const ownerBrowserMigration = fs.readFileSync(path.join(repoRoot, 'supabase', 'migrations', '20261111213000_allow_owner_kazakari_browser_access.sql'), 'utf8');
+assert.match(ownerBrowserMigration, /grant select on table public\.kazakari_preview_snapshots to authenticated/i);
+assert.match(ownerBrowserMigration, /grant select, insert, update, delete on table public\.kazakari_watch_rules to authenticated/i);
+assert.match(ownerBrowserMigration, /auth\.jwt\(\) ->> 'email'/i);
+assert.match(ownerBrowserMigration, /admin@mainphasemarket\.net/i);
+assert.match(ownerBrowserMigration, /user_id = auth\.uid\(\)/i);
+assert.doesNotMatch(ownerBrowserMigration, /\bto anon\b/i);
+
 console.log(JSON.stringify({
-  passed: 37,
+  passed: 47,
   source: snapshot.source,
   summary: snapshot.summary,
-  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'owner-only-allowlist', 'production-auth-required', 'watch-crud', 'route', 'noindex', 'evidence-labels', 'migration-scope', 'rls'],
+  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'owner-only-allowlist', 'production-auth-required', 'watch-crud', 'route', 'noindex', 'evidence-labels', 'direct-supabase-data', 'migration-scope', 'rls'],
 }, null, 2));
