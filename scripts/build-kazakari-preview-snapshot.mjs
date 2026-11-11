@@ -77,6 +77,10 @@ export function buildKazakariSnapshot({ databasePath = DEFAULT_DB, generatedAt =
     const products = [];
     if (activeIds.length > 0) {
       const placeholders = activeIds.map(() => '?').join(',');
+      const productColumns = new Set(database.prepare('PRAGMA table_info(products)').all().map((column) => String(column.name)));
+      const metadataSelect = ['product_url', 'image_url', 'image_source_url', 'image_provenance', 'image_verified_at', 'description', 'reference_price', 'reference_price_source', 'reference_price_verified_at']
+        .map((column) => productColumns.has(column) ? `p.${column}` : `NULL AS ${column}`)
+        .join(', ');
       const rows = database.prepare(`
         WITH active_products AS (
           SELECT pp.product_identifier, pp.publication_id, pp.last_observation_id,
@@ -84,9 +88,10 @@ export function buildKazakariSnapshot({ databasePath = DEFAULT_DB, generatedAt =
           FROM publication_products pp
           WHERE pp.publication_id IN (${placeholders}) AND pp.status = 'present'
         )
-        SELECT o.*, ap.publication_id, ap.first_seen_at, ap.last_seen_at
+        SELECT o.*, ap.publication_id, ap.first_seen_at, ap.last_seen_at, ${metadataSelect}
         FROM active_products ap
         JOIN observations o ON o.id = ap.last_observation_id
+        LEFT JOIN products p ON p.retailer = o.retailer AND p.product_identifier = o.product_identifier
         ORDER BY COALESCE(o.advertised_discount_percent, -1) DESC,
           COALESCE(o.current_price, 999999) ASC, o.product_name, o.product_identifier
       `).all(...activeIds);
@@ -107,7 +112,7 @@ export function buildKazakariSnapshot({ databasePath = DEFAULT_DB, generatedAt =
         if (seenProducts.has(identity)) continue;
         seenProducts.add(identity);
         const currentPrice = asNumber(row.current_price);
-        const regularPrice = asNumber(row.regular_price);
+        const regularPrice = asNumber(row.regular_price) ?? asNumber(row.reference_price);
         const advertisedPercent = asNumber(row.advertised_discount_percent);
         const computedPercent = regularPrice !== null && regularPrice > 0 && currentPrice !== null
           ? Number((((regularPrice - currentPrice) / regularPrice) * 100).toFixed(2))
@@ -136,7 +141,14 @@ export function buildKazakariSnapshot({ databasePath = DEFAULT_DB, generatedAt =
           upc: row.upc === null ? null : String(row.upc),
           productName: row.product_name === null ? null : String(row.product_name),
           category: row.category === null ? null : String(row.category),
-          imageUrl: null,
+          description: row.description === null ? null : String(row.description),
+          productUrl: row.product_url === null ? null : String(row.product_url),
+          imageUrl: row.image_url === null ? null : String(row.image_url),
+          imageSourceUrl: row.image_source_url === null ? null : String(row.image_source_url),
+          imageProvenance: row.image_provenance === null ? null : String(row.image_provenance),
+          imageVerifiedAt: row.image_verified_at === null ? null : String(row.image_verified_at),
+          referencePriceSource: row.reference_price_source === null ? null : String(row.reference_price_source),
+          referencePriceVerifiedAt: row.reference_price_verified_at === null ? null : String(row.reference_price_verified_at),
           storeId: row.store_identifier === null ? null : String(row.store_identifier),
           zip: row.zip === null ? null : String(row.zip),
           currentPrice,
@@ -194,6 +206,8 @@ export function buildKazakariSnapshot({ databasePath = DEFAULT_DB, generatedAt =
         storeSpecificProducts: products.filter((item) => item.priceScope === 'store-specific').length,
         qualifyingDeals: products.filter((item) => item.currentPrice === 0.01 || (item.discountPercent ?? -1) >= 50).length,
         pennyObservations: products.filter((item) => item.currentPrice === 0.01).length,
+        verifiedProductImages: products.filter((item) => item.imageUrl && item.imageProvenance === 'official-circular-item').length,
+        exactReferencePrices: products.filter((item) => item.regularPrice !== null).length,
       },
       publications,
       products,

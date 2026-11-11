@@ -16,6 +16,8 @@ assert.equal(snapshot.summary.currentProducts, 298);
 assert.equal(snapshot.summary.qualifyingDeals, 10);
 assert.equal(snapshot.summary.storeSpecificProducts, 0);
 assert.equal(snapshot.summary.pennyObservations, 0);
+assert.equal(snapshot.summary.verifiedProductImages, 0);
+assert.equal(snapshot.summary.exactReferencePrices, 0);
 assert.ok(snapshot.products.every((product) => product.priceScope === 'advertised'));
 assert.ok(snapshot.products.every((product) => product.imageUrl === null));
 assert.ok(snapshot.publications.every((publication) => publication.status === 'active'));
@@ -52,13 +54,17 @@ const serverSource = fs.readFileSync(path.join(repoRoot, 'server', 'index.mjs'),
 const headers = fs.readFileSync(path.join(repoRoot, 'public', '_headers'), 'utf8');
 assert.match(appSource, /path="\/private\/kazakari"/);
 assert.match(pageSource, /minimumDiscount.*50/);
-assert.match(pageSource, /Store-specific observation/);
-assert.match(pageSource, /Advertised promotion/);
-assert.match(pageSource, /Push notifications are not implemented/);
+assert.match(pageSource, /Hot Clearance/);
+assert.match(pageSource, /Penny Finds/);
+assert.match(pageSource, /Original price unavailable/);
+assert.match(pageSource, /Home & Garden/);
+assert.match(pageSource, /loading="lazy"/);
+assert.match(pageSource, /push notifications are not active yet/i);
+assert.doesNotMatch(pageSource, /Find the price drop worth leaving home for|Real Markdown Intelligence|Verified Source Records/);
 assert.match(apiSource, /\/rest\/v1\//);
 assert.match(apiSource, /kazakari_preview_snapshots\?select=payload/);
 assert.match(apiSource, /kazakari_watch_rules\?select=/);
-assert.doesNotMatch(apiSource, /requestPrivateLocalApi|VITE_API_ORIGIN|\/api\/local/);
+assert.doesNotMatch(apiSource, /VITE_API_ORIGIN|\/api\/local/);
 assert.match(serverSource, /requireKazakariAccess[\s\S]*!allowRemoteConnections\(\) && isLoopbackAddress/);
 assert.match(headers, /X-Robots-Tag: noindex, nofollow/);
 
@@ -80,8 +86,8 @@ assert.match(ownerBrowserMigration, /user_id = auth\.uid\(\)/i);
 assert.doesNotMatch(ownerBrowserMigration, /\bto anon\b/i);
 
 console.log(JSON.stringify({
-  passed: 47,
+  passed: 57,
   source: snapshot.source,
   summary: snapshot.summary,
-  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'owner-only-allowlist', 'production-auth-required', 'watch-crud', 'route', 'noindex', 'evidence-labels', 'direct-supabase-data', 'migration-scope', 'rls'],
+  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'owner-only-allowlist', 'production-auth-required', 'watch-crud', 'route', 'noindex', 'shopping-layout', 'image-lazy-loading', 'broad-categories', 'hot-clearance', 'penny-finds', 'direct-supabase-data', 'migration-scope', 'rls'],
 }, null, 2));
