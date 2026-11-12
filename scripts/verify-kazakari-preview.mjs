@@ -62,7 +62,17 @@ assert.match(pageSource, /<span>Hot Deals<\/span>/);
 assert.match(pageSource, /Penny Finds/);
 assert.match(pageSource, /Scanner coming soon/);
 assert.match(pageSource, /Filter &amp; Sort/);
-assert.match(pageSource, /Math\.max\(50/);
+assert.match(pageSource, /const hotDealComparator/);
+assert.match(pageSource, /discountPercent \?\? -1\) >= 50/);
+assert.match(pageSource, /const \[queries, setQueries\] = useState\(\{ hot: '', penny: '', discover: '', watches: '' \}\)/);
+assert.match(pageSource, /setMinimumDiscount\(0\)/);
+assert.match(pageSource, /setSort\('recent'\)/);
+assert.match(pageSource, /filtered\.slice\(0, visibleCount\)/);
+assert.match(pageSource, /Load more products/);
+assert.match(pageSource, /tab === 'discover' && filtersOpen/);
+assert.match(pageSource, /if \(nextTab === 'discover'\) clearFilters\(\)/);
+const hotListingSource = pageSource.match(/tab === 'hot'[\s\S]*?tab === 'discover'/)?.[0] || '';
+assert.doesNotMatch(hotListingSource, /kz-filter-toggle|Filter &amp; Sort/);
 assert.match(pageSource, /regularPrice != null && <del>/);
 assert.match(pageSource, /source advertised this discount but did not provide an exact original price/i);
 assert.match(pageSource, /Home & Garden/);
@@ -159,7 +169,7 @@ assert.match(familyMigration, /kazakari_android_releases/i);
 assert.doesNotMatch(familyMigration, /\bto anon\b/i);
 
 console.log(JSON.stringify({
-  passed: 117,
+  passed: 125,
   source: snapshot.source,
   summary: snapshot.summary,
   checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'explicit-family-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls', 'private-apk-bucket', 'authorized-release-function', 'short-lived-signed-download', 'release-integrity', 'native-back-bridge'],
