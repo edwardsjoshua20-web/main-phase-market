@@ -26,8 +26,14 @@ const initial = await evaluate(`({
   firstTitle:document.querySelector('.kz-penny-lead h3')?.textContent,
   overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,
   currentSelected:document.querySelector('.kz-penny-view-switch .active')?.textContent,
+  reportViewSelected:document.querySelector('.kz-penny-report-switch .active')?.textContent,
+  firstBadge:document.querySelector('.kz-penny-lead .kz-penny-evidence-badge')?.textContent,
+  firstCoverage:document.querySelector('.kz-penny-lead .kz-lead-evidence')?.textContent,
   firstBadgeInside:(()=>{const badge=document.querySelector('.kz-penny-evidence-badge')?.getBoundingClientRect();const image=document.querySelector('.kz-penny-lead .kz-image-wrap')?.getBoundingClientRect();return Boolean(badge&&image&&badge.left>=image.left&&badge.right<=image.right&&badge.top>=image.top&&badge.bottom<=image.bottom)})()
 })`);
+await evaluate(`document.querySelectorAll('.kz-penny-report-switch button')[1].click()`);
+await new Promise((resolve) => setTimeout(resolve, 150));
+const allKentuckyReports = await evaluate(`({toolbar:document.querySelector('.kz-penny-toolbar')?.textContent,count:document.querySelectorAll('.kz-penny-lead').length})`);
 const chooseState = async (value) => {
   await evaluate(`document.querySelector('.kz-penny-toolbar .kz-filter-toggle').click()`);
   await new Promise((resolve) => setTimeout(resolve, 100));
@@ -63,8 +69,8 @@ const allPredictions = await evaluate(`({toolbar:document.querySelector('.kz-pen
 const screenshot = await command('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
 const screenshotPath = path.join(output, 'phase9-penny-finds-384.png');
 fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
-const report = { initial, california, allStates, persisted, sorted, details, freshSession, kentuckyPredictions, allPredictions, screenshotPath };
-if (initial.title !== 'Penny Finds' || initial.currentSelected !== 'Current Pennies' || !initial.toolbar.includes('Kentucky · 9 current pennies') || initial.renderedLeads !== 9 || initial.removedCopy || initial.overflow || !initial.firstBadgeInside || !california.toolbar.includes('California') || !allStates.toolbar.includes('All States · 479 current pennies') || allStates.count !== 40 || !allStates.loadMore || !persisted.includes('All States') || sorted !== 'Packout 19.5 in. W x 14.7 in. H x 14.5 in. D Cabinet in Red (1-Piece)' || !details.open || !freshSession.includes('Kentucky · 9 current pennies') || !kentuckyPredictions.toolbar.includes('Kentucky · 0 predictions') || !kentuckyPredictions.empty.includes('No penny predictions') || !allPredictions.toolbar.includes('All States · 10 predictions') || allPredictions.count !== 10 || allPredictions.firstBadge !== 'Early signal') throw new Error(`Phase 9 UI verification failed: ${JSON.stringify(report)}`);
+const report = { initial, allKentuckyReports, california, allStates, persisted, sorted, details, freshSession, kentuckyPredictions, allPredictions, screenshotPath };
+if (initial.title !== 'Penny Finds' || initial.currentSelected !== 'Current Pennies' || initial.reportViewSelected !== 'Recent' || !initial.toolbar.includes('Kentucky · 3 current pennies') || initial.renderedLeads !== 3 || !['Confirmed','Observed','Reported','Verify'].includes(initial.firstBadge) || !initial.firstCoverage.includes('Kentucky: 1 report · Nationwide:') || initial.removedCopy || initial.overflow || !initial.firstBadgeInside || !allKentuckyReports.toolbar.includes('Kentucky · 9 current pennies') || allKentuckyReports.count !== 9 || !california.toolbar.includes('California') || !allStates.toolbar.includes('All States · 479 current pennies') || allStates.count !== 40 || !allStates.loadMore || !persisted.includes('All States') || sorted !== 'Packout 19.5 in. W x 14.7 in. H x 14.5 in. D Cabinet in Red (1-Piece)' || !details.open || !freshSession.includes('Kentucky · 3 current pennies') || !kentuckyPredictions.toolbar.includes('Kentucky · 0 predictions') || !kentuckyPredictions.empty.includes('No penny predictions') || !allPredictions.toolbar.includes('All States · 10 predictions') || allPredictions.count !== 10 || allPredictions.firstBadge !== 'Early signal') throw new Error(`Phase 10 UI verification failed: ${JSON.stringify(report)}`);
 fs.writeFileSync(path.join(output, 'phase9-penny-finds.json'), `${JSON.stringify(report, null, 2)}\n`);
 socket.close();
 console.log(JSON.stringify(report, null, 2));

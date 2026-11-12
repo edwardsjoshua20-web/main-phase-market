@@ -31,6 +31,7 @@ const stateLabel = (code) => code === 'ALL' ? 'All States' : stateNames[code] ||
 const reportDate = (value) => Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Date unavailable';
 const pennyCategory = (lead) => broadCategory(`${lead.category || ''} ${lead.productName || ''}`);
 const evidenceLabels = { 'register-confirmed': 'Register confirmed', 'retailer-price-observed': 'Retailer price observed', 'multiple-community-reports': 'Multiple community reports', 'single-community-report': 'Single community report', 'needs-verification': 'Needs verification' };
+const compactEvidenceLabels = { 'register-confirmed': 'Confirmed', 'retailer-price-observed': 'Observed', 'multiple-community-reports': 'Reported', 'single-community-report': 'Reported', 'needs-verification': 'Verify' };
 const freshnessLabels = { 'recently-reported': 'Recently reported', 'older-report': 'Older report', 'historical-report': 'Historical penny report' };
 const predictionLabels = { 'strong-candidate': 'Strong candidate', 'worth-watching': 'Worth watching', 'early-signal': 'Early signal' };
 const initialPennyState = () => {
@@ -99,9 +100,12 @@ function ProductItem({ product, onOpen, onWatch }) {
 
 function PennyLeadItem({ lead, onWatch, onOpen, selectedState }) {
   const watchProduct = lead.matchedProductId ? { retailer: 'home-depot', productId: lead.matchedProductId, productName: lead.productName, category: null } : null;
-  const stateReportCount = selectedState === 'ALL' ? Number(lead.reportCount || 0) : Number(lead.states?.[selectedState] || 0);
-  const coverage = selectedState === 'ALL' ? `${stateReportCount} report${stateReportCount === 1 ? '' : 's'} · ${Object.keys(lead.states || {}).length} states` : `${stateLabel(selectedState)} · ${stateReportCount} report${stateReportCount === 1 ? '' : 's'}`;
-  const evidence = evidenceLabels[lead.verification?.evidenceLabel] || 'Community report';
+  const nationwideReportCount = Number(lead.reportCount || 0);
+  const stateReportCount = selectedState === 'ALL' ? null : Number(lead.states?.[selectedState] || 0);
+  const coverage = selectedState === 'ALL'
+    ? `Nationwide: ${nationwideReportCount} report${nationwideReportCount === 1 ? '' : 's'} · ${Object.keys(lead.states || {}).length} states`
+    : `${stateLabel(selectedState)}: ${stateReportCount} report${stateReportCount === 1 ? '' : 's'} · Nationwide: ${nationwideReportCount}`;
+  const evidence = compactEvidenceLabels[lead.verification?.evidenceLabel] || 'Reported';
   const freshness = freshnessLabels[lead.verification?.freshness] || null;
   return <article className="kz-product kz-penny-lead">
     <button className="kz-image-action" onClick={() => onOpen(lead)} aria-label={`View evidence for ${lead.productName}`}><div className="kz-image-wrap kazakari-product-image"><ProductImage product={{ ...lead, productId: lead.productId || lead.sku }} /><div className={`kz-penny-evidence-badge ${lead.verification?.evidenceLabel === 'needs-verification' ? 'is-caution' : ''}`}>{evidence}</div></div></button>
@@ -198,6 +202,7 @@ export default function KazakariPagePhase7B() {
   const appInfo = useMemo(() => nativeAppInfo(), [androidApp]);
   const [snapshot, setSnapshot] = useState(null); const [watches, setWatches] = useState([]); const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [lastRefresh, setLastRefresh] = useState(null); const [refreshMessage, setRefreshMessage] = useState(''); const [error, setError] = useState(null); const [tab, setTab] = useState('hot');
   const [pennyView, setPennyView] = useState('current');
+  const [pennyReportView, setPennyReportView] = useState('recent');
   const [queries, setQueries] = useState({ hot: '', pennyCurrent: '', pennyPredictions: '', discover: '', watches: '' }); const queryKey = tab === 'penny' ? (pennyView === 'current' ? 'pennyCurrent' : 'pennyPredictions') : tab; const query = queries[queryKey] || ''; const setQuery = (value) => setQueries((current) => ({ ...current, [queryKey]: value }));
   const [retailer, setRetailer] = useState('all'); const [category, setCategory] = useState('All Products'); const [minimumDiscount, setMinimumDiscount] = useState(0); const [maximumPrice, setMaximumPrice] = useState(''); const [sort, setSort] = useState('recent'); const [visibleCount, setVisibleCount] = useState(40); const [visiblePennyCount, setVisiblePennyCount] = useState(40); const [filtersOpen, setFiltersOpen] = useState(false); const [pennyFiltersOpen, setPennyFiltersOpen] = useState(false); const [pennyState, setPennyState] = useState(initialPennyState); const [pennySort, setPennySort] = useState('best'); const [pennyCategoryFilter, setPennyCategoryFilter] = useState('All Products'); const [pennyRetailer, setPennyRetailer] = useState('all'); const [pennyEvidence, setPennyEvidence] = useState('all'); const [pennyFreshness, setPennyFreshness] = useState('all'); const [predictionSort, setPredictionSort] = useState('strength'); const [predictionCategory, setPredictionCategory] = useState('All Products'); const [predictionRetailer, setPredictionRetailer] = useState('all'); const [scannerNotice, setScannerNotice] = useState(false); const [selected, setSelected] = useState(null); const [selectedPennyLead, setSelectedPennyLead] = useState(null); const [selectedPrediction, setSelectedPrediction] = useState(null); const [watchPrefill, setWatchPrefill] = useState(null); const [creatingWatch, setCreatingWatch] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [updateState, setUpdateState] = useState(null);
   const [androidRelease, setAndroidRelease] = useState(null); const [releaseLoading, setReleaseLoading] = useState(false); const [releaseError, setReleaseError] = useState(''); const [downloading, setDownloading] = useState(false);
@@ -269,6 +274,7 @@ export default function KazakariPagePhase7B() {
     const freshnessWeight = { 'recently-reported': 3, 'older-report': 2, 'historical-report': 1 };
     return (snapshot?.phase9?.currentPennies || snapshot?.phase8?.pennyReports || [])
       .filter((lead) => pennyState === 'ALL' || Number(lead.states?.[pennyState] || 0) > 0)
+      .filter((lead) => pennyReportView === 'all' || lead.verification?.freshness === 'recently-reported')
       .filter((lead) => pennyCategoryFilter === 'All Products' || pennyCategory(lead) === pennyCategoryFilter)
       .filter((lead) => pennyRetailer === 'all' || (lead.retailer || 'home-depot') === pennyRetailer)
       .filter((lead) => pennyEvidence === 'all' || lead.verification?.evidenceLabel === pennyEvidence)
@@ -279,7 +285,7 @@ export default function KazakariPagePhase7B() {
         if (pennySort === 'recent') return Date.parse(right.lastObservedAt || 0) - Date.parse(left.lastObservedAt || 0) || Number(right.reportCount || 0) - Number(left.reportCount || 0);
         return (freshnessWeight[right.verification?.freshness] || 0) - (freshnessWeight[left.verification?.freshness] || 0) || (evidenceWeight[right.verification?.evidenceLabel] || 0) - (evidenceWeight[left.verification?.evidenceLabel] || 0) || Number(right.reportCount || 0) - Number(left.reportCount || 0);
       });
-  }, [snapshot, queries.pennyCurrent, pennyState, pennySort, pennyCategoryFilter, pennyRetailer, pennyEvidence, pennyFreshness]);
+  }, [snapshot, queries.pennyCurrent, pennyState, pennyReportView, pennySort, pennyCategoryFilter, pennyRetailer, pennyEvidence, pennyFreshness]);
   const pennyPredictions = useMemo(() => {
     const normalizedQuery = queries.pennyPredictions.trim().toLowerCase();
     const strengthWeight = { 'strong-candidate': 3, 'worth-watching': 2, 'early-signal': 1 };
@@ -291,13 +297,13 @@ export default function KazakariPagePhase7B() {
       .sort((left, right) => predictionSort === 'recent' ? Date.parse(right.lastObservedAt || 0) - Date.parse(left.lastObservedAt || 0) : (strengthWeight[right.strength] || 0) - (strengthWeight[left.strength] || 0) || Date.parse(right.lastObservedAt || 0) - Date.parse(left.lastObservedAt || 0));
   }, [snapshot, queries.pennyPredictions, pennyState, predictionSort, predictionCategory, predictionRetailer]);
   useEffect(() => { setVisibleCount(40); }, [queries.discover, retailer, category, minimumDiscount, maximumPrice, sort]);
-  useEffect(() => { setVisiblePennyCount(40); }, [queries.pennyCurrent, pennyState, pennySort, pennyCategoryFilter, pennyRetailer, pennyEvidence, pennyFreshness]);
+  useEffect(() => { setVisiblePennyCount(40); }, [queries.pennyCurrent, pennyState, pennyReportView, pennySort, pennyCategoryFilter, pennyRetailer, pennyEvidence, pennyFreshness]);
   const publicationFor = (product) => snapshot?.publications?.find((item) => item.id === product?.publicationId) || null;
   const startWatch = (product) => { setSelected(null); setSelectedPennyLead(null); setSelectedPrediction(null); setWatchPrefill(product); setTab('watches'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const createWatch = async (rule) => { setCreatingWatch(true); try { const created = await kazakariApi.createWatch(rule); setWatches((current) => [...current, created]); } finally { setCreatingWatch(false); } };
   const deleteWatch = async (id) => { await kazakariApi.deleteWatch(id); setWatches((current) => current.filter((item) => item.id !== id)); };
   const clearFilters = () => { setQueries((current) => ({ ...current, discover: '' })); setRetailer('all'); setCategory('All Products'); setMinimumDiscount(0); setMaximumPrice(''); setSort('recent'); setVisibleCount(40); };
-  const clearCurrentPennyFilters = () => { setPennyState('KY'); setPennySort('best'); setPennyCategoryFilter('All Products'); setPennyRetailer('all'); setPennyEvidence('all'); setPennyFreshness('all'); setVisiblePennyCount(40); };
+  const clearCurrentPennyFilters = () => { setPennyState('KY'); setPennyReportView('recent'); setPennySort('best'); setPennyCategoryFilter('All Products'); setPennyRetailer('all'); setPennyEvidence('all'); setPennyFreshness('all'); setVisiblePennyCount(40); };
   const clearPredictionFilters = () => { setPennyState('KY'); setPredictionSort('strength'); setPredictionCategory('All Products'); setPredictionRetailer('all'); };
   const changeTab = (nextTab) => { setQueries((current) => ({ ...current, [nextTab]: '' })); if (nextTab === 'discover') clearFilters(); setTab(nextTab); setFiltersOpen(false); setPennyFiltersOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const downloadAndroid = async () => { setDownloading(true); try { const release = await kazakariApi.androidDownload(); if (!release?.signedUrl) throw new Error('The private download link was not returned.'); window.location.assign(release.signedUrl); } catch (nextError) { setReleaseError(nextError.message); } finally { setDownloading(false); } };
@@ -326,9 +332,10 @@ export default function KazakariPagePhase7B() {
           <button className={pennyView === 'current' ? 'active' : ''} onClick={() => { setPennyView('current'); setPennyFiltersOpen(false); }}>Current Pennies</button>
           <button className={pennyView === 'predictions' ? 'active' : ''} onClick={() => { setPennyView('predictions'); setPennyFiltersOpen(false); }}>Penny Predictions</button>
         </div>
+        {pennyView === 'current' && <div className="kz-penny-report-switch" role="group" aria-label="Penny report age"><button className={pennyReportView === 'recent' ? 'active' : ''} onClick={() => setPennyReportView('recent')}>Recent</button><button className={pennyReportView === 'all' ? 'active' : ''} onClick={() => setPennyReportView('all')}>All Reports</button></div>}
         <div className="kz-penny-toolbar"><strong>{stateLabel(pennyState)} · {pennyView === 'current' ? `${currentPennies.length} current ${currentPennies.length === 1 ? 'penny' : 'pennies'}` : `${pennyPredictions.length} ${pennyPredictions.length === 1 ? 'prediction' : 'predictions'}`}</strong><button className="kz-filter-toggle" onClick={() => setPennyFiltersOpen(true)}><SlidersHorizontal /> Filter &amp; Sort</button></div>
         {pennyView === 'current' && (currentPennies.length === 0
-          ? <Empty title={`No penny reports in ${stateLabel(pennyState)}`} copy={pennyState === 'ALL' ? 'No penny evidence matches these filters.' : 'Try All States to browse every collected penny report.'} action={pennyState !== 'ALL' ? <button className="kz-text-button" onClick={() => setPennyState('ALL')}>View All States</button> : undefined} />
+          ? <Empty title={`No ${pennyReportView === 'recent' ? 'recent ' : ''}penny reports in ${stateLabel(pennyState)}`} copy={pennyReportView === 'recent' ? 'Older reports remain available in All Reports.' : pennyState === 'ALL' ? 'No penny evidence matches these filters.' : 'Try All States to browse every collected penny report.'} action={pennyReportView === 'recent' ? <button className="kz-text-button" onClick={() => setPennyReportView('all')}>View All Reports</button> : pennyState !== 'ALL' ? <button className="kz-text-button" onClick={() => setPennyState('ALL')}>View All States</button> : undefined} />
           : <><div className="kz-product-grid">{currentPennies.slice(0, visiblePennyCount).map((lead) => <PennyLeadItem key={`${lead.reportId}-${lead.sku || lead.productId}`} lead={lead} selectedState={pennyState} onOpen={setSelectedPennyLead} onWatch={startWatch} />)}</div>{visiblePennyCount < currentPennies.length && <button className="kz-primary kz-load-more" onClick={() => setVisiblePennyCount((count) => count + 40)}>Load more penny reports</button>}</>)}
         {pennyView === 'predictions' && (pennyPredictions.length === 0
           ? <Empty title={`No penny predictions in ${stateLabel(pennyState)}`} copy={pennyState === 'ALL' ? 'Kazakari does not have enough evidence for a prediction under these filters.' : 'Try All States to view products worth monitoring elsewhere.'} action={pennyState !== 'ALL' ? <button className="kz-text-button" onClick={() => setPennyState('ALL')}>View All States</button> : undefined} />

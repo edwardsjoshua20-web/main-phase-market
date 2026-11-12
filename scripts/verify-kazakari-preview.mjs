@@ -158,6 +158,7 @@ if (fs.existsSync(enrichedSnapshotPath)) {
   const kentuckyLeads = enriched.phase9.currentPennies.filter((report) => Number(report.states?.KY || 0) > 0);
   assert.equal(kentuckyLeads.length, 9);
   assert.equal(kentuckyLeads.reduce((total, report) => total + Number(report.states.KY), 0), 15);
+  assert.equal(kentuckyLeads.filter((report) => report.verification?.freshness === 'recently-reported').length, 3);
   assert.match(pageSource, /return saved \|\| session \|\| 'KY'/);
   assert.match(pageSource, /Most recently reported/);
   assert.match(pageSource, /Current Pennies/);
@@ -165,6 +166,10 @@ if (fs.existsSync(enrichedSnapshotPath)) {
   assert.match(pageSource, /Most reports/);
   assert.match(pageSource, /Needs verification/);
   assert.match(pageSource, /Historical penny report/);
+  assert.match(pageSource, /compactEvidenceLabels/);
+  assert.match(pageSource, /Nationwide:/);
+  assert.match(pageSource, /All Reports/);
+  assert.match(pageSource, /pennyReportView === 'all'/);
   assert.match(pageSource, /window\.sessionStorage\.setItem\('kazakari\.penny\.state'/);
   assert.doesNotMatch(pageSource, /Community leads, observed prices, and register-confirmed purchases remain separate\./);
   assert.doesNotMatch(pageSource, /Community-reported penny leads/);
