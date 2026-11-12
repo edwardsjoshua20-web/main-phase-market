@@ -16,6 +16,8 @@ await command('Page.enable'); await command('Runtime.enable');
 await command('Emulation.setDeviceMetricsOverride', { width: 384, height: 850, deviceScaleFactor: 3, mobile: true, screenWidth: 384, screenHeight: 850 });
 await command('Page.navigate', { url: 'http://127.0.0.1:4176/private/kazakari?preview=phase7b' });
 await new Promise((resolve) => setTimeout(resolve, 1800));
+await evaluate(`sessionStorage.removeItem('kazakari.penny.state');location.reload()`);
+await new Promise((resolve) => setTimeout(resolve, 900));
 await evaluate(`document.querySelectorAll('.kz-tabs button')[1].click()`);
 await new Promise((resolve) => setTimeout(resolve, 500));
 const initial = await evaluate(`({
@@ -31,6 +33,9 @@ const initial = await evaluate(`({
   firstCoverage:document.querySelector('.kz-penny-lead .kz-lead-evidence')?.textContent,
   firstBadgeInside:(()=>{const badge=document.querySelector('.kz-penny-evidence-badge')?.getBoundingClientRect();const image=document.querySelector('.kz-penny-lead .kz-image-wrap')?.getBoundingClientRect();return Boolean(badge&&image&&badge.left>=image.left&&badge.right<=image.right&&badge.top>=image.top&&badge.bottom<=image.bottom)})()
 })`);
+const initialScreenshot = await command('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
+const initialScreenshotPath = path.join(output, 'phase10-current-pennies-384.png');
+fs.writeFileSync(initialScreenshotPath, Buffer.from(initialScreenshot.data, 'base64'));
 await evaluate(`document.querySelectorAll('.kz-penny-report-switch button')[1].click()`);
 await new Promise((resolve) => setTimeout(resolve, 150));
 const allKentuckyReports = await evaluate(`({toolbar:document.querySelector('.kz-penny-toolbar')?.textContent,count:document.querySelectorAll('.kz-penny-lead').length})`);
@@ -69,7 +74,7 @@ const allPredictions = await evaluate(`({toolbar:document.querySelector('.kz-pen
 const screenshot = await command('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
 const screenshotPath = path.join(output, 'phase9-penny-finds-384.png');
 fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
-const report = { initial, allKentuckyReports, california, allStates, persisted, sorted, details, freshSession, kentuckyPredictions, allPredictions, screenshotPath };
+const report = { initial, initialScreenshotPath, allKentuckyReports, california, allStates, persisted, sorted, details, freshSession, kentuckyPredictions, allPredictions, screenshotPath };
 if (initial.title !== 'Penny Finds' || initial.currentSelected !== 'Current Pennies' || initial.reportViewSelected !== 'Recent' || !initial.toolbar.includes('Kentucky · 3 current pennies') || initial.renderedLeads !== 3 || !['Confirmed','Observed','Reported','Verify'].includes(initial.firstBadge) || !initial.firstCoverage.includes('Kentucky: 1 report · Nationwide:') || initial.removedCopy || initial.overflow || !initial.firstBadgeInside || !allKentuckyReports.toolbar.includes('Kentucky · 9 current pennies') || allKentuckyReports.count !== 9 || !california.toolbar.includes('California') || !allStates.toolbar.includes('All States · 479 current pennies') || allStates.count !== 40 || !allStates.loadMore || !persisted.includes('All States') || sorted !== 'Packout 19.5 in. W x 14.7 in. H x 14.5 in. D Cabinet in Red (1-Piece)' || !details.open || !freshSession.includes('Kentucky · 3 current pennies') || !kentuckyPredictions.toolbar.includes('Kentucky · 0 predictions') || !kentuckyPredictions.empty.includes('No penny predictions') || !allPredictions.toolbar.includes('All States · 10 predictions') || allPredictions.count !== 10 || allPredictions.firstBadge !== 'Early signal') throw new Error(`Phase 10 UI verification failed: ${JSON.stringify(report)}`);
 fs.writeFileSync(path.join(output, 'phase9-penny-finds.json'), `${JSON.stringify(report, null, 2)}\n`);
 socket.close();
