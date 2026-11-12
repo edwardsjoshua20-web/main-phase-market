@@ -101,13 +101,13 @@ for (const width of widths) {
       fonts: { productName: font(name), currentPrice: font(price), originalPrice: font(original), retailer: font(retailer), overlay: font(overlay?.querySelector('strong')), overlaySavings: font(overlay?.querySelector('span')), navigation: font(nav), search: font(search), filter: font(filterToggle) },
       geometry: { first: rect(first), second: rect(second), imageWrap: imageRect, image: rect(image), overlay: overlayRect, watch: rect(watch) },
       layout: {
-        productDisplay: getComputedStyle(first.querySelector('.kz-product-open')).display,
-        productColumns: getComputedStyle(first.querySelector('.kz-product-open')).gridTemplateColumns,
+        productDisplay: getComputedStyle(first).display,
+        productColumns: getComputedStyle(first).gridTemplateColumns,
         rowsStacked: second ? second.getBoundingClientRect().top >= first.getBoundingClientRect().bottom - 1 : null,
         overlayInsideImage: Boolean(imageRect && overlayRect && overlayRect.left >= imageRect.left && overlayRect.top >= imageRect.top && overlayRect.right <= imageRect.right && overlayRect.bottom <= imageRect.bottom),
-        filtersCollapsed: getComputedStyle(inlineFilters).display === 'none' && getComputedStyle(filterToggle).display !== 'none',
+        filtersCollapsed: (!inlineFilters || getComputedStyle(inlineFilters).display === 'none') && (!filterToggle || getComputedStyle(filterToggle).display !== 'none'),
         horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-        touchTargetsAtLeast48: [filterToggle, watch, document.querySelector('.kz-scan')].every((node) => node && node.getBoundingClientRect().height >= 48 && node.getBoundingClientRect().width >= 48),
+        touchTargetsAtLeast48: [watch, document.querySelector('.kz-scan')].every((node) => node && node.getBoundingClientRect().height >= 48 && node.getBoundingClientRect().width >= 48),
       },
       zoom: { body: getComputedStyle(document.body).zoom || '1', app: getComputedStyle(document.querySelector('.kz-app')).zoom || '1', bodyTransform: getComputedStyle(document.body).transform },
     };

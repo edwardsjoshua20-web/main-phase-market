@@ -138,6 +138,16 @@ if (fs.existsSync(enrichedSnapshotPath)) {
   assert.equal(enriched.summary.exactReferencePrices, 79);
   assert.equal(enriched.products.filter((product) => product.regularPrice != null).length, 79);
   assert.equal(enriched.products.filter((product) => (product.discountPercent ?? -1) >= 50 || product.currentPrice === 0.01).length, 10);
+  assert.equal(enriched.schemaVersion, 2);
+  assert.equal(enriched.phase8.summary.pennyReports, 479);
+  assert.equal(enriched.phase8.summary.exactMatches, 1);
+  assert.equal(enriched.phase8.summary.storeSpecificEvidence, 0);
+  assert.equal(enriched.phase8.summary.independentlyVerifiedPrices, 0);
+  assert.ok(enriched.phase8.pennyReports.every((report) => report.evidenceCategory === 'community-reported-penny'));
+  assert.ok(enriched.phase8.pennyReports.every((report) => report.relevantStore === null));
+  assert.ok(enriched.phase8.pennyReports.every((report) => report.estimatedTransitionWindow === null));
+  assert.match(pageSource, /Community-reported penny leads/);
+  assert.match(pageSource, /No store IDs were supplied by this feed/);
 }
 
 const ownerBrowserMigration = fs.readFileSync(path.join(repoRoot, 'supabase', 'migrations', '20261111213000_allow_owner_kazakari_browser_access.sql'), 'utf8');
@@ -169,8 +179,8 @@ assert.match(familyMigration, /kazakari_android_releases/i);
 assert.doesNotMatch(familyMigration, /\bto anon\b/i);
 
 console.log(JSON.stringify({
-  passed: 125,
+  passed: 135,
   source: snapshot.source,
   summary: snapshot.summary,
-  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'explicit-family-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls', 'private-apk-bucket', 'authorized-release-function', 'short-lived-signed-download', 'release-integrity', 'native-back-bridge'],
+  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'explicit-family-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'community-penny-evidence', 'exact-identifier-matching', 'no-store-inference', 'no-prediction-date-fabrication', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls', 'private-apk-bucket', 'authorized-release-function', 'short-lived-signed-download', 'release-integrity', 'native-back-bridge'],
 }, null, 2));

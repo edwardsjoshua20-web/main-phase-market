@@ -109,6 +109,7 @@
     "deck:modular:verify": "node scripts/verify-deck-modular-workflow.mjs",
     "deck:library:seed": "node scripts/seed-deck-library-examples.mjs",
     "kazakari:snapshot": "node scripts/build-kazakari-preview-snapshot.mjs",
+    "kazakari:phase8:merge": "node scripts/merge-kazakari-phase8.mjs",
     "kazakari:sync": "node scripts/sync-kazakari-preview-supabase.mjs",
     "kazakari:verify": "node scripts/verify-kazakari-preview.mjs",
     "kazakari:android:publish": "node scripts/publish-kazakari-android-release.mjs"
