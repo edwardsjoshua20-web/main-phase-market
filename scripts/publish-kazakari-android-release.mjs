@@ -6,7 +6,7 @@ const manifestArgument = process.argv.find((value) => value.startsWith('--manife
 if (!manifestArgument) throw new Error('Use --manifest=D:\\path\\to\\release-manifest.local.json');
 
 const manifestPath = path.resolve(manifestArgument.slice('--manifest='.length));
-const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8').replace(/^\uFEFF/, ''));
 const apkPath = path.resolve(path.dirname(manifestPath), 'releases', manifest.fileName);
 const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const serviceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
