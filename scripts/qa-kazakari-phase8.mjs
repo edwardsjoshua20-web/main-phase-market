@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const output = path.resolve(process.argv[2] || 'D:\\Projects\\Penny-Hunter\\verification\\phase8-mobile');
+const output = path.resolve(process.argv[2] || 'D:\\Projects\\Penny-Hunter\\verification\\phase9-mobile');
 fs.mkdirSync(output, { recursive: true });
 const targets = await fetch('http://127.0.0.1:9337/json').then((response) => response.json());
 const target = targets.find((item) => item.type === 'page');
@@ -25,6 +25,7 @@ const initial = await evaluate(`({
   removedCopy:document.body.textContent.includes('Community-reported penny leads')||document.body.textContent.includes('No store IDs were supplied by this feed'),
   firstTitle:document.querySelector('.kz-penny-lead h3')?.textContent,
   overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,
+  currentSelected:document.querySelector('.kz-penny-view-switch .active')?.textContent,
   firstBadgeInside:(()=>{const badge=document.querySelector('.kz-penny-evidence-badge')?.getBoundingClientRect();const image=document.querySelector('.kz-penny-lead .kz-image-wrap')?.getBoundingClientRect();return Boolean(badge&&image&&badge.left>=image.left&&badge.right<=image.right&&badge.top>=image.top&&badge.bottom<=image.bottom)})()
 })`);
 const chooseState = async (value) => {
@@ -53,11 +54,17 @@ await new Promise((resolve) => setTimeout(resolve, 900));
 await evaluate(`document.querySelectorAll('.kz-tabs button')[1].click()`);
 await new Promise((resolve) => setTimeout(resolve, 250));
 const freshSession = await evaluate(`document.querySelector('.kz-penny-toolbar')?.textContent`);
+await evaluate(`document.querySelectorAll('.kz-penny-view-switch button')[1].click()`);
+await new Promise((resolve) => setTimeout(resolve, 150));
+const kentuckyPredictions = await evaluate(`({toolbar:document.querySelector('.kz-penny-toolbar')?.textContent,empty:document.querySelector('.kz-state strong')?.textContent})`);
+await evaluate(`document.querySelector('.kz-state .kz-text-button').click()`);
+await new Promise((resolve) => setTimeout(resolve, 150));
+const allPredictions = await evaluate(`({toolbar:document.querySelector('.kz-penny-toolbar')?.textContent,count:document.querySelectorAll('.kz-prediction').length,firstBadge:document.querySelector('.kz-prediction .kz-penny-evidence-badge')?.textContent})`);
 const screenshot = await command('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
-const screenshotPath = path.join(output, 'phase8-penny-finds-384.png');
+const screenshotPath = path.join(output, 'phase9-penny-finds-384.png');
 fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
-const report = { initial, california, allStates, persisted, sorted, details, freshSession, screenshotPath };
-if (initial.title !== 'Penny Finds' || !initial.toolbar.includes('Kentucky · 9 penny leads') || initial.renderedLeads !== 9 || initial.removedCopy || initial.overflow || !initial.firstBadgeInside || !california.toolbar.includes('California') || !allStates.toolbar.includes('All States · 479 penny leads') || allStates.count !== 40 || !allStates.loadMore || !persisted.includes('All States') || sorted !== 'Packout 19.5 in. W x 14.7 in. H x 14.5 in. D Cabinet in Red (1-Piece)' || !details.open || !details.evidence || !freshSession.includes('Kentucky · 9 penny leads')) throw new Error(`Phase 8 UI verification failed: ${JSON.stringify(report)}`);
-fs.writeFileSync(path.join(output, 'phase8-penny-finds.json'), `${JSON.stringify(report, null, 2)}\n`);
+const report = { initial, california, allStates, persisted, sorted, details, freshSession, kentuckyPredictions, allPredictions, screenshotPath };
+if (initial.title !== 'Penny Finds' || initial.currentSelected !== 'Current Pennies' || !initial.toolbar.includes('Kentucky · 9 current pennies') || initial.renderedLeads !== 9 || initial.removedCopy || initial.overflow || !initial.firstBadgeInside || !california.toolbar.includes('California') || !allStates.toolbar.includes('All States · 479 current pennies') || allStates.count !== 40 || !allStates.loadMore || !persisted.includes('All States') || sorted !== 'Packout 19.5 in. W x 14.7 in. H x 14.5 in. D Cabinet in Red (1-Piece)' || !details.open || !freshSession.includes('Kentucky · 9 current pennies') || !kentuckyPredictions.toolbar.includes('Kentucky · 0 predictions') || !kentuckyPredictions.empty.includes('No penny predictions') || !allPredictions.toolbar.includes('All States · 10 predictions') || allPredictions.count !== 10 || allPredictions.firstBadge !== 'Early signal') throw new Error(`Phase 9 UI verification failed: ${JSON.stringify(report)}`);
+fs.writeFileSync(path.join(output, 'phase9-penny-finds.json'), `${JSON.stringify(report, null, 2)}\n`);
 socket.close();
 console.log(JSON.stringify(report, null, 2));
