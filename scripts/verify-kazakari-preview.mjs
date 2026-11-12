@@ -117,6 +117,9 @@ assert.match(apiSource, /\/rest\/v1\//);
 assert.match(apiSource, /kazakari_preview_snapshots\?select=payload/);
 assert.match(apiSource, /kazakari_watch_rules\?select=/);
 assert.match(apiSource, /functions\/v1\/kazakari-android-release/);
+assert.match(apiSource, /grant_type=refresh_token/);
+assert.match(apiSource, /tokenExpiresSoon/);
+assert.match(apiSource, /response\.status === 401[\s\S]*refreshAccessToken/);
 assert.doesNotMatch(apiSource, /VITE_API_ORIGIN|\/api\/local/);
 assert.match(serverSource, /requireKazakariAccess[\s\S]*!allowRemoteConnections\(\) && isLoopbackAddress/);
 assert.match(headers, /X-Robots-Tag: noindex, nofollow/);
@@ -180,8 +183,8 @@ assert.match(familyMigration, /kazakari_android_releases/i);
 assert.doesNotMatch(familyMigration, /\bto anon\b/i);
 
 console.log(JSON.stringify({
-  passed: 135,
+  passed: 138,
   source: snapshot.source,
   summary: snapshot.summary,
-  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'explicit-family-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'community-penny-evidence', 'exact-identifier-matching', 'no-store-inference', 'no-prediction-date-fabrication', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls', 'private-apk-bucket', 'authorized-release-function', 'short-lived-signed-download', 'release-integrity', 'native-back-bridge'],
+  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'explicit-family-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'community-penny-evidence', 'exact-identifier-matching', 'no-store-inference', 'no-prediction-date-fabrication', 'reference-price-integrity', 'direct-supabase-data', 'session-refresh', 'release-401-retry', 'migration-scope', 'rls', 'private-apk-bucket', 'authorized-release-function', 'short-lived-signed-download', 'release-integrity', 'native-back-bridge'],
 }, null, 2));

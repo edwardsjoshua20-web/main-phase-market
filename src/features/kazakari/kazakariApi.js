@@ -13,13 +13,61 @@ const supabaseAnonKey = String(
   (/** @type {{ env?: Record<string, string> }} */ (import.meta).env?.VITE_SUPABASE_ANON_KEY) || fallbackSupabaseAnonKey
 ).trim();
 
-function getAccessToken() {
+function getStoredSession() {
   if (typeof window === 'undefined') return '';
   try {
-    return JSON.parse(window.localStorage.getItem(sessionKey) || 'null')?.access_token || '';
+    return JSON.parse(window.localStorage.getItem(sessionKey) || 'null');
   } catch {
-    return '';
+    return null;
   }
+}
+
+function getAccessToken() { return getStoredSession()?.access_token || ''; }
+
+function tokenExpiresSoon(token) {
+  try {
+    const encoded = String(token).split('.')[1].replaceAll('-', '+').replaceAll('_', '/');
+    const payload = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '=')));
+    return !payload?.exp || Number(payload.exp) * 1000 <= Date.now() + 60_000;
+  } catch { return true; }
+}
+
+let refreshPromise = null;
+async function refreshAccessToken() {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    const current = getStoredSession();
+    if (!current?.refresh_token) {
+      const error = new Error('Your session expired. Please sign in again.');
+      error.status = 401;
+      throw error;
+    }
+    const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { apikey: supabaseAnonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: current.refresh_token }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.access_token) {
+      const error = new Error('Your session expired. Please sign in again.');
+      error.status = 401;
+      throw error;
+    }
+    const session = { ...current, ...payload };
+    window.localStorage.setItem(sessionKey, JSON.stringify(session));
+    return session.access_token;
+  })().finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
+async function validAccessToken() {
+  const token = getAccessToken();
+  if (!token) {
+    const error = new Error('Please sign in first.');
+    error.status = 401;
+    throw error;
+  }
+  return tokenExpiresSoon(token) ? refreshAccessToken() : token;
 }
 
 async function request(path, options = {}) {
@@ -55,21 +103,11 @@ async function request(path, options = {}) {
 }
 
 async function invokeReleaseFunction(action) {
-  const token = getAccessToken();
-  if (!token) {
-    const error = new Error('Please sign in first.');
-    error.status = 401;
-    throw error;
-  }
-  const response = await fetch(`${supabaseUrl}/functions/v1/kazakari-android-release`, {
-    method: 'POST',
-    headers: {
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ action }),
+  const call = (token) => fetch(`${supabaseUrl}/functions/v1/kazakari-android-release`, {
+    method: 'POST', headers: { apikey: supabaseAnonKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
   });
+  let response = await call(await validAccessToken());
+  if (response.status === 401 && getStoredSession()?.refresh_token) response = await call(await refreshAccessToken());
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     const error = new Error(payload?.error || `Android release request failed: ${response.status}`);
