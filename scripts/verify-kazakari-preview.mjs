@@ -142,6 +142,7 @@ if (fs.existsSync(enrichedSnapshotPath)) {
   assert.equal(enriched.phase8.summary.pennyReports, 479);
   assert.equal(enriched.phase8.summary.exactMatches, 1);
   assert.equal(enriched.phase8.summary.storeSpecificEvidence, 0);
+  assert.equal(enriched.phase8.summary.pennyLeadReferencePrices, 366);
   assert.equal(enriched.phase8.summary.independentlyVerifiedPrices, 0);
   assert.ok(enriched.phase8.pennyReports.every((report) => report.evidenceCategory === 'community-reported-penny'));
   assert.ok(enriched.phase8.pennyReports.every((report) => report.relevantStore === null));
