@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const snapshotPath = path.resolve(process.argv[2] || 'D:\\main-phase-market-kazakari-deploy\\server\\data\\kazakari-preview.json');
+const phase12Path = path.resolve(process.argv[3] || 'D:\\Projects\\Penny-Hunter\\data\\phase12-export.json');
+if (!/^D:\\/i.test(snapshotPath) || !/^D:\\/i.test(phase12Path)) throw new Error('Kazakari Phase 12 files must remain on D:.');
+const snapshot = JSON.parse(fs.readFileSync(snapshotPath, 'utf8'));
+const phase12 = JSON.parse(fs.readFileSync(phase12Path, 'utf8'));
+snapshot.phase12 = phase12;
+snapshot.summary = snapshot.summary || {};
+snapshot.summary.proofBackedStorePriceObservations = Number(phase12.summary?.storeSpecificObservations || 0);
+snapshot.summary.proofBackedRecentObservations = Number(phase12.summary?.recentWithin30Days || 0);
+snapshot.summary.proofBackedDiscountedObservations = Number(phase12.summary?.discountedObservations || 0);
+snapshot.summary.proofBackedKentuckyObservations = Number(phase12.summary?.kentuckyObservations || 0);
+snapshot.summary.retailerOfficialStoreIds = Number(phase12.summary?.retailerOfficialStoreIds || 0);
+if (Date.parse(phase12.generatedAt) > Date.parse(snapshot.generatedAt || 0)) snapshot.generatedAt = phase12.generatedAt;
+const temp = `${snapshotPath}.${process.pid}.tmp`;
+fs.writeFileSync(temp, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
+fs.renameSync(temp, snapshotPath);
+console.log(JSON.stringify({ snapshotPath, phase12: phase12.summary }, null, 2));
