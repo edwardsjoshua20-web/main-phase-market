@@ -19,21 +19,45 @@ await new Promise((resolve) => setTimeout(resolve, 1800));
 await evaluate(`document.querySelectorAll('.kz-tabs button')[1].click()`);
 await new Promise((resolve) => setTimeout(resolve, 500));
 const initial = await evaluate(`({
-  heading:[...document.querySelectorAll('.kz-penny-group h2')].map((node)=>node.textContent),
+  title:document.querySelector('.kz-page-heading h1')?.textContent,
+  toolbar:document.querySelector('.kz-penny-toolbar')?.textContent,
   renderedLeads:document.querySelectorAll('.kz-penny-lead').length,
-  disclaimer:document.querySelector('.kz-penny-disclaimer')?.textContent,
-  loadMore:Boolean(document.querySelector('.kz-load-more')),
+  removedCopy:document.body.textContent.includes('Community-reported penny leads')||document.body.textContent.includes('No store IDs were supplied by this feed'),
+  firstTitle:document.querySelector('.kz-penny-lead h3')?.textContent,
   overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,
   firstBadgeInside:(()=>{const badge=document.querySelector('.kz-penny-evidence-badge')?.getBoundingClientRect();const image=document.querySelector('.kz-penny-lead .kz-image-wrap')?.getBoundingClientRect();return Boolean(badge&&image&&badge.left>=image.left&&badge.right<=image.right&&badge.top>=image.top&&badge.bottom<=image.bottom)})()
 })`);
-await evaluate(`(()=>{const input=document.querySelector('.kz-search input');const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(input,'327716118');input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
-await new Promise((resolve) => setTimeout(resolve, 300));
-const exact = await evaluate(`({count:document.querySelectorAll('.kz-penny-lead').length,text:document.querySelector('.kz-penny-lead')?.textContent||''})`);
+const chooseState = async (value) => {
+  await evaluate(`document.querySelector('.kz-penny-toolbar .kz-filter-toggle').click()`);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  await evaluate(`(()=>{const select=document.querySelector('.kz-penny-sheet-backdrop select');const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(select,${JSON.stringify(value)});select.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('.kz-penny-sheet-backdrop .kz-primary').click()})()`);
+  await new Promise((resolve) => setTimeout(resolve, 200));
+};
+await chooseState('CA');
+const california = await evaluate(`({toolbar:document.querySelector('.kz-penny-toolbar')?.textContent,count:document.querySelectorAll('.kz-penny-lead').length})`);
+await chooseState('ALL');
+const allStates = await evaluate(`({toolbar:document.querySelector('.kz-penny-toolbar')?.textContent,count:document.querySelectorAll('.kz-penny-lead').length,loadMore:Boolean(document.querySelector('.kz-load-more'))})`);
+await evaluate(`document.querySelectorAll('.kz-tabs button')[0].click();document.querySelectorAll('.kz-tabs button')[1].click()`);
+await new Promise((resolve) => setTimeout(resolve, 150));
+const persisted = await evaluate(`document.querySelector('.kz-penny-toolbar')?.textContent`);
+await evaluate(`document.querySelector('.kz-penny-toolbar .kz-filter-toggle').click()`);
+await new Promise((resolve) => setTimeout(resolve, 100));
+await evaluate(`(()=>{const selects=document.querySelectorAll('.kz-penny-sheet-backdrop select');const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(selects[1],'reports');selects[1].dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('.kz-penny-sheet-backdrop .kz-primary').click()})()`);
+await new Promise((resolve) => setTimeout(resolve, 150));
+const sorted = await evaluate(`document.querySelector('.kz-penny-lead h3')?.textContent`);
+await evaluate(`document.querySelector('.kz-penny-lead .kz-image-action').click()`);
+await new Promise((resolve) => setTimeout(resolve, 100));
+const details = await evaluate(`({open:Boolean(document.querySelector('#kz-penny-detail-title')),evidence:document.querySelector('.kz-drawer')?.textContent.includes('Community-reported penny')})`);
+await evaluate(`document.querySelector('.kz-drawer-head button').click();sessionStorage.removeItem('kazakari.penny.state');location.reload()`);
+await new Promise((resolve) => setTimeout(resolve, 900));
+await evaluate(`document.querySelectorAll('.kz-tabs button')[1].click()`);
+await new Promise((resolve) => setTimeout(resolve, 250));
+const freshSession = await evaluate(`document.querySelector('.kz-penny-toolbar')?.textContent`);
 const screenshot = await command('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
 const screenshotPath = path.join(output, 'phase8-penny-finds-384.png');
 fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
-const report = { initial, exact, screenshotPath };
-if (!initial.heading.includes('Community-reported penny leads') || initial.renderedLeads !== 40 || !initial.loadMore || initial.overflow || !initial.firstBadgeInside || exact.count !== 1 || !exact.text.includes('Exact catalog match')) throw new Error(`Phase 8 UI verification failed: ${JSON.stringify(report)}`);
+const report = { initial, california, allStates, persisted, sorted, details, freshSession, screenshotPath };
+if (initial.title !== 'Penny Finds' || !initial.toolbar.includes('Kentucky · 9 penny leads') || initial.renderedLeads !== 9 || initial.removedCopy || initial.overflow || !initial.firstBadgeInside || !california.toolbar.includes('California') || !allStates.toolbar.includes('All States · 479 penny leads') || allStates.count !== 40 || !allStates.loadMore || !persisted.includes('All States') || sorted !== 'Packout 19.5 in. W x 14.7 in. H x 14.5 in. D Cabinet in Red (1-Piece)' || !details.open || !details.evidence || !freshSession.includes('Kentucky · 9 penny leads')) throw new Error(`Phase 8 UI verification failed: ${JSON.stringify(report)}`);
 fs.writeFileSync(path.join(output, 'phase8-penny-finds.json'), `${JSON.stringify(report, null, 2)}\n`);
 socket.close();
 console.log(JSON.stringify(report, null, 2));

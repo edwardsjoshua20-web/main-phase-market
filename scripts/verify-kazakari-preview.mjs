@@ -150,8 +150,16 @@ if (fs.existsSync(enrichedSnapshotPath)) {
   assert.ok(enriched.phase8.pennyReports.every((report) => report.evidenceCategory === 'community-reported-penny'));
   assert.ok(enriched.phase8.pennyReports.every((report) => report.relevantStore === null));
   assert.ok(enriched.phase8.pennyReports.every((report) => report.estimatedTransitionWindow === null));
-  assert.match(pageSource, /Community-reported penny leads/);
-  assert.match(pageSource, /No store IDs were supplied by this feed/);
+  const kentuckyLeads = enriched.phase8.pennyReports.filter((report) => Number(report.states?.KY || 0) > 0);
+  assert.equal(kentuckyLeads.length, 9);
+  assert.equal(kentuckyLeads.reduce((total, report) => total + Number(report.states.KY), 0), 15);
+  assert.match(pageSource, /return saved \|\| session \|\| 'KY'/);
+  assert.match(pageSource, /Most recently reported/);
+  assert.match(pageSource, /Most community reports/);
+  assert.match(pageSource, /window\.sessionStorage\.setItem\('kazakari\.penny\.state'/);
+  assert.doesNotMatch(pageSource, /Community leads, observed prices, and register-confirmed purchases remain separate\./);
+  assert.doesNotMatch(pageSource, /Community-reported penny leads/);
+  assert.doesNotMatch(pageSource, /No store IDs were supplied by this feed/);
 }
 
 const ownerBrowserMigration = fs.readFileSync(path.join(repoRoot, 'supabase', 'migrations', '20261111213000_allow_owner_kazakari_browser_access.sql'), 'utf8');
