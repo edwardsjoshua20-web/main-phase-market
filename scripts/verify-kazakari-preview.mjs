@@ -50,15 +50,15 @@ assert.equal((await owner.listWatches(actor)).length, 0);
 
 const appSource = fs.readFileSync(path.join(repoRoot, 'src', 'App.jsx'), 'utf8');
 const indexSource = fs.readFileSync(path.join(repoRoot, 'index.html'), 'utf8');
-const pageSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'KazakariPage.jsx'), 'utf8');
+const pageSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'KazakariPagePhase7B.jsx'), 'utf8');
 const apiSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'kazakariApi.js'), 'utf8');
-const cssSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'kazakari.css'), 'utf8');
+const cssSource = fs.readFileSync(path.join(repoRoot, 'src', 'features', 'kazakari', 'kazakari-phase7b.css'), 'utf8');
 const serverSource = fs.readFileSync(path.join(repoRoot, 'server', 'index.mjs'), 'utf8');
 const headers = fs.readFileSync(path.join(repoRoot, 'public', '_headers'), 'utf8');
 assert.match(appSource, /path="\/private\/kazakari"/);
 assert.match(indexSource, /name="viewport" content="width=device-width, initial-scale=1\.0"/);
 assert.match(pageSource, /minimumDiscount.*50/);
-assert.match(pageSource, /🔥 Hot Deals/);
+assert.match(pageSource, /<span>Hot Deals<\/span>/);
 assert.match(pageSource, /Penny Finds/);
 assert.match(pageSource, /Scanner coming soon/);
 assert.match(pageSource, /Filter &amp; Sort/);
@@ -70,20 +70,38 @@ assert.match(pageSource, /loading="lazy"/);
 assert.match(pageSource, /kazakari-product-image[^>]*><ProductImage product=\{product\} \/><DiscountOverlay product=\{product\} \/>/);
 assert.match(pageSource, /saved != null && <span>Save \{money\(saved\)\}<\/span>/);
 assert.match(pageSource, /push notifications are not active yet/i);
-assert.match(pageSource, /Download Kazakari for Android/);
+assert.match(pageSource, /function WebsiteDownload/);
 assert.match(pageSource, /__kazakariHandleNativeBack/);
+assert.match(pageSource, /Check for updates/);
+assert.match(pageSource, /Kazakari update available/);
+assert.match(pageSource, /You're up to date/);
+assert.match(pageSource, /downloadAndInstall/);
+assert.match(pageSource, /Refresh product data/);
+assert.match(pageSource, /Latest saved product data loaded/);
+assert.match(pageSource, /Expand product title/);
+assert.match(pageSource, /Collapse product title/);
+assert.match(pageSource, /<span className="kz-retailer">Home Depot<\/span>/);
+assert.match(pageSource, /<summary>More details<\/summary>/);
+assert.match(pageSource, /<span>Hot Deals<\/span>/);
+assert.match(pageSource, /<span>Penny Finds<\/span>/);
+assert.match(pageSource, /<span>All Products<\/span>/);
+assert.match(pageSource, /<span>Watches<\/span>/);
+assert.doesNotMatch(pageSource, /Home Depot · \{scopeLabel\(product\)\}/);
 assert.doesNotMatch(pageSource, /Find the price drop worth leaving home for|Real Markdown Intelligence|Verified Source Records/);
-assert.match(cssSource, /grid-template-columns:clamp\(125px,34vw,140px\) minmax\(0,1fr\)/);
+assert.match(cssSource, /grid-template-columns:clamp\(120px,34vw,136px\) minmax\(0,1fr\)/);
 assert.match(cssSource, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
-assert.match(cssSource, /\.kz-sheet-backdrop\{[^}]*display:flex/);
-assert.match(cssSource, /min-width:1181px[^}]*any-pointer:fine/);
+assert.match(cssSource, /\.kz-sheet-backdrop,\.kz-menu-backdrop,\.kz-dialog-backdrop\{[^}]*display:flex/);
+assert.match(cssSource, /min-width:900px[^}]*any-pointer:fine/);
 assert.match(cssSource, /\.kz-discount-overlay\{position:absolute;top:6px;left:6px;z-index:2/);
-assert.match(cssSource, /\.kz-product h3\{font-size:18px/);
+assert.match(cssSource, /\.kz-title-row h3\{[^}]*font-size:18px/);
 assert.match(cssSource, /\.kz-price-main strong\{font:800 26px/);
 assert.match(cssSource, /\.kz-retailer\{[^}]*font-size:14px/);
 assert.match(cssSource, /\.kz-discount-overlay strong\{font-size:14px/);
 assert.match(cssSource, /\.kz-tabs button\{[^}]*font-size:15px/);
 assert.match(cssSource, /\.kz-search input\{[^}]*font-size:16px/);
+assert.match(cssSource, /\.kz-tabs\{position:fixed/);
+assert.match(cssSource, /-webkit-line-clamp:3/);
+assert.match(cssSource, /\.kz-web-download\{min-height:48px/);
 assert.match(apiSource, /runningOnLocalHost[\s\S]*requestPrivateLocalApi\('\/kazakari\/snapshot'\)/);
 assert.match(apiSource, /\/rest\/v1\//);
 assert.match(apiSource, /kazakari_preview_snapshots\?select=payload/);
@@ -141,7 +159,7 @@ assert.match(familyMigration, /kazakari_android_releases/i);
 assert.doesNotMatch(familyMigration, /\bto anon\b/i);
 
 console.log(JSON.stringify({
-  passed: 95,
+  passed: 117,
   source: snapshot.source,
   summary: snapshot.summary,
   checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'explicit-family-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls', 'private-apk-bucket', 'authorized-release-function', 'short-lived-signed-download', 'release-integrity', 'native-back-bridge'],

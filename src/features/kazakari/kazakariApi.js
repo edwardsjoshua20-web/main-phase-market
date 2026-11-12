@@ -31,6 +31,7 @@ async function request(path, options = {}) {
   }
 
   const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
+    cache: 'no-store',
     ...options,
     headers: {
       apikey: supabaseAnonKey,

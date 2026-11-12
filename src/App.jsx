@@ -39,7 +39,7 @@ import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-d
 import PageNotFound from './lib/PageNotFound';
 import { AppAuthProvider, useAppAuth } from '@/lib/AppAuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-import KazakariPage from '@/features/kazakari/KazakariPage';
+import KazakariPage from '@/features/kazakari/KazakariPagePhase7B';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];

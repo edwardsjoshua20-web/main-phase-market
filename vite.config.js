@@ -56,6 +56,21 @@ function copyFilteredPublicAssetsPlugin({ enabled, rootDir }) {
   };
 }
 
+function kazakariDevelopmentPreviewPlugin({ rootDir }) {
+  return {
+    name: 'kazakari-development-preview',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/__kazakari_phase7b_snapshot', (_request, response) => {
+        const snapshotPath = path.resolve(rootDir, 'server', 'data', 'kazakari-preview.json');
+        response.setHeader('Content-Type', 'application/json');
+        response.setHeader('Cache-Control', 'no-store');
+        fs.createReadStream(snapshotPath).pipe(response);
+      });
+    }
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -68,6 +83,7 @@ export default defineConfig(({ mode }) => {
     logLevel: 'error',
     plugins: [
       react(),
+      kazakariDevelopmentPreviewPlugin({ rootDir: __dirname }),
       copyFilteredPublicAssetsPlugin({
         enabled: externalizePublicData,
         rootDir: __dirname
