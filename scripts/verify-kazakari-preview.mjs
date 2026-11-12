@@ -150,7 +150,7 @@ if (fs.existsSync(enrichedSnapshotPath)) {
   assert.ok(enriched.phase8.pennyReports.every((report) => report.evidenceCategory === 'community-reported-penny'));
   assert.ok(enriched.phase8.pennyReports.every((report) => report.relevantStore === null));
   assert.ok(enriched.phase8.pennyReports.every((report) => report.estimatedTransitionWindow === null));
-  assert.equal(enriched.phase9.currentPennies.length, 479);
+  assert.equal(enriched.phase9.currentPennies.length, 583);
   assert.equal(enriched.phase9.pennyPredictions.length, 10);
   assert.equal(enriched.phase9.verificationDiagnostics.questionableReports, 137);
   assert.equal(enriched.phase9.verificationDiagnostics.registerConfirmedPurchases, 0);
@@ -159,6 +159,15 @@ if (fs.existsSync(enrichedSnapshotPath)) {
   assert.equal(kentuckyLeads.length, 9);
   assert.equal(kentuckyLeads.reduce((total, report) => total + Number(report.states.KY), 0), 15);
   assert.equal(kentuckyLeads.filter((report) => report.verification?.freshness === 'recently-reported').length, 3);
+  assert.equal(enriched.phase11.summary.uniqueExactProducts, 104);
+  assert.equal(enriched.phase11.summary.upcomingPennyLists, 0);
+  assert.equal(enriched.phase11.summary.reportedPennyLists, 104);
+  assert.equal(enriched.phase11.summary.verifiedPennyPrices, 0);
+  assert.equal(enriched.phase11.summary.storeSpecificObservations, 0);
+  assert.equal(enriched.phase11.summary.kentuckySpecificObservations, 0);
+  assert.ok(enriched.phase11.advancePennyItems.every((item) => /^\d{8,14}$/.test(item.productIdentifier)));
+  assert.ok(enriched.phase11.advancePennyItems.every((item) => item.publicationDate === null));
+  assert.equal(enriched.phase9.currentPennies.filter((item) => item.retailer === 'dollar-general').length, 104);
   assert.match(pageSource, /return saved \|\| session \|\| 'KY'/);
   assert.match(pageSource, /Most recently reported/);
   assert.match(pageSource, /Current Pennies/);
@@ -167,6 +176,8 @@ if (fs.existsSync(enrichedSnapshotPath)) {
   assert.match(pageSource, /Needs verification/);
   assert.match(pageSource, /Historical penny report/);
   assert.match(pageSource, /compactEvidenceLabels/);
+  assert.match(pageSource, /scheduled-transition': 'Upcoming list'/);
+  assert.match(pageSource, /lead\.retailer === 'dollar-general' \? 'UPC\/SKU'/);
   assert.match(pageSource, /Nationwide:/);
   assert.match(pageSource, /All Reports/);
   assert.match(pageSource, /pennyReportView === 'all'/);
