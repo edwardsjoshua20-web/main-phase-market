@@ -115,7 +115,8 @@
     "kazakari:phase13:merge": "node scripts/merge-kazakari-phase13.mjs",
     "kazakari:sync": "node scripts/sync-kazakari-preview-supabase.mjs",
     "kazakari:verify": "node scripts/verify-kazakari-preview.mjs",
-    "kazakari:android:publish": "node scripts/publish-kazakari-android-release.mjs"
+    "kazakari:android:publish": "node scripts/publish-kazakari-android-release.mjs",
+    "no-blindsides:android:publish": "node scripts/publish-no-blindsides-android-release.mjs"
   },
   "dependencies": {
     "@babel/core": "^7.25.0",
