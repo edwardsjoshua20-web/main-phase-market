@@ -60,7 +60,11 @@ assert.match(indexSource, /name="viewport" content="width=device-width, initial-
 assert.match(pageSource, /minimumDiscount.*50/);
 assert.match(pageSource, /<span>Hot Deals<\/span>/);
 assert.match(pageSource, /Penny Finds/);
-assert.match(pageSource, /Scanner coming soon/);
+assert.match(pageSource, /function ScannerSheet/);
+assert.match(pageSource, /KazakariScanner\?\.scanBarcode/);
+assert.match(pageSource, /Save immutable observation/);
+assert.match(pageSource, /registerConfirmed = method === 'register-receipt' && Boolean\(evidencePath\)/);
+assert.match(pageSource, /tier-2-retailer-app-observed/);
 assert.match(pageSource, /Filter &amp; Sort/);
 assert.match(pageSource, /const hotDealComparator/);
 assert.match(pageSource, /discountPercent \?\? -1\) >= 50/);
@@ -120,6 +124,9 @@ assert.match(apiSource, /functions\/v1\/kazakari-android-release/);
 assert.match(apiSource, /grant_type=refresh_token/);
 assert.match(apiSource, /tokenExpiresSoon/);
 assert.match(apiSource, /response\.status === 401[\s\S]*refreshAccessToken/);
+assert.match(apiSource, /kazakari_price_observations/);
+assert.match(apiSource, /kazakari_preferred_stores/);
+assert.match(apiSource, /kazakari-price-evidence/);
 assert.doesNotMatch(apiSource, /VITE_API_ORIGIN|\/api\/local/);
 assert.match(serverSource, /requireKazakariAccess[\s\S]*!allowRemoteConnections\(\) && isLoopbackAddress/);
 assert.match(headers, /X-Robots-Tag: noindex, nofollow/);
@@ -199,6 +206,7 @@ const androidMigration = fs.readFileSync(path.join(repoRoot, 'supabase', 'migrat
 const releaseFunction = fs.readFileSync(path.join(repoRoot, 'supabase', 'functions', 'kazakari-android-release', 'index.ts'), 'utf8');
 const publishScript = fs.readFileSync(path.join(repoRoot, 'scripts', 'publish-kazakari-android-release.mjs'), 'utf8');
 const familyMigration = fs.readFileSync(path.join(repoRoot, 'supabase', 'migrations', '20261112020000_authorize_kazakari_family_member.sql'), 'utf8');
+const evidenceMigration = fs.readFileSync(path.join(repoRoot, 'supabase', 'migrations', '20261112070000_create_kazakari_price_evidence.sql'), 'utf8');
 assert.match(androidMigration, /create table if not exists public\.kazakari_android_releases/i);
 assert.match(androidMigration, /'kazakari-android-releases',[\s\S]*false/i);
 assert.match(androidMigration, /admin@mainphasemarket\.net/i);
@@ -214,10 +222,17 @@ assert.match(familyMigration, /zqbee2016@yahoo\.com/i);
 assert.match(familyMigration, /user_id = auth\.uid\(\)/i);
 assert.match(familyMigration, /kazakari_android_releases/i);
 assert.doesNotMatch(familyMigration, /\bto anon\b/i);
+assert.match(evidenceMigration, /create table if not exists public\.kazakari_preferred_stores/i);
+assert.match(evidenceMigration, /create table if not exists public\.kazakari_price_observations/i);
+assert.match(evidenceMigration, /grant select, insert on (?:table )?public\.kazakari_price_observations to authenticated/i);
+assert.match(evidenceMigration, /revoke update, delete on (?:table )?public\.kazakari_price_observations from authenticated/i);
+assert.match(evidenceMigration, /'kazakari-price-evidence',[\s\S]*false/i);
+assert.match(evidenceMigration, /zqbee2016@yahoo\.com/i);
+assert.doesNotMatch(evidenceMigration, /grant[^;]+\bto anon\b/i);
 
 console.log(JSON.stringify({
-  passed: 138,
+  passed: 149,
   source: snapshot.source,
   summary: snapshot.summary,
-  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'explicit-family-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'community-penny-evidence', 'exact-identifier-matching', 'no-store-inference', 'no-prediction-date-fabrication', 'reference-price-integrity', 'direct-supabase-data', 'session-refresh', 'release-401-retry', 'migration-scope', 'rls', 'private-apk-bucket', 'authorized-release-function', 'short-lived-signed-download', 'release-integrity', 'native-back-bridge'],
+  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'explicit-family-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'barcode-scanner', 'immutable-price-evidence', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'community-penny-evidence', 'exact-identifier-matching', 'no-store-inference', 'no-prediction-date-fabrication', 'reference-price-integrity', 'direct-supabase-data', 'session-refresh', 'release-401-retry', 'migration-scope', 'rls', 'private-apk-bucket', 'authorized-release-function', 'short-lived-signed-download', 'release-integrity', 'native-back-bridge'],
 }, null, 2));

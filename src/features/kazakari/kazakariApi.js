@@ -150,6 +150,20 @@ function fromWatch(rule) {
   };
 }
 
+function currentUserId() {
+  const id = getStoredSession()?.user?.id;
+  if (!id) { const error = new Error('Please sign in first.'); error.status = 401; throw error; }
+  return id;
+}
+
+function toPriceObservation(row) {
+  return { id: row.id, retailer: row.retailer, productId: row.product_identifier, upc: row.upc, productName: row.product_name,
+    storeId: row.store_number, storeZip: row.store_zip, storeAddress: row.store_address, observedPrice: Number(row.observed_price),
+    currency: row.currency, priceType: row.price_type, evidenceTier: row.evidence_tier, evidenceMethod: row.evidence_method,
+    availabilityStatus: row.availability_status, observedAt: row.observed_at, collectedAt: row.collected_at,
+    evidencePath: row.evidence_path, evidenceReference: row.evidence_reference, notes: row.notes, source: row.source };
+}
+
 export const kazakariApi = {
   androidRelease() {
     return invokeReleaseFunction('metadata');
@@ -187,5 +201,43 @@ export const kazakariApi = {
   deleteWatch(id) {
     if (runningOnLocalHost) return requestPrivateLocalApi(`/kazakari/watches/${encodeURIComponent(id)}`, { method: 'DELETE' });
     return request(`kazakari_watch_rules?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+  async preferredStores() {
+    const rows = await request('kazakari_preferred_stores?select=*&order=retailer,store_number');
+    return Array.isArray(rows) ? rows.map((row) => ({ id: row.id, retailer: row.retailer, storeId: row.store_number, zip: row.zip_code, address: row.address })) : [];
+  },
+  async savePreferredStore(store) {
+    const rows = await request('kazakari_preferred_stores?on_conflict=user_id,retailer,store_number&select=*', {
+      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify({ user_id: currentUserId(), retailer: store.retailer, store_number: store.storeId, zip_code: store.zip || null, address: store.address || null, updated_at: new Date().toISOString() }),
+    });
+    return rows?.[0] || null;
+  },
+  async priceObservations(barcode) {
+    const safe = String(barcode || '').replace(/[^0-9]/g, '');
+    if (!/^\d{8,14}$/.test(safe)) return [];
+    const rows = await request(`kazakari_price_observations?select=*&upc=eq.${encodeURIComponent(safe)}&order=observed_at.desc&limit=50`);
+    return Array.isArray(rows) ? rows.map(toPriceObservation) : [];
+  },
+  async uploadPriceEvidence(file) {
+    const token = await validAccessToken();
+    if (!file || !['image/jpeg','image/png','image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error('Evidence must be a JPG, PNG, or WebP image under 10 MB.');
+    const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+    const path = `${currentUserId()}/${crypto.randomUUID()}.${extension}`;
+    const response = await fetch(`${supabaseUrl}/storage/v1/object/kazakari-price-evidence/${path}`, { method: 'POST', headers: { apikey: supabaseAnonKey, Authorization: `Bearer ${token}`, 'Content-Type': file.type, 'x-upsert': 'false' }, body: file });
+    if (!response.ok) throw new Error((await response.json().catch(() => null))?.message || `Evidence upload failed: ${response.status}`);
+    return path;
+  },
+  async createPriceObservation(input) {
+    const rows = await request('kazakari_price_observations?select=*', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ user_id: currentUserId(), retailer: input.retailer, product_identifier: input.productId || null, upc: input.upc || null,
+        product_name: input.productName || null, category: input.category || null, image_url: input.imageUrl || null, product_url: input.productUrl || null,
+        store_number: input.storeId, store_zip: input.storeZip || null, store_address: input.storeAddress || null,
+        observed_price: input.observedPrice, currency: 'USD', price_type: input.priceType, evidence_tier: input.evidenceTier,
+        evidence_method: input.evidenceMethod, availability_status: input.availabilityStatus || 'unknown', observed_at: input.observedAt,
+        evidence_path: input.evidencePath || null, evidence_reference: input.evidenceReference || null, notes: input.notes || null, source: 'family-submission' }),
+    });
+    return toPriceObservation(rows[0]);
   },
 };
