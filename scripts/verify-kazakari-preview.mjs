@@ -69,6 +69,8 @@ assert.match(pageSource, /loading="lazy"/);
 assert.match(pageSource, /kazakari-product-image[^>]*><ProductImage product=\{product\} \/><DiscountOverlay product=\{product\} \/>/);
 assert.match(pageSource, /saved != null && <span>Save \{money\(saved\)\}<\/span>/);
 assert.match(pageSource, /push notifications are not active yet/i);
+assert.match(pageSource, /Download Kazakari for Android/);
+assert.match(pageSource, /__kazakariHandleNativeBack/);
 assert.doesNotMatch(pageSource, /Find the price drop worth leaving home for|Real Markdown Intelligence|Verified Source Records/);
 assert.match(cssSource, /grid-template-columns:clamp\(125px,34vw,140px\) minmax\(0,1fr\)/);
 assert.match(cssSource, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
@@ -85,6 +87,7 @@ assert.match(apiSource, /runningOnLocalHost[\s\S]*requestPrivateLocalApi\('\/kaz
 assert.match(apiSource, /\/rest\/v1\//);
 assert.match(apiSource, /kazakari_preview_snapshots\?select=payload/);
 assert.match(apiSource, /kazakari_watch_rules\?select=/);
+assert.match(apiSource, /functions\/v1\/kazakari-android-release/);
 assert.doesNotMatch(apiSource, /VITE_API_ORIGIN|\/api\/local/);
 assert.match(serverSource, /requireKazakariAccess[\s\S]*!allowRemoteConnections\(\) && isLoopbackAddress/);
 assert.match(headers, /X-Robots-Tag: noindex, nofollow/);
@@ -116,9 +119,24 @@ assert.match(ownerBrowserMigration, /admin@mainphasemarket\.net/i);
 assert.match(ownerBrowserMigration, /user_id = auth\.uid\(\)/i);
 assert.doesNotMatch(ownerBrowserMigration, /\bto anon\b/i);
 
+const androidMigration = fs.readFileSync(path.join(repoRoot, 'supabase', 'migrations', '20261112010000_create_kazakari_android_releases.sql'), 'utf8');
+const releaseFunction = fs.readFileSync(path.join(repoRoot, 'supabase', 'functions', 'kazakari-android-release', 'index.ts'), 'utf8');
+const publishScript = fs.readFileSync(path.join(repoRoot, 'scripts', 'publish-kazakari-android-release.mjs'), 'utf8');
+assert.match(androidMigration, /create table if not exists public\.kazakari_android_releases/i);
+assert.match(androidMigration, /'kazakari-android-releases',[\s\S]*false/i);
+assert.match(androidMigration, /admin@mainphasemarket\.net/i);
+assert.match(androidMigration, /revoke all on table public\.kazakari_android_releases from anon/i);
+assert.doesNotMatch(androidMigration, /create policy[^;]+storage\.objects/gi);
+assert.match(releaseFunction, /String\(user\?\.email[^;]+!== OWNER_EMAIL/);
+assert.match(releaseFunction, /expiresIn: 120/);
+assert.match(releaseFunction, /OWNER_FORBIDDEN/);
+assert.match(publishScript, /createHash\('sha256'\)/);
+assert.match(publishScript, /is_current: false/);
+assert.match(publishScript, /application\/vnd\.android\.package-archive/);
+
 console.log(JSON.stringify({
-  passed: 74,
+  passed: 89,
   source: snapshot.source,
   summary: snapshot.summary,
-  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'owner-only-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls'],
+  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'owner-only-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls', 'private-apk-bucket', 'owner-only-release-function', 'short-lived-signed-download', 'release-integrity', 'native-back-bridge'],
 }, null, 2));

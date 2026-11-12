@@ -53,6 +53,31 @@ async function request(path, options = {}) {
   return payload;
 }
 
+async function invokeReleaseFunction(action) {
+  const token = getAccessToken();
+  if (!token) {
+    const error = new Error('Please sign in first.');
+    error.status = 401;
+    throw error;
+  }
+  const response = await fetch(`${supabaseUrl}/functions/v1/kazakari-android-release`, {
+    method: 'POST',
+    headers: {
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = new Error(payload?.error || `Android release request failed: ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return payload?.release || null;
+}
+
 function toWatch(row) {
   return {
     id: row.id,
@@ -87,6 +112,12 @@ function fromWatch(rule) {
 }
 
 export const kazakariApi = {
+  androidRelease() {
+    return invokeReleaseFunction('metadata');
+  },
+  androidDownload() {
+    return invokeReleaseFunction('download');
+  },
   async snapshot() {
     if (runningOnLocalHost) return requestPrivateLocalApi('/kazakari/snapshot');
     const rows = await request('kazakari_preview_snapshots?select=payload&id=eq.current&limit=1');
