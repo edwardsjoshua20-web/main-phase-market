@@ -112,6 +112,7 @@
     "kazakari:phase8:merge": "node scripts/merge-kazakari-phase8.mjs",
     "kazakari:phase11:merge": "node scripts/merge-kazakari-phase11.mjs",
     "kazakari:phase12:merge": "node scripts/merge-kazakari-phase12.mjs",
+    "kazakari:phase13:merge": "node scripts/merge-kazakari-phase13.mjs",
     "kazakari:sync": "node scripts/sync-kazakari-preview-supabase.mjs",
     "kazakari:verify": "node scripts/verify-kazakari-preview.mjs",
     "kazakari:android:publish": "node scripts/publish-kazakari-android-release.mjs"
