@@ -92,7 +92,7 @@ assert.match(cssSource, /grid-template-columns:clamp\(120px,34vw,136px\) minmax\
 assert.match(cssSource, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
 assert.match(cssSource, /\.kz-sheet-backdrop,\.kz-menu-backdrop,\.kz-dialog-backdrop\{[^}]*display:flex/);
 assert.match(cssSource, /min-width:900px[^}]*any-pointer:fine/);
-assert.match(cssSource, /\.kz-discount-overlay\{position:absolute;top:6px;left:6px;z-index:2/);
+assert.match(cssSource, /\.kz-discount-overlay\{position:absolute;top:auto;bottom:8px;left:8px;z-index:2/);
 assert.match(cssSource, /\.kz-title-row h3\{[^}]*font-size:18px/);
 assert.match(cssSource, /\.kz-price-main strong\{font:800 26px/);
 assert.match(cssSource, /\.kz-retailer\{[^}]*font-size:14px/);
