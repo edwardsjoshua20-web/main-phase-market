@@ -33,6 +33,7 @@ assert.equal(isKazakariAuthorized({ role: 'admin', email: 'admin@mainphasemarket
 assert.equal(isKazakariAuthorized({ role: 'admin', email: 'other-admin@example.com' }, 'admin@mainphasemarket.net'), false);
 assert.equal(isKazakariAuthorized({ role: 'member', email: 'family@example.com' }, 'admin@mainphasemarket.net'), false);
 assert.equal(isKazakariAuthorized({ role: 'member', email: 'ADMIN@MAINPHASEMARKET.NET' }, 'admin@mainphasemarket.net'), true);
+assert.equal(isKazakariAuthorized({ role: 'member', email: 'zqbee2016@yahoo.com' }, 'admin@mainphasemarket.net,zqbee2016@yahoo.com'), true);
 assert.throws(() => sanitizeKazakariWatchRule({ name: '', minimumDiscount: 50 }), /name is required/i);
 assert.throws(() => sanitizeKazakariWatchRule({ name: 'Bad', minimumDiscount: 101 }), /between 0 and 100/i);
 
@@ -122,21 +123,26 @@ assert.doesNotMatch(ownerBrowserMigration, /\bto anon\b/i);
 const androidMigration = fs.readFileSync(path.join(repoRoot, 'supabase', 'migrations', '20261112010000_create_kazakari_android_releases.sql'), 'utf8');
 const releaseFunction = fs.readFileSync(path.join(repoRoot, 'supabase', 'functions', 'kazakari-android-release', 'index.ts'), 'utf8');
 const publishScript = fs.readFileSync(path.join(repoRoot, 'scripts', 'publish-kazakari-android-release.mjs'), 'utf8');
+const familyMigration = fs.readFileSync(path.join(repoRoot, 'supabase', 'migrations', '20261112020000_authorize_kazakari_family_member.sql'), 'utf8');
 assert.match(androidMigration, /create table if not exists public\.kazakari_android_releases/i);
 assert.match(androidMigration, /'kazakari-android-releases',[\s\S]*false/i);
 assert.match(androidMigration, /admin@mainphasemarket\.net/i);
 assert.match(androidMigration, /revoke all on table public\.kazakari_android_releases from anon/i);
 assert.doesNotMatch(androidMigration, /create policy[^;]+storage\.objects/gi);
-assert.match(releaseFunction, /String\(user\?\.email[^;]+!== OWNER_EMAIL/);
+assert.match(releaseFunction, /AUTHORIZED_EMAILS\.has\(String\(user\?\.email/);
 assert.match(releaseFunction, /expiresIn: 120/);
 assert.match(releaseFunction, /OWNER_FORBIDDEN/);
 assert.match(publishScript, /createHash\('sha256'\)/);
 assert.match(publishScript, /is_current: false/);
 assert.match(publishScript, /application\/vnd\.android\.package-archive/);
+assert.match(familyMigration, /zqbee2016@yahoo\.com/i);
+assert.match(familyMigration, /user_id = auth\.uid\(\)/i);
+assert.match(familyMigration, /kazakari_android_releases/i);
+assert.doesNotMatch(familyMigration, /\bto anon\b/i);
 
 console.log(JSON.stringify({
-  passed: 89,
+  passed: 95,
   source: snapshot.source,
   summary: snapshot.summary,
-  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'owner-only-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls', 'private-apk-bucket', 'owner-only-release-function', 'short-lived-signed-download', 'release-integrity', 'native-back-bridge'],
+  checks: ['snapshot', 'sensitive-data-scan', 'expiration-filter', 'explicit-family-allowlist', 'production-auth-required', 'watch-crud', 'route', 'viewport-meta', 'noindex', 'mobile-product-rows', 'coarse-pointer-mobile-fallback', 'desktop-three-column-catalog', 'filter-sheet', 'scanner-disclosure', 'image-lazy-loading', 'discount-image-overlay', 'overlay-savings-integrity', 'broad-categories', 'hot-deals-50-percent', 'penny-finds', 'reference-price-integrity', 'direct-supabase-data', 'migration-scope', 'rls', 'private-apk-bucket', 'authorized-release-function', 'short-lived-signed-download', 'release-integrity', 'native-back-bridge'],
 }, null, 2));

@@ -3,7 +3,10 @@ import { errorResponse, jsonResponse } from '../_shared/http.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')?.replace(/\/+$/, '') || '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const OWNER_EMAIL = 'admin@mainphasemarket.net';
+const AUTHORIZED_EMAILS = new Set([
+  'admin@mainphasemarket.net',
+  'zqbee2016@yahoo.com',
+]);
 const BUCKET = 'kazakari-android-releases';
 
 function serviceHeaders(extra: Record<string, string> = {}) {
@@ -15,7 +18,7 @@ function serviceHeaders(extra: Record<string, string> = {}) {
   };
 }
 
-async function requireOwner(request: Request) {
+async function requireAuthorizedUser(request: Request) {
   const authorization = request.headers.get('authorization') || '';
   if (!authorization || authorization === `Bearer ${SERVICE_ROLE_KEY}`) {
     throw new Error('OWNER_AUTH_REQUIRED');
@@ -25,7 +28,7 @@ async function requireOwner(request: Request) {
   });
   if (!response.ok) throw new Error('OWNER_AUTH_REQUIRED');
   const user = await response.json();
-  if (String(user?.email || '').trim().toLowerCase() !== OWNER_EMAIL) {
+  if (!AUTHORIZED_EMAILS.has(String(user?.email || '').trim().toLowerCase())) {
     throw new Error('OWNER_FORBIDDEN');
   }
   return user;
@@ -81,7 +84,7 @@ Deno.serve(async (request) => {
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return errorResponse('Android releases are not configured.', 503);
 
   try {
-    await requireOwner(request);
+    await requireAuthorizedUser(request);
     const body = await request.json().catch(() => ({}));
     const action = String(body?.action || 'metadata');
     const release = await currentRelease();
