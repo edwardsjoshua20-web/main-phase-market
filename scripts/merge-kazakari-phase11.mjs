@@ -38,6 +38,7 @@ const keys = new Set(existingCurrent.map((item) => `${item.retailer || 'home-dep
 snapshot.phase9.currentPennies = [...existingCurrent, ...reported.filter((item) => !keys.has(`${item.retailer}:${item.upc}:${item.lastObservedAt}`))];
 snapshot.phase9.pennyPredictions = [...(snapshot.phase9?.pennyPredictions || []).filter((item) => !String(item.candidateKey || '').includes(':advance-list')), ...upcoming];
 snapshot.phase11 = phase11;
+if (Date.parse(phase11.generatedAt) > Date.parse(snapshot.generatedAt || 0)) snapshot.generatedAt = phase11.generatedAt;
 snapshot.summary.dollarGeneralExactProducts = Number(phase11.summary?.uniqueExactProducts || 0);
 snapshot.summary.upcomingPennyLists = Number(phase11.summary?.upcomingPennyLists || 0);
 snapshot.summary.historicalPennyListRecords = Number(phase11.summary?.reportedPennyLists || 0);
